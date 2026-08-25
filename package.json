@@ -11,6 +11,12 @@
     "build": "tsc",
     "test": "node --test"
   },
+  "dependencies": {
+    "@bufbuild/protobuf": "^2.6.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.2"
+  },
   "engines": {
     "node": ">=22"
   }

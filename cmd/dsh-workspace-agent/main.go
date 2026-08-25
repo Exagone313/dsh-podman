@@ -6,6 +6,8 @@ import (
 	"os"
 	"path/filepath"
 
+	"dsh-container-plugin/internal/agent/auth"
+	workspacefs "dsh-container-plugin/internal/agent/fs"
 	"dsh-container-plugin/internal/agent/grpcserver"
 	agent "dsh-container-plugin/internal/genproto/dshagent/v1"
 	"google.golang.org/grpc"
@@ -30,8 +32,17 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	server := grpc.NewServer()
-	agent.RegisterWorkspaceAgentServer(server, grpcserver.New())
+	token := os.Getenv("DSH_AGENT_TOKEN")
+	root := os.Getenv("DSH_WORKSPACE_ROOT")
+	if root == "" {
+		root = "/workspace"
+	}
+	filesystem, err := workspacefs.New([]workspacefs.Mount{{Virtual: "/workspace", Host: root}})
+	if err != nil {
+		panic(err)
+	}
+	server := grpc.NewServer(grpc.UnaryInterceptor(auth.Unary(token)), grpc.StreamInterceptor(auth.Stream(token)))
+	agent.RegisterWorkspaceAgentServer(server, grpcserver.New().WithFS(filesystem))
 	if err := server.Serve(listener); err != nil {
 		panic(err)
 	}

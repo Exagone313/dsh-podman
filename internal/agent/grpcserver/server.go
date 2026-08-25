@@ -10,6 +10,7 @@ import (
 	"sync"
 
 	"dsh-container-plugin/internal/agent/exec"
+	workspacefs "dsh-container-plugin/internal/agent/fs"
 	agent "dsh-container-plugin/internal/genproto/dshagent/v1"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -18,9 +19,12 @@ import (
 type Server struct {
 	agent.UnimplementedWorkspaceAgentServer
 	Processes *exec.Manager
+	FS        *workspacefs.WorkspaceFS
 }
 
 func New() *Server { return &Server{Processes: exec.NewManager()} }
+
+func (s *Server) WithFS(filesystem *workspacefs.WorkspaceFS) *Server { s.FS = filesystem; return s }
 
 func (s *Server) Exec(stream agent.WorkspaceAgent_ExecServer) error {
 	first, err := stream.Recv()
@@ -163,4 +167,144 @@ func (s *Server) ListProcesses(context.Context, *agent.ListProcessesRequest) (*a
 func (s *Server) ValidateProcessID(id string) bool {
 	_, err := strconv.ParseUint(id, 10, 64)
 	return err == nil
+}
+
+func (s *Server) resolve(path string, write bool) (string, error) {
+	if s.FS == nil {
+		return "", errors.New("filesystem is not configured")
+	}
+	resolved, _, err := s.FS.Resolve(path, write)
+	return resolved, err
+}
+func (s *Server) ReadFile(request *agent.ReadFileRequest, stream agent.WorkspaceAgent_ReadFileServer) error {
+	path, err := s.resolve(request.GetPath(), false)
+	if err != nil {
+		return status.Error(codes.PermissionDenied, err.Error())
+	}
+	file, err := os.Open(path)
+	if err != nil {
+		return status.Error(codes.NotFound, err.Error())
+	}
+	defer file.Close()
+	buffer := make([]byte, 32*1024)
+	for {
+		n, readErr := file.Read(buffer)
+		if n > 0 {
+			if err := stream.Send(&agent.ReadFileChunk{Data: append([]byte(nil), buffer[:n]...)}); err != nil {
+				return err
+			}
+		}
+		if errors.Is(readErr, io.EOF) {
+			return nil
+		}
+		if readErr != nil {
+			return status.Error(codes.Internal, readErr.Error())
+		}
+	}
+}
+func (s *Server) WriteFile(stream agent.WorkspaceAgent_WriteFileServer) error {
+	first, err := stream.Recv()
+	if err != nil {
+		return err
+	}
+	start := first.GetStart()
+	if start == nil {
+		return status.Error(codes.InvalidArgument, "first write message must be start")
+	}
+	path, err := s.resolve(start.GetPath(), true)
+	if err != nil {
+		return status.Error(codes.PermissionDenied, err.Error())
+	}
+	flags := os.O_WRONLY
+	if start.GetCreate() {
+		flags |= os.O_CREATE
+	}
+	if start.GetTruncate() {
+		flags |= os.O_TRUNC
+	}
+	file, err := os.OpenFile(path, flags, 0600)
+	if err != nil {
+		return status.Error(codes.Internal, err.Error())
+	}
+	defer file.Close()
+	var written int64
+	for {
+		chunk, recvErr := stream.Recv()
+		if errors.Is(recvErr, io.EOF) {
+			return stream.SendAndClose(&agent.WriteFileResponse{BytesWritten: written})
+		}
+		if recvErr != nil {
+			return recvErr
+		}
+		if data := chunk.GetDataChunk(); len(data) > 0 {
+			n, writeErr := file.Write(data)
+			written += int64(n)
+			if writeErr != nil {
+				return status.Error(codes.Internal, writeErr.Error())
+			}
+		}
+	}
+}
+func (s *Server) Stat(_ context.Context, request *agent.StatRequest) (*agent.StatResponse, error) {
+	path, err := s.resolve(request.GetPath(), false)
+	if err != nil {
+		return nil, status.Error(codes.PermissionDenied, err.Error())
+	}
+	info, err := os.Stat(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return &agent.StatResponse{}, nil
+		}
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	return &agent.StatResponse{Exists: true, IsDir: info.IsDir(), Size: info.Size(), Mode: info.Mode().String(), ModifiedAt: info.ModTime().UTC().Format("2006-01-02T15:04:05Z07:00")}, nil
+}
+func (s *Server) ReadDir(_ context.Context, request *agent.ReadDirRequest) (*agent.ReadDirResponse, error) {
+	path, err := s.resolve(request.GetPath(), false)
+	if err != nil {
+		return nil, status.Error(codes.PermissionDenied, err.Error())
+	}
+	entries, err := os.ReadDir(path)
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	result := &agent.ReadDirResponse{}
+	for _, entry := range entries {
+		info, infoErr := entry.Info()
+		if infoErr != nil {
+			return nil, status.Error(codes.Internal, infoErr.Error())
+		}
+		result.Entries = append(result.Entries, &agent.DirEntry{Name: entry.Name(), IsDir: entry.IsDir(), Size: info.Size()})
+	}
+	return result, nil
+}
+func (s *Server) Mkdir(_ context.Context, request *agent.MkdirRequest) (*agent.MkdirResponse, error) {
+	path, err := s.resolve(request.GetPath(), true)
+	if err != nil {
+		return nil, status.Error(codes.PermissionDenied, err.Error())
+	}
+	if request.GetParents() {
+		err = os.MkdirAll(path, 0755)
+	} else {
+		err = os.Mkdir(path, 0755)
+	}
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	return &agent.MkdirResponse{}, nil
+}
+func (s *Server) Delete(_ context.Context, request *agent.DeleteRequest) (*agent.DeleteResponse, error) {
+	path, err := s.resolve(request.GetPath(), true)
+	if err != nil {
+		return nil, status.Error(codes.PermissionDenied, err.Error())
+	}
+	if request.GetRecursive() {
+		err = os.RemoveAll(path)
+	} else {
+		err = os.Remove(path)
+	}
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	return &agent.DeleteResponse{}, nil
 }

@@ -7,6 +7,7 @@ BIN_DIR ?= bin
 
 GO_SOURCES := $(shell find cmd internal -type f -name '*.go' -print)
 JS_SOURCES := $(shell find src -type f -name '*.ts' -print)
+PROTO_SOURCES := $(shell find proto -type f -name '*.proto' -print)
 NODE_MODULES_TSC := node_modules/.bin/tsc
 
 .PHONY: all build build-go npm-ci npm-build npm-test npm-prune clean
@@ -29,7 +30,7 @@ $(BIN_DIR)/dsh-orchestrator: $(GO_SOURCES) go.mod go.sum
 npm-ci:
 	npm ci
 
-dist/index.js: $(JS_SOURCES) package.json package-lock.json tsconfig.json $(NODE_MODULES_TSC)
+dist/index.js: $(JS_SOURCES) $(PROTO_SOURCES) package.json package-lock.json tsconfig.json $(NODE_MODULES_TSC)
 	npm run build
 
 $(NODE_MODULES_TSC): package.json package-lock.json

@@ -3,7 +3,7 @@ import loader from '@grpc/proto-loader'
 import { fileURLToPath } from 'node:url'
 import { dirname, resolve } from 'node:path'
 
-const root = resolve(dirname(fileURLToPath(import.meta.url)), '../proto')
+const root = resolve(dirname(fileURLToPath(import.meta.url)), 'proto')
 const definitions = new Map<string, grpc.ServiceClientConstructor>()
 
 function client(service: string, proto: string, socket: string): grpc.Client {

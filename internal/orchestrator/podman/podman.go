@@ -46,3 +46,13 @@ func (c *Client) Remove(name string) error {
 	_, err := containers.Remove(c.ctx, name, &containers.RemoveOptions{})
 	return err
 }
+
+func (c *Client) RecreateWorkspace(name, image, token string, mounts []specs.Mount) error {
+	if err := c.Stop(name); err != nil {
+		return err
+	}
+	if err := c.Remove(name); err != nil {
+		return err
+	}
+	return c.CreateWorkspace(name, image, token, mounts)
+}

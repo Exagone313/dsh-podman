@@ -10,7 +10,7 @@ export function apply(ctx: any, config: PluginConfig = {}): void {
   ctx.provide('workspaceResolver', resolver)
   ctx.provide('subprocess', createSubprocessProvider(resolver))
   ctx.provide('fs', createFilesystemProvider(resolver))
-  if (ctx.tools?.register !== undefined) registerTools(ctx, resolver)
+  registerTools(ctx, resolver)
 }
 
 function createSubprocessProvider(resolver: WorkspaceResolver): object {
@@ -42,4 +42,3 @@ function createFilesystemProvider(resolver: WorkspaceResolver): object {
 function registerTools(ctx: any, resolver: WorkspaceResolver): void { ctx.tools.register({ name: 'recreate_workspace', description: 'Recreate the current workspace', execute: async (input: any) => unaryControl(resolver, 'recreateWorkspace', input) }); ctx.tools.register({ name: 'rebuild_image', description: 'Rebuild a workspace image', execute: async (input: any) => unaryControl(resolver, 'rebuildImage', input) }); ctx.tools.register({ name: 'install_packages', description: 'Install ephemeral workspace packages', execute: async (input: any) => { const binding = await resolver.resolve(input); return unaryAgent({ binding }, 'installPackages', input) } }); ctx.tools.register({ name: 'share_workspace', description: 'Request human approval before widening workspace access', approval: true, execute: async (input: any) => unaryControl(resolver, 'recreateWorkspace', input) }) }
 async function unaryControl(resolver: WorkspaceResolver, method: string, input: unknown): Promise<unknown> { return resolver.control(method, input) }
 async function unaryAgent(target: any, method: string, request: unknown): Promise<unknown> { return new Promise((resolveDone, reject) => (target.binding.agent as any)[method](request, metadata(target.binding.token), (error: Error | null, result: unknown) => error ? reject(error) : resolveDone(result))) }
-export default apply

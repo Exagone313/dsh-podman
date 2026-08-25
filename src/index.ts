@@ -5,9 +5,9 @@ import { PassThrough } from 'node:stream'
 export interface PluginConfig { controlSocket?: string; defaultImage?: string }
 export function apply(ctx: any, config: PluginConfig = {}): void {
   const resolver = new WorkspaceResolver({ controlSocket: config.controlSocket ?? process.env.DSH_CONTROL_SOCKET ?? '/run/dsh-sockets/control.sock', defaultImage: config.defaultImage ?? process.env.DSH_DEFAULT_IMAGE ?? 'arch-base' })
-  ctx.workspaceResolver = resolver
-  ctx.subprocess = createSubprocessProvider(resolver)
-  ctx.fs = createFilesystemProvider(resolver)
+  ctx.provide('workspaceResolver', resolver)
+  ctx.provide('subprocess', createSubprocessProvider(resolver))
+  ctx.provide('fs', createFilesystemProvider(resolver))
   if (ctx.tools?.register !== undefined) registerTools(ctx, resolver)
 }
 

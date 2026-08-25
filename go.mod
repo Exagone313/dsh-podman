@@ -3,6 +3,7 @@ module dsh-container-plugin
 go 1.27
 
 require (
+	github.com/pelletier/go-toml/v2 v2.4.3 // indirect
 	golang.org/x/net v0.55.0 // indirect
 	golang.org/x/sys v0.45.0 // indirect
 	golang.org/x/text v0.37.0 // indirect

@@ -8,8 +8,11 @@ import (
 	"time"
 
 	ctl "dsh-container-plugin/internal/genproto/dshctl/v1"
+	"dsh-container-plugin/internal/orchestrator/podman"
 	"dsh-container-plugin/internal/orchestrator/projects"
 	"dsh-container-plugin/internal/orchestrator/state"
+	"dsh-container-plugin/internal/orchestrator/token"
+	"github.com/opencontainers/runtime-spec/specs-go"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -18,6 +21,7 @@ type Server struct {
 	ctl.UnimplementedOrchestratorControlServer
 	ProjectsRoot string
 	Store        *state.Store
+	Podman       *podman.Client
 }
 
 func (s *Server) ListProjects(context.Context, *ctl.ListProjectsRequest) (*ctl.ListProjectsResponse, error) {
@@ -54,6 +58,76 @@ func (s *Server) ListWorkspaces(context.Context, *ctl.ListWorkspacesRequest) (*c
 	}
 	return result, nil
 }
+func (s *Server) CreateWorkspace(_ context.Context, request *ctl.CreateWorkspaceRequest) (*ctl.Workspace, error) {
+	if request.GetWorkspaceSlug() == "" || filepath.Base(request.GetWorkspaceSlug()) != request.GetWorkspaceSlug() {
+		return nil, status.Error(codes.InvalidArgument, "invalid workspace slug")
+	}
+	images, err := s.Store.Images()
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	found := false
+	for _, image := range images {
+		if image.ImageID == request.GetImageId() && image.ImageTag != "" {
+			found = true
+		}
+	}
+	if !found {
+		return nil, status.Error(codes.NotFound, "built image not found")
+	}
+	secret, err := token.New()
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	mounts := make([]state.Mount, 0, len(request.GetMounts()))
+	podmanMounts := make([]specs.Mount, 0, len(request.GetMounts()))
+	for _, mount := range request.GetMounts() {
+		path, pathErr := ValidateProject(s.ProjectsRoot, mount.GetProjectName())
+		if pathErr != nil {
+			return nil, status.Error(codes.InvalidArgument, pathErr.Error())
+		}
+		mode := "read_only"
+		options := []string{"ro"}
+		if mount.GetMode() == ctl.MountMode_MOUNT_MODE_READ_WRITE {
+			mode, options = "read_write", []string{"rw"}
+		}
+		mounts = append(mounts, state.Mount{ProjectName: mount.GetProjectName(), Mode: mode})
+		podmanMounts = append(podmanMounts, specs.Mount{Type: "bind", Source: path, Destination: filepath.Join("/workspace", mount.GetProjectName()), Options: options})
+	}
+	if s.Podman == nil {
+		return nil, status.Error(codes.FailedPrecondition, "podman is not configured")
+	}
+	name := "dsh-workspace-" + request.GetWorkspaceSlug()
+	imageTag := ""
+	for _, image := range images {
+		if image.ImageID == request.GetImageId() {
+			imageTag = image.ImageTag
+		}
+	}
+	if err := s.Podman.CreateWorkspace(name, imageTag, secret, podmanMounts); err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	workspace := state.Workspace{WorkspaceSlug: request.GetWorkspaceSlug(), ContainerName: name, ImageID: request.GetImageId(), Mounts: mounts, Status: "running", AgentSocketPath: "/run/dsh-sockets/agent.sock", AgentToken: secret, CreatedAt: time.Now().UTC().Format(time.RFC3339)}
+	all, _ := s.Store.Workspaces()
+	all = append(all, workspace)
+	if err := s.Store.SaveWorkspaces(all); err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	return toProto(workspace), nil
+}
+func (s *Server) StopWorkspace(_ context.Context, request *ctl.StopWorkspaceRequest) (*ctl.StopWorkspaceResponse, error) {
+	workspace, err := s.DescribeWorkspace(context.Background(), &ctl.DescribeWorkspaceRequest{WorkspaceSlug: request.GetWorkspaceSlug()})
+	if err != nil {
+		return nil, err
+	}
+	if s.Podman == nil {
+		return nil, status.Error(codes.FailedPrecondition, "podman is not configured")
+	}
+	if err := s.Podman.Stop(workspace.GetContainerName()); err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	return &ctl.StopWorkspaceResponse{}, nil
+}
 func toProto(workspace state.Workspace) *ctl.Workspace {
 	result := &ctl.Workspace{WorkspaceSlug: workspace.WorkspaceSlug, ContainerName: workspace.ContainerName, ImageId: workspace.ImageID, Status: workspace.Status, AgentSocketPath: workspace.AgentSocketPath, AgentToken: workspace.AgentToken, CreatedAt: workspace.CreatedAt}
 	for _, mount := range workspace.Mounts {
@@ -76,5 +150,3 @@ func ValidateProject(root, name string) (string, error) {
 	}
 	return filepath.Abs(path)
 }
-
-var _ = time.RFC3339

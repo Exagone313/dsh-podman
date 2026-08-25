@@ -7,6 +7,7 @@ import (
 	"os"
 	osexec "os/exec"
 	"strconv"
+	"strings"
 	"sync"
 
 	"dsh-container-plugin/internal/agent/exec"
@@ -307,4 +308,43 @@ func (s *Server) Delete(_ context.Context, request *agent.DeleteRequest) (*agent
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 	return &agent.DeleteResponse{}, nil
+}
+
+func (s *Server) InstallPackages(request *agent.InstallPackagesRequest, stream agent.WorkspaceAgent_InstallPackagesServer) error {
+	if len(request.GetPackages()) == 0 {
+		return status.Error(codes.InvalidArgument, "at least one package is required")
+	}
+	for _, pkg := range request.GetPackages() {
+		if pkg == "" || strings.ContainsAny(pkg, " \t\r\n") {
+			return status.Error(codes.InvalidArgument, "invalid package name")
+		}
+	}
+	command := append([]string{"pacman", "-S", "--noconfirm"}, request.GetPackages()...)
+	process, err := s.Processes.Start(stream.Context(), command, "", nil)
+	if err != nil {
+		return status.Error(codes.Internal, err.Error())
+	}
+	stdout, _ := process.Command.StdoutPipe()
+	stderr, _ := process.Command.StderrPipe()
+	if err := process.Command.Start(); err != nil {
+		return status.Error(codes.Internal, err.Error())
+	}
+	go func() {
+		data, _ := io.ReadAll(stdout)
+		if len(data) > 0 {
+			_ = stream.Send(&agent.InstallPackagesOutput{Payload: &agent.InstallPackagesOutput_StdoutChunk{StdoutChunk: data}})
+		}
+	}()
+	go func() {
+		data, _ := io.ReadAll(stderr)
+		if len(data) > 0 {
+			_ = stream.Send(&agent.InstallPackagesOutput{Payload: &agent.InstallPackagesOutput_StderrChunk{StderrChunk: data}})
+		}
+	}()
+	waitErr := process.Command.Wait()
+	code := int32(0)
+	if waitErr != nil {
+		code = 1
+	}
+	return stream.Send(&agent.InstallPackagesOutput{Payload: &agent.InstallPackagesOutput_Exit{Exit: &agent.ExecExit{ExitCode: code}}})
 }

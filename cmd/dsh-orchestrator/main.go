@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"os"
@@ -8,6 +9,7 @@ import (
 
 	ctl "dsh-container-plugin/internal/genproto/dshctl/v1"
 	"dsh-container-plugin/internal/orchestrator/grpcserver"
+	"dsh-container-plugin/internal/orchestrator/podman"
 	"dsh-container-plugin/internal/orchestrator/state"
 	"google.golang.org/grpc"
 )
@@ -44,7 +46,14 @@ func main() {
 		panic(err)
 	}
 	server := grpc.NewServer()
-	ctl.RegisterOrchestratorControlServer(server, &grpcserver.Server{ProjectsRoot: root, Store: store})
+	var podmanClient *podman.Client
+	if socketPath := os.Getenv("CONTAINER_HOST"); socketPath != "" {
+		podmanClient, err = podman.New(context.Background(), socketPath, filepath.Dir(socket), os.Getenv("DSH_AGENT_BINARY"))
+		if err != nil {
+			panic(err)
+		}
+	}
+	ctl.RegisterOrchestratorControlServer(server, &grpcserver.Server{ProjectsRoot: root, Store: store, Podman: podmanClient})
 	if err := server.Serve(listener); err != nil {
 		panic(err)
 	}

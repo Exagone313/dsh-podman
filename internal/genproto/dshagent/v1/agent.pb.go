@@ -1515,7 +1515,7 @@ const file_dshagent_v1_agent_proto_rawDesc = "" +
 	"\aReadDir\x12\x1b.dshagent.v1.ReadDirRequest\x1a\x1c.dshagent.v1.ReadDirResponse\x12>\n" +
 	"\x05Mkdir\x12\x19.dshagent.v1.MkdirRequest\x1a\x1a.dshagent.v1.MkdirResponse\x12A\n" +
 	"\x06Delete\x12\x1a.dshagent.v1.DeleteRequest\x1a\x1b.dshagent.v1.DeleteResponse\x12\\\n" +
-	"\x0fInstallPackages\x12#.dshagent.v1.InstallPackagesRequest\x1a\".dshagent.v1.InstallPackagesOutput0\x01B?Z=dsh-container-plugin/internal/genproto/dshagent/v1;dshagentv1b\x06proto3"
+	"\x0fInstallPackages\x12#.dshagent.v1.InstallPackagesRequest\x1a\".dshagent.v1.InstallPackagesOutput0\x01BUZSgitlab.com/Exagone313/dsh-container-plugin/internal/genproto/dshagent/v1;dshagentv1b\x06proto3"
 
 var (
 	file_dshagent_v1_agent_proto_rawDescOnce sync.Once

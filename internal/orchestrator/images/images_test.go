@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"dsh-container-plugin/internal/orchestrator/state"
+	"gitlab.com/Exagone313/dsh-container-plugin/internal/orchestrator/state"
 )
 
 func TestContainerfileUsesPacmanCache(t *testing.T) {

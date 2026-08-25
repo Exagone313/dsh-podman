@@ -1,4 +1,4 @@
-module dsh-container-plugin
+module gitlab.com/Exagone313/dsh-container-plugin
 
 go 1.27
 

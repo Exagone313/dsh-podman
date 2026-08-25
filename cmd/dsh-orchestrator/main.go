@@ -7,10 +7,10 @@ import (
 	"os"
 	"path/filepath"
 
-	ctl "dsh-container-plugin/internal/genproto/dshctl/v1"
-	"dsh-container-plugin/internal/orchestrator/grpcserver"
-	"dsh-container-plugin/internal/orchestrator/podman"
-	"dsh-container-plugin/internal/orchestrator/state"
+	ctl "gitlab.com/Exagone313/dsh-container-plugin/internal/genproto/dshctl/v1"
+	"gitlab.com/Exagone313/dsh-container-plugin/internal/orchestrator/grpcserver"
+	"gitlab.com/Exagone313/dsh-container-plugin/internal/orchestrator/podman"
+	"gitlab.com/Exagone313/dsh-container-plugin/internal/orchestrator/state"
 	"google.golang.org/grpc"
 )
 

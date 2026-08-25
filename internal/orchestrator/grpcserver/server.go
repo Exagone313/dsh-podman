@@ -7,12 +7,12 @@ import (
 	"path/filepath"
 	"time"
 
-	ctl "dsh-container-plugin/internal/genproto/dshctl/v1"
-	"dsh-container-plugin/internal/orchestrator/podman"
-	"dsh-container-plugin/internal/orchestrator/projects"
-	"dsh-container-plugin/internal/orchestrator/state"
-	"dsh-container-plugin/internal/orchestrator/token"
 	"github.com/opencontainers/runtime-spec/specs-go"
+	ctl "gitlab.com/Exagone313/dsh-container-plugin/internal/genproto/dshctl/v1"
+	"gitlab.com/Exagone313/dsh-container-plugin/internal/orchestrator/podman"
+	"gitlab.com/Exagone313/dsh-container-plugin/internal/orchestrator/projects"
+	"gitlab.com/Exagone313/dsh-container-plugin/internal/orchestrator/state"
+	"gitlab.com/Exagone313/dsh-container-plugin/internal/orchestrator/token"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )

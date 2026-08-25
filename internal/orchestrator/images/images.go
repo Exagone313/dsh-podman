@@ -8,9 +8,9 @@ import (
 	"regexp"
 	"strings"
 
-	"dsh-container-plugin/internal/orchestrator/state"
 	"github.com/containers/podman/v5/pkg/bindings/images"
 	entities "github.com/containers/podman/v5/pkg/domain/entities/types"
+	"gitlab.com/Exagone313/dsh-container-plugin/internal/orchestrator/state"
 )
 
 var packageName = regexp.MustCompile(`^[A-Za-z0-9@+._:-]+$`)

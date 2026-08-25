@@ -956,7 +956,7 @@ const file_dshctl_v1_control_proto_rawDesc = "" +
 	"\rStopWorkspace\x12\x1f.dshctl.v1.StopWorkspaceRequest\x1a .dshctl.v1.StopWorkspaceResponse\x12I\n" +
 	"\n" +
 	"ListImages\x12\x1c.dshctl.v1.ListImagesRequest\x1a\x1d.dshctl.v1.ListImagesResponse\x12@\n" +
-	"\fRebuildImage\x12\x1e.dshctl.v1.RebuildImageRequest\x1a\x10.dshctl.v1.ImageB;Z9dsh-container-plugin/internal/genproto/dshctl/v1;dshctlv1b\x06proto3"
+	"\fRebuildImage\x12\x1e.dshctl.v1.RebuildImageRequest\x1a\x10.dshctl.v1.ImageBQZOgitlab.com/Exagone313/dsh-container-plugin/internal/genproto/dshctl/v1;dshctlv1b\x06proto3"
 
 var (
 	file_dshctl_v1_control_proto_rawDescOnce sync.Once

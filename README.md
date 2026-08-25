@@ -1,7 +1,7 @@
 # dsh-container-plugin
 
 This repository contains the `dsh-orchestrator`, `dsh-workspace-agent`, and
-`@yourscope/dsh-container-workspace` Cordis plugin.
+`@exagone313/dsh-container-workspace` Cordis plugin.
 
 ## Build
 

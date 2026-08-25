@@ -6,10 +6,10 @@ import (
 	"os"
 	"path/filepath"
 
-	"dsh-container-plugin/internal/agent/auth"
-	workspacefs "dsh-container-plugin/internal/agent/fs"
-	"dsh-container-plugin/internal/agent/grpcserver"
-	agent "dsh-container-plugin/internal/genproto/dshagent/v1"
+	"gitlab.com/Exagone313/dsh-container-plugin/internal/agent/auth"
+	workspacefs "gitlab.com/Exagone313/dsh-container-plugin/internal/agent/fs"
+	"gitlab.com/Exagone313/dsh-container-plugin/internal/agent/grpcserver"
+	agent "gitlab.com/Exagone313/dsh-container-plugin/internal/genproto/dshagent/v1"
 	"google.golang.org/grpc"
 )
 

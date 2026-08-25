@@ -10,9 +10,9 @@ import (
 	"strings"
 	"sync"
 
-	"dsh-container-plugin/internal/agent/exec"
-	workspacefs "dsh-container-plugin/internal/agent/fs"
-	agent "dsh-container-plugin/internal/genproto/dshagent/v1"
+	"gitlab.com/Exagone313/dsh-container-plugin/internal/agent/exec"
+	workspacefs "gitlab.com/Exagone313/dsh-container-plugin/internal/agent/fs"
+	agent "gitlab.com/Exagone313/dsh-container-plugin/internal/genproto/dshagent/v1"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )

@@ -9,7 +9,7 @@
   },
   "scripts": {
     "build": "tsc",
-    "test": "node --test"
+    "test": "node --test dist/*.test.js"
   },
   "dependencies": {
     "@bufbuild/protobuf": "^2.6.0",

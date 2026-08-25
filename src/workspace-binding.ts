@@ -19,8 +19,9 @@ export class WorkspaceResolver {
     const socket = workspace.agentSocketPath as string
     return { agent: agentClient(socket), token: workspace.agentToken as string, socket }
   }
+  async control<T>(method: string, request: unknown): Promise<T> { return unary<T>(controlClient(this.config.controlSocket), method, request) }
 }
 
-export function workspaceSlug(session: unknown): string { const value = (session as any)?.workspace?.name ?? (session as any)?.workspaceName ?? (session as any)?.projectName ?? (session as any)?.id ?? 'default'; return String(value).replace(/[^a-zA-Z0-9_.-]+/g, '-').replace(/^-+|-+$/g, '').slice(0,  fifty) || 'default' }
+export function workspaceSlug(session: unknown): string { const value = (session as any)?.workspace?.name ?? (session as any)?.workspaceName ?? (session as any)?.projectName ?? (session as any)?.id ?? 'default'; const raw = String(value); const parts = raw.split(/[\\/]+/); const safe = parts.includes('..') ? (parts.filter(part => part !== '.' && part !== '..').at(-1) ?? 'default') : raw; return safe.replace(/[^a-zA-Z0-9_.-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, fifty) || 'default' }
 const fifty = 50
 export function metadata(token: string): grpc.Metadata { const result = new grpc.Metadata(); result.set('authorization', `bearer ${token}`); return result }

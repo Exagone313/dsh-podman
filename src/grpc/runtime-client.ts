@@ -6,6 +6,10 @@ import { dirname, resolve } from 'node:path'
 const root = resolve(dirname(fileURLToPath(import.meta.url)), 'proto')
 const definitions = new Map<string, grpc.ServiceClientConstructor>()
 
+function unixTarget(socket: string): string {
+  return socket.startsWith('unix:') ? socket : `unix:${socket}`
+}
+
 function client(service: string, proto: string, socket: string): grpc.Client {
   const key = `${service}:${socket}`
   let Constructor = definitions.get(key)
@@ -17,7 +21,7 @@ function client(service: string, proto: string, socket: string): grpc.Client {
     Constructor = version[service.split('.').at(-1)!] as grpc.ServiceClientConstructor
     definitions.set(key, Constructor)
   }
-  return new Constructor(socket, grpc.credentials.createInsecure())
+  return new Constructor(unixTarget(socket), grpc.credentials.createInsecure())
 }
 
 export function controlClient(socket: string): grpc.Client { return client('dshctl.v1.OrchestratorControl', 'dshctl/v1/control.proto', socket) }

@@ -8,7 +8,7 @@
     ".": "./dist/index.js"
   },
   "scripts": {
-    "build": "tsc && rm -rf dist/grpc/proto && cp -r proto dist/grpc/proto",
+    "build": "tsc",
     "test": "node --test dist/*.test.js"
   },
   "dependencies": {

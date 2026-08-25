@@ -4,6 +4,19 @@ import { PassThrough } from 'node:stream'
 
 function defineTool<T>(definition: T): T { return definition }
 const toolOutput = { schema: { type: 'string' }, render: (_args: unknown, value: string) => [{ type: 'text', text: value }] }
+const workspaceParameters = {
+  workspace_slug: { type: 'string', required: true, description: 'Workspace slug.' },
+  mounts: { type: 'array', items: { type: 'object', additionalProperties: false, properties: {
+    project_name: { type: 'string', required: true },
+    mode: { type: 'string', enum: ['read_only', 'read_write'], required: true },
+  } } },
+}
+const packageParameters = { packages: { type: 'array', required: true, items: { type: 'string' } } }
+const imageParameters = {
+  image_id: { type: 'string', required: true },
+  base_image: { type: 'string' },
+  packages: { type: 'array', items: { type: 'string' } },
+}
 
 export const name = 'container-plugin'
 export const inject = ['tools']
@@ -42,14 +55,14 @@ function createFilesystemProvider(resolver: WorkspaceResolver): object {
     remove: async (target: any, recursive = false) => unaryAgent(target, 'delete', { path: target.targetKey, recursive }),
   }
 }
-function defineLifecycleTool(ctx: any, resolver: WorkspaceResolver, name: string, description: string, method: string, approval = false): void {
-  ctx.tools.register(defineTool({ name, description, ...(approval ? { approval: true } : {}), output: toolOutput, execute: async (input: any) => JSON.stringify(await unaryControl(resolver, method, input)) }))
+function defineLifecycleTool(ctx: any, resolver: WorkspaceResolver, name: string, description: string, method: string, parameters: object, approval = false): void {
+  ctx.tools.register(defineTool({ name, description, parameters, ...(approval ? { approval: true } : {}), output: toolOutput, execute: async (input: any) => JSON.stringify(await unaryControl(resolver, method, input)) }))
 }
 function registerTools(ctx: any, resolver: WorkspaceResolver): void {
-  defineLifecycleTool(ctx, resolver, 'recreate_workspace', 'Recreate the current workspace', 'recreateWorkspace')
-  defineLifecycleTool(ctx, resolver, 'rebuild_image', 'Rebuild a workspace image', 'rebuildImage')
-  ctx.tools.register(defineTool({ name: 'install_packages', description: 'Install ephemeral workspace packages', output: toolOutput, execute: async (input: any) => { const binding = await resolver.resolve(input); return JSON.stringify(await unaryAgent({ binding }, 'installPackages', input)) } }))
-  defineLifecycleTool(ctx, resolver, 'share_workspace', 'Request human approval before widening workspace access', 'recreateWorkspace', true)
+  defineLifecycleTool(ctx, resolver, 'recreate_workspace', 'Recreate the current workspace', 'recreateWorkspace', workspaceParameters)
+  defineLifecycleTool(ctx, resolver, 'rebuild_image', 'Rebuild a workspace image', 'rebuildImage', imageParameters)
+  ctx.tools.register(defineTool({ name: 'install_packages', description: 'Install ephemeral workspace packages', parameters: packageParameters, output: toolOutput, execute: async (input: any) => { const binding = await resolver.resolve(input); return JSON.stringify(await unaryAgent({ binding }, 'installPackages', input)) } }))
+  defineLifecycleTool(ctx, resolver, 'share_workspace', 'Request human approval before widening workspace access', 'recreateWorkspace', workspaceParameters, true)
 }
 async function unaryControl(resolver: WorkspaceResolver, method: string, input: unknown): Promise<unknown> { return resolver.control(method, input) }
 async function unaryAgent(target: any, method: string, request: unknown): Promise<unknown> { return new Promise((resolveDone, reject) => (target.binding.agent as any)[method](request, metadata(target.binding.token), (error: Error | null, result: unknown) => error ? reject(error) : resolveDone(result))) }

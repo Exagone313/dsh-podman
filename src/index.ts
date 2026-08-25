@@ -2,6 +2,8 @@ import { WorkspaceResolver } from './workspace-binding.js'
 import { metadata } from './workspace-binding.js'
 import { PassThrough } from 'node:stream'
 
+export const name = 'container-plugin'
+export const inject = ['tools']
 export interface PluginConfig { controlSocket?: string; defaultImage?: string }
 export function apply(ctx: any, config: PluginConfig = {}): void {
   const resolver = new WorkspaceResolver({ controlSocket: config.controlSocket ?? process.env.DSH_CONTROL_SOCKET ?? '/run/dsh-sockets/control.sock', defaultImage: config.defaultImage ?? process.env.DSH_DEFAULT_IMAGE ?? 'arch-base' })

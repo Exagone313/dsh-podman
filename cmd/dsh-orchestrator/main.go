@@ -2,7 +2,14 @@ package main
 
 import (
 	"fmt"
+	"net"
 	"os"
+	"path/filepath"
+
+	ctl "dsh-container-plugin/internal/genproto/dshctl/v1"
+	"dsh-container-plugin/internal/orchestrator/grpcserver"
+	"dsh-container-plugin/internal/orchestrator/state"
+	"google.golang.org/grpc"
 )
 
 const version = "0.1.0"
@@ -12,5 +19,33 @@ func main() {
 		fmt.Println(version)
 		return
 	}
-	fmt.Fprintln(os.Stderr, "dsh-orchestrator: use --version for version information")
+	socket := os.Getenv("DSH_CONTROL_SOCKET")
+	if socket == "" {
+		socket = "/run/dsh-sockets/control.sock"
+	}
+	root := os.Getenv("DSH_PROJECTS_ROOT")
+	if root == "" {
+		root = "/projects"
+	}
+	stateDir := os.Getenv("DSH_STATE_DIR")
+	if stateDir == "" {
+		stateDir = "/var/lib/dsh-orchestrator"
+	}
+	if err := os.MkdirAll(filepath.Dir(socket), 0700); err != nil {
+		panic(err)
+	}
+	_ = os.Remove(socket)
+	store, err := state.New(stateDir)
+	if err != nil {
+		panic(err)
+	}
+	listener, err := net.Listen("unix", socket)
+	if err != nil {
+		panic(err)
+	}
+	server := grpc.NewServer()
+	ctl.RegisterOrchestratorControlServer(server, &grpcserver.Server{ProjectsRoot: root, Store: store})
+	if err := server.Serve(listener); err != nil {
+		panic(err)
+	}
 }

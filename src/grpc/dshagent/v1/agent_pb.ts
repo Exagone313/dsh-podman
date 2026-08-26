@@ -2,15 +2,26 @@
 // @generated from file dshagent/v1/agent.proto (package dshagent.v1, syntax proto3)
 /* eslint-disable */
 
-import type { GenFile, GenMessage, GenService } from "@bufbuild/protobuf/codegenv2";
-import { fileDesc, messageDesc, serviceDesc } from "@bufbuild/protobuf/codegenv2";
+import type {
+  GenFile,
+  GenMessage,
+  GenService,
+} from "@bufbuild/protobuf/codegenv2";
+import {
+  fileDesc,
+  messageDesc,
+  serviceDesc,
+} from "@bufbuild/protobuf/codegenv2";
 import type { Message } from "@bufbuild/protobuf";
 
 /**
  * Describes the file dshagent/v1/agent.proto.
  */
-export const file_dshagent_v1_agent: GenFile = /*@__PURE__*/
-  fileDesc("Chdkc2hhZ2VudC92MS9hZ2VudC5wcm90bxILZHNoYWdlbnQudjEiVgoJRXhlY0lucHV0EicKBXN0YXJ0GAEgASgLMhYuZHNoYWdlbnQudjEuRXhlY1N0YXJ0SAASFQoLc3RkaW5fY2h1bmsYAiABKAxIAEIJCgdwYXlsb2FkIpsBCglFeGVjU3RhcnQSDAoEYXJndhgBIAMoCRILCgNjd2QYAiABKAkSLAoDZW52GAMgAygLMh8uZHNoYWdlbnQudjEuRXhlY1N0YXJ0LkVudkVudHJ5EhkKEXJ1bl9pbl9iYWNrZ3JvdW5kGAQgASgIGioKCEVudkVudHJ5EgsKA2tleRgBIAEoCRINCgV2YWx1ZRgCIAEoCToCOAEibgoKRXhlY091dHB1dBIWCgxzdGRvdXRfY2h1bmsYASABKAxIABIWCgxzdGRlcnJfY2h1bmsYAiABKAxIABIlCgRleGl0GAMgASgLMhUuZHNoYWdlbnQudjEuRXhlY0V4aXRIAEIJCgdwYXlsb2FkIj8KCEV4ZWNFeGl0EhEKCWV4aXRfY29kZRgBIAEoBRIQCghzaWduYWxlZBgCIAEoCBIOCgZzaWduYWwYAyABKAkiMwoNU2lnbmFsUmVxdWVzdBISCgpwcm9jZXNzX2lkGAEgASgJEg4KBnNpZ25hbBgCIAEoCSIQCg5TaWduYWxSZXNwb25zZSIWChRMaXN0UHJvY2Vzc2VzUmVxdWVzdCJEChVMaXN0UHJvY2Vzc2VzUmVzcG9uc2USKwoJcHJvY2Vzc2VzGAEgAygLMhguZHNoYWdlbnQudjEuUHJvY2Vzc0luZm8iQAoLUHJvY2Vzc0luZm8SEgoKcHJvY2Vzc19pZBgBIAEoCRIMCgRhcmd2GAIgAygJEg8KB3J1bm5pbmcYAyABKAgiHwoPUmVhZEZpbGVSZXF1ZXN0EgwKBHBhdGgYASABKAkiHQoNUmVhZEZpbGVDaHVuaxIMCgRkYXRhGAEgASgMIl8KDldyaXRlRmlsZUNodW5rEiwKBXN0YXJ0GAEgASgLMhsuZHNoYWdlbnQudjEuV3JpdGVGaWxlU3RhcnRIABIUCgpkYXRhX2NodW5rGAIgASgMSABCCQoHcGF5bG9hZCJACg5Xcml0ZUZpbGVTdGFydBIMCgRwYXRoGAEgASgJEg4KBmNyZWF0ZRgCIAEoCBIQCgh0cnVuY2F0ZRgDIAEoCCIqChFXcml0ZUZpbGVSZXNwb25zZRIVCg1ieXRlc193cml0dGVuGAEgASgDIhsKC1N0YXRSZXF1ZXN0EgwKBHBhdGgYASABKAkiXwoMU3RhdFJlc3BvbnNlEg4KBmV4aXN0cxgBIAEoCBIOCgZpc19kaXIYAiABKAgSDAoEc2l6ZRgDIAEoAxIMCgRtb2RlGAQgASgJEhMKC21vZGlmaWVkX2F0GAUgASgJIh4KDlJlYWREaXJSZXF1ZXN0EgwKBHBhdGgYASABKAkiOQoPUmVhZERpclJlc3BvbnNlEiYKB2VudHJpZXMYASADKAsyFS5kc2hhZ2VudC52MS5EaXJFbnRyeSI2CghEaXJFbnRyeRIMCgRuYW1lGAEgASgJEg4KBmlzX2RpchgCIAEoCBIMCgRzaXplGAMgASgDIi0KDE1rZGlyUmVxdWVzdBIMCgRwYXRoGAEgASgJEg8KB3BhcmVudHMYAiABKAgiDwoNTWtkaXJSZXNwb25zZSIwCg1EZWxldGVSZXF1ZXN0EgwKBHBhdGgYASABKAkSEQoJcmVjdXJzaXZlGAIgASgIIhAKDkRlbGV0ZVJlc3BvbnNlIioKFkluc3RhbGxQYWNrYWdlc1JlcXVlc3QSEAoIcGFja2FnZXMYASADKAkieQoVSW5zdGFsbFBhY2thZ2VzT3V0cHV0EhYKDHN0ZG91dF9jaHVuaxgBIAEoDEgAEhYKDHN0ZGVycl9jaHVuaxgCIAEoDEgAEiUKBGV4aXQYAyABKAsyFS5kc2hhZ2VudC52MS5FeGVjRXhpdEgAQgkKB3BheWxvYWQy4AUKDldvcmtzcGFjZUFnZW50EjsKBEV4ZWMSFi5kc2hhZ2VudC52MS5FeGVjSW5wdXQaFy5kc2hhZ2VudC52MS5FeGVjT3V0cHV0KAEwARJBCgZTaWduYWwSGi5kc2hhZ2VudC52MS5TaWduYWxSZXF1ZXN0GhsuZHNoYWdlbnQudjEuU2lnbmFsUmVzcG9uc2USVgoNTGlzdFByb2Nlc3NlcxIhLmRzaGFnZW50LnYxLkxpc3RQcm9jZXNzZXNSZXF1ZXN0GiIuZHNoYWdlbnQudjEuTGlzdFByb2Nlc3Nlc1Jlc3BvbnNlEkYKCFJlYWRGaWxlEhwuZHNoYWdlbnQudjEuUmVhZEZpbGVSZXF1ZXN0GhouZHNoYWdlbnQudjEuUmVhZEZpbGVDaHVuazABEkoKCVdyaXRlRmlsZRIbLmRzaGFnZW50LnYxLldyaXRlRmlsZUNodW5rGh4uZHNoYWdlbnQudjEuV3JpdGVGaWxlUmVzcG9uc2UoARI7CgRTdGF0EhguZHNoYWdlbnQudjEuU3RhdFJlcXVlc3QaGS5kc2hhZ2VudC52MS5TdGF0UmVzcG9uc2USRAoHUmVhZERpchIbLmRzaGFnZW50LnYxLlJlYWREaXJSZXF1ZXN0GhwuZHNoYWdlbnQudjEuUmVhZERpclJlc3BvbnNlEj4KBU1rZGlyEhkuZHNoYWdlbnQudjEuTWtkaXJSZXF1ZXN0GhouZHNoYWdlbnQudjEuTWtkaXJSZXNwb25zZRJBCgZEZWxldGUSGi5kc2hhZ2VudC52MS5EZWxldGVSZXF1ZXN0GhsuZHNoYWdlbnQudjEuRGVsZXRlUmVzcG9uc2USXAoPSW5zdGFsbFBhY2thZ2VzEiMuZHNoYWdlbnQudjEuSW5zdGFsbFBhY2thZ2VzUmVxdWVzdBoiLmRzaGFnZW50LnYxLkluc3RhbGxQYWNrYWdlc091dHB1dDABQlVaU2dpdGxhYi5jb20vRXhhZ29uZTMxMy9kc2gtY29udGFpbmVyLXBsdWdpbi9pbnRlcm5hbC9nZW5wcm90by9kc2hhZ2VudC92MTtkc2hhZ2VudHYxYgZwcm90bzM");
+export const file_dshagent_v1_agent: GenFile =
+  /*@__PURE__*/
+  fileDesc(
+    "Chdkc2hhZ2VudC92MS9hZ2VudC5wcm90bxILZHNoYWdlbnQudjEiVgoJRXhlY0lucHV0EicKBXN0YXJ0GAEgASgLMhYuZHNoYWdlbnQudjEuRXhlY1N0YXJ0SAASFQoLc3RkaW5fY2h1bmsYAiABKAxIAEIJCgdwYXlsb2FkIpsBCglFeGVjU3RhcnQSDAoEYXJndhgBIAMoCRILCgNjd2QYAiABKAkSLAoDZW52GAMgAygLMh8uZHNoYWdlbnQudjEuRXhlY1N0YXJ0LkVudkVudHJ5EhkKEXJ1bl9pbl9iYWNrZ3JvdW5kGAQgASgIGioKCEVudkVudHJ5EgsKA2tleRgBIAEoCRINCgV2YWx1ZRgCIAEoCToCOAEibgoKRXhlY091dHB1dBIWCgxzdGRvdXRfY2h1bmsYASABKAxIABIWCgxzdGRlcnJfY2h1bmsYAiABKAxIABIlCgRleGl0GAMgASgLMhUuZHNoYWdlbnQudjEuRXhlY0V4aXRIAEIJCgdwYXlsb2FkIj8KCEV4ZWNFeGl0EhEKCWV4aXRfY29kZRgBIAEoBRIQCghzaWduYWxlZBgCIAEoCBIOCgZzaWduYWwYAyABKAkiMwoNU2lnbmFsUmVxdWVzdBISCgpwcm9jZXNzX2lkGAEgASgJEg4KBnNpZ25hbBgCIAEoCSIQCg5TaWduYWxSZXNwb25zZSIWChRMaXN0UHJvY2Vzc2VzUmVxdWVzdCJEChVMaXN0UHJvY2Vzc2VzUmVzcG9uc2USKwoJcHJvY2Vzc2VzGAEgAygLMhguZHNoYWdlbnQudjEuUHJvY2Vzc0luZm8iQAoLUHJvY2Vzc0luZm8SEgoKcHJvY2Vzc19pZBgBIAEoCRIMCgRhcmd2GAIgAygJEg8KB3J1bm5pbmcYAyABKAgiHwoPUmVhZEZpbGVSZXF1ZXN0EgwKBHBhdGgYASABKAkiHQoNUmVhZEZpbGVDaHVuaxIMCgRkYXRhGAEgASgMIl8KDldyaXRlRmlsZUNodW5rEiwKBXN0YXJ0GAEgASgLMhsuZHNoYWdlbnQudjEuV3JpdGVGaWxlU3RhcnRIABIUCgpkYXRhX2NodW5rGAIgASgMSABCCQoHcGF5bG9hZCJACg5Xcml0ZUZpbGVTdGFydBIMCgRwYXRoGAEgASgJEg4KBmNyZWF0ZRgCIAEoCBIQCgh0cnVuY2F0ZRgDIAEoCCIqChFXcml0ZUZpbGVSZXNwb25zZRIVCg1ieXRlc193cml0dGVuGAEgASgDIhsKC1N0YXRSZXF1ZXN0EgwKBHBhdGgYASABKAkiXwoMU3RhdFJlc3BvbnNlEg4KBmV4aXN0cxgBIAEoCBIOCgZpc19kaXIYAiABKAgSDAoEc2l6ZRgDIAEoAxIMCgRtb2RlGAQgASgJEhMKC21vZGlmaWVkX2F0GAUgASgJIh4KDlJlYWREaXJSZXF1ZXN0EgwKBHBhdGgYASABKAkiOQoPUmVhZERpclJlc3BvbnNlEiYKB2VudHJpZXMYASADKAsyFS5kc2hhZ2VudC52MS5EaXJFbnRyeSI2CghEaXJFbnRyeRIMCgRuYW1lGAEgASgJEg4KBmlzX2RpchgCIAEoCBIMCgRzaXplGAMgASgDIi0KDE1rZGlyUmVxdWVzdBIMCgRwYXRoGAEgASgJEg8KB3BhcmVudHMYAiABKAgiDwoNTWtkaXJSZXNwb25zZSIwCg1EZWxldGVSZXF1ZXN0EgwKBHBhdGgYASABKAkSEQoJcmVjdXJzaXZlGAIgASgIIhAKDkRlbGV0ZVJlc3BvbnNlIioKFkluc3RhbGxQYWNrYWdlc1JlcXVlc3QSEAoIcGFja2FnZXMYASADKAkieQoVSW5zdGFsbFBhY2thZ2VzT3V0cHV0EhYKDHN0ZG91dF9jaHVuaxgBIAEoDEgAEhYKDHN0ZGVycl9jaHVuaxgCIAEoDEgAEiUKBGV4aXQYAyABKAsyFS5kc2hhZ2VudC52MS5FeGVjRXhpdEgAQgkKB3BheWxvYWQy4AUKDldvcmtzcGFjZUFnZW50EjsKBEV4ZWMSFi5kc2hhZ2VudC52MS5FeGVjSW5wdXQaFy5kc2hhZ2VudC52MS5FeGVjT3V0cHV0KAEwARJBCgZTaWduYWwSGi5kc2hhZ2VudC52MS5TaWduYWxSZXF1ZXN0GhsuZHNoYWdlbnQudjEuU2lnbmFsUmVzcG9uc2USVgoNTGlzdFByb2Nlc3NlcxIhLmRzaGFnZW50LnYxLkxpc3RQcm9jZXNzZXNSZXF1ZXN0GiIuZHNoYWdlbnQudjEuTGlzdFByb2Nlc3Nlc1Jlc3BvbnNlEkYKCFJlYWRGaWxlEhwuZHNoYWdlbnQudjEuUmVhZEZpbGVSZXF1ZXN0GhouZHNoYWdlbnQudjEuUmVhZEZpbGVDaHVuazABEkoKCVdyaXRlRmlsZRIbLmRzaGFnZW50LnYxLldyaXRlRmlsZUNodW5rGh4uZHNoYWdlbnQudjEuV3JpdGVGaWxlUmVzcG9uc2UoARI7CgRTdGF0EhguZHNoYWdlbnQudjEuU3RhdFJlcXVlc3QaGS5kc2hhZ2VudC52MS5TdGF0UmVzcG9uc2USRAoHUmVhZERpchIbLmRzaGFnZW50LnYxLlJlYWREaXJSZXF1ZXN0GhwuZHNoYWdlbnQudjEuUmVhZERpclJlc3BvbnNlEj4KBU1rZGlyEhkuZHNoYWdlbnQudjEuTWtkaXJSZXF1ZXN0GhouZHNoYWdlbnQudjEuTWtkaXJSZXNwb25zZRJBCgZEZWxldGUSGi5kc2hhZ2VudC52MS5EZWxldGVSZXF1ZXN0GhsuZHNoYWdlbnQudjEuRGVsZXRlUmVzcG9uc2USXAoPSW5zdGFsbFBhY2thZ2VzEiMuZHNoYWdlbnQudjEuSW5zdGFsbFBhY2thZ2VzUmVxdWVzdBoiLmRzaGFnZW50LnYxLkluc3RhbGxQYWNrYWdlc091dHB1dDABQlVaU2dpdGxhYi5jb20vRXhhZ29uZTMxMy9kc2gtY29udGFpbmVyLXBsdWdpbi9pbnRlcm5hbC9nZW5wcm90by9kc2hhZ2VudC92MTtkc2hhZ2VudHYxYgZwcm90bzM",
+  );
 
 /**
  * @generated from message dshagent.v1.ExecInput
@@ -19,26 +30,30 @@ export type ExecInput = Message<"dshagent.v1.ExecInput"> & {
   /**
    * @generated from oneof dshagent.v1.ExecInput.payload
    */
-  payload: {
-    /**
-     * @generated from field: dshagent.v1.ExecStart start = 1;
-     */
-    value: ExecStart;
-    case: "start";
-  } | {
-    /**
-     * @generated from field: bytes stdin_chunk = 2;
-     */
-    value: Uint8Array;
-    case: "stdinChunk";
-  } | { case: undefined; value?: undefined };
+  payload:
+    | {
+        /**
+         * @generated from field: dshagent.v1.ExecStart start = 1;
+         */
+        value: ExecStart;
+        case: "start";
+      }
+    | {
+        /**
+         * @generated from field: bytes stdin_chunk = 2;
+         */
+        value: Uint8Array;
+        case: "stdinChunk";
+      }
+    | { case: undefined; value?: undefined };
 };
 
 /**
  * Describes the message dshagent.v1.ExecInput.
  * Use `create(ExecInputSchema)` to create a new message.
  */
-export const ExecInputSchema: GenMessage<ExecInput> = /*@__PURE__*/
+export const ExecInputSchema: GenMessage<ExecInput> =
+  /*@__PURE__*/
   messageDesc(file_dshagent_v1_agent, 0);
 
 /**
@@ -70,7 +85,8 @@ export type ExecStart = Message<"dshagent.v1.ExecStart"> & {
  * Describes the message dshagent.v1.ExecStart.
  * Use `create(ExecStartSchema)` to create a new message.
  */
-export const ExecStartSchema: GenMessage<ExecStart> = /*@__PURE__*/
+export const ExecStartSchema: GenMessage<ExecStart> =
+  /*@__PURE__*/
   messageDesc(file_dshagent_v1_agent, 1);
 
 /**
@@ -80,32 +96,37 @@ export type ExecOutput = Message<"dshagent.v1.ExecOutput"> & {
   /**
    * @generated from oneof dshagent.v1.ExecOutput.payload
    */
-  payload: {
-    /**
-     * @generated from field: bytes stdout_chunk = 1;
-     */
-    value: Uint8Array;
-    case: "stdoutChunk";
-  } | {
-    /**
-     * @generated from field: bytes stderr_chunk = 2;
-     */
-    value: Uint8Array;
-    case: "stderrChunk";
-  } | {
-    /**
-     * @generated from field: dshagent.v1.ExecExit exit = 3;
-     */
-    value: ExecExit;
-    case: "exit";
-  } | { case: undefined; value?: undefined };
+  payload:
+    | {
+        /**
+         * @generated from field: bytes stdout_chunk = 1;
+         */
+        value: Uint8Array;
+        case: "stdoutChunk";
+      }
+    | {
+        /**
+         * @generated from field: bytes stderr_chunk = 2;
+         */
+        value: Uint8Array;
+        case: "stderrChunk";
+      }
+    | {
+        /**
+         * @generated from field: dshagent.v1.ExecExit exit = 3;
+         */
+        value: ExecExit;
+        case: "exit";
+      }
+    | { case: undefined; value?: undefined };
 };
 
 /**
  * Describes the message dshagent.v1.ExecOutput.
  * Use `create(ExecOutputSchema)` to create a new message.
  */
-export const ExecOutputSchema: GenMessage<ExecOutput> = /*@__PURE__*/
+export const ExecOutputSchema: GenMessage<ExecOutput> =
+  /*@__PURE__*/
   messageDesc(file_dshagent_v1_agent, 2);
 
 /**
@@ -132,7 +153,8 @@ export type ExecExit = Message<"dshagent.v1.ExecExit"> & {
  * Describes the message dshagent.v1.ExecExit.
  * Use `create(ExecExitSchema)` to create a new message.
  */
-export const ExecExitSchema: GenMessage<ExecExit> = /*@__PURE__*/
+export const ExecExitSchema: GenMessage<ExecExit> =
+  /*@__PURE__*/
   messageDesc(file_dshagent_v1_agent, 3);
 
 /**
@@ -154,50 +176,54 @@ export type SignalRequest = Message<"dshagent.v1.SignalRequest"> & {
  * Describes the message dshagent.v1.SignalRequest.
  * Use `create(SignalRequestSchema)` to create a new message.
  */
-export const SignalRequestSchema: GenMessage<SignalRequest> = /*@__PURE__*/
+export const SignalRequestSchema: GenMessage<SignalRequest> =
+  /*@__PURE__*/
   messageDesc(file_dshagent_v1_agent, 4);
 
 /**
  * @generated from message dshagent.v1.SignalResponse
  */
-export type SignalResponse = Message<"dshagent.v1.SignalResponse"> & {
-};
+export type SignalResponse = Message<"dshagent.v1.SignalResponse"> & {};
 
 /**
  * Describes the message dshagent.v1.SignalResponse.
  * Use `create(SignalResponseSchema)` to create a new message.
  */
-export const SignalResponseSchema: GenMessage<SignalResponse> = /*@__PURE__*/
+export const SignalResponseSchema: GenMessage<SignalResponse> =
+  /*@__PURE__*/
   messageDesc(file_dshagent_v1_agent, 5);
 
 /**
  * @generated from message dshagent.v1.ListProcessesRequest
  */
-export type ListProcessesRequest = Message<"dshagent.v1.ListProcessesRequest"> & {
-};
+export type ListProcessesRequest =
+  Message<"dshagent.v1.ListProcessesRequest"> & {};
 
 /**
  * Describes the message dshagent.v1.ListProcessesRequest.
  * Use `create(ListProcessesRequestSchema)` to create a new message.
  */
-export const ListProcessesRequestSchema: GenMessage<ListProcessesRequest> = /*@__PURE__*/
+export const ListProcessesRequestSchema: GenMessage<ListProcessesRequest> =
+  /*@__PURE__*/
   messageDesc(file_dshagent_v1_agent, 6);
 
 /**
  * @generated from message dshagent.v1.ListProcessesResponse
  */
-export type ListProcessesResponse = Message<"dshagent.v1.ListProcessesResponse"> & {
-  /**
-   * @generated from field: repeated dshagent.v1.ProcessInfo processes = 1;
-   */
-  processes: ProcessInfo[];
-};
+export type ListProcessesResponse =
+  Message<"dshagent.v1.ListProcessesResponse"> & {
+    /**
+     * @generated from field: repeated dshagent.v1.ProcessInfo processes = 1;
+     */
+    processes: ProcessInfo[];
+  };
 
 /**
  * Describes the message dshagent.v1.ListProcessesResponse.
  * Use `create(ListProcessesResponseSchema)` to create a new message.
  */
-export const ListProcessesResponseSchema: GenMessage<ListProcessesResponse> = /*@__PURE__*/
+export const ListProcessesResponseSchema: GenMessage<ListProcessesResponse> =
+  /*@__PURE__*/
   messageDesc(file_dshagent_v1_agent, 7);
 
 /**
@@ -224,7 +250,8 @@ export type ProcessInfo = Message<"dshagent.v1.ProcessInfo"> & {
  * Describes the message dshagent.v1.ProcessInfo.
  * Use `create(ProcessInfoSchema)` to create a new message.
  */
-export const ProcessInfoSchema: GenMessage<ProcessInfo> = /*@__PURE__*/
+export const ProcessInfoSchema: GenMessage<ProcessInfo> =
+  /*@__PURE__*/
   messageDesc(file_dshagent_v1_agent, 8);
 
 /**
@@ -241,7 +268,8 @@ export type ReadFileRequest = Message<"dshagent.v1.ReadFileRequest"> & {
  * Describes the message dshagent.v1.ReadFileRequest.
  * Use `create(ReadFileRequestSchema)` to create a new message.
  */
-export const ReadFileRequestSchema: GenMessage<ReadFileRequest> = /*@__PURE__*/
+export const ReadFileRequestSchema: GenMessage<ReadFileRequest> =
+  /*@__PURE__*/
   messageDesc(file_dshagent_v1_agent, 9);
 
 /**
@@ -258,7 +286,8 @@ export type ReadFileChunk = Message<"dshagent.v1.ReadFileChunk"> & {
  * Describes the message dshagent.v1.ReadFileChunk.
  * Use `create(ReadFileChunkSchema)` to create a new message.
  */
-export const ReadFileChunkSchema: GenMessage<ReadFileChunk> = /*@__PURE__*/
+export const ReadFileChunkSchema: GenMessage<ReadFileChunk> =
+  /*@__PURE__*/
   messageDesc(file_dshagent_v1_agent, 10);
 
 /**
@@ -268,26 +297,30 @@ export type WriteFileChunk = Message<"dshagent.v1.WriteFileChunk"> & {
   /**
    * @generated from oneof dshagent.v1.WriteFileChunk.payload
    */
-  payload: {
-    /**
-     * @generated from field: dshagent.v1.WriteFileStart start = 1;
-     */
-    value: WriteFileStart;
-    case: "start";
-  } | {
-    /**
-     * @generated from field: bytes data_chunk = 2;
-     */
-    value: Uint8Array;
-    case: "dataChunk";
-  } | { case: undefined; value?: undefined };
+  payload:
+    | {
+        /**
+         * @generated from field: dshagent.v1.WriteFileStart start = 1;
+         */
+        value: WriteFileStart;
+        case: "start";
+      }
+    | {
+        /**
+         * @generated from field: bytes data_chunk = 2;
+         */
+        value: Uint8Array;
+        case: "dataChunk";
+      }
+    | { case: undefined; value?: undefined };
 };
 
 /**
  * Describes the message dshagent.v1.WriteFileChunk.
  * Use `create(WriteFileChunkSchema)` to create a new message.
  */
-export const WriteFileChunkSchema: GenMessage<WriteFileChunk> = /*@__PURE__*/
+export const WriteFileChunkSchema: GenMessage<WriteFileChunk> =
+  /*@__PURE__*/
   messageDesc(file_dshagent_v1_agent, 11);
 
 /**
@@ -314,7 +347,8 @@ export type WriteFileStart = Message<"dshagent.v1.WriteFileStart"> & {
  * Describes the message dshagent.v1.WriteFileStart.
  * Use `create(WriteFileStartSchema)` to create a new message.
  */
-export const WriteFileStartSchema: GenMessage<WriteFileStart> = /*@__PURE__*/
+export const WriteFileStartSchema: GenMessage<WriteFileStart> =
+  /*@__PURE__*/
   messageDesc(file_dshagent_v1_agent, 12);
 
 /**
@@ -331,7 +365,8 @@ export type WriteFileResponse = Message<"dshagent.v1.WriteFileResponse"> & {
  * Describes the message dshagent.v1.WriteFileResponse.
  * Use `create(WriteFileResponseSchema)` to create a new message.
  */
-export const WriteFileResponseSchema: GenMessage<WriteFileResponse> = /*@__PURE__*/
+export const WriteFileResponseSchema: GenMessage<WriteFileResponse> =
+  /*@__PURE__*/
   messageDesc(file_dshagent_v1_agent, 13);
 
 /**
@@ -348,7 +383,8 @@ export type StatRequest = Message<"dshagent.v1.StatRequest"> & {
  * Describes the message dshagent.v1.StatRequest.
  * Use `create(StatRequestSchema)` to create a new message.
  */
-export const StatRequestSchema: GenMessage<StatRequest> = /*@__PURE__*/
+export const StatRequestSchema: GenMessage<StatRequest> =
+  /*@__PURE__*/
   messageDesc(file_dshagent_v1_agent, 14);
 
 /**
@@ -385,7 +421,8 @@ export type StatResponse = Message<"dshagent.v1.StatResponse"> & {
  * Describes the message dshagent.v1.StatResponse.
  * Use `create(StatResponseSchema)` to create a new message.
  */
-export const StatResponseSchema: GenMessage<StatResponse> = /*@__PURE__*/
+export const StatResponseSchema: GenMessage<StatResponse> =
+  /*@__PURE__*/
   messageDesc(file_dshagent_v1_agent, 15);
 
 /**
@@ -402,7 +439,8 @@ export type ReadDirRequest = Message<"dshagent.v1.ReadDirRequest"> & {
  * Describes the message dshagent.v1.ReadDirRequest.
  * Use `create(ReadDirRequestSchema)` to create a new message.
  */
-export const ReadDirRequestSchema: GenMessage<ReadDirRequest> = /*@__PURE__*/
+export const ReadDirRequestSchema: GenMessage<ReadDirRequest> =
+  /*@__PURE__*/
   messageDesc(file_dshagent_v1_agent, 16);
 
 /**
@@ -419,7 +457,8 @@ export type ReadDirResponse = Message<"dshagent.v1.ReadDirResponse"> & {
  * Describes the message dshagent.v1.ReadDirResponse.
  * Use `create(ReadDirResponseSchema)` to create a new message.
  */
-export const ReadDirResponseSchema: GenMessage<ReadDirResponse> = /*@__PURE__*/
+export const ReadDirResponseSchema: GenMessage<ReadDirResponse> =
+  /*@__PURE__*/
   messageDesc(file_dshagent_v1_agent, 17);
 
 /**
@@ -446,7 +485,8 @@ export type DirEntry = Message<"dshagent.v1.DirEntry"> & {
  * Describes the message dshagent.v1.DirEntry.
  * Use `create(DirEntrySchema)` to create a new message.
  */
-export const DirEntrySchema: GenMessage<DirEntry> = /*@__PURE__*/
+export const DirEntrySchema: GenMessage<DirEntry> =
+  /*@__PURE__*/
   messageDesc(file_dshagent_v1_agent, 18);
 
 /**
@@ -468,20 +508,21 @@ export type MkdirRequest = Message<"dshagent.v1.MkdirRequest"> & {
  * Describes the message dshagent.v1.MkdirRequest.
  * Use `create(MkdirRequestSchema)` to create a new message.
  */
-export const MkdirRequestSchema: GenMessage<MkdirRequest> = /*@__PURE__*/
+export const MkdirRequestSchema: GenMessage<MkdirRequest> =
+  /*@__PURE__*/
   messageDesc(file_dshagent_v1_agent, 19);
 
 /**
  * @generated from message dshagent.v1.MkdirResponse
  */
-export type MkdirResponse = Message<"dshagent.v1.MkdirResponse"> & {
-};
+export type MkdirResponse = Message<"dshagent.v1.MkdirResponse"> & {};
 
 /**
  * Describes the message dshagent.v1.MkdirResponse.
  * Use `create(MkdirResponseSchema)` to create a new message.
  */
-export const MkdirResponseSchema: GenMessage<MkdirResponse> = /*@__PURE__*/
+export const MkdirResponseSchema: GenMessage<MkdirResponse> =
+  /*@__PURE__*/
   messageDesc(file_dshagent_v1_agent, 20);
 
 /**
@@ -503,72 +544,81 @@ export type DeleteRequest = Message<"dshagent.v1.DeleteRequest"> & {
  * Describes the message dshagent.v1.DeleteRequest.
  * Use `create(DeleteRequestSchema)` to create a new message.
  */
-export const DeleteRequestSchema: GenMessage<DeleteRequest> = /*@__PURE__*/
+export const DeleteRequestSchema: GenMessage<DeleteRequest> =
+  /*@__PURE__*/
   messageDesc(file_dshagent_v1_agent, 21);
 
 /**
  * @generated from message dshagent.v1.DeleteResponse
  */
-export type DeleteResponse = Message<"dshagent.v1.DeleteResponse"> & {
-};
+export type DeleteResponse = Message<"dshagent.v1.DeleteResponse"> & {};
 
 /**
  * Describes the message dshagent.v1.DeleteResponse.
  * Use `create(DeleteResponseSchema)` to create a new message.
  */
-export const DeleteResponseSchema: GenMessage<DeleteResponse> = /*@__PURE__*/
+export const DeleteResponseSchema: GenMessage<DeleteResponse> =
+  /*@__PURE__*/
   messageDesc(file_dshagent_v1_agent, 22);
 
 /**
  * @generated from message dshagent.v1.InstallPackagesRequest
  */
-export type InstallPackagesRequest = Message<"dshagent.v1.InstallPackagesRequest"> & {
-  /**
-   * @generated from field: repeated string packages = 1;
-   */
-  packages: string[];
-};
+export type InstallPackagesRequest =
+  Message<"dshagent.v1.InstallPackagesRequest"> & {
+    /**
+     * @generated from field: repeated string packages = 1;
+     */
+    packages: string[];
+  };
 
 /**
  * Describes the message dshagent.v1.InstallPackagesRequest.
  * Use `create(InstallPackagesRequestSchema)` to create a new message.
  */
-export const InstallPackagesRequestSchema: GenMessage<InstallPackagesRequest> = /*@__PURE__*/
+export const InstallPackagesRequestSchema: GenMessage<InstallPackagesRequest> =
+  /*@__PURE__*/
   messageDesc(file_dshagent_v1_agent, 23);
 
 /**
  * @generated from message dshagent.v1.InstallPackagesOutput
  */
-export type InstallPackagesOutput = Message<"dshagent.v1.InstallPackagesOutput"> & {
-  /**
-   * @generated from oneof dshagent.v1.InstallPackagesOutput.payload
-   */
-  payload: {
+export type InstallPackagesOutput =
+  Message<"dshagent.v1.InstallPackagesOutput"> & {
     /**
-     * @generated from field: bytes stdout_chunk = 1;
+     * @generated from oneof dshagent.v1.InstallPackagesOutput.payload
      */
-    value: Uint8Array;
-    case: "stdoutChunk";
-  } | {
-    /**
-     * @generated from field: bytes stderr_chunk = 2;
-     */
-    value: Uint8Array;
-    case: "stderrChunk";
-  } | {
-    /**
-     * @generated from field: dshagent.v1.ExecExit exit = 3;
-     */
-    value: ExecExit;
-    case: "exit";
-  } | { case: undefined; value?: undefined };
-};
+    payload:
+      | {
+          /**
+           * @generated from field: bytes stdout_chunk = 1;
+           */
+          value: Uint8Array;
+          case: "stdoutChunk";
+        }
+      | {
+          /**
+           * @generated from field: bytes stderr_chunk = 2;
+           */
+          value: Uint8Array;
+          case: "stderrChunk";
+        }
+      | {
+          /**
+           * @generated from field: dshagent.v1.ExecExit exit = 3;
+           */
+          value: ExecExit;
+          case: "exit";
+        }
+      | { case: undefined; value?: undefined };
+  };
 
 /**
  * Describes the message dshagent.v1.InstallPackagesOutput.
  * Use `create(InstallPackagesOutputSchema)` to create a new message.
  */
-export const InstallPackagesOutputSchema: GenMessage<InstallPackagesOutput> = /*@__PURE__*/
+export const InstallPackagesOutputSchema: GenMessage<InstallPackagesOutput> =
+  /*@__PURE__*/
   messageDesc(file_dshagent_v1_agent, 24);
 
 /**
@@ -582,7 +632,7 @@ export const WorkspaceAgent: GenService<{
     methodKind: "bidi_streaming";
     input: typeof ExecInputSchema;
     output: typeof ExecOutputSchema;
-  },
+  };
   /**
    * @generated from rpc dshagent.v1.WorkspaceAgent.Signal
    */
@@ -590,7 +640,7 @@ export const WorkspaceAgent: GenService<{
     methodKind: "unary";
     input: typeof SignalRequestSchema;
     output: typeof SignalResponseSchema;
-  },
+  };
   /**
    * @generated from rpc dshagent.v1.WorkspaceAgent.ListProcesses
    */
@@ -598,7 +648,7 @@ export const WorkspaceAgent: GenService<{
     methodKind: "unary";
     input: typeof ListProcessesRequestSchema;
     output: typeof ListProcessesResponseSchema;
-  },
+  };
   /**
    * @generated from rpc dshagent.v1.WorkspaceAgent.ReadFile
    */
@@ -606,7 +656,7 @@ export const WorkspaceAgent: GenService<{
     methodKind: "server_streaming";
     input: typeof ReadFileRequestSchema;
     output: typeof ReadFileChunkSchema;
-  },
+  };
   /**
    * @generated from rpc dshagent.v1.WorkspaceAgent.WriteFile
    */
@@ -614,7 +664,7 @@ export const WorkspaceAgent: GenService<{
     methodKind: "client_streaming";
     input: typeof WriteFileChunkSchema;
     output: typeof WriteFileResponseSchema;
-  },
+  };
   /**
    * @generated from rpc dshagent.v1.WorkspaceAgent.Stat
    */
@@ -622,7 +672,7 @@ export const WorkspaceAgent: GenService<{
     methodKind: "unary";
     input: typeof StatRequestSchema;
     output: typeof StatResponseSchema;
-  },
+  };
   /**
    * @generated from rpc dshagent.v1.WorkspaceAgent.ReadDir
    */
@@ -630,7 +680,7 @@ export const WorkspaceAgent: GenService<{
     methodKind: "unary";
     input: typeof ReadDirRequestSchema;
     output: typeof ReadDirResponseSchema;
-  },
+  };
   /**
    * @generated from rpc dshagent.v1.WorkspaceAgent.Mkdir
    */
@@ -638,7 +688,7 @@ export const WorkspaceAgent: GenService<{
     methodKind: "unary";
     input: typeof MkdirRequestSchema;
     output: typeof MkdirResponseSchema;
-  },
+  };
   /**
    * @generated from rpc dshagent.v1.WorkspaceAgent.Delete
    */
@@ -646,7 +696,7 @@ export const WorkspaceAgent: GenService<{
     methodKind: "unary";
     input: typeof DeleteRequestSchema;
     output: typeof DeleteResponseSchema;
-  },
+  };
   /**
    * @generated from rpc dshagent.v1.WorkspaceAgent.InstallPackages
    */
@@ -654,7 +704,5 @@ export const WorkspaceAgent: GenService<{
     methodKind: "server_streaming";
     input: typeof InstallPackagesRequestSchema;
     output: typeof InstallPackagesOutputSchema;
-  },
-}> = /*@__PURE__*/
-  serviceDesc(file_dshagent_v1_agent, 0);
-
+  };
+}> = /*@__PURE__*/ serviceDesc(file_dshagent_v1_agent, 0);

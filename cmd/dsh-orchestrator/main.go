@@ -69,7 +69,10 @@ func main() {
 		}
 		imageBuilder = &images.Builder{Context: podmanContext, StateDir: stateDir}
 	} else {
-		panic("Podman API is not configured: set DSH_ORCH_PODMAN_SOCKET")
+		_, orchSocketSet := os.LookupEnv("DSH_ORCH_PODMAN_SOCKET")
+		_, containerHostSet := os.LookupEnv("CONTAINER_HOST")
+		logger.Error("Podman API configuration is missing", "DSH_ORCH_PODMAN_SOCKET_present", orchSocketSet, "CONTAINER_HOST_present", containerHostSet, "expected", "DSH_ORCH_PODMAN_SOCKET=unix:///run/podman/podman.sock")
+		panic("Podman API is not configured: DSH_ORCH_PODMAN_SOCKET is absent or empty")
 	}
 	ctl.RegisterOrchestratorControlServer(server, &grpcserver.Server{ProjectsRoot: root, HostProjectsRoot: hostProjectsRoot, SocketsRoot: socketsRoot, Store: store, Podman: podmanClient, ImageBuilder: imageBuilder, Logger: logger})
 	if err := server.Serve(listener); err != nil {

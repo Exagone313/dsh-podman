@@ -1,6 +1,7 @@
 import { WorkspaceResolver } from "./workspace-binding.js";
 import { metadata } from "./workspace-binding.js";
 import { PassThrough } from "node:stream";
+import { createHash } from "node:crypto";
 
 function defineTool<T>(definition: T): T {
   return definition;
@@ -104,7 +105,7 @@ function createSubprocessProvider(resolver: WorkspaceResolver): object {
             stream.on("error", reject);
             stream.write({
               start: {
-                argv: spec.argv,
+                argv: remoteArgv(spec.argv),
                 cwd: spec.cwd,
                 env: spec.env ?? {},
                 runInBackground: false,
@@ -131,6 +132,15 @@ function createSubprocessProvider(resolver: WorkspaceResolver): object {
       };
     },
   };
+}
+
+function remoteArgv(argv: readonly string[]): readonly string[] {
+  const runner = argv[0];
+  if (runner !== undefined && /(?:^|\/)landlock-run(?:$|\/)/.test(runner)) {
+    const separator = argv.indexOf("--");
+    if (separator >= 0) return argv.slice(separator + 1);
+  }
+  return argv;
 }
 function createFilesystemProvider(resolver: WorkspaceResolver): object {
   return {
@@ -162,12 +172,24 @@ function createFilesystemProvider(resolver: WorkspaceResolver): object {
       return Buffer.concat(chunks).toString("utf8");
     },
     writeText: async (target: any, content: string) => {
+      const current = await target.binding.agent.stat(
+        { path: target.targetKey },
+        metadata(target.binding.token),
+      );
+      const before = current.exists ? await readRemoteText(target) : null;
       return new Promise((resolveDone, reject) => {
         const call = (target.binding.agent as any).writeFile(
           metadata(target.binding.token),
           {},
           (error: Error | null, result: unknown) =>
-            error ? reject(error) : resolveDone(result),
+            error
+              ? reject(error)
+              : resolveDone({
+                  operation: current.exists ? "update" : "create",
+                  version: `agent:${createHash("sha256").update(content).digest("hex")}`,
+                  before,
+                  after: content,
+                }),
         );
         call.write({
           start: { path: target.targetKey, create: true, truncate: true },
@@ -192,6 +214,20 @@ function createFilesystemProvider(resolver: WorkspaceResolver): object {
     remove: async (target: any, recursive = false) =>
       unaryAgent(target, "delete", { path: target.targetKey, recursive }),
   };
+}
+
+async function readRemoteText(target: any): Promise<string> {
+  const chunks: Buffer[] = [];
+  await new Promise<void>((resolveDone, reject) => {
+    const call = target.binding.agent.readFile(
+      { path: target.targetKey },
+      metadata(target.binding.token),
+    );
+    call.on("data", (chunk: any) => chunks.push(Buffer.from(chunk.data)));
+    call.on("error", reject);
+    call.on("end", resolveDone);
+  });
+  return Buffer.concat(chunks).toString("utf8");
 }
 function defineLifecycleTool(
   ctx: any,

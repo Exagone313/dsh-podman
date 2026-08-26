@@ -146,9 +146,7 @@ function createSubprocessProvider(resolver: WorkspaceResolver): object {
   };
 }
 
-function outputReader(
-  mode: unknown,
-):
+function outputReader(mode: unknown):
   | {
       append: (data: Buffer) => void;
       readFrom: (offset: number) => {
@@ -245,21 +243,30 @@ function createFilesystemProvider(resolver: WorkspaceResolver): object {
         call.end();
       });
     },
-    stat: async (target: any) =>
-      new Promise((resolveDone, reject) =>
-        (target.binding.agent as any).stat(
-          { path: target.targetKey },
-          metadata(target.binding.token),
-          (error: Error | null, result: unknown) =>
-            error ? reject(error) : resolveDone(result),
-        ),
-      ),
+    stat: async (target: any) => agentStat(target),
     listDir: async (target: any) =>
       unaryAgent(target, "readDir", { path: target.targetKey }),
     mkdir: async (target: any, parents = true) =>
       unaryAgent(target, "mkdir", { path: target.targetKey, parents }),
     remove: async (target: any, recursive = false) =>
       unaryAgent(target, "delete", { path: target.targetKey, recursive }),
+  };
+}
+
+async function agentStat(target: any): Promise<any> {
+  const result = await new Promise<any>((resolveDone, reject) =>
+    target.binding.agent.stat(
+      { path: target.targetKey },
+      metadata(target.binding.token),
+      (error: Error | null, value: any) =>
+        error ? reject(error) : resolveDone(value),
+    ),
+  );
+  if (!result.exists) return undefined;
+  return {
+    version: `agent:${result.modifiedAt ?? ""}:${result.size ?? 0}:${result.mode ?? ""}`,
+    type: result.isDir ? "directory" : "file",
+    ...(result.isDir ? {} : { size: Number(result.size ?? 0) }),
   };
 }
 

@@ -61,7 +61,7 @@ function defineLifecycleTool(ctx: any, resolver: WorkspaceResolver, name: string
 function registerTools(ctx: any, resolver: WorkspaceResolver): void {
   defineLifecycleTool(ctx, resolver, 'recreate_workspace', 'Recreate the current workspace', 'recreateWorkspace', workspaceParameters)
   defineLifecycleTool(ctx, resolver, 'rebuild_image', 'Rebuild a workspace image', 'rebuildImage', imageParameters)
-  ctx.tools.register(defineTool({ name: 'install_packages', description: 'Install ephemeral workspace packages', parameters: packageParameters, output: toolOutput, execute: async (input: any) => { const binding = await resolver.resolveSlug(String(input.workspace_slug ?? 'default')); return JSON.stringify(await unaryAgent({ binding }, 'installPackages', input)) } }))
+  ctx.tools.register(defineTool({ name: 'install_packages', description: 'Install ephemeral workspace packages', parameters: packageParameters, output: toolOutput, execute: async (input: any, exec: any) => { const cwd = exec?.agent?.session?.header?.cwd; const binding = cwd === undefined ? await resolver.resolveSlug(String(input.workspace_slug ?? '')) : await resolver.resolve(cwd); return JSON.stringify(await unaryAgent({ binding }, 'installPackages', input)) } }))
   defineLifecycleTool(ctx, resolver, 'share_workspace', 'Request human approval before widening workspace access', 'recreateWorkspace', workspaceParameters, true)
 }
 async function unaryControl(resolver: WorkspaceResolver, method: string, input: unknown): Promise<unknown> { return resolver.control(method, input) }

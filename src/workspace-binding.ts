@@ -23,12 +23,8 @@ export class WorkspaceResolver {
     private readonly registry: any,
   ) {}
   async resolve(cwd: unknown): Promise<WorkspaceBinding> {
-    console.info("[dsh-container-plugin] resolving session workspace", { cwd });
     const workspace = await this.registry?.resolveByPath?.(String(cwd));
     if (workspace === undefined) {
-      console.error("[dsh-container-plugin] session workspace lookup failed", {
-        cwd,
-      });
       throw new Error(
         `no DH workspace owns session cwd ${JSON.stringify(cwd)}`,
       );
@@ -38,18 +34,9 @@ export class WorkspaceResolver {
       "",
     );
     const key = workspaceSlug(String(workspace.id));
-    console.info("[dsh-container-plugin] session workspace resolved", {
-      cwd,
-      workspacePath: workspace.path,
-      workspaceId: workspace.id,
-      workspaceSlug: key,
-    });
     return this.resolveBinding(key, relativePath);
   }
   resolveSlug(key: string): Promise<WorkspaceBinding> {
-    console.info("[dsh-container-plugin] resolving workspace binding", {
-      workspaceSlug: key,
-    });
     return this.resolveBinding(key, key);
   }
   private resolveBinding(

@@ -9,6 +9,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/containers/buildah/define"
 	"github.com/containers/podman/v5/pkg/bindings/images"
 	entities "github.com/containers/podman/v5/pkg/domain/entities/types"
 	"gitlab.com/Exagone313/dsh-container-plugin/internal/orchestrator/state"
@@ -39,6 +40,9 @@ type Builder struct {
 }
 
 func (b Builder) Build(image state.Image) (string, error) {
+	if b.Context == nil {
+		return "", fmt.Errorf("podman build context is not configured")
+	}
 	contents, err := Containerfile(image)
 	if err != nil {
 		return "", err
@@ -58,7 +62,7 @@ func (b Builder) Build(image state.Image) (string, error) {
 		return "", fmt.Errorf("pacman cache path must be an absolute path")
 	}
 	tag := "localhost/dsh-workspace/" + image.ImageID + ":latest"
-	options := entities.BuildOptions{ContainerFiles: []string{file}}
+	options := entities.BuildOptions{ContainerFiles: []string{file}, BuildOptions: define.BuildOptions{CommonBuildOpts: &define.CommonBuildOptions{}}}
 	options.ContextDirectory = dir
 	options.AdditionalTags = []string{tag}
 	options.CommonBuildOpts.Volumes = []string{b.HostPacmanCache + ":/var/cache/pacman/pkg"}

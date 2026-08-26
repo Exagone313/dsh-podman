@@ -162,8 +162,10 @@ func (s *Server) CreateWorkspace(ctx context.Context, request *ctl.CreateWorkspa
 	mounts := make([]state.Mount, 0, len(request.GetMounts()))
 	podmanMounts := make([]specs.Mount, 0, len(request.GetMounts()))
 	for _, mount := range request.GetMounts() {
+		s.log().Info("CreateWorkspace validating project mount", "project_name", mount.GetProjectName(), "container_projects_root", s.ProjectsRoot, "host_projects_root", s.HostProjectsRoot)
 		path, pathErr := ValidateProject(s.ProjectsRoot, mount.GetProjectName())
 		if pathErr != nil {
+			s.log().Error("CreateWorkspace project validation failed", "project_name", mount.GetProjectName(), "root", s.ProjectsRoot, "error", pathErr)
 			return nil, status.Error(codes.InvalidArgument, pathErr.Error())
 		}
 		mode := "read_only"
@@ -176,6 +178,7 @@ func (s *Server) CreateWorkspace(ctx context.Context, request *ctl.CreateWorkspa
 		if s.HostProjectsRoot != "" {
 			hostPath, pathErr = ValidateProject(s.HostProjectsRoot, mount.GetProjectName())
 			if pathErr != nil {
+				s.log().Error("CreateWorkspace host project validation failed", "project_name", mount.GetProjectName(), "root", s.HostProjectsRoot, "error", pathErr)
 				return nil, status.Error(codes.InvalidArgument, pathErr.Error())
 			}
 		}
@@ -287,7 +290,7 @@ func ValidateProject(root, name string) (string, error) {
 	path := filepath.Join(root, name)
 	info, err := os.Stat(path)
 	if err != nil || !info.IsDir() {
-		return "", fmt.Errorf("project does not exist")
+		return "", fmt.Errorf("project %q does not exist under %q", name, root)
 	}
 	return filepath.Abs(path)
 }

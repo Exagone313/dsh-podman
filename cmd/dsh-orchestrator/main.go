@@ -65,7 +65,7 @@ func main() {
 		if err != nil {
 			panic(fmt.Errorf("initialize Podman client: %w", err))
 		}
-		imageBuilder = &images.Builder{Context: podmanContext, StateDir: stateDir, HostPacmanCache: hostPacmanCache}
+		imageBuilder = &images.Builder{Context: podmanContext, StateDir: stateDir, HostPacmanCache: hostPacmanCache, Logger: logger}
 	} else {
 		_, orchSocketSet := os.LookupEnv("DSH_ORCH_PODMAN_SOCKET")
 		logger.Error("Podman API configuration is missing", "DSH_ORCH_PODMAN_SOCKET_present", orchSocketSet, "expected", "DSH_ORCH_PODMAN_SOCKET=unix:///run/podman/podman.sock")

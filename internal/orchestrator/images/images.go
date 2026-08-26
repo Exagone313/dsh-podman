@@ -3,6 +3,7 @@ package images
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -21,10 +22,11 @@ func Containerfile(image state.Image) (string, error) {
 			return "", fmt.Errorf("invalid package name %q", pkg)
 		}
 	}
-	lines := []string{"FROM " + image.BaseImage, "RUN pacman -Sy --noconfirm"}
+	lines := []string{"FROM " + image.BaseImage, "RUN ls -la /var/cache/pacman/pkg && pacman -Sy --noconfirm"}
 	if len(image.Packages) > 0 {
 		lines[1] += " " + strings.Join(image.Packages, " ")
 	}
+	lines[1] += " && ls -la /var/cache/pacman/pkg"
 	lines = append(lines, "ENTRYPOINT [\"/usr/local/bin/dsh-workspace-agent\"]")
 	return strings.Join(lines, "\n") + "\n", nil
 }
@@ -33,6 +35,7 @@ type Builder struct {
 	Context         context.Context
 	StateDir        string
 	HostPacmanCache string
+	Logger          *slog.Logger
 }
 
 func (b Builder) Build(image state.Image) (string, error) {
@@ -59,9 +62,16 @@ func (b Builder) Build(image state.Image) (string, error) {
 	options.ContextDirectory = dir
 	options.AdditionalTags = []string{tag}
 	options.TransientMounts = []string{b.HostPacmanCache + ":/var/cache/pacman/pkg"}
+	logger := b.Logger
+	if logger == nil {
+		logger = slog.Default()
+	}
+	logger.Info("building workspace image", "image_id", image.ImageID, "base_image", image.BaseImage, "packages", image.Packages, "context_directory", dir, "container_files", options.ContainerFiles, "tags", options.AdditionalTags, "transient_mounts", options.TransientMounts, "host_pacman_cache", b.HostPacmanCache)
 	_, err = images.Build(b.Context, []string{file}, options)
 	if err != nil {
+		logger.Error("workspace image build failed", "image_id", image.ImageID, "error", err)
 		return "", err
 	}
+	logger.Info("workspace image build completed", "image_id", image.ImageID, "image_tag", tag)
 	return tag, nil
 }

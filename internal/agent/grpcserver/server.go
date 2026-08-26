@@ -7,9 +7,11 @@ import (
 	"log/slog"
 	"os"
 	osexec "os/exec"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"gitlab.com/Exagone313/dsh-container-plugin/internal/agent/exec"
 	workspacefs "gitlab.com/Exagone313/dsh-container-plugin/internal/agent/fs"
@@ -234,15 +236,32 @@ func (s *Server) WriteFile(stream agent.WorkspaceAgent_WriteFileServer) error {
 	if start.GetTruncate() {
 		flags |= os.O_TRUNC
 	}
-	file, err := os.OpenFile(path, flags, 0600)
+	if !start.GetCreate() {
+		if _, statErr := os.Stat(path); statErr != nil {
+			return status.Error(codes.NotFound, statErr.Error())
+		}
+	}
+	temporary, err := os.CreateTemp(filepath.Dir(path), ".dsh-write-*")
 	if err != nil {
 		return status.Error(codes.Internal, err.Error())
 	}
-	defer file.Close()
+	temporaryName := temporary.Name()
+	defer os.Remove(temporaryName)
+	if err := temporary.Chmod(0600); err != nil {
+		temporary.Close()
+		return status.Error(codes.Internal, err.Error())
+	}
+	file := temporary
 	var written int64
 	for {
 		chunk, recvErr := stream.Recv()
 		if errors.Is(recvErr, io.EOF) {
+			if err := file.Close(); err != nil {
+				return status.Error(codes.Internal, err.Error())
+			}
+			if err := os.Rename(temporaryName, path); err != nil {
+				return status.Error(codes.Internal, err.Error())
+			}
 			return stream.SendAndClose(&agent.WriteFileResponse{BytesWritten: written})
 		}
 		if recvErr != nil {
@@ -270,7 +289,7 @@ func (s *Server) Stat(_ context.Context, request *agent.StatRequest) (*agent.Sta
 		}
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	return &agent.StatResponse{Exists: true, IsDir: info.IsDir(), Size: info.Size(), Mode: info.Mode().String(), ModifiedAt: info.ModTime().UTC().Format("2006-01-02T15:04:05Z07:00")}, nil
+	return &agent.StatResponse{Exists: true, IsDir: info.IsDir(), Size: info.Size(), Mode: info.Mode().String(), ModifiedAt: info.ModTime().UTC().Format(time.RFC3339Nano)}, nil
 }
 func (s *Server) ReadDir(_ context.Context, request *agent.ReadDirRequest) (*agent.ReadDirResponse, error) {
 	slog.Info("agent ReadDir requested", "path", request.GetPath())

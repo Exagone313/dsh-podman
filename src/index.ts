@@ -243,22 +243,40 @@ function createFilesystemProvider(resolver: WorkspaceResolver): object {
       });
       return Buffer.concat(chunks).toString("utf8");
     },
-    writeText: async (target: any, content: string) => {
+    writeText: async (target: any, content: string, expected?: any) => {
       const current = await agentStatResponse(target);
+      const currentVersion = current.exists ? agentVersion(current) : undefined;
+      if (expected?.kind === "createIfAbsent" && current.exists) {
+        throw new Error(`file already exists: ${target.displayPath}`);
+      }
+      if (
+        expected?.kind === "replaceIfVersion" &&
+        currentVersion !== expected.version
+      ) {
+        throw new Error(`file version is stale: ${target.displayPath}`);
+      }
       const before = current.exists ? await readRemoteText(target) : null;
       return new Promise((resolveDone, reject) => {
         const call = (target.binding.agent as any).writeFile(
           metadata(target.binding.token),
           {},
-          (error: Error | null, result: unknown) =>
-            error
-              ? reject(error)
-              : resolveDone({
-                  operation: current.exists ? "update" : "create",
-                  version: `agent:${createHash("sha256").update(content).digest("hex")}`,
-                  before,
-                  after: content,
-                }),
+          async (error: Error | null, _result: unknown) => {
+            if (error) {
+              reject(error);
+              return;
+            }
+            try {
+              const after = await agentStatResponse(target);
+              resolveDone({
+                operation: current.exists ? "update" : "create",
+                version: agentVersion(after),
+                before,
+                after: content,
+              });
+            } catch (statError) {
+              reject(statError);
+            }
+          },
         );
         call.write({
           start: { path: target.targetKey, create: true, truncate: true },
@@ -292,6 +310,10 @@ function createFilesystemProvider(resolver: WorkspaceResolver): object {
   };
 }
 
+function agentVersion(result: any): string {
+  return `agent:${result.modifiedAt ?? ""}:${result.size ?? 0}:${result.mode ?? ""}`;
+}
+
 async function writeAgentFile(target: any, content: string): Promise<void> {
   await new Promise<void>((resolveDone, reject) => {
     const call = target.binding.agent.writeFile(
@@ -311,7 +333,7 @@ async function agentStat(target: any): Promise<any> {
   const result = await agentStatResponse(target);
   if (!result.exists) return undefined;
   return {
-    version: `agent:${result.modifiedAt ?? ""}:${result.size ?? 0}:${result.mode ?? ""}`,
+    version: agentVersion(result),
     type: result.isDir ? "directory" : "file",
     ...(result.isDir ? {} : { size: Number(result.size ?? 0) }),
   };

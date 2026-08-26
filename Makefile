@@ -20,7 +20,7 @@ build: build-go npm-build
 
 build-go: $(BIN_DIR)/dsh-workspace-agent $(BIN_DIR)/dsh-orchestrator
 
-image:
+image: build-go
 	$(CONTAINER) build -f Containerfile.orchestrator -t localhost/dsh-orchestrator:latest .
 
 

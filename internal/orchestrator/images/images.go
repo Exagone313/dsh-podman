@@ -61,12 +61,12 @@ func (b Builder) Build(image state.Image) (string, error) {
 	options := entities.BuildOptions{ContainerFiles: []string{file}}
 	options.ContextDirectory = dir
 	options.AdditionalTags = []string{tag}
-	options.TransientMounts = []string{b.HostPacmanCache + ":/var/cache/pacman/pkg"}
+	options.CommonBuildOpts.Volumes = []string{b.HostPacmanCache + ":/var/cache/pacman/pkg"}
 	logger := b.Logger
 	if logger == nil {
 		logger = slog.Default()
 	}
-	logger.Info("building workspace image", "image_id", image.ImageID, "base_image", image.BaseImage, "packages", image.Packages, "context_directory", dir, "container_files", options.ContainerFiles, "tags", options.AdditionalTags, "transient_mounts", options.TransientMounts, "host_pacman_cache", b.HostPacmanCache)
+	logger.Info("building workspace image", "image_id", image.ImageID, "base_image", image.BaseImage, "packages", image.Packages, "context_directory", dir, "container_files", options.ContainerFiles, "tags", options.AdditionalTags, "build_volumes", options.CommonBuildOpts.Volumes, "host_pacman_cache", b.HostPacmanCache)
 	_, err = images.Build(b.Context, []string{file}, options)
 	if err != nil {
 		logger.Error("workspace image build failed", "image_id", image.ImageID, "error", err)

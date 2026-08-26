@@ -23,11 +23,10 @@ func Containerfile(image state.Image) (string, error) {
 			return "", fmt.Errorf("invalid package name %q", pkg)
 		}
 	}
-	lines := []string{"FROM " + image.BaseImage, "RUN id && echo 'cache mounts:' && (grep '/var/cache/pacman/pkg' /proc/self/mountinfo || true) && echo 'cache filesystem:' && df -T /var/cache/pacman/pkg && echo 'cache before:' && ls -lad /var/cache/pacman/pkg && ls -la /var/cache/pacman/pkg && pacman -Sy --noconfirm"}
+	lines := []string{"FROM " + image.BaseImage, "RUN pacman -Sy --noconfirm"}
 	if len(image.Packages) > 0 {
 		lines[1] += " " + strings.Join(image.Packages, " ")
 	}
-	lines[1] += " && echo 'cache after:' && ls -la /var/cache/pacman/pkg"
 	lines = append(lines, "ENTRYPOINT [\"/usr/local/bin/dsh-workspace-agent\"]")
 	return strings.Join(lines, "\n") + "\n", nil
 }

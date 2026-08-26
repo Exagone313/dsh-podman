@@ -78,6 +78,15 @@ func (c *Client) Stop(name string) error {
 	}
 	return err
 }
+func (c *Client) ContainerExists(name string) (bool, error) {
+	exists, err := containers.Exists(c.ctx, name, nil)
+	if err != nil {
+		c.log().Error("workspace container lookup failed", "container_name", name, "error", err)
+	} else {
+		c.log().Info("workspace container lookup completed", "container_name", name, "exists", exists)
+	}
+	return exists, err
+}
 func (c *Client) ImageExists(name string) (bool, error) {
 	exists, err := images.Exists(c.ctx, name, nil)
 	if err != nil {

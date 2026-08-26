@@ -79,6 +79,16 @@ func (s *Server) DescribeWorkspace(_ context.Context, request *ctl.DescribeWorks
 	}
 	for _, workspace := range workspaces {
 		if workspace.WorkspaceSlug == request.GetWorkspaceSlug() {
+			if s.Podman != nil {
+				exists, containerErr := s.Podman.ContainerExists(workspace.ContainerName)
+				if containerErr != nil {
+					return nil, status.Error(codes.Internal, containerErr.Error())
+				}
+				if !exists {
+					s.log().Warn("DescribeWorkspace found stale state", "workspace_slug", workspace.WorkspaceSlug, "container_name", workspace.ContainerName)
+					return nil, status.Error(codes.NotFound, "workspace container not found")
+				}
+			}
 			s.log().Info("control request completed", "method", "DescribeWorkspace", "workspace_slug", workspace.WorkspaceSlug, "status", workspace.Status)
 			return toProto(workspace), nil
 		}
@@ -216,7 +226,16 @@ func (s *Server) CreateWorkspace(ctx context.Context, request *ctl.CreateWorkspa
 	agentSocket := filepath.Join(s.SocketsRoot, name, "agent.sock")
 	workspace := state.Workspace{WorkspaceSlug: request.GetWorkspaceSlug(), ContainerName: name, ImageID: request.GetImageId(), Mounts: mounts, Status: "running", AgentSocketPath: agentSocket, AgentToken: secret, CreatedAt: time.Now().UTC().Format(time.RFC3339)}
 	all, _ := s.Store.Workspaces()
-	all = append(all, workspace)
+	replaced := false
+	for i := range all {
+		if all[i].WorkspaceSlug == workspace.WorkspaceSlug {
+			all[i] = workspace
+			replaced = true
+		}
+	}
+	if !replaced {
+		all = append(all, workspace)
+	}
 	if err := s.Store.SaveWorkspaces(all); err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}

@@ -26,7 +26,8 @@ func New(ctx context.Context, socket, socketRoot, agentBinary, hostSocketRoot, p
 	return &Client{ctx: connected, socketRoot: socketRoot, hostSocketRoot: hostSocketRoot, projectRoot: projectRoot, agentBinary: agentBinary, hostAgentBinary: hostAgentBinary}, nil
 }
 func (c *Client) CreateWorkspace(name, image, token string, mounts []specs.Mount) error {
-	socketDir := filepath.Join(c.hostSocketRoot, name)
+	socketDir := filepath.Join(c.socketRoot, name)
+	hostSocketDir := filepath.Join(c.hostSocketRoot, name)
 	if err := os.MkdirAll(socketDir, 0700); err != nil {
 		return err
 	}
@@ -36,7 +37,7 @@ func (c *Client) CreateWorkspace(name, image, token string, mounts []specs.Mount
 	generator.Command = []string{c.agentBinary}
 	generator.Env = map[string]string{"DSH_AGENT_TOKEN": token, "DSH_AGENT_SOCKET": filepath.Join(c.socketRoot, name, "agent.sock"), "DSH_WORKSPACE_ROOT": c.projectRoot}
 	generator.Init = &init
-	generator.Mounts = append(mounts, specs.Mount{Type: "bind", Source: c.hostAgentBinary, Destination: c.agentBinary, Options: []string{"ro"}}, specs.Mount{Type: "bind", Source: socketDir, Destination: filepath.Join(c.socketRoot, name), Options: []string{"rw"}})
+	generator.Mounts = append(mounts, specs.Mount{Type: "bind", Source: c.hostAgentBinary, Destination: c.agentBinary, Options: []string{"ro"}}, specs.Mount{Type: "bind", Source: hostSocketDir, Destination: filepath.Join(c.socketRoot, name), Options: []string{"rw"}})
 	if _, err := containers.CreateWithSpec(c.ctx, generator, nil); err != nil {
 		return fmt.Errorf("create container: %w", err)
 	}

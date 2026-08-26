@@ -14,8 +14,8 @@ export class WorkspaceResolver {
       throw new Error(`no DH workspace owns session cwd ${JSON.stringify(cwd)}`)
     }
     const relativePath = String(workspace.path).replace(`${this.config.projectsRoot}/`, '')
-    const key = workspaceSlug(relativePath)
-    console.info('[dsh-container-plugin] session workspace resolved', { cwd, workspacePath: workspace.path, workspaceSlug: key })
+    const key = workspaceSlug(String(workspace.id))
+    console.info('[dsh-container-plugin] session workspace resolved', { cwd, workspacePath: workspace.path, workspaceId: workspace.id, workspaceSlug: key })
     return this.resolveBinding(key, relativePath)
   }
   resolveSlug(key: string): Promise<WorkspaceBinding> {

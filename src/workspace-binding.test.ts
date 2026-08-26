@@ -6,5 +6,5 @@ test('workspace slugs are stable and container-safe', () => {
   assert.equal(workspaceSlug({ projectName: 'my/project' }), 'my-project')
   assert.equal(workspaceSlug({ id: 'session-1' }), 'session-1')
   assert.equal(workspaceSlug({ projectName: '../../etc' }), 'etc')
-  assert.equal(workspaceSlug('team/nested/test-dh'), 'team-nested-test-dh')
+  assert.equal(workspaceSlug('workspace-123'), 'workspace-123')
 })

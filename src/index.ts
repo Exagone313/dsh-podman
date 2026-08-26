@@ -70,6 +70,14 @@ export function apply(ctx: any, config: PluginConfig = {}): void {
 
 function createSubprocessProvider(resolver: WorkspaceResolver): object {
   return {
+    resolveExecutable: async (command: string) => {
+      if (command.length === 0)
+        throw new Error("executable name must be non-empty");
+      if (command.startsWith("/")) return command;
+      if (command.includes("/"))
+        throw new Error("relative executable paths are not supported");
+      return `/usr/bin/${command}`;
+    },
     spawn: (spec: any) => {
       if (
         !Array.isArray(spec.argv) ||
@@ -247,7 +255,37 @@ function createFilesystemProvider(resolver: WorkspaceResolver): object {
       unaryAgent(target, "mkdir", { path: target.targetKey, parents }),
     remove: async (target: any, recursive = false) =>
       unaryAgent(target, "delete", { path: target.targetKey, recursive }),
+    editText: async (target: any, edit: any) => {
+      const before = await readRemoteText(target);
+      if (edit.oldString.length === 0)
+        throw new Error("oldString must be non-empty");
+      const after = edit.replaceAll
+        ? before.split(edit.oldString).join(edit.newString)
+        : before.replace(edit.oldString, edit.newString);
+      if (after === before) throw new Error("oldString was not found");
+      await writeAgentFile(target, after);
+      return {
+        version: `agent:${createHash("sha256").update(after).digest("hex")}`,
+        before,
+        after,
+      };
+    },
   };
+}
+
+async function writeAgentFile(target: any, content: string): Promise<void> {
+  await new Promise<void>((resolveDone, reject) => {
+    const call = target.binding.agent.writeFile(
+      metadata(target.binding.token),
+      {},
+      (error: Error | null) => (error ? reject(error) : resolveDone()),
+    );
+    call.write({
+      start: { path: target.targetKey, create: true, truncate: true },
+    });
+    call.write({ dataChunk: Buffer.from(content) });
+    call.end();
+  });
 }
 
 async function agentStat(target: any): Promise<any> {

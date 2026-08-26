@@ -18,6 +18,8 @@ type Client struct {
 	socketRoot, hostSocketRoot, projectRoot, agentBinary, hostAgentBinary string
 }
 
+const agentDestination = "/usr/local/bin/dsh-workspace-agent"
+
 func New(ctx context.Context, socket, socketRoot, agentBinary, hostSocketRoot, projectRoot, hostAgentBinary string) (*Client, error) {
 	connected, err := bindings.NewConnection(ctx, socket)
 	if err != nil {
@@ -41,10 +43,10 @@ func (c *Client) CreateWorkspace(name, image, token string, mounts []specs.Mount
 	init := true
 	generator := specgen.NewSpecGenerator(image, false)
 	generator.Name = name
-	generator.Command = []string{c.agentBinary}
+	generator.Command = []string{agentDestination}
 	generator.Env = map[string]string{"DSH_AGENT_TOKEN": token, "DSH_AGENT_SOCKET": filepath.Join(c.socketRoot, name, "agent.sock"), "DSH_WORKSPACE_ROOT": c.projectRoot}
 	generator.Init = &init
-	generator.Mounts = append(mounts, specs.Mount{Type: "bind", Source: c.hostAgentBinary, Destination: c.agentBinary, Options: []string{"ro"}}, specs.Mount{Type: "bind", Source: hostSocketDir, Destination: filepath.Join(c.socketRoot, name), Options: []string{"rw"}})
+	generator.Mounts = append(mounts, specs.Mount{Type: "bind", Source: c.hostAgentBinary, Destination: agentDestination, Options: []string{"ro"}}, specs.Mount{Type: "bind", Source: hostSocketDir, Destination: filepath.Join(c.socketRoot, name), Options: []string{"rw"}})
 	if _, err := containers.CreateWithSpec(c.ctx, generator, nil); err != nil {
 		return fmt.Errorf("create container: %w", err)
 	}

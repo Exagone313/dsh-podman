@@ -78,6 +78,8 @@ function createSubprocessProvider(resolver: WorkspaceResolver): object {
         spec.argv[0] === ""
       )
         throw new Error("argv must contain a program");
+      const stdoutReader = outputReader(spec.stdio?.stdout);
+      const stderrReader = outputReader(spec.stdio?.stderr);
       const state = {
         pid: -1,
         stdin: undefined as any,
@@ -89,10 +91,16 @@ function createSubprocessProvider(resolver: WorkspaceResolver): object {
           new Promise<any>((resolveDone, reject) => {
             const stream = (binding.agent as any).exec(metadata(binding.token));
             stream.on("data", (output: any) => {
-              if (output.stdoutChunk && state.stdout)
-                state.stdout.write(output.stdoutChunk);
-              if (output.stderrChunk && state.stderr)
-                state.stderr.write(output.stderrChunk);
+              if (output.stdoutChunk) {
+                const data = Buffer.from(output.stdoutChunk);
+                stdoutReader?.append(data);
+                state.stdout?.write(data);
+              }
+              if (output.stderrChunk) {
+                const data = Buffer.from(output.stderrChunk);
+                stderrReader?.append(data);
+                state.stderr?.write(data);
+              }
               if (output.exit) {
                 state.stdout?.end();
                 state.stderr?.end();
@@ -112,23 +120,62 @@ function createSubprocessProvider(resolver: WorkspaceResolver): object {
               },
             });
             if (spec.stdio?.stdin !== "pipe") stream.end();
-            else
-              state.stdin = new PassThrough({
-                final: () => {
-                  stream.end();
-                },
-              });
+            else {
+              state.stdin = new PassThrough();
+              state.stdin.on("data", (data: Buffer) =>
+                stream.write({ stdinChunk: data }),
+              );
+              state.stdin.on("end", () => stream.end());
+            }
           }),
       );
       return {
         ...state,
-        collected: {},
+        collected: {
+          ...(stdoutReader === undefined ? {} : { stdout: stdoutReader }),
+          ...(stderrReader === undefined ? {} : { stderr: stderrReader }),
+        },
         done,
         terminate: () => undefined,
         waitForExit: async () => {
           await done;
           return true;
         },
+      };
+    },
+  };
+}
+
+function outputReader(
+  mode: unknown,
+):
+  | {
+      append: (data: Buffer) => void;
+      readFrom: (offset: number) => {
+        text: string;
+        nextOffset: number;
+        lossy: boolean;
+      };
+    }
+  | undefined {
+  if (typeof mode !== "object" || mode === null) return undefined;
+  const maxBytes = Number((mode as { maxBytes?: number }).maxBytes);
+  if (!Number.isFinite(maxBytes) || maxBytes < 0) return undefined;
+  let total = 0;
+  let retained = Buffer.alloc(0);
+  return {
+    append(data) {
+      total += data.length;
+      retained = Buffer.concat([retained, data]).subarray(-maxBytes);
+    },
+    readFrom(offset) {
+      const start = Math.max(0, total - retained.length);
+      const requested = Math.max(0, Number.isFinite(offset) ? offset : 0);
+      const local = Math.max(0, requested - start);
+      return {
+        text: retained.subarray(local).toString("utf8"),
+        nextOffset: total,
+        lossy: requested < start,
       };
     },
   };

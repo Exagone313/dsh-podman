@@ -36,7 +36,6 @@ func ContainerfileWithCache(image state.Image, cacheSource string) (string, erro
 	if len(image.Packages) > 0 {
 		lines[1] += " " + strings.Join(image.Packages, " ")
 	}
-	lines[1] += " && pacman -Scc --noconfirm"
 	lines = append(lines, "ENTRYPOINT [\"/usr/local/bin/dsh-workspace-agent\"]")
 	return strings.Join(lines, "\n") + "\n", nil
 }

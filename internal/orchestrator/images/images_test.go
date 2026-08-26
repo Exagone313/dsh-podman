@@ -30,4 +30,7 @@ func TestContainerfileUsesConfiguredPacmanCache(t *testing.T) {
 	if !strings.Contains(file, "source=/var/cache/dsh/pacman") {
 		t.Fatalf("cache source missing: %s", file)
 	}
+	if strings.Contains(file, "pacman -Scc") {
+		t.Fatalf("Containerfile cleans the persistent pacman cache: %s", file)
+	}
 }

@@ -16,12 +16,23 @@ import (
 var packageName = regexp.MustCompile(`^[A-Za-z0-9@+._:-]+$`)
 
 func Containerfile(image state.Image) (string, error) {
+	return ContainerfileWithCache(image, "")
+}
+
+func ContainerfileWithCache(image state.Image, cacheSource string) (string, error) {
 	for _, pkg := range image.Packages {
 		if !packageName.MatchString(pkg) {
 			return "", fmt.Errorf("invalid package name %q", pkg)
 		}
 	}
-	lines := []string{"FROM " + image.BaseImage, "RUN --mount=type=cache,target=/var/cache/pacman/pkg,sharing=locked,id=pacman-cache pacman -Sy --noconfirm"}
+	if cacheSource != "" && !filepath.IsAbs(cacheSource) {
+		return "", fmt.Errorf("pacman cache source must be an absolute path")
+	}
+	mount := "RUN --mount=type=cache,target=/var/cache/pacman/pkg,sharing=locked,id=pacman-cache"
+	if cacheSource != "" {
+		mount += ",source=" + cacheSource
+	}
+	lines := []string{"FROM " + image.BaseImage, mount + " pacman -Sy --noconfirm"}
 	if len(image.Packages) > 0 {
 		lines[1] += " " + strings.Join(image.Packages, " ")
 	}
@@ -31,12 +42,13 @@ func Containerfile(image state.Image) (string, error) {
 }
 
 type Builder struct {
-	Context  context.Context
-	StateDir string
+	Context         context.Context
+	StateDir        string
+	HostPacmanCache string
 }
 
 func (b Builder) Build(image state.Image) (string, error) {
-	contents, err := Containerfile(image)
+	contents, err := ContainerfileWithCache(image, b.HostPacmanCache)
 	if err != nil {
 		return "", err
 	}

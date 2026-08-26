@@ -21,7 +21,8 @@ The orchestrator deployment variables are `DSH_ORCH_STATE`,
 `DSH_ORCH_PODMAN_SOCKET`, `DSH_ORCH_HOST_PROJECTS_ROOT`,
 `DSH_ORCH_HOST_SOCKETS_ROOT`, and `DSH_ORCH_HOST_AGENT_BIN`. The optional
 `DSH_ORCH_DEFAULT_IMAGE` selects the default image ID and otherwise defaults
-to `arch-base`.
+to `arch-base`. `DSH_ORCH_HOST_PACMAN_CACHE` supplies the host-absolute
+Buildah cache directory used by workspace-image builds.
 
 `DSH_ORCH_PROJECTS_ROOT` is the shared project prefix inside all containers;
 `DSH_ORCH_HOST_PROJECTS_ROOT` is the corresponding real host prefix used as

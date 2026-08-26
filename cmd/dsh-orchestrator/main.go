@@ -33,6 +33,7 @@ func main() {
 	hostSocketsRoot := getenv("DSH_ORCH_HOST_SOCKETS_ROOT", socketsRoot)
 	agentBinary := getenv("DSH_ORCH_AGENT_BIN", "")
 	hostAgentBinary := getenv("DSH_ORCH_HOST_AGENT_BIN", agentBinary)
+	hostPacmanCache := getenv("DSH_ORCH_HOST_PACMAN_CACHE", "")
 	if err := os.MkdirAll(filepath.Dir(socket), 0700); err != nil {
 		panic(err)
 	}
@@ -64,7 +65,7 @@ func main() {
 		if err != nil {
 			panic(fmt.Errorf("initialize Podman client: %w", err))
 		}
-		imageBuilder = &images.Builder{Context: podmanContext, StateDir: stateDir}
+		imageBuilder = &images.Builder{Context: podmanContext, StateDir: stateDir, HostPacmanCache: hostPacmanCache}
 	} else {
 		_, orchSocketSet := os.LookupEnv("DSH_ORCH_PODMAN_SOCKET")
 		logger.Error("Podman API configuration is missing", "DSH_ORCH_PODMAN_SOCKET_present", orchSocketSet, "expected", "DSH_ORCH_PODMAN_SOCKET=unix:///run/podman/podman.sock")

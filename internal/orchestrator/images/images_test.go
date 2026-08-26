@@ -21,3 +21,13 @@ func TestContainerfileRejectsCommandInjection(t *testing.T) {
 		t.Fatal("accepted invalid package")
 	}
 }
+
+func TestContainerfileUsesConfiguredPacmanCache(t *testing.T) {
+	file, err := ContainerfileWithCache(state.Image{BaseImage: "archlinux"}, "/var/cache/dsh/pacman")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(file, "source=/var/cache/dsh/pacman") {
+		t.Fatalf("cache source missing: %s", file)
+	}
+}

@@ -59,7 +59,10 @@ export class WorkspaceResolver {
   ): Promise<WorkspaceBinding> {
     let binding = this.bindings.get(key);
     if (binding === undefined) {
-      binding = this.create(key, projectName);
+      binding = this.create(key, projectName).catch((error: unknown) => {
+        if (this.bindings.get(key) === binding) this.bindings.delete(key);
+        throw error;
+      });
       this.bindings.set(key, binding);
     }
     return binding;

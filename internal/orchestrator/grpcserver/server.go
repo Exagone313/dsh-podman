@@ -248,7 +248,7 @@ func (s *Server) RebuildImage(ctx context.Context, request *ctl.RebuildImageRequ
 	return &ctl.Image{ImageId: image.ImageID, BaseImage: image.BaseImage, Packages: image.Packages, ImageTag: image.ImageTag, BuiltAt: image.BuiltAt}, nil
 }
 func defaultImageID() string {
-	if value := os.Getenv("DSH_DEFAULT_IMAGE"); value != "" {
+	if value := os.Getenv("DSH_ORCH_DEFAULT_IMAGE"); value != "" {
 		return value
 	}
 	return "arch-base"

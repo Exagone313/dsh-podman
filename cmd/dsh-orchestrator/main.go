@@ -26,9 +26,9 @@ func main() {
 		return
 	}
 	socketsRoot := getenv("DSH_ORCH_SOCKETS_ROOT", "/run/dsh-sockets")
-	socket := getenv("DSH_CONTROL_SOCKET", filepath.Join(socketsRoot, "control.sock"))
-	root := getenv("DSH_ORCH_PROJECTS_ROOT", getenv("DSH_PROJECTS_ROOT", "/projects"))
-	stateDir := getenv("DSH_ORCH_STATE", getenv("DSH_STATE_DIR", "/var/lib/dsh-orchestrator"))
+	socket := filepath.Join(socketsRoot, "control.sock")
+	root := getenv("DSH_ORCH_PROJECTS_ROOT", "/projects")
+	stateDir := getenv("DSH_ORCH_STATE", "/var/lib/dsh-orchestrator")
 	hostProjectsRoot := getenv("DSH_ORCH_HOST_PROJECTS_ROOT", root)
 	hostSocketsRoot := getenv("DSH_ORCH_HOST_SOCKETS_ROOT", socketsRoot)
 	agentBinary := getenv("DSH_ORCH_AGENT_BIN", "")

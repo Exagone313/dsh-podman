@@ -16,23 +16,12 @@ import (
 var packageName = regexp.MustCompile(`^[A-Za-z0-9@+._:-]+$`)
 
 func Containerfile(image state.Image) (string, error) {
-	return ContainerfileWithCache(image, "")
-}
-
-func ContainerfileWithCache(image state.Image, cacheSource string) (string, error) {
 	for _, pkg := range image.Packages {
 		if !packageName.MatchString(pkg) {
 			return "", fmt.Errorf("invalid package name %q", pkg)
 		}
 	}
-	if cacheSource != "" && !filepath.IsAbs(cacheSource) {
-		return "", fmt.Errorf("pacman cache source must be an absolute path")
-	}
-	mount := "RUN --mount=type=cache,target=/var/cache/pacman/pkg,sharing=locked,id=pacman-cache"
-	if cacheSource != "" {
-		mount += ",source=" + cacheSource
-	}
-	lines := []string{"FROM " + image.BaseImage, mount + " pacman -Sy --noconfirm"}
+	lines := []string{"FROM " + image.BaseImage, "RUN pacman -Sy --noconfirm"}
 	if len(image.Packages) > 0 {
 		lines[1] += " " + strings.Join(image.Packages, " ")
 	}
@@ -47,7 +36,7 @@ type Builder struct {
 }
 
 func (b Builder) Build(image state.Image) (string, error) {
-	contents, err := ContainerfileWithCache(image, b.HostPacmanCache)
+	contents, err := Containerfile(image)
 	if err != nil {
 		return "", err
 	}
@@ -62,10 +51,14 @@ func (b Builder) Build(image state.Image) (string, error) {
 	if err := os.WriteFile(file, []byte(contents), 0600); err != nil {
 		return "", err
 	}
+	if b.HostPacmanCache == "" || !filepath.IsAbs(b.HostPacmanCache) {
+		return "", fmt.Errorf("pacman cache path must be an absolute path")
+	}
 	tag := "localhost/dsh-workspace/" + image.ImageID + ":latest"
 	options := entities.BuildOptions{ContainerFiles: []string{file}}
 	options.ContextDirectory = dir
 	options.AdditionalTags = []string{tag}
+	options.TransientMounts = []string{b.HostPacmanCache + ":/var/cache/pacman/pkg"}
 	_, err = images.Build(b.Context, []string{file}, options)
 	if err != nil {
 		return "", err

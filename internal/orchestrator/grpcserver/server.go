@@ -150,6 +150,7 @@ func (s *Server) CreateWorkspace(ctx context.Context, request *ctl.CreateWorkspa
 			return nil, status.Error(codes.Internal, fmt.Sprintf("build default image: %v", err))
 		}
 		images = append(images, image)
+		imageIndex = len(images) - 1
 		s.log().Info("CreateWorkspace auto-provisioned image", "image_id", image.ImageID, "image_tag", image.ImageTag)
 		if err := s.Store.SaveImages(images); err != nil {
 			return nil, status.Error(codes.Internal, err.Error())
@@ -184,13 +185,30 @@ func (s *Server) CreateWorkspace(ctx context.Context, request *ctl.CreateWorkspa
 	if s.Podman == nil {
 		return nil, status.Error(codes.FailedPrecondition, "podman is not configured")
 	}
-	name := "dsh-workspace-" + request.GetWorkspaceSlug()
-	imageTag := ""
-	for _, image := range images {
-		if image.ImageID == request.GetImageId() {
-			imageTag = image.ImageTag
-		}
+	imageTag := images[imageIndex].ImageTag
+	exists, imageErr := s.Podman.ImageExists(imageTag)
+	if imageErr != nil {
+		return nil, status.Error(codes.Internal, imageErr.Error())
 	}
+	if !exists {
+		s.log().Warn("CreateWorkspace image state is stale", "image_id", request.GetImageId(), "image_tag", imageTag)
+		if request.GetImageId() != defaultImageID() || s.ImageBuilder == nil {
+			return nil, status.Error(codes.NotFound, "built image not found")
+		}
+		image := images[imageIndex]
+		image.ImageTag, err = s.ImageBuilder.Build(image)
+		if err != nil {
+			return nil, status.Error(codes.Internal, fmt.Sprintf("rebuild default image: %v", err))
+		}
+		image.BuiltAt = time.Now().UTC().Format(time.RFC3339)
+		images[imageIndex] = image
+		if err := s.Store.SaveImages(images); err != nil {
+			return nil, status.Error(codes.Internal, err.Error())
+		}
+		imageTag = image.ImageTag
+		s.log().Info("CreateWorkspace rebuilt stale default image", "image_id", image.ImageID, "image_tag", image.ImageTag)
+	}
+	name := "dsh-workspace-" + request.GetWorkspaceSlug()
 	if err := s.Podman.CreateWorkspace(name, imageTag, secret, podmanMounts); err != nil {
 		s.log().Error("control request failed", "method", "CreateWorkspace", "workspace_slug", request.GetWorkspaceSlug(), "error", err)
 		return nil, status.Error(codes.Internal, err.Error())

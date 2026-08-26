@@ -8,6 +8,7 @@ import (
 
 	"github.com/containers/podman/v5/pkg/bindings"
 	"github.com/containers/podman/v5/pkg/bindings/containers"
+	"github.com/containers/podman/v5/pkg/bindings/images"
 	"github.com/containers/podman/v5/pkg/specgen"
 	"github.com/opencontainers/runtime-spec/specs-go"
 )
@@ -41,7 +42,8 @@ func (c *Client) CreateWorkspace(name, image, token string, mounts []specs.Mount
 	}
 	return containers.Start(c.ctx, name, nil)
 }
-func (c *Client) Stop(name string) error { return containers.Stop(c.ctx, name, nil) }
+func (c *Client) Stop(name string) error                { return containers.Stop(c.ctx, name, nil) }
+func (c *Client) ImageExists(name string) (bool, error) { return images.Exists(c.ctx, name, nil) }
 func (c *Client) Remove(name string) error {
 	_, err := containers.Remove(c.ctx, name, &containers.RemoveOptions{})
 	return err

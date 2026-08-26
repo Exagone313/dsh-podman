@@ -23,5 +23,9 @@ The orchestrator deployment variables are `DSH_ORCH_STATE`,
 `DSH_ORCH_DEFAULT_IMAGE` selects the default image ID and otherwise defaults
 to `arch-base`.
 
+`DSH_ORCH_PROJECTS_ROOT` is the shared project prefix inside all containers;
+`DSH_ORCH_HOST_PROJECTS_ROOT` is the corresponding real host prefix used as
+the source of bind mounts.
+
 The plugin auto-creates a missing workspace using its configured default image and a
 single read-write project mount. It never falls back to host execution.

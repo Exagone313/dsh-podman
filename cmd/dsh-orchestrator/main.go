@@ -60,7 +60,7 @@ func main() {
 			panic(fmt.Errorf("Podman API is unreachable: %w", connectionErr))
 		}
 		logger.Info("Podman API reachable", "socket", podmanSocket)
-		podmanClient, err = podman.New(context.Background(), podmanSocket, socketsRoot, agentBinary, hostSocketsRoot, hostAgentBinary)
+		podmanClient, err = podman.New(context.Background(), podmanSocket, socketsRoot, agentBinary, hostSocketsRoot, root, hostAgentBinary)
 		if err != nil {
 			panic(fmt.Errorf("initialize Podman client: %w", err))
 		}

@@ -37,7 +37,7 @@ func main() {
 	if root == "" {
 		root = "/workspace"
 	}
-	filesystem, err := workspacefs.New([]workspacefs.Mount{{Virtual: "/workspace", Host: root}})
+	filesystem, err := workspacefs.New([]workspacefs.Mount{{Virtual: root, Host: root}})
 	if err != nil {
 		panic(err)
 	}

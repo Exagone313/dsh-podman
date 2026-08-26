@@ -179,7 +179,7 @@ func (s *Server) CreateWorkspace(ctx context.Context, request *ctl.CreateWorkspa
 				return nil, status.Error(codes.InvalidArgument, pathErr.Error())
 			}
 		}
-		podmanMounts = append(podmanMounts, specs.Mount{Type: "bind", Source: hostPath, Destination: filepath.Join("/workspace", mount.GetProjectName()), Options: options})
+		podmanMounts = append(podmanMounts, specs.Mount{Type: "bind", Source: hostPath, Destination: filepath.Join(s.ProjectsRoot, mount.GetProjectName()), Options: options})
 	}
 	if s.Podman == nil {
 		return nil, status.Error(codes.FailedPrecondition, "podman is not configured")

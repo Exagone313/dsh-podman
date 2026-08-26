@@ -13,16 +13,16 @@ import (
 )
 
 type Client struct {
-	ctx                                                      context.Context
-	socketRoot, hostSocketRoot, agentBinary, hostAgentBinary string
+	ctx                                                                   context.Context
+	socketRoot, hostSocketRoot, projectRoot, agentBinary, hostAgentBinary string
 }
 
-func New(ctx context.Context, socket, socketRoot, agentBinary, hostSocketRoot, hostAgentBinary string) (*Client, error) {
+func New(ctx context.Context, socket, socketRoot, agentBinary, hostSocketRoot, projectRoot, hostAgentBinary string) (*Client, error) {
 	connected, err := bindings.NewConnection(ctx, socket)
 	if err != nil {
 		return nil, err
 	}
-	return &Client{ctx: connected, socketRoot: socketRoot, hostSocketRoot: hostSocketRoot, agentBinary: agentBinary, hostAgentBinary: hostAgentBinary}, nil
+	return &Client{ctx: connected, socketRoot: socketRoot, hostSocketRoot: hostSocketRoot, projectRoot: projectRoot, agentBinary: agentBinary, hostAgentBinary: hostAgentBinary}, nil
 }
 func (c *Client) CreateWorkspace(name, image, token string, mounts []specs.Mount) error {
 	socketDir := filepath.Join(c.hostSocketRoot, name)
@@ -33,7 +33,7 @@ func (c *Client) CreateWorkspace(name, image, token string, mounts []specs.Mount
 	generator := specgen.NewSpecGenerator(image, false)
 	generator.Name = name
 	generator.Command = []string{c.agentBinary}
-	generator.Env = map[string]string{"DSH_AGENT_TOKEN": token, "DSH_AGENT_SOCKET": filepath.Join(c.socketRoot, name, "agent.sock"), "DSH_WORKSPACE_ROOT": "/workspace"}
+	generator.Env = map[string]string{"DSH_AGENT_TOKEN": token, "DSH_AGENT_SOCKET": filepath.Join(c.socketRoot, name, "agent.sock"), "DSH_WORKSPACE_ROOT": c.projectRoot}
 	generator.Init = &init
 	generator.Mounts = append(mounts, specs.Mount{Type: "bind", Source: c.hostAgentBinary, Destination: c.agentBinary, Options: []string{"ro"}}, specs.Mount{Type: "bind", Source: socketDir, Destination: filepath.Join(c.socketRoot, name), Options: []string{"rw"}})
 	if _, err := containers.CreateWithSpec(c.ctx, generator, nil); err != nil {

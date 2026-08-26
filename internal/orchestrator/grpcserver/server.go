@@ -134,8 +134,12 @@ func (s *Server) CreateWorkspace(ctx context.Context, request *ctl.CreateWorkspa
 	}
 	if !found {
 		s.log().Info("CreateWorkspace image lookup", "image_id", request.GetImageId(), "found", false, "default_image", request.GetImageId() == defaultImageID())
-		if request.GetImageId() != defaultImageID() || imageIndex >= 0 || s.ImageBuilder == nil {
+		if request.GetImageId() != defaultImageID() || imageIndex >= 0 {
 			return nil, status.Error(codes.NotFound, "built image not found")
+		}
+		if s.ImageBuilder == nil {
+			s.log().Error("CreateWorkspace cannot auto-provision default image", "image_id", request.GetImageId(), "reason", "podman image builder is not configured")
+			return nil, status.Error(codes.FailedPrecondition, "podman image builder is not configured")
 		}
 		image := state.Image{ImageID: request.GetImageId(), BaseImage: "docker.io/library/archlinux:latest", Packages: append([]string(nil), defaultPackages...)}
 		image.ImageTag, err = s.ImageBuilder.Build(image)

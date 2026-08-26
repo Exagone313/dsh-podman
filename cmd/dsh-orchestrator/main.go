@@ -52,16 +52,23 @@ func main() {
 	server := grpc.NewServer(grpc.UnaryInterceptor(grpcserver.UnaryLogger(logger)))
 	var podmanClient *podman.Client
 	var imageBuilder *images.Builder
-	if socketPath := os.Getenv("CONTAINER_HOST"); socketPath != "" {
-		podmanClient, err = podman.New(context.Background(), socketPath, filepath.Dir(socket), os.Getenv("DSH_AGENT_BINARY"))
+	podmanSocket := os.Getenv("DSH_PODMAN_SOCKET")
+	if podmanSocket == "" {
+		podmanSocket = os.Getenv("CONTAINER_HOST")
+	}
+	if podmanSocket != "" {
+		logger.Info("Podman API configured", "socket", podmanSocket)
+		podmanClient, err = podman.New(context.Background(), podmanSocket, filepath.Dir(socket), os.Getenv("DSH_AGENT_BINARY"))
 		if err != nil {
 			panic(err)
 		}
-		podmanContext, connectionErr := bindings.NewConnection(context.Background(), socketPath)
+		podmanContext, connectionErr := bindings.NewConnection(context.Background(), podmanSocket)
 		if connectionErr != nil {
 			panic(connectionErr)
 		}
 		imageBuilder = &images.Builder{Context: podmanContext, StateDir: stateDir}
+	} else {
+		logger.Warn("Podman API is not configured; workspace creation and image auto-provisioning are unavailable", "env", "DSH_PODMAN_SOCKET or CONTAINER_HOST")
 	}
 	ctl.RegisterOrchestratorControlServer(server, &grpcserver.Server{ProjectsRoot: root, Store: store, Podman: podmanClient, ImageBuilder: imageBuilder, Logger: logger})
 	if err := server.Serve(listener); err != nil {

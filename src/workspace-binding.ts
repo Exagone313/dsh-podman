@@ -7,12 +7,18 @@ export class WorkspaceResolver {
   private readonly bindings = new Map<string, Promise<WorkspaceBinding>>()
   constructor(private readonly config: BindingConfig, private readonly registry: any) {}
   async resolve(cwd: unknown): Promise<WorkspaceBinding> {
+    console.info('[dsh-container-plugin] resolving session workspace', { cwd })
     const workspace = await this.registry?.resolveByPath?.(String(cwd))
-    if (workspace === undefined) throw new Error(`no DH workspace owns session cwd ${JSON.stringify(cwd)}`)
+    if (workspace === undefined) {
+      console.error('[dsh-container-plugin] session workspace lookup failed', { cwd })
+      throw new Error(`no DH workspace owns session cwd ${JSON.stringify(cwd)}`)
+    }
     const key = workspaceSlug(String(workspace.path).split(/[\\/]+/).filter(Boolean).at(-1) ?? '')
+    console.info('[dsh-container-plugin] session workspace resolved', { cwd, workspacePath: workspace.path, workspaceSlug: key })
     return this.resolveSlug(key)
   }
   resolveSlug(key: string): Promise<WorkspaceBinding> {
+    console.info('[dsh-container-plugin] resolving workspace binding', { workspaceSlug: key })
     let binding = this.bindings.get(key)
     if (binding === undefined) { binding = this.create(key); this.bindings.set(key, binding) }
     return binding

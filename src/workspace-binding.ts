@@ -5,9 +5,14 @@ export interface BindingConfig { controlSocket: string; defaultImage: string }
 
 export class WorkspaceResolver {
   private readonly bindings = new Map<string, Promise<WorkspaceBinding>>()
-  constructor(private readonly config: BindingConfig) {}
-  resolve(session: unknown): Promise<WorkspaceBinding> {
-    const key = workspaceSlug(session)
+  constructor(private readonly config: BindingConfig, private readonly registry: any) {}
+  async resolve(cwd: unknown): Promise<WorkspaceBinding> {
+    const workspace = await this.registry?.resolveByPath?.(String(cwd))
+    if (workspace === undefined) throw new Error(`no DH workspace owns session cwd ${JSON.stringify(cwd)}`)
+    const key = workspaceSlug(String(workspace.path).split(/[\\/]+/).filter(Boolean).at(-1) ?? '')
+    return this.resolveSlug(key)
+  }
+  resolveSlug(key: string): Promise<WorkspaceBinding> {
     let binding = this.bindings.get(key)
     if (binding === undefined) { binding = this.create(key); this.bindings.set(key, binding) }
     return binding

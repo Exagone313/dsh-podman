@@ -19,10 +19,10 @@ const imageParameters = {
 }
 
 export const name = 'container-plugin'
-export const inject = ['tools']
+export const inject = ['tools', 'workspaceRegistry']
 export interface PluginConfig { controlSocket?: string; defaultImage?: string }
 export function apply(ctx: any, config: PluginConfig = {}): void {
-  const resolver = new WorkspaceResolver({ controlSocket: config.controlSocket ?? process.env.DSH_ORCH_CONTROL_SOCKET ?? process.env.DSH_CONTROL_SOCKET ?? '/run/dsh-sockets/control.sock', defaultImage: config.defaultImage ?? process.env.DSH_DEFAULT_IMAGE ?? 'arch-base' })
+  const resolver = new WorkspaceResolver({ controlSocket: config.controlSocket ?? process.env.DSH_ORCH_CONTROL_SOCKET ?? process.env.DSH_CONTROL_SOCKET ?? '/run/dsh-sockets/control.sock', defaultImage: config.defaultImage ?? process.env.DSH_DEFAULT_IMAGE ?? 'arch-base' }, ctx.workspaceRegistry)
   ctx.provide('workspaceResolver', resolver)
   ctx.provide('subprocess', createSubprocessProvider(resolver))
   ctx.provide('fs', createFilesystemProvider(resolver))
@@ -33,7 +33,7 @@ function createSubprocessProvider(resolver: WorkspaceResolver): object {
   return { spawn: (spec: any) => {
   if (!Array.isArray(spec.argv) || spec.argv.length === 0 || typeof spec.argv[0] !== 'string' || spec.argv[0] === '') throw new Error('argv must contain a program')
   const state = { pid: -1, stdin: undefined as any, stdout: spec.stdio?.stdout === 'pipe' ? new PassThrough() : undefined, stderr: spec.stdio?.stderr === 'pipe' ? new PassThrough() : undefined }
-  const done = resolver.resolve(spec.session ?? spec).then(binding => new Promise<any>((resolveDone, reject) => {
+  const done = resolver.resolve(spec.cwd).then(binding => new Promise<any>((resolveDone, reject) => {
     const stream = (binding.agent as any).exec(metadata(binding.token)); stream.on('data', (output: any) => { if (output.stdoutChunk && state.stdout) state.stdout.write(output.stdoutChunk); if (output.stderrChunk && state.stderr) state.stderr.write(output.stderrChunk); if (output.exit) { state.stdout?.end(); state.stderr?.end(); resolveDone({ exitCode: output.exit.exitCode, signal: output.exit.signaled ? output.exit.signal : null }) } }); stream.on('error', reject); stream.write({ start: { argv: spec.argv, cwd: spec.cwd, env: spec.env ?? {}, runInBackground: false } }); if (spec.stdio?.stdin !== 'pipe') stream.end(); else state.stdin = new PassThrough({ final: () => { stream.end() } }); }))
   return { ...state, collected: {}, done, terminate: () => undefined, waitForExit: async () => { await done; return true } }
   } }
@@ -42,7 +42,7 @@ function createFilesystemProvider(resolver: WorkspaceResolver): object {
   return {
     resolve: async (path: string, opts?: any) => {
       if (!path.startsWith('/') || path.split('/').includes('..')) throw new Error('path must be an absolute safe workspace path')
-      return { targetKey: path, displayPath: path, binding: await resolver.resolve(opts?.session) }
+      return { targetKey: path, displayPath: path, binding: await resolver.resolve(opts?.cwd) }
     },
     processPath: (target: any) => target.targetKey,
     fileUrl: (target: any) => `file://${target.targetKey}`,
@@ -61,7 +61,7 @@ function defineLifecycleTool(ctx: any, resolver: WorkspaceResolver, name: string
 function registerTools(ctx: any, resolver: WorkspaceResolver): void {
   defineLifecycleTool(ctx, resolver, 'recreate_workspace', 'Recreate the current workspace', 'recreateWorkspace', workspaceParameters)
   defineLifecycleTool(ctx, resolver, 'rebuild_image', 'Rebuild a workspace image', 'rebuildImage', imageParameters)
-  ctx.tools.register(defineTool({ name: 'install_packages', description: 'Install ephemeral workspace packages', parameters: packageParameters, output: toolOutput, execute: async (input: any) => { const binding = await resolver.resolve(input); return JSON.stringify(await unaryAgent({ binding }, 'installPackages', input)) } }))
+  ctx.tools.register(defineTool({ name: 'install_packages', description: 'Install ephemeral workspace packages', parameters: packageParameters, output: toolOutput, execute: async (input: any) => { const binding = await resolver.resolveSlug(String(input.workspace_slug ?? 'default')); return JSON.stringify(await unaryAgent({ binding }, 'installPackages', input)) } }))
   defineLifecycleTool(ctx, resolver, 'share_workspace', 'Request human approval before widening workspace access', 'recreateWorkspace', workspaceParameters, true)
 }
 async function unaryControl(resolver: WorkspaceResolver, method: string, input: unknown): Promise<unknown> { return resolver.control(method, input) }

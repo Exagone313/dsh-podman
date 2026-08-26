@@ -7,8 +7,10 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/containers/podman/v5/pkg/bindings"
 	ctl "gitlab.com/Exagone313/dsh-container-plugin/internal/genproto/dshctl/v1"
 	"gitlab.com/Exagone313/dsh-container-plugin/internal/orchestrator/grpcserver"
+	"gitlab.com/Exagone313/dsh-container-plugin/internal/orchestrator/images"
 	"gitlab.com/Exagone313/dsh-container-plugin/internal/orchestrator/podman"
 	"gitlab.com/Exagone313/dsh-container-plugin/internal/orchestrator/state"
 	"google.golang.org/grpc"
@@ -47,13 +49,19 @@ func main() {
 	}
 	server := grpc.NewServer()
 	var podmanClient *podman.Client
+	var imageBuilder *images.Builder
 	if socketPath := os.Getenv("CONTAINER_HOST"); socketPath != "" {
 		podmanClient, err = podman.New(context.Background(), socketPath, filepath.Dir(socket), os.Getenv("DSH_AGENT_BINARY"))
 		if err != nil {
 			panic(err)
 		}
+		podmanContext, connectionErr := bindings.NewConnection(context.Background(), socketPath)
+		if connectionErr != nil {
+			panic(connectionErr)
+		}
+		imageBuilder = &images.Builder{Context: podmanContext, StateDir: stateDir}
 	}
-	ctl.RegisterOrchestratorControlServer(server, &grpcserver.Server{ProjectsRoot: root, Store: store, Podman: podmanClient})
+	ctl.RegisterOrchestratorControlServer(server, &grpcserver.Server{ProjectsRoot: root, Store: store, Podman: podmanClient, ImageBuilder: imageBuilder})
 	if err := server.Serve(listener); err != nil {
 		panic(err)
 	}

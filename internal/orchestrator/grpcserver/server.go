@@ -9,6 +9,7 @@ import (
 
 	"github.com/opencontainers/runtime-spec/specs-go"
 	ctl "gitlab.com/Exagone313/dsh-container-plugin/internal/genproto/dshctl/v1"
+	imagebuild "gitlab.com/Exagone313/dsh-container-plugin/internal/orchestrator/images"
 	"gitlab.com/Exagone313/dsh-container-plugin/internal/orchestrator/podman"
 	"gitlab.com/Exagone313/dsh-container-plugin/internal/orchestrator/projects"
 	"gitlab.com/Exagone313/dsh-container-plugin/internal/orchestrator/state"
@@ -22,7 +23,10 @@ type Server struct {
 	ProjectsRoot string
 	Store        *state.Store
 	Podman       *podman.Client
+	ImageBuilder *imagebuild.Builder
 }
+
+var defaultPackages = []string{"base-devel", "git", "python", "curl", "wget", "openssh", "ca-certificates", "ripgrep", "fd", "jq", "unzip", "zstd", "less", "procps-ng", "diffutils", "patch", "tree"}
 
 func (s *Server) ListProjects(context.Context, *ctl.ListProjectsRequest) (*ctl.ListProjectsResponse, error) {
 	found, err := projects.List(s.ProjectsRoot)
@@ -58,7 +62,7 @@ func (s *Server) ListWorkspaces(context.Context, *ctl.ListWorkspacesRequest) (*c
 	}
 	return result, nil
 }
-func (s *Server) CreateWorkspace(_ context.Context, request *ctl.CreateWorkspaceRequest) (*ctl.Workspace, error) {
+func (s *Server) CreateWorkspace(ctx context.Context, request *ctl.CreateWorkspaceRequest) (*ctl.Workspace, error) {
 	if request.GetWorkspaceSlug() == "" || filepath.Base(request.GetWorkspaceSlug()) != request.GetWorkspaceSlug() {
 		return nil, status.Error(codes.InvalidArgument, "invalid workspace slug")
 	}
@@ -67,13 +71,29 @@ func (s *Server) CreateWorkspace(_ context.Context, request *ctl.CreateWorkspace
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 	found := false
-	for _, image := range images {
+	imageIndex := -1
+	for i, image := range images {
+		if image.ImageID == request.GetImageId() {
+			imageIndex = i
+		}
 		if image.ImageID == request.GetImageId() && image.ImageTag != "" {
 			found = true
 		}
 	}
 	if !found {
-		return nil, status.Error(codes.NotFound, "built image not found")
+		if request.GetImageId() != defaultImageID() || imageIndex >= 0 || s.ImageBuilder == nil {
+			return nil, status.Error(codes.NotFound, "built image not found")
+		}
+		image := state.Image{ImageID: request.GetImageId(), BaseImage: "docker.io/library/archlinux:latest", Packages: append([]string(nil), defaultPackages...)}
+		image.ImageTag, err = s.ImageBuilder.Build(image)
+		if err != nil {
+			return nil, status.Error(codes.Internal, fmt.Sprintf("build default image: %v", err))
+		}
+		images = append(images, image)
+		if err := s.Store.SaveImages(images); err != nil {
+			return nil, status.Error(codes.Internal, err.Error())
+		}
+		found = true
 	}
 	secret, err := token.New()
 	if err != nil {
@@ -114,6 +134,50 @@ func (s *Server) CreateWorkspace(_ context.Context, request *ctl.CreateWorkspace
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 	return toProto(workspace), nil
+}
+
+func (s *Server) RebuildImage(ctx context.Context, request *ctl.RebuildImageRequest) (*ctl.Image, error) {
+	if s.ImageBuilder == nil {
+		return nil, status.Error(codes.FailedPrecondition, "image builder is not configured")
+	}
+	base := request.GetBaseImage()
+	if base == "" {
+		base = "docker.io/library/archlinux:latest"
+	}
+	packages := append([]string(nil), request.GetPackages()...)
+	if len(packages) == 0 && request.GetImageId() == defaultImageID() {
+		packages = append([]string(nil), defaultPackages...)
+	}
+	image := state.Image{ImageID: request.GetImageId(), BaseImage: base, Packages: packages}
+	tag, err := s.ImageBuilder.Build(image)
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	image.ImageTag, image.BuiltAt = tag, time.Now().UTC().Format(time.RFC3339)
+	all, err := s.Store.Images()
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	replaced := false
+	for i := range all {
+		if all[i].ImageID == image.ImageID {
+			all[i] = image
+			replaced = true
+		}
+	}
+	if !replaced {
+		all = append(all, image)
+	}
+	if err := s.Store.SaveImages(all); err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	return &ctl.Image{ImageId: image.ImageID, BaseImage: image.BaseImage, Packages: image.Packages, ImageTag: image.ImageTag, BuiltAt: image.BuiltAt}, nil
+}
+func defaultImageID() string {
+	if value := os.Getenv("DSH_DEFAULT_IMAGE"); value != "" {
+		return value
+	}
+	return "arch-base"
 }
 func (s *Server) StopWorkspace(_ context.Context, request *ctl.StopWorkspaceRequest) (*ctl.StopWorkspaceResponse, error) {
 	workspace, err := s.DescribeWorkspace(context.Background(), &ctl.DescribeWorkspaceRequest{WorkspaceSlug: request.GetWorkspaceSlug()})

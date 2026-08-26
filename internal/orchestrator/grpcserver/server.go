@@ -177,11 +177,7 @@ func (s *Server) CreateWorkspace(ctx context.Context, request *ctl.CreateWorkspa
 		mounts = append(mounts, state.Mount{ProjectName: mount.GetProjectName(), Mode: mode})
 		hostPath := path
 		if s.HostProjectsRoot != "" {
-			hostPath, pathErr = ValidateProject(s.HostProjectsRoot, mount.GetProjectName())
-			if pathErr != nil {
-				s.log().Error("CreateWorkspace host project validation failed", "project_name", mount.GetProjectName(), "root", s.HostProjectsRoot, "error", pathErr)
-				return nil, status.Error(codes.InvalidArgument, pathErr.Error())
-			}
+			hostPath = filepath.Join(s.HostProjectsRoot, filepath.FromSlash(mount.GetProjectName()))
 		}
 		podmanMounts = append(podmanMounts, specs.Mount{Type: "bind", Source: hostPath, Destination: filepath.Join(s.ProjectsRoot, mount.GetProjectName()), Options: options})
 	}

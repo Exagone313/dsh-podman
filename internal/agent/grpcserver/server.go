@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"log/slog"
 	"os"
 	osexec "os/exec"
 	"strconv"
@@ -36,6 +37,12 @@ func (s *Server) Exec(stream agent.WorkspaceAgent_ExecServer) error {
 	if start == nil {
 		return status.Error(codes.InvalidArgument, "first exec message must be start")
 	}
+	argv := first.GetStart().GetArgv()
+	argv0 := ""
+	if len(argv) > 0 {
+		argv0 = argv[0]
+	}
+	slog.Info("agent Exec started", "argv0", argv0, "argc", len(argv))
 	process, err := s.Processes.Start(stream.Context(), start.GetArgv(), start.GetCwd(), start.GetEnv())
 	if err != nil {
 		return status.Error(codes.InvalidArgument, err.Error())
@@ -131,6 +138,7 @@ func (s *Server) Exec(stream agent.WorkspaceAgent_ExecServer) error {
 	if err := send(&agent.ExecOutput{Payload: &agent.ExecOutput_Exit{Exit: &agent.ExecExit{ExitCode: exit, Signaled: signaled, Signal: signalName}}}); err != nil {
 		return err
 	}
+	slog.Info("agent Exec completed", "exit_code", exit, "signaled", signaled)
 	return nil
 }
 
@@ -178,6 +186,7 @@ func (s *Server) resolve(path string, write bool) (string, error) {
 	return resolved, err
 }
 func (s *Server) ReadFile(request *agent.ReadFileRequest, stream agent.WorkspaceAgent_ReadFileServer) error {
+	slog.Info("agent ReadFile requested", "path", request.GetPath())
 	path, err := s.resolve(request.GetPath(), false)
 	if err != nil {
 		return status.Error(codes.PermissionDenied, err.Error())
@@ -212,6 +221,7 @@ func (s *Server) WriteFile(stream agent.WorkspaceAgent_WriteFileServer) error {
 	if start == nil {
 		return status.Error(codes.InvalidArgument, "first write message must be start")
 	}
+	slog.Info("agent WriteFile requested", "path", start.GetPath())
 	path, err := s.resolve(start.GetPath(), true)
 	if err != nil {
 		return status.Error(codes.PermissionDenied, err.Error())
@@ -247,6 +257,7 @@ func (s *Server) WriteFile(stream agent.WorkspaceAgent_WriteFileServer) error {
 	}
 }
 func (s *Server) Stat(_ context.Context, request *agent.StatRequest) (*agent.StatResponse, error) {
+	slog.Info("agent Stat requested", "path", request.GetPath())
 	path, err := s.resolve(request.GetPath(), false)
 	if err != nil {
 		return nil, status.Error(codes.PermissionDenied, err.Error())
@@ -261,6 +272,7 @@ func (s *Server) Stat(_ context.Context, request *agent.StatRequest) (*agent.Sta
 	return &agent.StatResponse{Exists: true, IsDir: info.IsDir(), Size: info.Size(), Mode: info.Mode().String(), ModifiedAt: info.ModTime().UTC().Format("2006-01-02T15:04:05Z07:00")}, nil
 }
 func (s *Server) ReadDir(_ context.Context, request *agent.ReadDirRequest) (*agent.ReadDirResponse, error) {
+	slog.Info("agent ReadDir requested", "path", request.GetPath())
 	path, err := s.resolve(request.GetPath(), false)
 	if err != nil {
 		return nil, status.Error(codes.PermissionDenied, err.Error())
@@ -280,6 +292,7 @@ func (s *Server) ReadDir(_ context.Context, request *agent.ReadDirRequest) (*age
 	return result, nil
 }
 func (s *Server) Mkdir(_ context.Context, request *agent.MkdirRequest) (*agent.MkdirResponse, error) {
+	slog.Info("agent Mkdir requested", "path", request.GetPath())
 	path, err := s.resolve(request.GetPath(), true)
 	if err != nil {
 		return nil, status.Error(codes.PermissionDenied, err.Error())
@@ -295,6 +308,7 @@ func (s *Server) Mkdir(_ context.Context, request *agent.MkdirRequest) (*agent.M
 	return &agent.MkdirResponse{}, nil
 }
 func (s *Server) Delete(_ context.Context, request *agent.DeleteRequest) (*agent.DeleteResponse, error) {
+	slog.Info("agent Delete requested", "path", request.GetPath())
 	path, err := s.resolve(request.GetPath(), true)
 	if err != nil {
 		return nil, status.Error(codes.PermissionDenied, err.Error())
@@ -311,6 +325,7 @@ func (s *Server) Delete(_ context.Context, request *agent.DeleteRequest) (*agent
 }
 
 func (s *Server) InstallPackages(request *agent.InstallPackagesRequest, stream agent.WorkspaceAgent_InstallPackagesServer) error {
+	slog.Info("agent InstallPackages requested", "package_count", len(request.GetPackages()))
 	if len(request.GetPackages()) == 0 {
 		return status.Error(codes.InvalidArgument, "at least one package is required")
 	}

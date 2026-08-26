@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"log/slog"
 	"net"
 	"os"
 	"path/filepath"
@@ -24,6 +25,14 @@ func main() {
 	if socket == "" {
 		socket = "/run/dsh-sockets/agent.sock"
 	}
+	token := os.Getenv("DSH_AGENT_TOKEN")
+	root := os.Getenv("DSH_WORKSPACE_ROOT")
+	if root == "" {
+		root = "/workspace"
+	}
+	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
+	slog.SetDefault(logger)
+	logger.Info("workspace agent starting", "socket", socket, "workspace_root", root, "token_configured", token != "")
 	if err := os.MkdirAll(filepath.Dir(socket), 0700); err != nil {
 		panic(err)
 	}
@@ -32,17 +41,13 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	token := os.Getenv("DSH_AGENT_TOKEN")
-	root := os.Getenv("DSH_WORKSPACE_ROOT")
-	if root == "" {
-		root = "/workspace"
-	}
 	filesystem, err := workspacefs.New([]workspacefs.Mount{{Virtual: root, Host: root}})
 	if err != nil {
 		panic(err)
 	}
 	server := grpc.NewServer(grpc.UnaryInterceptor(auth.Unary(token)), grpc.StreamInterceptor(auth.Stream(token)))
 	agent.RegisterWorkspaceAgentServer(server, grpcserver.New().WithFS(filesystem))
+	logger.Info("workspace agent listening", "socket", socket)
 	if err := server.Serve(listener); err != nil {
 		panic(err)
 	}

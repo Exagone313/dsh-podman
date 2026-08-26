@@ -217,10 +217,7 @@ function createFilesystemProvider(resolver: WorkspaceResolver): object {
       return Buffer.concat(chunks).toString("utf8");
     },
     writeText: async (target: any, content: string) => {
-      const current = await target.binding.agent.stat(
-        { path: target.targetKey },
-        metadata(target.binding.token),
-      );
+      const current = await agentStatResponse(target);
       const before = current.exists ? await readRemoteText(target) : null;
       return new Promise((resolveDone, reject) => {
         const call = (target.binding.agent as any).writeFile(
@@ -254,7 +251,17 @@ function createFilesystemProvider(resolver: WorkspaceResolver): object {
 }
 
 async function agentStat(target: any): Promise<any> {
-  const result = await new Promise<any>((resolveDone, reject) =>
+  const result = await agentStatResponse(target);
+  if (!result.exists) return undefined;
+  return {
+    version: `agent:${result.modifiedAt ?? ""}:${result.size ?? 0}:${result.mode ?? ""}`,
+    type: result.isDir ? "directory" : "file",
+    ...(result.isDir ? {} : { size: Number(result.size ?? 0) }),
+  };
+}
+
+async function agentStatResponse(target: any): Promise<any> {
+  return new Promise<any>((resolveDone, reject) =>
     target.binding.agent.stat(
       { path: target.targetKey },
       metadata(target.binding.token),
@@ -262,12 +269,6 @@ async function agentStat(target: any): Promise<any> {
         error ? reject(error) : resolveDone(value),
     ),
   );
-  if (!result.exists) return undefined;
-  return {
-    version: `agent:${result.modifiedAt ?? ""}:${result.size ?? 0}:${result.mode ?? ""}`,
-    type: result.isDir ? "directory" : "file",
-    ...(result.isDir ? {} : { size: Number(result.size ?? 0) }),
-  };
 }
 
 async function readRemoteText(target: any): Promise<string> {

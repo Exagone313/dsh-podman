@@ -3,6 +3,7 @@ package grpcserver
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"time"
@@ -14,6 +15,7 @@ import (
 	"gitlab.com/Exagone313/dsh-container-plugin/internal/orchestrator/projects"
 	"gitlab.com/Exagone313/dsh-container-plugin/internal/orchestrator/state"
 	"gitlab.com/Exagone313/dsh-container-plugin/internal/orchestrator/token"
+	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -24,34 +26,65 @@ type Server struct {
 	Store        *state.Store
 	Podman       *podman.Client
 	ImageBuilder *imagebuild.Builder
+	Logger       *slog.Logger
 }
 
 var defaultPackages = []string{"base-devel", "git", "python", "curl", "wget", "openssh", "ca-certificates", "ripgrep", "fd", "jq", "unzip", "zstd", "less", "procps-ng", "diffutils", "patch", "tree"}
 
+func (s *Server) log() *slog.Logger {
+	if s.Logger != nil {
+		return s.Logger
+	}
+	return slog.Default()
+}
+
+func UnaryLogger(logger *slog.Logger) grpc.UnaryServerInterceptor {
+	if logger == nil {
+		logger = slog.Default()
+	}
+	return func(ctx context.Context, request any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
+		logger.Info("gRPC request", "method", info.FullMethod, "request_type", fmt.Sprintf("%T", request))
+		response, err := handler(ctx, request)
+		if err != nil {
+			logger.Error("gRPC request failed", "method", info.FullMethod, "error", err)
+			return response, err
+		}
+		logger.Info("gRPC request completed", "method", info.FullMethod)
+		return response, nil
+	}
+}
+
 func (s *Server) ListProjects(context.Context, *ctl.ListProjectsRequest) (*ctl.ListProjectsResponse, error) {
+	s.log().Info("control request", "method", "ListProjects", "projects_root", s.ProjectsRoot)
 	found, err := projects.List(s.ProjectsRoot)
 	if err != nil {
+		s.log().Error("control request failed", "method", "ListProjects", "error", err)
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 	result := &ctl.ListProjectsResponse{}
 	for _, project := range found {
 		result.Projects = append(result.Projects, &ctl.Project{Name: project.Name, HostPath: project.HostPath})
 	}
+	s.log().Info("control request completed", "method", "ListProjects", "count", len(result.Projects))
 	return result, nil
 }
 func (s *Server) DescribeWorkspace(_ context.Context, request *ctl.DescribeWorkspaceRequest) (*ctl.Workspace, error) {
+	s.log().Info("control request", "method", "DescribeWorkspace", "workspace_slug", request.GetWorkspaceSlug())
 	workspaces, err := s.Store.Workspaces()
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 	for _, workspace := range workspaces {
 		if workspace.WorkspaceSlug == request.GetWorkspaceSlug() {
+			s.log().Info("control request completed", "method", "DescribeWorkspace", "workspace_slug", workspace.WorkspaceSlug, "status", workspace.Status)
 			return toProto(workspace), nil
 		}
 	}
+	s.log().Warn("control request failed", "method", "DescribeWorkspace", "workspace_slug", request.GetWorkspaceSlug(), "reason", "not found")
 	return nil, status.Error(codes.NotFound, "workspace not found")
 }
 func (s *Server) ListWorkspaces(context.Context, *ctl.ListWorkspacesRequest) (*ctl.ListWorkspacesResponse, error) {
+	s.log().Info("control request", "method", "ListWorkspaces")
 	workspaces, err := s.Store.Workspaces()
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
@@ -60,9 +93,28 @@ func (s *Server) ListWorkspaces(context.Context, *ctl.ListWorkspacesRequest) (*c
 	for _, workspace := range workspaces {
 		result.Workspaces = append(result.Workspaces, toProto(workspace))
 	}
+	s.log().Info("control request completed", "method", "ListWorkspaces", "count", len(result.Workspaces))
 	return result, nil
 }
+func (s *Server) ListImages(context.Context, *ctl.ListImagesRequest) (*ctl.ListImagesResponse, error) {
+	s.log().Info("control request", "method", "ListImages")
+	images, err := s.Store.Images()
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	result := &ctl.ListImagesResponse{}
+	for _, image := range images {
+		result.Images = append(result.Images, &ctl.Image{ImageId: image.ImageID, BaseImage: image.BaseImage, Packages: image.Packages, ImageTag: image.ImageTag, BuiltAt: image.BuiltAt})
+	}
+	s.log().Info("control request completed", "method", "ListImages", "count", len(result.Images))
+	return result, nil
+}
+func (s *Server) RecreateWorkspace(context.Context, *ctl.RecreateWorkspaceRequest) (*ctl.Workspace, error) {
+	s.log().Warn("control request failed", "method", "RecreateWorkspace", "reason", "not implemented")
+	return nil, status.Error(codes.Unimplemented, "workspace recreation is not configured")
+}
 func (s *Server) CreateWorkspace(ctx context.Context, request *ctl.CreateWorkspaceRequest) (*ctl.Workspace, error) {
+	s.log().Info("control request", "method", "CreateWorkspace", "workspace_slug", request.GetWorkspaceSlug(), "image_id", request.GetImageId(), "mount_count", len(request.GetMounts()))
 	if request.GetWorkspaceSlug() == "" || filepath.Base(request.GetWorkspaceSlug()) != request.GetWorkspaceSlug() {
 		return nil, status.Error(codes.InvalidArgument, "invalid workspace slug")
 	}
@@ -81,6 +133,7 @@ func (s *Server) CreateWorkspace(ctx context.Context, request *ctl.CreateWorkspa
 		}
 	}
 	if !found {
+		s.log().Info("CreateWorkspace image lookup", "image_id", request.GetImageId(), "found", false, "default_image", request.GetImageId() == defaultImageID())
 		if request.GetImageId() != defaultImageID() || imageIndex >= 0 || s.ImageBuilder == nil {
 			return nil, status.Error(codes.NotFound, "built image not found")
 		}
@@ -90,6 +143,7 @@ func (s *Server) CreateWorkspace(ctx context.Context, request *ctl.CreateWorkspa
 			return nil, status.Error(codes.Internal, fmt.Sprintf("build default image: %v", err))
 		}
 		images = append(images, image)
+		s.log().Info("CreateWorkspace auto-provisioned image", "image_id", image.ImageID, "image_tag", image.ImageTag)
 		if err := s.Store.SaveImages(images); err != nil {
 			return nil, status.Error(codes.Internal, err.Error())
 		}
@@ -125,6 +179,7 @@ func (s *Server) CreateWorkspace(ctx context.Context, request *ctl.CreateWorkspa
 		}
 	}
 	if err := s.Podman.CreateWorkspace(name, imageTag, secret, podmanMounts); err != nil {
+		s.log().Error("control request failed", "method", "CreateWorkspace", "workspace_slug", request.GetWorkspaceSlug(), "error", err)
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 	workspace := state.Workspace{WorkspaceSlug: request.GetWorkspaceSlug(), ContainerName: name, ImageID: request.GetImageId(), Mounts: mounts, Status: "running", AgentSocketPath: "/run/dsh-sockets/agent.sock", AgentToken: secret, CreatedAt: time.Now().UTC().Format(time.RFC3339)}
@@ -133,10 +188,12 @@ func (s *Server) CreateWorkspace(ctx context.Context, request *ctl.CreateWorkspa
 	if err := s.Store.SaveWorkspaces(all); err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
+	s.log().Info("control request completed", "method", "CreateWorkspace", "workspace_slug", workspace.WorkspaceSlug, "container_name", workspace.ContainerName)
 	return toProto(workspace), nil
 }
 
 func (s *Server) RebuildImage(ctx context.Context, request *ctl.RebuildImageRequest) (*ctl.Image, error) {
+	s.log().Info("control request", "method", "RebuildImage", "image_id", request.GetImageId(), "base_image", request.GetBaseImage(), "package_count", len(request.GetPackages()))
 	if s.ImageBuilder == nil {
 		return nil, status.Error(codes.FailedPrecondition, "image builder is not configured")
 	}
@@ -147,6 +204,7 @@ func (s *Server) RebuildImage(ctx context.Context, request *ctl.RebuildImageRequ
 	packages := append([]string(nil), request.GetPackages()...)
 	if len(packages) == 0 && request.GetImageId() == defaultImageID() {
 		packages = append([]string(nil), defaultPackages...)
+		s.log().Info("RebuildImage using default package set", "image_id", request.GetImageId(), "package_count", len(packages))
 	}
 	image := state.Image{ImageID: request.GetImageId(), BaseImage: base, Packages: packages}
 	tag, err := s.ImageBuilder.Build(image)
@@ -169,8 +227,10 @@ func (s *Server) RebuildImage(ctx context.Context, request *ctl.RebuildImageRequ
 		all = append(all, image)
 	}
 	if err := s.Store.SaveImages(all); err != nil {
+		s.log().Error("control request failed", "method", "RebuildImage", "image_id", image.ImageID, "error", err)
 		return nil, status.Error(codes.Internal, err.Error())
 	}
+	s.log().Info("control request completed", "method", "RebuildImage", "image_id", image.ImageID, "image_tag", image.ImageTag)
 	return &ctl.Image{ImageId: image.ImageID, BaseImage: image.BaseImage, Packages: image.Packages, ImageTag: image.ImageTag, BuiltAt: image.BuiltAt}, nil
 }
 func defaultImageID() string {
@@ -180,6 +240,7 @@ func defaultImageID() string {
 	return "arch-base"
 }
 func (s *Server) StopWorkspace(_ context.Context, request *ctl.StopWorkspaceRequest) (*ctl.StopWorkspaceResponse, error) {
+	s.log().Info("control request", "method", "StopWorkspace", "workspace_slug", request.GetWorkspaceSlug())
 	workspace, err := s.DescribeWorkspace(context.Background(), &ctl.DescribeWorkspaceRequest{WorkspaceSlug: request.GetWorkspaceSlug()})
 	if err != nil {
 		return nil, err
@@ -188,8 +249,10 @@ func (s *Server) StopWorkspace(_ context.Context, request *ctl.StopWorkspaceRequ
 		return nil, status.Error(codes.FailedPrecondition, "podman is not configured")
 	}
 	if err := s.Podman.Stop(workspace.GetContainerName()); err != nil {
+		s.log().Error("control request failed", "method", "StopWorkspace", "workspace_slug", request.GetWorkspaceSlug(), "error", err)
 		return nil, status.Error(codes.Internal, err.Error())
 	}
+	s.log().Info("control request completed", "method", "StopWorkspace", "workspace_slug", request.GetWorkspaceSlug())
 	return &ctl.StopWorkspaceResponse{}, nil
 }
 func toProto(workspace state.Workspace) *ctl.Workspace {

@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"net"
 	"os"
 	"path/filepath"
@@ -47,7 +48,8 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	server := grpc.NewServer()
+	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
+	server := grpc.NewServer(grpc.UnaryInterceptor(grpcserver.UnaryLogger(logger)))
 	var podmanClient *podman.Client
 	var imageBuilder *images.Builder
 	if socketPath := os.Getenv("CONTAINER_HOST"); socketPath != "" {
@@ -61,7 +63,7 @@ func main() {
 		}
 		imageBuilder = &images.Builder{Context: podmanContext, StateDir: stateDir}
 	}
-	ctl.RegisterOrchestratorControlServer(server, &grpcserver.Server{ProjectsRoot: root, Store: store, Podman: podmanClient, ImageBuilder: imageBuilder})
+	ctl.RegisterOrchestratorControlServer(server, &grpcserver.Server{ProjectsRoot: root, Store: store, Podman: podmanClient, ImageBuilder: imageBuilder, Logger: logger})
 	if err := server.Serve(listener); err != nil {
 		panic(err)
 	}

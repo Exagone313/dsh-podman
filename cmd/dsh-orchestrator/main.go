@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 
 	"github.com/containers/podman/v5/pkg/bindings"
+	"github.com/containers/podman/v5/pkg/bindings/system"
 	ctl "gitlab.com/Exagone313/dsh-container-plugin/internal/genproto/dshctl/v1"
 	"gitlab.com/Exagone313/dsh-container-plugin/internal/orchestrator/grpcserver"
 	"gitlab.com/Exagone313/dsh-container-plugin/internal/orchestrator/images"
@@ -54,17 +55,21 @@ func main() {
 	}
 	if podmanSocket != "" {
 		logger.Info("Podman API configured", "socket", podmanSocket)
-		podmanClient, err = podman.New(context.Background(), podmanSocket, socketsRoot, agentBinary, hostSocketsRoot, hostAgentBinary)
-		if err != nil {
-			panic(err)
-		}
 		podmanContext, connectionErr := bindings.NewConnection(context.Background(), podmanSocket)
 		if connectionErr != nil {
-			panic(connectionErr)
+			panic(fmt.Errorf("connect to Podman API: %w", connectionErr))
+		}
+		if _, connectionErr = system.Info(podmanContext, nil); connectionErr != nil {
+			panic(fmt.Errorf("Podman API is unreachable: %w", connectionErr))
+		}
+		logger.Info("Podman API reachable", "socket", podmanSocket)
+		podmanClient, err = podman.New(context.Background(), podmanSocket, socketsRoot, agentBinary, hostSocketsRoot, hostAgentBinary)
+		if err != nil {
+			panic(fmt.Errorf("initialize Podman client: %w", err))
 		}
 		imageBuilder = &images.Builder{Context: podmanContext, StateDir: stateDir}
 	} else {
-		logger.Warn("Podman API is not configured; workspace creation and image auto-provisioning are unavailable", "env", "DSH_PODMAN_SOCKET or CONTAINER_HOST")
+		panic("Podman API is not configured: set DSH_ORCH_PODMAN_SOCKET")
 	}
 	ctl.RegisterOrchestratorControlServer(server, &grpcserver.Server{ProjectsRoot: root, HostProjectsRoot: hostProjectsRoot, SocketsRoot: socketsRoot, Store: store, Podman: podmanClient, ImageBuilder: imageBuilder, Logger: logger})
 	if err := server.Serve(listener); err != nil {

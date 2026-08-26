@@ -23,7 +23,7 @@ func Containerfile(image state.Image) (string, error) {
 			return "", fmt.Errorf("invalid package name %q", pkg)
 		}
 	}
-	lines := []string{"FROM " + image.BaseImage, "RUN pacman -Sy --noconfirm"}
+	lines := []string{"FROM " + image.BaseImage, "RUN pacman -Syu --needed --noconfirm"}
 	if len(image.Packages) > 0 {
 		lines[1] += " " + strings.Join(image.Packages, " ")
 	}

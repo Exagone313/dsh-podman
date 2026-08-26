@@ -189,9 +189,12 @@ function outputReader(mode: unknown):
 
 function remoteArgv(argv: readonly string[]): readonly string[] {
   const runner = argv[0];
+  if (runner !== undefined && /(?:^|\/)rg(?:\.exe)?$/.test(runner)) {
+    return ["/usr/bin/rg", ...argv.slice(1)];
+  }
   if (runner !== undefined && /(?:^|\/)landlock-run(?:$|\/)/.test(runner)) {
     const separator = argv.indexOf("--");
-    if (separator >= 0) return argv.slice(separator + 1);
+    if (separator >= 0) return remoteArgv(argv.slice(separator + 1));
   }
   return argv;
 }

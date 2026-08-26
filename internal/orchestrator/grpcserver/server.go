@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/opencontainers/runtime-spec/specs-go"
@@ -284,7 +285,8 @@ func toProto(workspace state.Workspace) *ctl.Workspace {
 	return result
 }
 func ValidateProject(root, name string) (string, error) {
-	if name == "" || filepath.Base(name) != name {
+	clean := filepath.Clean(filepath.FromSlash(name))
+	if name == "" || filepath.IsAbs(name) || strings.ContainsRune(name, '\x00') || clean != filepath.FromSlash(name) || clean == "." || clean == ".." || strings.HasPrefix(clean, ".."+string(filepath.Separator)) {
 		return "", fmt.Errorf("invalid project name")
 	}
 	path := filepath.Join(root, name)

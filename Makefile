@@ -4,6 +4,7 @@ GO_BUILD_FLAGS = -tags "$(GO_BUILD_TAGS)"
 GOOS ?= linux
 GOARCH ?= amd64
 BIN_DIR ?= bin
+CONTAINER ?= podman
 
 GO_SOURCES := $(shell find cmd internal -type f -name '*.go' -print)
 JS_SOURCES := $(shell find src -type f -name '*.ts' -print)
@@ -11,13 +12,16 @@ PROTO_SOURCES := $(shell find proto -type f -name '*.proto' -print)
 PROTO_DESTS := $(patsubst proto/%,dist/grpc/proto/%,$(PROTO_SOURCES))
 NODE_MODULES_TSC := node_modules/.bin/tsc
 
-.PHONY: all build build-go copy-proto npm-ci npm-build npm-test npm-prune clean
+.PHONY: all build build-go image copy-proto npm-ci npm-build npm-test npm-prune clean
 
 all: build
 
 build: build-go npm-build
 
 build-go: $(BIN_DIR)/dsh-workspace-agent $(BIN_DIR)/dsh-orchestrator
+
+image:
+	$(CONTAINER) build -f Containerfile.orchestrator -t localhost/dsh-orchestrator:latest .
 
 
 $(BIN_DIR)/dsh-workspace-agent: $(GO_SOURCES) go.mod go.sum

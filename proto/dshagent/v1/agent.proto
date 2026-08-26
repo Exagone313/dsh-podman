@@ -16,7 +16,7 @@ service WorkspaceAgent {
 }
 message ExecInput { oneof payload { ExecStart start = 1; bytes stdin_chunk = 2; } }
 message ExecStart { repeated string argv = 1; string cwd = 2; map<string, string> env = 3; bool run_in_background = 4; }
-message ExecOutput { oneof payload { bytes stdout_chunk = 1; bytes stderr_chunk = 2; ExecExit exit = 3; } }
+message ExecOutput { oneof payload { bytes stdout_chunk = 1; bytes stderr_chunk = 2; ExecExit exit = 3; } string process_id = 4; }
 message ExecExit { int32 exit_code = 1; bool signaled = 2; string signal = 3; }
 message SignalRequest { string process_id = 1; string signal = 2; }
 message SignalResponse {}

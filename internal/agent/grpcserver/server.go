@@ -65,6 +65,7 @@ func (s *Server) Exec(stream agent.WorkspaceAgent_ExecServer) error {
 	}
 	var sendMu sync.Mutex
 	send := func(output *agent.ExecOutput) error {
+		output.ProcessId = process.ID
 		sendMu.Lock()
 		defer sendMu.Unlock()
 		return stream.Send(output)

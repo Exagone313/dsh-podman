@@ -94,15 +94,31 @@ function createSubprocessProvider(resolver: WorkspaceResolver): object {
         stdout: spec.stdio?.stdout === "pipe" ? new PassThrough() : undefined,
         stderr: spec.stdio?.stderr === "pipe" ? new PassThrough() : undefined,
       };
+      let processBinding: any;
+      let terminated = false;
+      const terminate = (): void => {
+        terminated = true;
+        if (processBinding !== undefined && state.pid > 0) {
+          void unaryAgent({ binding: processBinding }, "signal", {
+            processId: String(state.pid),
+            signal: "SIGTERM",
+          });
+        }
+      };
       const done = resolver.resolve(spec.cwd).then(
         (binding) =>
           new Promise<any>((resolveDone, reject) => {
+            processBinding = binding;
             const stream = (binding.agent as any).exec(metadata(binding.token));
             stream.on("data", (output: any) => {
               if (output.stdoutChunk) {
                 const data = Buffer.from(output.stdoutChunk);
                 stdoutReader?.append(data);
                 state.stdout?.write(data);
+              }
+              if (output.processId) {
+                state.pid = Number(output.processId);
+                if (terminated) terminate();
               }
               if (output.stderrChunk) {
                 const data = Buffer.from(output.stderrChunk);
@@ -144,7 +160,7 @@ function createSubprocessProvider(resolver: WorkspaceResolver): object {
           ...(stderrReader === undefined ? {} : { stderr: stderrReader }),
         },
         done,
-        terminate: () => undefined,
+        terminate,
         waitForExit: async () => {
           await done;
           return true;

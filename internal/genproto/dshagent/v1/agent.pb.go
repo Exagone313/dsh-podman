@@ -179,6 +179,7 @@ type ExecOutput struct {
 	//	*ExecOutput_StderrChunk
 	//	*ExecOutput_Exit
 	Payload       isExecOutput_Payload `protobuf_oneof:"payload"`
+	ProcessId     string               `protobuf:"bytes,4,opt,name=process_id,json=processId,proto3" json:"process_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -245,6 +246,13 @@ func (x *ExecOutput) GetExit() *ExecExit {
 		}
 	}
 	return nil
+}
+
+func (x *ExecOutput) GetProcessId() string {
+	if x != nil {
+		return x.ProcessId
+	}
+	return ""
 }
 
 type isExecOutput_Payload interface {
@@ -1434,12 +1442,14 @@ const file_dshagent_v1_agent_proto_rawDesc = "" +
 	"\x11run_in_background\x18\x04 \x01(\bR\x0frunInBackground\x1a6\n" +
 	"\bEnvEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\x8e\x01\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xad\x01\n" +
 	"\n" +
 	"ExecOutput\x12#\n" +
 	"\fstdout_chunk\x18\x01 \x01(\fH\x00R\vstdoutChunk\x12#\n" +
 	"\fstderr_chunk\x18\x02 \x01(\fH\x00R\vstderrChunk\x12+\n" +
-	"\x04exit\x18\x03 \x01(\v2\x15.dshagent.v1.ExecExitH\x00R\x04exitB\t\n" +
+	"\x04exit\x18\x03 \x01(\v2\x15.dshagent.v1.ExecExitH\x00R\x04exit\x12\x1d\n" +
+	"\n" +
+	"process_id\x18\x04 \x01(\tR\tprocessIdB\t\n" +
 	"\apayload\"[\n" +
 	"\bExecExit\x12\x1b\n" +
 	"\texit_code\x18\x01 \x01(\x05R\bexitCode\x12\x1a\n" +

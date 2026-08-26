@@ -2,40 +2,27 @@
 // @generated from file dshctl/v1/control.proto (package dshctl.v1, syntax proto3)
 /* eslint-disable */
 
-import type {
-  GenEnum,
-  GenFile,
-  GenMessage,
-  GenService,
-} from "@bufbuild/protobuf/codegenv2";
-import {
-  enumDesc,
-  fileDesc,
-  messageDesc,
-  serviceDesc,
-} from "@bufbuild/protobuf/codegenv2";
+import type { GenEnum, GenFile, GenMessage, GenService } from "@bufbuild/protobuf/codegenv2";
+import { enumDesc, fileDesc, messageDesc, serviceDesc } from "@bufbuild/protobuf/codegenv2";
 import type { Message } from "@bufbuild/protobuf";
 
 /**
  * Describes the file dshctl/v1/control.proto.
  */
-export const file_dshctl_v1_control: GenFile =
-  /*@__PURE__*/
-  fileDesc(
-    "Chdkc2hjdGwvdjEvY29udHJvbC5wcm90bxIJZHNoY3RsLnYxIhUKE0xpc3RQcm9qZWN0c1JlcXVlc3QiPAoUTGlzdFByb2plY3RzUmVzcG9uc2USJAoIcHJvamVjdHMYASADKAsyEi5kc2hjdGwudjEuUHJvamVjdCIqCgdQcm9qZWN0EgwKBG5hbWUYASABKAkSEQoJaG9zdF9wYXRoGAIgASgJIkgKDFByb2plY3RNb3VudBIUCgxwcm9qZWN0X25hbWUYASABKAkSIgoEbW9kZRgCIAEoDjIULmRzaGN0bC52MS5Nb3VudE1vZGUiawoWQ3JlYXRlV29ya3NwYWNlUmVxdWVzdBIWCg53b3Jrc3BhY2Vfc2x1ZxgBIAEoCRIQCghpbWFnZV9pZBgCIAEoCRInCgZtb3VudHMYAyADKAsyFy5kc2hjdGwudjEuUHJvamVjdE1vdW50IjIKGERlc2NyaWJlV29ya3NwYWNlUmVxdWVzdBIWCg53b3Jrc3BhY2Vfc2x1ZxgBIAEoCSIXChVMaXN0V29ya3NwYWNlc1JlcXVlc3QiQgoWTGlzdFdvcmtzcGFjZXNSZXNwb25zZRIoCgp3b3Jrc3BhY2VzGAEgAygLMhQuZHNoY3RsLnYxLldvcmtzcGFjZSJbChhSZWNyZWF0ZVdvcmtzcGFjZVJlcXVlc3QSFgoOd29ya3NwYWNlX3NsdWcYASABKAkSJwoGbW91bnRzGAIgAygLMhcuZHNoY3RsLnYxLlByb2plY3RNb3VudCIuChRTdG9wV29ya3NwYWNlUmVxdWVzdBIWCg53b3Jrc3BhY2Vfc2x1ZxgBIAEoCSIXChVTdG9wV29ya3NwYWNlUmVzcG9uc2UiygEKCVdvcmtzcGFjZRIWCg53b3Jrc3BhY2Vfc2x1ZxgBIAEoCRIWCg5jb250YWluZXJfbmFtZRgCIAEoCRIQCghpbWFnZV9pZBgDIAEoCRInCgZtb3VudHMYBCADKAsyFy5kc2hjdGwudjEuUHJvamVjdE1vdW50Eg4KBnN0YXR1cxgFIAEoCRIZChFhZ2VudF9zb2NrZXRfcGF0aBgGIAEoCRITCgthZ2VudF90b2tlbhgHIAEoCRISCgpjcmVhdGVkX2F0GAggASgJIhMKEUxpc3RJbWFnZXNSZXF1ZXN0IjYKEkxpc3RJbWFnZXNSZXNwb25zZRIgCgZpbWFnZXMYASADKAsyEC5kc2hjdGwudjEuSW1hZ2UiZAoFSW1hZ2USEAoIaW1hZ2VfaWQYASABKAkSEgoKYmFzZV9pbWFnZRgCIAEoCRIQCghwYWNrYWdlcxgDIAMoCRIRCglpbWFnZV90YWcYBCABKAkSEAoIYnVpbHRfYXQYBSABKAkiTQoTUmVidWlsZEltYWdlUmVxdWVzdBIQCghpbWFnZV9pZBgBIAEoCRISCgpiYXNlX2ltYWdlGAIgASgJEhAKCHBhY2thZ2VzGAMgAygJKlwKCU1vdW50TW9kZRIaChZNT1VOVF9NT0RFX1VOU1BFQ0lGSUVEEAASGAoUTU9VTlRfTU9ERV9SRUFEX09OTFkQARIZChVNT1VOVF9NT0RFX1JFQURfV1JJVEUQAjKKBQoTT3JjaGVzdHJhdG9yQ29udHJvbBJPCgxMaXN0UHJvamVjdHMSHi5kc2hjdGwudjEuTGlzdFByb2plY3RzUmVxdWVzdBofLmRzaGN0bC52MS5MaXN0UHJvamVjdHNSZXNwb25zZRJKCg9DcmVhdGVXb3Jrc3BhY2USIS5kc2hjdGwudjEuQ3JlYXRlV29ya3NwYWNlUmVxdWVzdBoULmRzaGN0bC52MS5Xb3Jrc3BhY2USTgoRRGVzY3JpYmVXb3Jrc3BhY2USIy5kc2hjdGwudjEuRGVzY3JpYmVXb3Jrc3BhY2VSZXF1ZXN0GhQuZHNoY3RsLnYxLldvcmtzcGFjZRJVCg5MaXN0V29ya3NwYWNlcxIgLmRzaGN0bC52MS5MaXN0V29ya3NwYWNlc1JlcXVlc3QaIS5kc2hjdGwudjEuTGlzdFdvcmtzcGFjZXNSZXNwb25zZRJOChFSZWNyZWF0ZVdvcmtzcGFjZRIjLmRzaGN0bC52MS5SZWNyZWF0ZVdvcmtzcGFjZVJlcXVlc3QaFC5kc2hjdGwudjEuV29ya3NwYWNlElIKDVN0b3BXb3Jrc3BhY2USHy5kc2hjdGwudjEuU3RvcFdvcmtzcGFjZVJlcXVlc3QaIC5kc2hjdGwudjEuU3RvcFdvcmtzcGFjZVJlc3BvbnNlEkkKCkxpc3RJbWFnZXMSHC5kc2hjdGwudjEuTGlzdEltYWdlc1JlcXVlc3QaHS5kc2hjdGwudjEuTGlzdEltYWdlc1Jlc3BvbnNlEkAKDFJlYnVpbGRJbWFnZRIeLmRzaGN0bC52MS5SZWJ1aWxkSW1hZ2VSZXF1ZXN0GhAuZHNoY3RsLnYxLkltYWdlQlFaT2dpdGxhYi5jb20vRXhhZ29uZTMxMy9kc2gtY29udGFpbmVyLXBsdWdpbi9pbnRlcm5hbC9nZW5wcm90by9kc2hjdGwvdjE7ZHNoY3RsdjFiBnByb3RvMw",
-  );
+export const file_dshctl_v1_control: GenFile = /*@__PURE__*/
+  fileDesc("Chdkc2hjdGwvdjEvY29udHJvbC5wcm90bxIJZHNoY3RsLnYxIhUKE0xpc3RQcm9qZWN0c1JlcXVlc3QiPAoUTGlzdFByb2plY3RzUmVzcG9uc2USJAoIcHJvamVjdHMYASADKAsyEi5kc2hjdGwudjEuUHJvamVjdCIqCgdQcm9qZWN0EgwKBG5hbWUYASABKAkSEQoJaG9zdF9wYXRoGAIgASgJIkgKDFByb2plY3RNb3VudBIUCgxwcm9qZWN0X25hbWUYASABKAkSIgoEbW9kZRgCIAEoDjIULmRzaGN0bC52MS5Nb3VudE1vZGUiawoWQ3JlYXRlV29ya3NwYWNlUmVxdWVzdBIWCg53b3Jrc3BhY2Vfc2x1ZxgBIAEoCRIQCghpbWFnZV9pZBgCIAEoCRInCgZtb3VudHMYAyADKAsyFy5kc2hjdGwudjEuUHJvamVjdE1vdW50IjIKGERlc2NyaWJlV29ya3NwYWNlUmVxdWVzdBIWCg53b3Jrc3BhY2Vfc2x1ZxgBIAEoCSIXChVMaXN0V29ya3NwYWNlc1JlcXVlc3QiQgoWTGlzdFdvcmtzcGFjZXNSZXNwb25zZRIoCgp3b3Jrc3BhY2VzGAEgAygLMhQuZHNoY3RsLnYxLldvcmtzcGFjZSJbChhSZWNyZWF0ZVdvcmtzcGFjZVJlcXVlc3QSFgoOd29ya3NwYWNlX3NsdWcYASABKAkSJwoGbW91bnRzGAIgAygLMhcuZHNoY3RsLnYxLlByb2plY3RNb3VudCIuChRTdG9wV29ya3NwYWNlUmVxdWVzdBIWCg53b3Jrc3BhY2Vfc2x1ZxgBIAEoCSIXChVTdG9wV29ya3NwYWNlUmVzcG9uc2UiygEKCVdvcmtzcGFjZRIWCg53b3Jrc3BhY2Vfc2x1ZxgBIAEoCRIWCg5jb250YWluZXJfbmFtZRgCIAEoCRIQCghpbWFnZV9pZBgDIAEoCRInCgZtb3VudHMYBCADKAsyFy5kc2hjdGwudjEuUHJvamVjdE1vdW50Eg4KBnN0YXR1cxgFIAEoCRIZChFhZ2VudF9zb2NrZXRfcGF0aBgGIAEoCRITCgthZ2VudF90b2tlbhgHIAEoCRISCgpjcmVhdGVkX2F0GAggASgJIhMKEUxpc3RJbWFnZXNSZXF1ZXN0IjYKEkxpc3RJbWFnZXNSZXNwb25zZRIgCgZpbWFnZXMYASADKAsyEC5kc2hjdGwudjEuSW1hZ2UiZAoFSW1hZ2USEAoIaW1hZ2VfaWQYASABKAkSEgoKYmFzZV9pbWFnZRgCIAEoCRIQCghwYWNrYWdlcxgDIAMoCRIRCglpbWFnZV90YWcYBCABKAkSEAoIYnVpbHRfYXQYBSABKAkiTQoTUmVidWlsZEltYWdlUmVxdWVzdBIQCghpbWFnZV9pZBgBIAEoCRISCgpiYXNlX2ltYWdlGAIgASgJEhAKCHBhY2thZ2VzGAMgAygJKlwKCU1vdW50TW9kZRIaChZNT1VOVF9NT0RFX1VOU1BFQ0lGSUVEEAASGAoUTU9VTlRfTU9ERV9SRUFEX09OTFkQARIZChVNT1VOVF9NT0RFX1JFQURfV1JJVEUQAjKKBQoTT3JjaGVzdHJhdG9yQ29udHJvbBJPCgxMaXN0UHJvamVjdHMSHi5kc2hjdGwudjEuTGlzdFByb2plY3RzUmVxdWVzdBofLmRzaGN0bC52MS5MaXN0UHJvamVjdHNSZXNwb25zZRJKCg9DcmVhdGVXb3Jrc3BhY2USIS5kc2hjdGwudjEuQ3JlYXRlV29ya3NwYWNlUmVxdWVzdBoULmRzaGN0bC52MS5Xb3Jrc3BhY2USTgoRRGVzY3JpYmVXb3Jrc3BhY2USIy5kc2hjdGwudjEuRGVzY3JpYmVXb3Jrc3BhY2VSZXF1ZXN0GhQuZHNoY3RsLnYxLldvcmtzcGFjZRJVCg5MaXN0V29ya3NwYWNlcxIgLmRzaGN0bC52MS5MaXN0V29ya3NwYWNlc1JlcXVlc3QaIS5kc2hjdGwudjEuTGlzdFdvcmtzcGFjZXNSZXNwb25zZRJOChFSZWNyZWF0ZVdvcmtzcGFjZRIjLmRzaGN0bC52MS5SZWNyZWF0ZVdvcmtzcGFjZVJlcXVlc3QaFC5kc2hjdGwudjEuV29ya3NwYWNlElIKDVN0b3BXb3Jrc3BhY2USHy5kc2hjdGwudjEuU3RvcFdvcmtzcGFjZVJlcXVlc3QaIC5kc2hjdGwudjEuU3RvcFdvcmtzcGFjZVJlc3BvbnNlEkkKCkxpc3RJbWFnZXMSHC5kc2hjdGwudjEuTGlzdEltYWdlc1JlcXVlc3QaHS5kc2hjdGwudjEuTGlzdEltYWdlc1Jlc3BvbnNlEkAKDFJlYnVpbGRJbWFnZRIeLmRzaGN0bC52MS5SZWJ1aWxkSW1hZ2VSZXF1ZXN0GhAuZHNoY3RsLnYxLkltYWdlQlFaT2dpdGxhYi5jb20vRXhhZ29uZTMxMy9kc2gtY29udGFpbmVyLXBsdWdpbi9pbnRlcm5hbC9nZW5wcm90by9kc2hjdGwvdjE7ZHNoY3RsdjFiBnByb3RvMw");
 
 /**
  * @generated from message dshctl.v1.ListProjectsRequest
  */
-export type ListProjectsRequest = Message<"dshctl.v1.ListProjectsRequest"> & {};
+export type ListProjectsRequest = Message<"dshctl.v1.ListProjectsRequest"> & {
+};
 
 /**
  * Describes the message dshctl.v1.ListProjectsRequest.
  * Use `create(ListProjectsRequestSchema)` to create a new message.
  */
-export const ListProjectsRequestSchema: GenMessage<ListProjectsRequest> =
-  /*@__PURE__*/
+export const ListProjectsRequestSchema: GenMessage<ListProjectsRequest> = /*@__PURE__*/
   messageDesc(file_dshctl_v1_control, 0);
 
 /**
@@ -52,8 +39,7 @@ export type ListProjectsResponse = Message<"dshctl.v1.ListProjectsResponse"> & {
  * Describes the message dshctl.v1.ListProjectsResponse.
  * Use `create(ListProjectsResponseSchema)` to create a new message.
  */
-export const ListProjectsResponseSchema: GenMessage<ListProjectsResponse> =
-  /*@__PURE__*/
+export const ListProjectsResponseSchema: GenMessage<ListProjectsResponse> = /*@__PURE__*/
   messageDesc(file_dshctl_v1_control, 1);
 
 /**
@@ -75,8 +61,7 @@ export type Project = Message<"dshctl.v1.Project"> & {
  * Describes the message dshctl.v1.Project.
  * Use `create(ProjectSchema)` to create a new message.
  */
-export const ProjectSchema: GenMessage<Project> =
-  /*@__PURE__*/
+export const ProjectSchema: GenMessage<Project> = /*@__PURE__*/
   messageDesc(file_dshctl_v1_control, 2);
 
 /**
@@ -98,113 +83,103 @@ export type ProjectMount = Message<"dshctl.v1.ProjectMount"> & {
  * Describes the message dshctl.v1.ProjectMount.
  * Use `create(ProjectMountSchema)` to create a new message.
  */
-export const ProjectMountSchema: GenMessage<ProjectMount> =
-  /*@__PURE__*/
+export const ProjectMountSchema: GenMessage<ProjectMount> = /*@__PURE__*/
   messageDesc(file_dshctl_v1_control, 3);
 
 /**
  * @generated from message dshctl.v1.CreateWorkspaceRequest
  */
-export type CreateWorkspaceRequest =
-  Message<"dshctl.v1.CreateWorkspaceRequest"> & {
-    /**
-     * @generated from field: string workspace_slug = 1;
-     */
-    workspaceSlug: string;
+export type CreateWorkspaceRequest = Message<"dshctl.v1.CreateWorkspaceRequest"> & {
+  /**
+   * @generated from field: string workspace_slug = 1;
+   */
+  workspaceSlug: string;
 
-    /**
-     * @generated from field: string image_id = 2;
-     */
-    imageId: string;
+  /**
+   * @generated from field: string image_id = 2;
+   */
+  imageId: string;
 
-    /**
-     * @generated from field: repeated dshctl.v1.ProjectMount mounts = 3;
-     */
-    mounts: ProjectMount[];
-  };
+  /**
+   * @generated from field: repeated dshctl.v1.ProjectMount mounts = 3;
+   */
+  mounts: ProjectMount[];
+};
 
 /**
  * Describes the message dshctl.v1.CreateWorkspaceRequest.
  * Use `create(CreateWorkspaceRequestSchema)` to create a new message.
  */
-export const CreateWorkspaceRequestSchema: GenMessage<CreateWorkspaceRequest> =
-  /*@__PURE__*/
+export const CreateWorkspaceRequestSchema: GenMessage<CreateWorkspaceRequest> = /*@__PURE__*/
   messageDesc(file_dshctl_v1_control, 4);
 
 /**
  * @generated from message dshctl.v1.DescribeWorkspaceRequest
  */
-export type DescribeWorkspaceRequest =
-  Message<"dshctl.v1.DescribeWorkspaceRequest"> & {
-    /**
-     * @generated from field: string workspace_slug = 1;
-     */
-    workspaceSlug: string;
-  };
+export type DescribeWorkspaceRequest = Message<"dshctl.v1.DescribeWorkspaceRequest"> & {
+  /**
+   * @generated from field: string workspace_slug = 1;
+   */
+  workspaceSlug: string;
+};
 
 /**
  * Describes the message dshctl.v1.DescribeWorkspaceRequest.
  * Use `create(DescribeWorkspaceRequestSchema)` to create a new message.
  */
-export const DescribeWorkspaceRequestSchema: GenMessage<DescribeWorkspaceRequest> =
-  /*@__PURE__*/
+export const DescribeWorkspaceRequestSchema: GenMessage<DescribeWorkspaceRequest> = /*@__PURE__*/
   messageDesc(file_dshctl_v1_control, 5);
 
 /**
  * @generated from message dshctl.v1.ListWorkspacesRequest
  */
-export type ListWorkspacesRequest =
-  Message<"dshctl.v1.ListWorkspacesRequest"> & {};
+export type ListWorkspacesRequest = Message<"dshctl.v1.ListWorkspacesRequest"> & {
+};
 
 /**
  * Describes the message dshctl.v1.ListWorkspacesRequest.
  * Use `create(ListWorkspacesRequestSchema)` to create a new message.
  */
-export const ListWorkspacesRequestSchema: GenMessage<ListWorkspacesRequest> =
-  /*@__PURE__*/
+export const ListWorkspacesRequestSchema: GenMessage<ListWorkspacesRequest> = /*@__PURE__*/
   messageDesc(file_dshctl_v1_control, 6);
 
 /**
  * @generated from message dshctl.v1.ListWorkspacesResponse
  */
-export type ListWorkspacesResponse =
-  Message<"dshctl.v1.ListWorkspacesResponse"> & {
-    /**
-     * @generated from field: repeated dshctl.v1.Workspace workspaces = 1;
-     */
-    workspaces: Workspace[];
-  };
+export type ListWorkspacesResponse = Message<"dshctl.v1.ListWorkspacesResponse"> & {
+  /**
+   * @generated from field: repeated dshctl.v1.Workspace workspaces = 1;
+   */
+  workspaces: Workspace[];
+};
 
 /**
  * Describes the message dshctl.v1.ListWorkspacesResponse.
  * Use `create(ListWorkspacesResponseSchema)` to create a new message.
  */
-export const ListWorkspacesResponseSchema: GenMessage<ListWorkspacesResponse> =
-  /*@__PURE__*/
+export const ListWorkspacesResponseSchema: GenMessage<ListWorkspacesResponse> = /*@__PURE__*/
   messageDesc(file_dshctl_v1_control, 7);
 
 /**
  * @generated from message dshctl.v1.RecreateWorkspaceRequest
  */
-export type RecreateWorkspaceRequest =
-  Message<"dshctl.v1.RecreateWorkspaceRequest"> & {
-    /**
-     * @generated from field: string workspace_slug = 1;
-     */
-    workspaceSlug: string;
+export type RecreateWorkspaceRequest = Message<"dshctl.v1.RecreateWorkspaceRequest"> & {
+  /**
+   * @generated from field: string workspace_slug = 1;
+   */
+  workspaceSlug: string;
 
-    /**
-     * @generated from field: repeated dshctl.v1.ProjectMount mounts = 2;
-     */
-    mounts: ProjectMount[];
-  };
+  /**
+   * @generated from field: repeated dshctl.v1.ProjectMount mounts = 2;
+   */
+  mounts: ProjectMount[];
+};
 
 /**
  * Describes the message dshctl.v1.RecreateWorkspaceRequest.
  * Use `create(RecreateWorkspaceRequestSchema)` to create a new message.
  */
-export const RecreateWorkspaceRequestSchema: GenMessage<RecreateWorkspaceRequest> =
-  /*@__PURE__*/
+export const RecreateWorkspaceRequestSchema: GenMessage<RecreateWorkspaceRequest> = /*@__PURE__*/
   messageDesc(file_dshctl_v1_control, 8);
 
 /**
@@ -221,22 +196,20 @@ export type StopWorkspaceRequest = Message<"dshctl.v1.StopWorkspaceRequest"> & {
  * Describes the message dshctl.v1.StopWorkspaceRequest.
  * Use `create(StopWorkspaceRequestSchema)` to create a new message.
  */
-export const StopWorkspaceRequestSchema: GenMessage<StopWorkspaceRequest> =
-  /*@__PURE__*/
+export const StopWorkspaceRequestSchema: GenMessage<StopWorkspaceRequest> = /*@__PURE__*/
   messageDesc(file_dshctl_v1_control, 9);
 
 /**
  * @generated from message dshctl.v1.StopWorkspaceResponse
  */
-export type StopWorkspaceResponse =
-  Message<"dshctl.v1.StopWorkspaceResponse"> & {};
+export type StopWorkspaceResponse = Message<"dshctl.v1.StopWorkspaceResponse"> & {
+};
 
 /**
  * Describes the message dshctl.v1.StopWorkspaceResponse.
  * Use `create(StopWorkspaceResponseSchema)` to create a new message.
  */
-export const StopWorkspaceResponseSchema: GenMessage<StopWorkspaceResponse> =
-  /*@__PURE__*/
+export const StopWorkspaceResponseSchema: GenMessage<StopWorkspaceResponse> = /*@__PURE__*/
   messageDesc(file_dshctl_v1_control, 10);
 
 /**
@@ -288,21 +261,20 @@ export type Workspace = Message<"dshctl.v1.Workspace"> & {
  * Describes the message dshctl.v1.Workspace.
  * Use `create(WorkspaceSchema)` to create a new message.
  */
-export const WorkspaceSchema: GenMessage<Workspace> =
-  /*@__PURE__*/
+export const WorkspaceSchema: GenMessage<Workspace> = /*@__PURE__*/
   messageDesc(file_dshctl_v1_control, 11);
 
 /**
  * @generated from message dshctl.v1.ListImagesRequest
  */
-export type ListImagesRequest = Message<"dshctl.v1.ListImagesRequest"> & {};
+export type ListImagesRequest = Message<"dshctl.v1.ListImagesRequest"> & {
+};
 
 /**
  * Describes the message dshctl.v1.ListImagesRequest.
  * Use `create(ListImagesRequestSchema)` to create a new message.
  */
-export const ListImagesRequestSchema: GenMessage<ListImagesRequest> =
-  /*@__PURE__*/
+export const ListImagesRequestSchema: GenMessage<ListImagesRequest> = /*@__PURE__*/
   messageDesc(file_dshctl_v1_control, 12);
 
 /**
@@ -319,8 +291,7 @@ export type ListImagesResponse = Message<"dshctl.v1.ListImagesResponse"> & {
  * Describes the message dshctl.v1.ListImagesResponse.
  * Use `create(ListImagesResponseSchema)` to create a new message.
  */
-export const ListImagesResponseSchema: GenMessage<ListImagesResponse> =
-  /*@__PURE__*/
+export const ListImagesResponseSchema: GenMessage<ListImagesResponse> = /*@__PURE__*/
   messageDesc(file_dshctl_v1_control, 13);
 
 /**
@@ -357,8 +328,7 @@ export type Image = Message<"dshctl.v1.Image"> & {
  * Describes the message dshctl.v1.Image.
  * Use `create(ImageSchema)` to create a new message.
  */
-export const ImageSchema: GenMessage<Image> =
-  /*@__PURE__*/
+export const ImageSchema: GenMessage<Image> = /*@__PURE__*/
   messageDesc(file_dshctl_v1_control, 14);
 
 /**
@@ -385,8 +355,7 @@ export type RebuildImageRequest = Message<"dshctl.v1.RebuildImageRequest"> & {
  * Describes the message dshctl.v1.RebuildImageRequest.
  * Use `create(RebuildImageRequestSchema)` to create a new message.
  */
-export const RebuildImageRequestSchema: GenMessage<RebuildImageRequest> =
-  /*@__PURE__*/
+export const RebuildImageRequestSchema: GenMessage<RebuildImageRequest> = /*@__PURE__*/
   messageDesc(file_dshctl_v1_control, 15);
 
 /**
@@ -412,8 +381,7 @@ export enum MountMode {
 /**
  * Describes the enum dshctl.v1.MountMode.
  */
-export const MountModeSchema: GenEnum<MountMode> =
-  /*@__PURE__*/
+export const MountModeSchema: GenEnum<MountMode> = /*@__PURE__*/
   enumDesc(file_dshctl_v1_control, 0);
 
 /**
@@ -427,7 +395,7 @@ export const OrchestratorControl: GenService<{
     methodKind: "unary";
     input: typeof ListProjectsRequestSchema;
     output: typeof ListProjectsResponseSchema;
-  };
+  },
   /**
    * @generated from rpc dshctl.v1.OrchestratorControl.CreateWorkspace
    */
@@ -435,7 +403,7 @@ export const OrchestratorControl: GenService<{
     methodKind: "unary";
     input: typeof CreateWorkspaceRequestSchema;
     output: typeof WorkspaceSchema;
-  };
+  },
   /**
    * @generated from rpc dshctl.v1.OrchestratorControl.DescribeWorkspace
    */
@@ -443,7 +411,7 @@ export const OrchestratorControl: GenService<{
     methodKind: "unary";
     input: typeof DescribeWorkspaceRequestSchema;
     output: typeof WorkspaceSchema;
-  };
+  },
   /**
    * @generated from rpc dshctl.v1.OrchestratorControl.ListWorkspaces
    */
@@ -451,7 +419,7 @@ export const OrchestratorControl: GenService<{
     methodKind: "unary";
     input: typeof ListWorkspacesRequestSchema;
     output: typeof ListWorkspacesResponseSchema;
-  };
+  },
   /**
    * @generated from rpc dshctl.v1.OrchestratorControl.RecreateWorkspace
    */
@@ -459,7 +427,7 @@ export const OrchestratorControl: GenService<{
     methodKind: "unary";
     input: typeof RecreateWorkspaceRequestSchema;
     output: typeof WorkspaceSchema;
-  };
+  },
   /**
    * @generated from rpc dshctl.v1.OrchestratorControl.StopWorkspace
    */
@@ -467,7 +435,7 @@ export const OrchestratorControl: GenService<{
     methodKind: "unary";
     input: typeof StopWorkspaceRequestSchema;
     output: typeof StopWorkspaceResponseSchema;
-  };
+  },
   /**
    * @generated from rpc dshctl.v1.OrchestratorControl.ListImages
    */
@@ -475,7 +443,7 @@ export const OrchestratorControl: GenService<{
     methodKind: "unary";
     input: typeof ListImagesRequestSchema;
     output: typeof ListImagesResponseSchema;
-  };
+  },
   /**
    * @generated from rpc dshctl.v1.OrchestratorControl.RebuildImage
    */
@@ -483,5 +451,6 @@ export const OrchestratorControl: GenService<{
     methodKind: "unary";
     input: typeof RebuildImageRequestSchema;
     output: typeof ImageSchema;
-  };
-}> = /*@__PURE__*/ serviceDesc(file_dshctl_v1_control, 0);
+  },
+}> = /*@__PURE__*/
+  serviceDesc(file_dshctl_v1_control, 0);

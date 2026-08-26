@@ -34,10 +34,24 @@ export class WorkspaceResolver {
       "",
     );
     const key = workspaceSlug(String(workspace.id));
-    return this.resolveBinding(key, relativePath);
+    return this.ready(key, relativePath);
   }
   resolveSlug(key: string): Promise<WorkspaceBinding> {
-    return this.resolveBinding(key, key);
+    return this.ready(key, key);
+  }
+  private async ready(
+    key: string,
+    projectName: string,
+  ): Promise<WorkspaceBinding> {
+    let binding = await this.resolveBinding(key, projectName);
+    try {
+      await waitForReady(binding.agent);
+    } catch {
+      this.bindings.delete(key);
+      binding = await this.resolveBinding(key, projectName);
+      await waitForReady(binding.agent);
+    }
+    return binding;
   }
   private resolveBinding(
     key: string,
@@ -78,6 +92,14 @@ export class WorkspaceResolver {
   async control<T>(method: string, request: unknown): Promise<T> {
     return unary<T>(controlClient(this.config.controlSocket), method, request);
   }
+}
+
+function waitForReady(agent: grpc.Client): Promise<void> {
+  return new Promise((resolve, reject) => {
+    agent.waitForReady(Date.now() + 5000, (error) =>
+      error ? reject(error) : resolve(),
+    );
+  });
 }
 
 export function workspaceSlug(session: unknown): string {

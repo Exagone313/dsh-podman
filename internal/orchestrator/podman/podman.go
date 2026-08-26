@@ -33,7 +33,7 @@ func (c *Client) CreateWorkspace(name, image, token string, mounts []specs.Mount
 	generator := specgen.NewSpecGenerator(image, false)
 	generator.Name = name
 	generator.Command = []string{c.agentBinary}
-	generator.Env = map[string]string{"DSH_AGENT_TOKEN": token, "DSH_AGENT_SOCKET": filepath.Join(c.socketRoot, name, "agent.sock")}
+	generator.Env = map[string]string{"DSH_AGENT_TOKEN": token, "DSH_AGENT_SOCKET": filepath.Join(c.socketRoot, name, "agent.sock"), "DSH_WORKSPACE_ROOT": "/workspace"}
 	generator.Init = &init
 	generator.Mounts = append(mounts, specs.Mount{Type: "bind", Source: c.hostAgentBinary, Destination: c.agentBinary, Options: []string{"ro"}}, specs.Mount{Type: "bind", Source: socketDir, Destination: filepath.Join(c.socketRoot, name), Options: []string{"rw"}})
 	if _, err := containers.CreateWithSpec(c.ctx, generator, nil); err != nil {

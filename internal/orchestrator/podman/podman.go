@@ -23,7 +23,14 @@ func New(ctx context.Context, socket, socketRoot, agentBinary, hostSocketRoot, p
 	if err != nil {
 		return nil, err
 	}
-	return &Client{ctx: connected, socketRoot: socketRoot, hostSocketRoot: hostSocketRoot, projectRoot: projectRoot, agentBinary: agentBinary, hostAgentBinary: hostAgentBinary}, nil
+	return &Client{ctx: connected, socketRoot: socketRoot, hostSocketRoot: hostSocketRoot, projectRoot: projectRoot, agentBinary: binaryPath(agentBinary), hostAgentBinary: binaryPath(hostAgentBinary)}, nil
+}
+
+func binaryPath(path string) string {
+	if filepath.Base(path) == "dsh-workspace-agent" {
+		return path
+	}
+	return filepath.Join(path, "dsh-workspace-agent")
 }
 func (c *Client) CreateWorkspace(name, image, token string, mounts []specs.Mount) error {
 	socketDir := filepath.Join(c.socketRoot, name)

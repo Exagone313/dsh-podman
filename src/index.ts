@@ -162,18 +162,19 @@ function createFilesystemProvider(resolver: WorkspaceResolver): object {
       return Buffer.concat(chunks).toString("utf8");
     },
     writeText: async (target: any, content: string) => {
-      const call = (target.binding.agent as any).writeFile(
-        metadata(target.binding.token),
-      );
-      call.write({
-        start: { path: target.targetKey, create: true, truncate: true },
+      return new Promise((resolveDone, reject) => {
+        const call = (target.binding.agent as any).writeFile(
+          metadata(target.binding.token),
+          {},
+          (error: Error | null, result: unknown) =>
+            error ? reject(error) : resolveDone(result),
+        );
+        call.write({
+          start: { path: target.targetKey, create: true, truncate: true },
+        });
+        call.write({ dataChunk: Buffer.from(content) });
+        call.end();
       });
-      call.write({ dataChunk: Buffer.from(content) });
-      return new Promise((resolveDone, reject) =>
-        call.end((error: Error | null, result: unknown) =>
-          error ? reject(error) : resolveDone(result),
-        ),
-      );
     },
     stat: async (target: any) =>
       new Promise((resolveDone, reject) =>

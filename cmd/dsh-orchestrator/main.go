@@ -24,18 +24,14 @@ func main() {
 		fmt.Println(version)
 		return
 	}
-	socket := os.Getenv("DSH_CONTROL_SOCKET")
-	if socket == "" {
-		socket = "/run/dsh-sockets/control.sock"
-	}
-	root := os.Getenv("DSH_PROJECTS_ROOT")
-	if root == "" {
-		root = "/projects"
-	}
-	stateDir := os.Getenv("DSH_STATE_DIR")
-	if stateDir == "" {
-		stateDir = "/var/lib/dsh-orchestrator"
-	}
+	socketsRoot := getenv("DSH_ORCH_SOCKETS_ROOT", "/run/dsh-sockets")
+	socket := getenv("DSH_CONTROL_SOCKET", filepath.Join(socketsRoot, "control.sock"))
+	root := getenv("DSH_ORCH_PROJECTS_ROOT", getenv("DSH_PROJECTS_ROOT", "/projects"))
+	stateDir := getenv("DSH_ORCH_STATE", getenv("DSH_STATE_DIR", "/var/lib/dsh-orchestrator"))
+	hostProjectsRoot := getenv("DSH_ORCH_HOST_PROJECTS_ROOT", root)
+	hostSocketsRoot := getenv("DSH_ORCH_HOST_SOCKETS_ROOT", socketsRoot)
+	agentBinary := getenv("DSH_ORCH_AGENT_BIN", "")
+	hostAgentBinary := getenv("DSH_ORCH_HOST_AGENT_BIN", agentBinary)
 	if err := os.MkdirAll(filepath.Dir(socket), 0700); err != nil {
 		panic(err)
 	}
@@ -58,7 +54,7 @@ func main() {
 	}
 	if podmanSocket != "" {
 		logger.Info("Podman API configured", "socket", podmanSocket)
-		podmanClient, err = podman.New(context.Background(), podmanSocket, filepath.Dir(socket), os.Getenv("DSH_AGENT_BINARY"))
+		podmanClient, err = podman.New(context.Background(), podmanSocket, socketsRoot, agentBinary, hostSocketsRoot, hostAgentBinary)
 		if err != nil {
 			panic(err)
 		}
@@ -70,8 +66,15 @@ func main() {
 	} else {
 		logger.Warn("Podman API is not configured; workspace creation and image auto-provisioning are unavailable", "env", "DSH_PODMAN_SOCKET or CONTAINER_HOST")
 	}
-	ctl.RegisterOrchestratorControlServer(server, &grpcserver.Server{ProjectsRoot: root, Store: store, Podman: podmanClient, ImageBuilder: imageBuilder, Logger: logger})
+	ctl.RegisterOrchestratorControlServer(server, &grpcserver.Server{ProjectsRoot: root, HostProjectsRoot: hostProjectsRoot, SocketsRoot: socketsRoot, Store: store, Podman: podmanClient, ImageBuilder: imageBuilder, Logger: logger})
 	if err := server.Serve(listener); err != nil {
 		panic(err)
 	}
+}
+
+func getenv(name, fallback string) string {
+	if value := os.Getenv(name); value != "" {
+		return value
+	}
+	return fallback
 }

@@ -22,11 +22,13 @@ import (
 
 type Server struct {
 	ctl.UnimplementedOrchestratorControlServer
-	ProjectsRoot string
-	Store        *state.Store
-	Podman       *podman.Client
-	ImageBuilder *imagebuild.Builder
-	Logger       *slog.Logger
+	ProjectsRoot     string
+	HostProjectsRoot string
+	SocketsRoot      string
+	Store            *state.Store
+	Podman           *podman.Client
+	ImageBuilder     *imagebuild.Builder
+	Logger           *slog.Logger
 }
 
 var defaultPackages = []string{"base-devel", "git", "python", "curl", "wget", "openssh", "ca-certificates", "ripgrep", "fd", "jq", "unzip", "zstd", "less", "procps-ng", "diffutils", "patch", "tree"}
@@ -170,7 +172,14 @@ func (s *Server) CreateWorkspace(ctx context.Context, request *ctl.CreateWorkspa
 			mode, options = "read_write", []string{"rw"}
 		}
 		mounts = append(mounts, state.Mount{ProjectName: mount.GetProjectName(), Mode: mode})
-		podmanMounts = append(podmanMounts, specs.Mount{Type: "bind", Source: path, Destination: filepath.Join("/workspace", mount.GetProjectName()), Options: options})
+		hostPath := path
+		if s.HostProjectsRoot != "" {
+			hostPath, pathErr = ValidateProject(s.HostProjectsRoot, mount.GetProjectName())
+			if pathErr != nil {
+				return nil, status.Error(codes.InvalidArgument, pathErr.Error())
+			}
+		}
+		podmanMounts = append(podmanMounts, specs.Mount{Type: "bind", Source: hostPath, Destination: filepath.Join("/workspace", mount.GetProjectName()), Options: options})
 	}
 	if s.Podman == nil {
 		return nil, status.Error(codes.FailedPrecondition, "podman is not configured")
@@ -186,7 +195,8 @@ func (s *Server) CreateWorkspace(ctx context.Context, request *ctl.CreateWorkspa
 		s.log().Error("control request failed", "method", "CreateWorkspace", "workspace_slug", request.GetWorkspaceSlug(), "error", err)
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	workspace := state.Workspace{WorkspaceSlug: request.GetWorkspaceSlug(), ContainerName: name, ImageID: request.GetImageId(), Mounts: mounts, Status: "running", AgentSocketPath: "/run/dsh-sockets/agent.sock", AgentToken: secret, CreatedAt: time.Now().UTC().Format(time.RFC3339)}
+	agentSocket := filepath.Join(s.SocketsRoot, name, "agent.sock")
+	workspace := state.Workspace{WorkspaceSlug: request.GetWorkspaceSlug(), ContainerName: name, ImageID: request.GetImageId(), Mounts: mounts, Status: "running", AgentSocketPath: agentSocket, AgentToken: secret, CreatedAt: time.Now().UTC().Format(time.RFC3339)}
 	all, _ := s.Store.Workspaces()
 	all = append(all, workspace)
 	if err := s.Store.SaveWorkspaces(all); err != nil {

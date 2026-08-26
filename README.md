@@ -17,5 +17,10 @@ and agent socket are Unix sockets configured with `DSH_CONTROL_SOCKET` and
 `DSH_AGENT_SOCKET`; workspace configuration uses `DSH_AGENT_TOKEN` and
 `DSH_WORKSPACE_ROOT`.
 
+The orchestrator deployment variables are `DSH_ORCH_STATE`,
+`DSH_ORCH_AGENT_BIN`, `DSH_ORCH_SOCKETS_ROOT`, `DSH_ORCH_PROJECTS_ROOT`,
+`DSH_ORCH_PODMAN_SOCKET`, `DSH_ORCH_HOST_PROJECTS_ROOT`,
+`DSH_ORCH_HOST_SOCKETS_ROOT`, and `DSH_ORCH_HOST_AGENT_BIN`.
+
 The plugin auto-creates a missing workspace using `DSH_DEFAULT_IMAGE` and a
 single read-write project mount. It never falls back to host execution.

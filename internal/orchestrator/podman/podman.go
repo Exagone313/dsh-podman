@@ -13,19 +13,19 @@ import (
 )
 
 type Client struct {
-	ctx                     context.Context
-	socketRoot, agentBinary string
+	ctx                                                      context.Context
+	socketRoot, hostSocketRoot, agentBinary, hostAgentBinary string
 }
 
-func New(ctx context.Context, socket, socketRoot, agentBinary string) (*Client, error) {
+func New(ctx context.Context, socket, socketRoot, agentBinary, hostSocketRoot, hostAgentBinary string) (*Client, error) {
 	connected, err := bindings.NewConnection(ctx, socket)
 	if err != nil {
 		return nil, err
 	}
-	return &Client{ctx: connected, socketRoot: socketRoot, agentBinary: agentBinary}, nil
+	return &Client{ctx: connected, socketRoot: socketRoot, hostSocketRoot: hostSocketRoot, agentBinary: agentBinary, hostAgentBinary: hostAgentBinary}, nil
 }
 func (c *Client) CreateWorkspace(name, image, token string, mounts []specs.Mount) error {
-	socketDir := filepath.Join(c.socketRoot, name)
+	socketDir := filepath.Join(c.hostSocketRoot, name)
 	if err := os.MkdirAll(socketDir, 0700); err != nil {
 		return err
 	}
@@ -33,9 +33,9 @@ func (c *Client) CreateWorkspace(name, image, token string, mounts []specs.Mount
 	generator := specgen.NewSpecGenerator(image, false)
 	generator.Name = name
 	generator.Command = []string{c.agentBinary}
-	generator.Env = map[string]string{"DSH_AGENT_TOKEN": token, "DSH_AGENT_SOCKET": "/run/dsh-sockets/agent.sock"}
+	generator.Env = map[string]string{"DSH_AGENT_TOKEN": token, "DSH_AGENT_SOCKET": filepath.Join(c.socketRoot, name, "agent.sock")}
 	generator.Init = &init
-	generator.Mounts = append(mounts, specs.Mount{Type: "bind", Source: c.agentBinary, Destination: c.agentBinary, Options: []string{"ro"}}, specs.Mount{Type: "bind", Source: socketDir, Destination: "/run/dsh-sockets", Options: []string{"rw"}})
+	generator.Mounts = append(mounts, specs.Mount{Type: "bind", Source: c.hostAgentBinary, Destination: c.agentBinary, Options: []string{"ro"}}, specs.Mount{Type: "bind", Source: socketDir, Destination: filepath.Join(c.socketRoot, name), Options: []string{"rw"}})
 	if _, err := containers.CreateWithSpec(c.ctx, generator, nil); err != nil {
 		return fmt.Errorf("create container: %w", err)
 	}

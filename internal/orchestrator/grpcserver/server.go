@@ -162,7 +162,15 @@ func (s *Server) CreateWorkspace(ctx context.Context, request *ctl.CreateWorkspa
 		images = append(images, image)
 		imageIndex = len(images) - 1
 		s.log().Info("CreateWorkspace auto-provisioned image", "image_id", image.ImageID, "image_tag", image.ImageTag)
-		if err := s.Store.SaveImages(images); err != nil {
+		if err := s.Store.UpdateImages(func(current []state.Image) ([]state.Image, error) {
+			for i := range current {
+				if current[i].ImageID == image.ImageID {
+					current[i] = image
+					return current, nil
+				}
+			}
+			return append(current, image), nil
+		}); err != nil {
 			return nil, status.Error(codes.Internal, err.Error())
 		}
 		found = true
@@ -212,7 +220,15 @@ func (s *Server) CreateWorkspace(ctx context.Context, request *ctl.CreateWorkspa
 		}
 		image.BuiltAt = time.Now().UTC().Format(time.RFC3339)
 		images[imageIndex] = image
-		if err := s.Store.SaveImages(images); err != nil {
+		if err := s.Store.UpdateImages(func(current []state.Image) ([]state.Image, error) {
+			for i := range current {
+				if current[i].ImageID == image.ImageID {
+					current[i] = image
+					return current, nil
+				}
+			}
+			return append(current, image), nil
+		}); err != nil {
 			return nil, status.Error(codes.Internal, err.Error())
 		}
 		imageTag = image.ImageTag
@@ -225,18 +241,19 @@ func (s *Server) CreateWorkspace(ctx context.Context, request *ctl.CreateWorkspa
 	}
 	agentSocket := filepath.Join(s.SocketsRoot, name, "agent.sock")
 	workspace := state.Workspace{WorkspaceSlug: request.GetWorkspaceSlug(), ContainerName: name, ImageID: request.GetImageId(), Mounts: mounts, Status: "running", AgentSocketPath: agentSocket, AgentToken: secret, CreatedAt: time.Now().UTC().Format(time.RFC3339)}
-	all, _ := s.Store.Workspaces()
-	replaced := false
-	for i := range all {
-		if all[i].WorkspaceSlug == workspace.WorkspaceSlug {
-			all[i] = workspace
-			replaced = true
+	if err := s.Store.UpdateWorkspaces(func(all []state.Workspace) ([]state.Workspace, error) {
+		replaced := false
+		for i := range all {
+			if all[i].WorkspaceSlug == workspace.WorkspaceSlug {
+				all[i] = workspace
+				replaced = true
+			}
 		}
-	}
-	if !replaced {
-		all = append(all, workspace)
-	}
-	if err := s.Store.SaveWorkspaces(all); err != nil {
+		if !replaced {
+			all = append(all, workspace)
+		}
+		return all, nil
+	}); err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 	s.log().Info("control request completed", "method", "CreateWorkspace", "workspace_slug", workspace.WorkspaceSlug, "container_name", workspace.ContainerName)
@@ -263,21 +280,19 @@ func (s *Server) RebuildImage(ctx context.Context, request *ctl.RebuildImageRequ
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 	image.ImageTag, image.BuiltAt = tag, time.Now().UTC().Format(time.RFC3339)
-	all, err := s.Store.Images()
-	if err != nil {
-		return nil, status.Error(codes.Internal, err.Error())
-	}
-	replaced := false
-	for i := range all {
-		if all[i].ImageID == image.ImageID {
-			all[i] = image
-			replaced = true
+	if err := s.Store.UpdateImages(func(all []state.Image) ([]state.Image, error) {
+		replaced := false
+		for i := range all {
+			if all[i].ImageID == image.ImageID {
+				all[i] = image
+				replaced = true
+			}
 		}
-	}
-	if !replaced {
-		all = append(all, image)
-	}
-	if err := s.Store.SaveImages(all); err != nil {
+		if !replaced {
+			all = append(all, image)
+		}
+		return all, nil
+	}); err != nil {
 		s.log().Error("control request failed", "method", "RebuildImage", "image_id", image.ImageID, "error", err)
 		return nil, status.Error(codes.Internal, err.Error())
 	}

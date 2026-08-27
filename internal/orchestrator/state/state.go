@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sync"
 
 	"github.com/pelletier/go-toml/v2"
 )
@@ -37,7 +38,10 @@ type workspacesFile struct {
 	Workspaces []Workspace `toml:"workspaces"`
 }
 
-type Store struct{ dir string }
+type Store struct {
+	dir string
+	mu  sync.Mutex
+}
 
 func New(dir string) (*Store, error) {
 	if err := os.MkdirAll(dir, 0700); err != nil {
@@ -49,6 +53,11 @@ func New(dir string) (*Store, error) {
 	return &Store{dir: dir}, nil
 }
 func (s *Store) Images() ([]Image, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.images()
+}
+func (s *Store) images() ([]Image, error) {
 	var file imagesFile
 	if err := s.read("images.toml", &file); err != nil {
 		return nil, err
@@ -56,9 +65,19 @@ func (s *Store) Images() ([]Image, error) {
 	return file.Images, nil
 }
 func (s *Store) SaveImages(images []Image) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.saveImages(images)
+}
+func (s *Store) saveImages(images []Image) error {
 	return s.write("images.toml", imagesFile{Images: images})
 }
 func (s *Store) Workspaces() ([]Workspace, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.workspaces()
+}
+func (s *Store) workspaces() ([]Workspace, error) {
 	var file workspacesFile
 	if err := s.read("workspaces.toml", &file); err != nil {
 		return nil, err
@@ -66,7 +85,38 @@ func (s *Store) Workspaces() ([]Workspace, error) {
 	return file.Workspaces, nil
 }
 func (s *Store) SaveWorkspaces(workspaces []Workspace) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.saveWorkspaces(workspaces)
+}
+func (s *Store) saveWorkspaces(workspaces []Workspace) error {
 	return s.write("workspaces.toml", workspacesFile{Workspaces: workspaces})
+}
+func (s *Store) UpdateImages(update func([]Image) ([]Image, error)) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	current, err := s.images()
+	if err != nil {
+		return err
+	}
+	next, err := update(current)
+	if err != nil {
+		return err
+	}
+	return s.saveImages(next)
+}
+func (s *Store) UpdateWorkspaces(update func([]Workspace) ([]Workspace, error)) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	current, err := s.workspaces()
+	if err != nil {
+		return err
+	}
+	next, err := update(current)
+	if err != nil {
+		return err
+	}
+	return s.saveWorkspaces(next)
 }
 func (s *Store) read(name string, target any) error {
 	data, err := os.ReadFile(filepath.Join(s.dir, name))

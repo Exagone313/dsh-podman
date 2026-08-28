@@ -130,3 +130,77 @@ func TestBuildRejectsInvalidImageID(t *testing.T) {
 		}
 	}
 }
+
+func TestContainerfileWithoutGuestAgentImageIsUnchanged(t *testing.T) {
+	file, err := Containerfile(state.Image{BaseImage: "archlinux", Packages: []string{"git"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(file, "guestagent") {
+		t.Fatalf("unexpected multi-stage build: %s", file)
+	}
+	if !strings.HasPrefix(file, "FROM archlinux\n") {
+		t.Fatalf("expected plain FROM first: %s", file)
+	}
+}
+
+func TestContainerfileBakesGuestAgentBinary(t *testing.T) {
+	guest := GuestAgentImage{Image: "localhost/dsh-podman-guest-agent:latest", AgentBin: "/bin/dsh-podman-guest-agent", DestAgentBin: "/usr/local/bin/dsh-podman-guest-agent"}
+	file, err := Containerfile(state.Image{BaseImage: "archlinux"}, guest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.HasPrefix(file, "FROM localhost/dsh-podman-guest-agent:latest AS guestagent\n") {
+		t.Fatalf("missing guestagent stage: %s", file)
+	}
+	if !strings.Contains(file, "COPY --from=guestagent /bin/dsh-podman-guest-agent /usr/local/bin/dsh-podman-guest-agent") {
+		t.Fatalf("missing binary copy: %s", file)
+	}
+	if !strings.Contains(file, "ENTRYPOINT [\"/usr/local/bin/dsh-podman-guest-agent\"]") {
+		t.Fatalf("missing entrypoint: %s", file)
+	}
+}
+
+func TestContainerfileGuestAgentUsesDefaults(t *testing.T) {
+	file, err := Containerfile(state.Image{BaseImage: "archlinux"}, GuestAgentImage{Image: "localhost/dsh-podman-guest-agent:latest"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(file, "COPY --from=guestagent /bin/dsh-podman-guest-agent /usr/local/bin/dsh-podman-guest-agent") {
+		t.Fatalf("defaults not applied: %s", file)
+	}
+}
+
+func TestContainerfileGuestAgentEntrypointFollowsDestination(t *testing.T) {
+	guest := GuestAgentImage{Image: "localhost/dsh-podman-guest-agent:latest", AgentBin: "/bin/dsh-podman-guest-agent", DestAgentBin: "/opt/dsh/guest-agent"}
+	file, err := Containerfile(state.Image{BaseImage: "archlinux"}, guest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(file, "COPY --from=guestagent /bin/dsh-podman-guest-agent /opt/dsh/guest-agent") {
+		t.Fatalf("missing copy to custom destination: %s", file)
+	}
+	if !strings.Contains(file, "ENTRYPOINT [\"/opt/dsh/guest-agent\"]") {
+		t.Fatalf("entrypoint does not follow destination: %s", file)
+	}
+}
+
+func TestContainerfileRejectsInvalidGuestAgentConfig(t *testing.T) {
+	valid := GuestAgentImage{Image: "localhost/dsh-podman-guest-agent:latest", AgentBin: "/bin/dsh-podman-guest-agent", DestAgentBin: "/usr/local/bin/dsh-podman-guest-agent"}
+	cases := []GuestAgentImage{
+		{Image: "arch\nRUN evil", AgentBin: "/bin/x", DestAgentBin: "/bin/x"},
+		{Image: "..", AgentBin: "/bin/x", DestAgentBin: "/bin/x"},
+		{Image: "img", AgentBin: "relative", DestAgentBin: "/bin/x"},
+		{Image: "img", AgentBin: "/a/../b", DestAgentBin: "/bin/x"},
+		{Image: "img", AgentBin: "/bin/x", DestAgentBin: "/usr/bin/x y"},
+		{Image: "img", AgentBin: "/bin/x", DestAgentBin: "/usr/bin/x\"\nRUN evil"},
+	}
+	for _, guest := range cases {
+		if _, err := Containerfile(state.Image{BaseImage: "arch"}, guest); err == nil {
+			t.Errorf("accepted invalid guest agent config %#v", guest)
+		}
+	}
+	if _, err := Containerfile(state.Image{BaseImage: "arch"}, valid); err != nil {
+		t.Errorf("rejected valid guest agent config: %v", err)
+	}
+}

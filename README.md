@@ -61,6 +61,9 @@ guest-only values are namespaced under `DSH_PODMAN_ORCHESTRATOR_` and
 | `DSH_PODMAN_GUEST_AGENT_BIN` | `dsh-podman-guest-agent` | Guest agent binary path (container-internal); resolved via the image's `PATH` when unset |
 | `DSH_PODMAN_HOST_GUEST_AGENT_BIN` | — | Host-side guest agent binary path; bind-mounted when set |
 | `DSH_PODMAN_HOST_PACMAN_CACHE` | — | Host-absolute Buildah cache directory used by workspace-image builds |
+| `DSH_PODMAN_GUEST_AGENT_IMAGE` | — | Prebuilt guest-agent image baked into workspace images via a multi-stage `COPY`; unset disables the feature (binary is bind-mounted instead) |
+| `DSH_PODMAN_GUEST_AGENT_IMAGE_AGENT_BIN` | `/bin/dsh-podman-guest-agent` | Path of the guest agent binary inside the guest-agent image |
+| `DSH_PODMAN_GUEST_AGENT_IMAGE_DEST_AGENT_BIN` | `/usr/local/bin/dsh-podman-guest-agent` | Destination path for the copied binary inside built workspace images |
 | `DSH_PODMAN_ORCHESTRATOR_TOKEN` | — | Shared bearer token required on control-plane gRPC calls; when unset the control socket is unauthenticated |
 
 ### Guest agent (`dsh-podman-guest-agent`)

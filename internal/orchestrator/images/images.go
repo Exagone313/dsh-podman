@@ -22,6 +22,7 @@ import (
 var packageName = regexp.MustCompile(`^[A-Za-z0-9@+._:][A-Za-z0-9@+._:-]*$`)
 var baseImageName = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9._:/@-]*$`)
 var imageIDName = regexp.MustCompile(`^[a-zA-Z0-9_][a-zA-Z0-9_.-]{0,99}$`)
+var containerPathName = regexp.MustCompile(`^/[a-zA-Z0-9._:@+=-]+(?:/[a-zA-Z0-9._:@+=-]+)*$`)
 
 func validPackage(pkg string) bool {
 	return pkg != "." && pkg != ".." && packageName.MatchString(pkg)
@@ -39,11 +40,29 @@ func validBaseImage(base string) bool {
 	return true
 }
 
+func validContainerPath(path string) bool {
+	if !containerPathName.MatchString(path) {
+		return false
+	}
+	for _, segment := range strings.Split(path, "/") {
+		if segment == "." || segment == ".." {
+			return false
+		}
+	}
+	return true
+}
+
 func validImageID(id string) bool {
 	return id != "." && id != ".." && imageIDName.MatchString(id)
 }
 
-func Containerfile(image state.Image) (string, error) {
+type GuestAgentImage struct {
+	Image        string
+	AgentBin     string
+	DestAgentBin string
+}
+
+func Containerfile(image state.Image, guestAgent ...GuestAgentImage) (string, error) {
 	for _, pkg := range image.Packages {
 		if !validPackage(pkg) {
 			return "", fmt.Errorf("invalid package name %q", pkg)
@@ -52,11 +71,44 @@ func Containerfile(image state.Image) (string, error) {
 	if !validBaseImage(image.BaseImage) {
 		return "", fmt.Errorf("invalid base image %q", image.BaseImage)
 	}
-	lines := []string{"FROM " + image.BaseImage, "RUN pacman -Syu --needed --noconfirm"}
-	if len(image.Packages) > 0 {
-		lines[1] += " " + strings.Join(image.Packages, " ")
+	var guest GuestAgentImage
+	if len(guestAgent) > 0 {
+		guest = guestAgent[0]
 	}
-	lines = append(lines, "ENTRYPOINT [\"/usr/local/bin/dsh-podman-guest-agent\"]")
+	if guest.Image != "" {
+		if guest.AgentBin == "" {
+			guest.AgentBin = "/bin/dsh-podman-guest-agent"
+		}
+		if guest.DestAgentBin == "" {
+			guest.DestAgentBin = "/usr/local/bin/dsh-podman-guest-agent"
+		}
+		if !validBaseImage(guest.Image) {
+			return "", fmt.Errorf("invalid guest agent image %q", guest.Image)
+		}
+		if !validContainerPath(guest.AgentBin) {
+			return "", fmt.Errorf("invalid guest agent binary path %q", guest.AgentBin)
+		}
+		if !validContainerPath(guest.DestAgentBin) {
+			return "", fmt.Errorf("invalid guest agent destination path %q", guest.DestAgentBin)
+		}
+	}
+	lines := make([]string, 0, 5)
+	if guest.Image != "" {
+		lines = append(lines, "FROM "+guest.Image+" AS guestagent")
+	}
+	lines = append(lines, "FROM "+image.BaseImage)
+	lines = append(lines, "RUN pacman -Syu --needed --noconfirm")
+	if len(image.Packages) > 0 {
+		lines[len(lines)-1] += " " + strings.Join(image.Packages, " ")
+	}
+	if guest.Image != "" {
+		lines = append(lines, "COPY --from=guestagent "+guest.AgentBin+" "+guest.DestAgentBin)
+	}
+	if guest.Image != "" {
+		lines = append(lines, "ENTRYPOINT [\""+guest.DestAgentBin+"\"]")
+	} else {
+		lines = append(lines, "ENTRYPOINT [\"/usr/local/bin/dsh-podman-guest-agent\"]")
+	}
 	return strings.Join(lines, "\n") + "\n", nil
 }
 
@@ -64,6 +116,7 @@ type Builder struct {
 	Context         context.Context
 	StateDir        string
 	HostPacmanCache string
+	GuestAgentImage GuestAgentImage
 	Logger          *slog.Logger
 }
 
@@ -74,7 +127,7 @@ func (b Builder) Build(image state.Image) (string, error) {
 	if !validImageID(image.ImageID) {
 		return "", fmt.Errorf("invalid image id %q", image.ImageID)
 	}
-	contents, err := Containerfile(image)
+	contents, err := Containerfile(image, b.GuestAgentImage)
 	if err != nil {
 		return "", err
 	}

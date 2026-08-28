@@ -11,7 +11,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"gitlab.com/Exagone313/dsh-podman/internal/guestagent/auth"
+	"gitlab.com/Exagone313/dsh-podman/internal/auth"
 	workspacefs "gitlab.com/Exagone313/dsh-podman/internal/guestagent/fs"
 	"gitlab.com/Exagone313/dsh-podman/internal/guestagent/grpcserver"
 	guest "gitlab.com/Exagone313/dsh-podman/internal/genproto/dshguest/v1"

@@ -9,8 +9,8 @@ disposable, per-project Podman containers instead of the dsh host.
 
 | Component | Runs | What it does |
 |---|---|---|
-| `dsh-orchestrator` | A container with access to the Podman API | Owns the control socket and persisted state; creates/removes workspace containers; builds workspace images |
-| `dsh-guest-agent` | Inside every workspace container | Serves the exec/filesystem gRPC API for one workspace |
+| `dsh-podman-orchestrator` | A container with access to the Podman API | Owns the control socket and persisted state; creates/removes workspace containers; builds workspace images |
+| `dsh-podman-guest-agent` | Inside every workspace container | Serves the exec/filesystem gRPC API for one workspace |
 | `@exagone313/dsh-podman` | Inside dsh itself | Registers `ctx.subprocess` and `ctx.fs` backed by the orchestrator, plus lifecycle tools |
 
 The plugin auto-creates a missing workspace using its configured default
@@ -43,7 +43,7 @@ guest-only values are namespaced under `DSH_PODMAN_ORCHESTRATOR_` and
 | `DSH_PODMAN_PROJECTS_ROOT` | `/projects` | Project root inside every container; also the guest agent's workspace root |
 | `DSH_PODMAN_DEFAULT_IMAGE` | `arch-base` | Default workspace image id |
 
-### Orchestrator (`dsh-orchestrator`)
+### Orchestrator (`dsh-podman-orchestrator`)
 
 | Variable | Default | Description |
 |---|---|---|
@@ -56,7 +56,7 @@ guest-only values are namespaced under `DSH_PODMAN_ORCHESTRATOR_` and
 | `DSH_PODMAN_ORCHESTRATOR_HOST_GUEST_BIN` | `DSH_PODMAN_ORCHESTRATOR_GUEST_BIN` | Host-side guest agent binary path |
 | `DSH_PODMAN_ORCHESTRATOR_HOST_PACMAN_CACHE` | — | Host-absolute Buildah cache directory used by workspace-image builds |
 
-### Guest agent (`dsh-guest-agent`)
+### Guest agent (`dsh-podman-guest-agent`)
 
 | Variable | Default | Description |
 |---|---|---|

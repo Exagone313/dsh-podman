@@ -17,18 +17,18 @@ all: build
 
 build: build-go pnpm-build
 
-build-go: $(BIN_DIR)/dsh-guest-agent $(BIN_DIR)/dsh-orchestrator
+build-go: $(BIN_DIR)/dsh-podman-guest-agent $(BIN_DIR)/dsh-podman-orchestrator
 
 image: build-go
-	$(CONTAINER) build -f Containerfile.orchestrator -t localhost/dsh-orchestrator:latest .
+	$(CONTAINER) build -f Containerfile.orchestrator -t localhost/dsh-podman-orchestrator:latest .
 
-$(BIN_DIR)/dsh-guest-agent: $(GO_SOURCES) go.mod go.sum
+$(BIN_DIR)/dsh-podman-guest-agent: $(GO_SOURCES) go.mod go.sum
 	mkdir -p $(BIN_DIR)
-	CGO_ENABLED=0 GOOS=$(GOOS) GOARCH=$(GOARCH) $(GO) build $(GO_BUILD_FLAGS) -o $(BIN_DIR)/dsh-guest-agent ./cmd/dsh-guest-agent
+	CGO_ENABLED=0 GOOS=$(GOOS) GOARCH=$(GOARCH) $(GO) build $(GO_BUILD_FLAGS) -o $(BIN_DIR)/dsh-podman-guest-agent ./cmd/dsh-podman-guest-agent
 
-$(BIN_DIR)/dsh-orchestrator: $(GO_SOURCES) go.mod go.sum
+$(BIN_DIR)/dsh-podman-orchestrator: $(GO_SOURCES) go.mod go.sum
 	mkdir -p $(BIN_DIR)
-	CGO_ENABLED=0 GOOS=$(GOOS) GOARCH=$(GOARCH) $(GO) build $(GO_BUILD_FLAGS) -o $(BIN_DIR)/dsh-orchestrator ./cmd/dsh-orchestrator
+	CGO_ENABLED=0 GOOS=$(GOOS) GOARCH=$(GOARCH) $(GO) build $(GO_BUILD_FLAGS) -o $(BIN_DIR)/dsh-podman-orchestrator ./cmd/dsh-podman-orchestrator
 
 pnpm-install:
 	pnpm install --frozen-lockfile

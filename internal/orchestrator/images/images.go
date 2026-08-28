@@ -27,7 +27,7 @@ func Containerfile(image state.Image) (string, error) {
 	if len(image.Packages) > 0 {
 		lines[1] += " " + strings.Join(image.Packages, " ")
 	}
-	lines = append(lines, "ENTRYPOINT [\"/usr/local/bin/dsh-guest-agent\"]")
+	lines = append(lines, "ENTRYPOINT [\"/usr/local/bin/dsh-podman-guest-agent\"]")
 	return strings.Join(lines, "\n") + "\n", nil
 }
 

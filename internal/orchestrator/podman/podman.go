@@ -20,7 +20,7 @@ type Client struct {
 	logger                                                                *slog.Logger
 }
 
-const guestDestination = "/usr/local/bin/dsh-guest-agent"
+const guestDestination = "/usr/local/bin/dsh-podman-guest-agent"
 
 func New(ctx context.Context, socket, socketRoot, guestBinary, hostSocketRoot, projectRoot, hostGuestBinary string, logger *slog.Logger) (*Client, error) {
 	connected, err := bindings.NewConnection(ctx, socket)
@@ -38,10 +38,10 @@ func (c *Client) log() *slog.Logger {
 }
 
 func binaryPath(path string) string {
-	if filepath.Base(path) == "dsh-guest-agent" {
+	if filepath.Base(path) == "dsh-podman-guest-agent" {
 		return path
 	}
-	return filepath.Join(path, "dsh-guest-agent")
+	return filepath.Join(path, "dsh-podman-guest-agent")
 }
 func (c *Client) CreateWorkspace(name, image, token string, mounts []specs.Mount) error {
 	c.log().Info("creating workspace container", "container_name", name, "image", image, "mount_count", len(mounts))

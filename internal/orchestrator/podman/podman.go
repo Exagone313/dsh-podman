@@ -53,11 +53,7 @@ func (c *Client) CreateWorkspace(name, image, token string, mounts []specs.Mount
 	generator.Command = []string{c.guestBinary}
 	generator.Env = map[string]string{"DSH_PODMAN_GUEST_TOKEN": token, "DSH_PODMAN_GUEST_SOCKET": filepath.Join(c.socketRoot, name, "guest.sock"), "DSH_PODMAN_PROJECTS_ROOT": c.projectRoot}
 	generator.Init = &init
-	extraMounts := []specs.Mount{{Type: "bind", Source: hostSocketDir, Destination: filepath.Join(c.socketRoot, name), Options: []string{"rw"}}}
-	if c.hostGuestBinary != "" {
-		extraMounts = append([]specs.Mount{{Type: "bind", Source: c.hostGuestBinary, Destination: c.guestBinary, Options: []string{"ro"}}}, extraMounts...)
-	}
-	generator.Mounts = append(mounts, extraMounts...)
+	generator.Mounts = append(mounts, guestAgentMounts(hostSocketDir, c.socketRoot, name, c.hostGuestBinary, c.guestBinary)...)
 	if _, err := containers.CreateWithSpec(c.ctx, generator, nil); err != nil {
 		c.log().Error("workspace container creation failed", "container_name", name, "error", err)
 		return fmt.Errorf("create container: %w", err)
@@ -68,6 +64,14 @@ func (c *Client) CreateWorkspace(name, image, token string, mounts []specs.Mount
 	}
 	c.log().Info("workspace container started", "container_name", name)
 	return nil
+}
+
+func guestAgentMounts(hostSocketDir, socketRoot, name, hostGuestBinary, guestBinary string) []specs.Mount {
+	mounts := []specs.Mount{{Type: "bind", Source: hostSocketDir, Destination: filepath.Join(socketRoot, name), Options: []string{"rw"}}}
+	if hostGuestBinary != "" {
+		mounts = append([]specs.Mount{{Type: "bind", Source: hostGuestBinary, Destination: guestBinary, Options: []string{"ro"}}}, mounts...)
+	}
+	return mounts
 }
 func (c *Client) Stop(name string) error {
 	c.log().Info("stopping workspace container", "container_name", name)

@@ -11,7 +11,7 @@ BIN_DIR ?= bin
 CONTAINER ?= podman
 
 GO_SOURCES := $(shell find cmd internal -type f -name '*.go' -print)
-JS_SOURCES := $(shell find src -type f ( -name '*.ts' -o -name '*.tsx' ) -print)
+JS_SOURCES := $(shell find src -type f \( -name '*.ts' -o -name '*.tsx' \) -print)
 PROTO_SOURCES := $(shell find proto -type f -name '*.proto' -print)
 NODE_MODULES_TSC := node_modules/.bin/tsc
 

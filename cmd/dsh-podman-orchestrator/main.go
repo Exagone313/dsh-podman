@@ -33,11 +33,11 @@ func main() {
 	socket := filepath.Join(socketsRoot, "control.sock")
 	root := getenv("DSH_PODMAN_PROJECTS_ROOT", "/projects")
 	stateDir := getenv("DSH_PODMAN_ORCHESTRATOR_STATE", "/var/lib/dsh-orchestrator")
-	hostProjectsRoot := getenv("DSH_PODMAN_ORCHESTRATOR_HOST_PROJECTS_ROOT", root)
-	hostSocketsRoot := getenv("DSH_PODMAN_ORCHESTRATOR_HOST_SOCKETS_ROOT", socketsRoot)
-	guestBinary := getenv("DSH_PODMAN_ORCHESTRATOR_GUEST_BIN", "")
-	hostGuestBinary := getenv("DSH_PODMAN_ORCHESTRATOR_HOST_GUEST_BIN", guestBinary)
-	hostPacmanCache := getenv("DSH_PODMAN_ORCHESTRATOR_HOST_PACMAN_CACHE", "")
+	hostProjectsRoot := getenv("DSH_PODMAN_HOST_PROJECTS_ROOT", root)
+	hostSocketsRoot := getenv("DSH_PODMAN_HOST_SOCKETS_ROOT", socketsRoot)
+	guestBinary := getenv("DSH_PODMAN_GUEST_AGENT_BIN", "")
+	hostGuestBinary := getenv("DSH_PODMAN_HOST_GUEST_AGENT_BIN", guestBinary)
+	hostPacmanCache := getenv("DSH_PODMAN_HOST_PACMAN_CACHE", "")
 	if err := os.MkdirAll(filepath.Dir(socket), 0700); err != nil {
 		panic(err)
 	}

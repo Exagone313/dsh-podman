@@ -56,11 +56,11 @@ guest-only values are namespaced under `DSH_PODMAN_ORCHESTRATOR_` and
 | `DSH_PODMAN_ORCHESTRATOR_PODMAN_SOCKET` | required | Podman API socket, e.g. `unix:///run/podman/podman.sock` |
 | `DSH_PODMAN_ORCHESTRATOR_SOCKETS_ROOT` | `/run/dsh-sockets` | Directory for the control socket and per-workspace guest sockets |
 | `DSH_PODMAN_ORCHESTRATOR_STATE` | `/var/lib/dsh-orchestrator` | Persisted state directory |
-| `DSH_PODMAN_ORCHESTRATOR_HOST_PROJECTS_ROOT` | `DSH_PODMAN_PROJECTS_ROOT` | Host-side projects root used as the source of bind mounts |
-| `DSH_PODMAN_ORCHESTRATOR_HOST_SOCKETS_ROOT` | `DSH_PODMAN_ORCHESTRATOR_SOCKETS_ROOT` | Host-side sockets root for guest socket bind mounts |
-| `DSH_PODMAN_ORCHESTRATOR_GUEST_BIN` | — | Guest agent binary path (container-internal) |
-| `DSH_PODMAN_ORCHESTRATOR_HOST_GUEST_BIN` | `DSH_PODMAN_ORCHESTRATOR_GUEST_BIN` | Host-side guest agent binary path |
-| `DSH_PODMAN_ORCHESTRATOR_HOST_PACMAN_CACHE` | — | Host-absolute Buildah cache directory used by workspace-image builds |
+| `DSH_PODMAN_HOST_PROJECTS_ROOT` | `DSH_PODMAN_PROJECTS_ROOT` | Host-side projects root used as the source of bind mounts |
+| `DSH_PODMAN_HOST_SOCKETS_ROOT` | `DSH_PODMAN_ORCHESTRATOR_SOCKETS_ROOT` | Host-side sockets root for guest socket bind mounts |
+| `DSH_PODMAN_GUEST_AGENT_BIN` | — | Guest agent binary path (container-internal) |
+| `DSH_PODMAN_HOST_GUEST_AGENT_BIN` | `DSH_PODMAN_GUEST_AGENT_BIN` | Host-side guest agent binary path |
+| `DSH_PODMAN_HOST_PACMAN_CACHE` | — | Host-absolute Buildah cache directory used by workspace-image builds |
 
 ### Guest agent (`dsh-podman-guest-agent`)
 

@@ -14,6 +14,7 @@ import (
 	"github.com/containers/podman/v5/pkg/bindings"
 	"github.com/containers/podman/v5/pkg/bindings/containers"
 	"github.com/containers/podman/v5/pkg/bindings/images"
+	entities "github.com/containers/podman/v5/pkg/domain/entities/types"
 	"github.com/containers/podman/v5/pkg/specgen"
 	"github.com/opencontainers/runtime-spec/specs-go"
 )
@@ -91,6 +92,21 @@ func (c *Client) ContainerExists(name string) (bool, error) {
 	}
 	return exists, err
 }
+func (c *Client) List() ([]entities.ListContainer, error) {
+	c.log().Info("listing containers")
+	result, err := containers.List(c.ctx, &containers.ListOptions{All: boolPtr(true)})
+	if err != nil {
+		c.log().Error("container list failed", "error", err)
+		return nil, err
+	}
+	c.log().Info("container list completed", "count", len(result))
+	return result, nil
+}
+
+func boolPtr(value bool) *bool {
+	return &value
+}
+
 func (c *Client) ImageExists(name string) (bool, error) {
 	exists, err := images.Exists(c.ctx, name, nil)
 	if err != nil {

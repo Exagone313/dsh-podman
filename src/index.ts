@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: MIT
 
 import { WorkspaceResolver } from "./workspace-binding.js";
+import { installContainerSettings } from "./settings-bridge.js";
 import { metadata } from "./workspace-binding.js";
 import { PassThrough } from "node:stream";
 import { createHash } from "node:crypto";
@@ -69,6 +70,7 @@ export function apply(ctx: any, config: PluginConfig = {}): void {
   ctx.provide("subprocess", createSubprocessProvider(resolver));
   ctx.provide("fs", createFilesystemProvider(resolver));
   registerTools(ctx, resolver);
+  installContainerSettings(ctx, resolver);
 }
 
 function createSubprocessProvider(resolver: WorkspaceResolver): object {

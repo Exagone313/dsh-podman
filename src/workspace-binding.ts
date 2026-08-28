@@ -26,6 +26,12 @@ export class WorkspaceResolver {
     private readonly config: BindingConfig,
     private readonly registry: any,
   ) {}
+  setConfig(patch: Partial<BindingConfig>): void {
+    Object.assign(this.config, patch);
+  }
+  getConfig(): Readonly<BindingConfig> {
+    return this.config;
+  }
   async resolve(cwd: unknown): Promise<WorkspaceBinding> {
     const workspace = await this.registry?.resolveByPath?.(String(cwd));
     if (workspace === undefined) {

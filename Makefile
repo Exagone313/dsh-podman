@@ -11,11 +11,11 @@ BIN_DIR ?= bin
 CONTAINER ?= podman
 
 GO_SOURCES := $(shell find cmd internal -type f -name '*.go' -print)
-JS_SOURCES := $(shell find src -type f -name '*.ts' -print)
+JS_SOURCES := $(shell find src -type f ( -name '*.ts' -o -name '*.tsx' ) -print)
 PROTO_SOURCES := $(shell find proto -type f -name '*.proto' -print)
 NODE_MODULES_TSC := node_modules/.bin/tsc
 
-.PHONY: all build build-go image pnpm-install pnpm-build pnpm-test pnpm-prune clean
+.PHONY: all build build-go image pnpm-install pnpm-build pnpm-test pnpm-prune link-dh clean
 
 all: build
 
@@ -37,7 +37,20 @@ $(BIN_DIR)/dsh-podman-orchestrator: $(GO_SOURCES) go.mod go.sum
 pnpm-install:
 	pnpm install --frozen-lockfile
 
-dist/index.js: $(JS_SOURCES) $(PROTO_SOURCES) package.json pnpm-lock.yaml tsconfig.json $(NODE_MODULES_TSC)
+# Link the DeepSeek Harness workspace packages this plugin depends on into
+# node_modules so local tsc (host and client halves) can resolve them. Point
+# DSH_ROOT at your deepseek-harness checkout.
+link-dh:
+	@if [ -z "$(DSH_ROOT)" ]; then echo "usage: make link-dh DSH_ROOT=/path/to/deepseek-harness"; exit 1; fi
+	@mkdir -p node_modules/@deepseek-ai node_modules/@types
+	@for p in schemastery dsh-settings dsh-client-runtime dsh-client-ui-slots dsh-client-ui-settings dsh-client-locale dsh-client-connection; do \
+		ln -sfn "$(DSH_ROOT)/node_modules/.pnpm/node_modules/@deepseek-ai/$$p" "node_modules/@deepseek-ai/$$p"; \
+	done
+	@ln -sfn "$(DSH_ROOT)/node_modules/.pnpm/react@18.3.1/node_modules/react" node_modules/react
+	@ln -sfn "$(DSH_ROOT)/node_modules/.pnpm/@types+react@18.3.31/node_modules/@types/react" node_modules/@types/react
+	@echo "linked DeepSeek Harness packages from $(DSH_ROOT)"
+
+dist/index.js: $(JS_SOURCES) $(PROTO_SOURCES) package.json pnpm-lock.yaml tsconfig.json tsconfig.client.json $(NODE_MODULES_TSC)
 	pnpm run build
 
 $(NODE_MODULES_TSC): package.json pnpm-lock.yaml

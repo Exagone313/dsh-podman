@@ -130,6 +130,134 @@ func (s *Server) RecreateWorkspace(context.Context, *ctl.RecreateWorkspaceReques
 	s.log().Warn("control request failed", "method", "RecreateWorkspace", "reason", "not implemented")
 	return nil, status.Error(codes.Unimplemented, "workspace recreation is not configured")
 }
+func (s *Server) ListContainers(context.Context, *ctl.ListContainersRequest) (*ctl.ListContainersResponse, error) {
+	s.log().Info("control request", "method", "ListContainers")
+	if s.Podman == nil {
+		return nil, status.Error(codes.FailedPrecondition, "podman is not configured")
+	}
+	listed, err := s.Podman.List()
+	if err != nil {
+		s.log().Error("control request failed", "method", "ListContainers", "error", err)
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	workspaces, err := s.Store.Workspaces()
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	byName := make(map[string]state.Workspace, len(workspaces))
+	for _, workspace := range workspaces {
+		byName[workspace.ContainerName] = workspace
+	}
+	result := &ctl.ListContainersResponse{}
+	for _, container := range listed {
+		name := ""
+		for _, candidate := range container.Names {
+			name = strings.TrimPrefix(candidate, "/")
+			break
+		}
+		row := &ctl.Container{ContainerName: name, Status: container.State, CreatedAt: container.CreatedAt}
+		if workspace, ok := byName[name]; ok {
+			row.WorkspaceSlug = workspace.WorkspaceSlug
+			row.ImageId = workspace.ImageID
+			for _, mount := range workspace.Mounts {
+				mode := ctl.MountMode_MOUNT_MODE_READ_ONLY
+				if mount.Mode == "read_write" {
+					mode = ctl.MountMode_MOUNT_MODE_READ_WRITE
+				}
+				row.Mounts = append(row.Mounts, &ctl.ProjectMount{ProjectName: mount.ProjectName, Mode: mode})
+			}
+		} else {
+			row.ImageId = container.Image
+		}
+		result.Containers = append(result.Containers, row)
+	}
+	s.log().Info("control request completed", "method", "ListContainers", "count", len(result.Containers))
+	return result, nil
+}
+func (s *Server) RecreateContainer(ctx context.Context, request *ctl.RecreateContainerRequest) (*ctl.Workspace, error) {
+	s.log().Info("control request", "method", "RecreateContainer", "workspace_slug", request.GetWorkspaceSlug(), "image_id", request.GetImageId())
+	workspace, err := s.DescribeWorkspace(ctx, &ctl.DescribeWorkspaceRequest{WorkspaceSlug: request.GetWorkspaceSlug()})
+	if err != nil {
+		return nil, err
+	}
+	if s.Podman == nil {
+		return nil, status.Error(codes.FailedPrecondition, "podman is not configured")
+	}
+	imageID := request.GetImageId()
+	if imageID == "" {
+		imageID = workspace.GetImageId()
+	}
+	images, err := s.Store.Images()
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	imageTag := ""
+	for _, image := range images {
+		if image.ImageID == imageID {
+			imageTag = image.ImageTag
+			break
+		}
+	}
+	if imageTag == "" {
+		s.log().Error("control request failed", "method", "RecreateContainer", "workspace_slug", request.GetWorkspaceSlug(), "reason", "built image not found", "image_id", imageID)
+		return nil, status.Error(codes.NotFound, "built image not found")
+	}
+	exists, imageErr := s.Podman.ImageExists(imageTag)
+	if imageErr != nil {
+		return nil, status.Error(codes.Internal, imageErr.Error())
+	}
+	if !exists {
+		s.log().Error("control request failed", "method", "RecreateContainer", "workspace_slug", request.GetWorkspaceSlug(), "reason", "built image tag is missing", "image_tag", imageTag)
+		return nil, status.Error(codes.NotFound, "built image tag is missing")
+	}
+	podmanMounts := make([]specs.Mount, 0, len(workspace.GetMounts()))
+	for _, mount := range workspace.GetMounts() {
+		path, pathErr := ValidateProject(s.ProjectsRoot, mount.GetProjectName())
+		if pathErr != nil {
+			s.log().Error("RecreateContainer project validation failed", "project_name", mount.GetProjectName(), "error", pathErr)
+			return nil, status.Error(codes.InvalidArgument, pathErr.Error())
+		}
+		hostPath := path
+		if s.HostProjectsRoot != "" {
+			hostPath = filepath.Join(s.HostProjectsRoot, filepath.FromSlash(mount.GetProjectName()))
+		}
+		options := []string{"ro"}
+		if mount.GetMode() == ctl.MountMode_MOUNT_MODE_READ_WRITE {
+			options = []string{"rw"}
+		}
+		podmanMounts = append(podmanMounts, specs.Mount{Type: "bind", Source: hostPath, Destination: filepath.Join(s.ProjectsRoot, mount.GetProjectName()), Options: options})
+	}
+	secret, err := token.New()
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	if err := s.Podman.RecreateWorkspace(workspace.GetContainerName(), imageTag, secret, podmanMounts); err != nil {
+		s.log().Error("control request failed", "method", "RecreateContainer", "workspace_slug", request.GetWorkspaceSlug(), "error", err)
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	updated := state.Workspace{WorkspaceSlug: workspace.GetWorkspaceSlug(), ContainerName: workspace.GetContainerName(), ImageID: imageID, Status: "running", AgentSocketPath: workspace.GetAgentSocketPath(), AgentToken: secret, CreatedAt: workspace.GetCreatedAt()}
+	for _, mount := range workspace.GetMounts() {
+		mode := "read_only"
+		if mount.GetMode() == ctl.MountMode_MOUNT_MODE_READ_WRITE {
+			mode = "read_write"
+		}
+		updated.Mounts = append(updated.Mounts, state.Mount{ProjectName: mount.GetProjectName(), Mode: mode})
+	}
+	if err := s.Store.UpdateWorkspaces(func(all []state.Workspace) ([]state.Workspace, error) {
+		for i := range all {
+			if all[i].WorkspaceSlug == updated.WorkspaceSlug {
+				all[i] = updated
+				return all, nil
+			}
+		}
+		return append(all, updated), nil
+	}); err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	s.log().Info("control request completed", "method", "RecreateContainer", "workspace_slug", request.GetWorkspaceSlug(), "image_id", imageID)
+	return toProto(updated), nil
+}
+
 func (s *Server) CreateWorkspace(ctx context.Context, request *ctl.CreateWorkspaceRequest) (*ctl.Workspace, error) {
 	s.log().Info("control request", "method", "CreateWorkspace", "workspace_slug", request.GetWorkspaceSlug(), "image_id", request.GetImageId(), "mount_count", len(request.GetMounts()))
 	if request.GetWorkspaceSlug() == "" || filepath.Base(request.GetWorkspaceSlug()) != request.GetWorkspaceSlug() {

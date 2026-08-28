@@ -31,6 +31,8 @@ const (
 	OrchestratorControl_StopWorkspace_FullMethodName     = "/dshctl.v1.OrchestratorControl/StopWorkspace"
 	OrchestratorControl_ListImages_FullMethodName        = "/dshctl.v1.OrchestratorControl/ListImages"
 	OrchestratorControl_RebuildImage_FullMethodName      = "/dshctl.v1.OrchestratorControl/RebuildImage"
+	OrchestratorControl_ListContainers_FullMethodName    = "/dshctl.v1.OrchestratorControl/ListContainers"
+	OrchestratorControl_RecreateContainer_FullMethodName = "/dshctl.v1.OrchestratorControl/RecreateContainer"
 )
 
 // OrchestratorControlClient is the client API for OrchestratorControl service.
@@ -45,6 +47,8 @@ type OrchestratorControlClient interface {
 	StopWorkspace(ctx context.Context, in *StopWorkspaceRequest, opts ...grpc.CallOption) (*StopWorkspaceResponse, error)
 	ListImages(ctx context.Context, in *ListImagesRequest, opts ...grpc.CallOption) (*ListImagesResponse, error)
 	RebuildImage(ctx context.Context, in *RebuildImageRequest, opts ...grpc.CallOption) (*Image, error)
+	ListContainers(ctx context.Context, in *ListContainersRequest, opts ...grpc.CallOption) (*ListContainersResponse, error)
+	RecreateContainer(ctx context.Context, in *RecreateContainerRequest, opts ...grpc.CallOption) (*Workspace, error)
 }
 
 type orchestratorControlClient struct {
@@ -135,6 +139,26 @@ func (c *orchestratorControlClient) RebuildImage(ctx context.Context, in *Rebuil
 	return out, nil
 }
 
+func (c *orchestratorControlClient) ListContainers(ctx context.Context, in *ListContainersRequest, opts ...grpc.CallOption) (*ListContainersResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListContainersResponse)
+	err := c.cc.Invoke(ctx, OrchestratorControl_ListContainers_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *orchestratorControlClient) RecreateContainer(ctx context.Context, in *RecreateContainerRequest, opts ...grpc.CallOption) (*Workspace, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(Workspace)
+	err := c.cc.Invoke(ctx, OrchestratorControl_RecreateContainer_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // OrchestratorControlServer is the server API for OrchestratorControl service.
 // All implementations must embed UnimplementedOrchestratorControlServer
 // for forward compatibility.
@@ -147,6 +171,8 @@ type OrchestratorControlServer interface {
 	StopWorkspace(context.Context, *StopWorkspaceRequest) (*StopWorkspaceResponse, error)
 	ListImages(context.Context, *ListImagesRequest) (*ListImagesResponse, error)
 	RebuildImage(context.Context, *RebuildImageRequest) (*Image, error)
+	ListContainers(context.Context, *ListContainersRequest) (*ListContainersResponse, error)
+	RecreateContainer(context.Context, *RecreateContainerRequest) (*Workspace, error)
 	mustEmbedUnimplementedOrchestratorControlServer()
 }
 
@@ -180,6 +206,12 @@ func (UnimplementedOrchestratorControlServer) ListImages(context.Context, *ListI
 }
 func (UnimplementedOrchestratorControlServer) RebuildImage(context.Context, *RebuildImageRequest) (*Image, error) {
 	return nil, status.Error(codes.Unimplemented, "method RebuildImage not implemented")
+}
+func (UnimplementedOrchestratorControlServer) ListContainers(context.Context, *ListContainersRequest) (*ListContainersResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListContainers not implemented")
+}
+func (UnimplementedOrchestratorControlServer) RecreateContainer(context.Context, *RecreateContainerRequest) (*Workspace, error) {
+	return nil, status.Error(codes.Unimplemented, "method RecreateContainer not implemented")
 }
 func (UnimplementedOrchestratorControlServer) mustEmbedUnimplementedOrchestratorControlServer() {}
 func (UnimplementedOrchestratorControlServer) testEmbeddedByValue()                             {}
@@ -346,6 +378,42 @@ func _OrchestratorControl_RebuildImage_Handler(srv interface{}, ctx context.Cont
 	return interceptor(ctx, in, info, handler)
 }
 
+func _OrchestratorControl_ListContainers_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListContainersRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(OrchestratorControlServer).ListContainers(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: OrchestratorControl_ListContainers_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(OrchestratorControlServer).ListContainers(ctx, req.(*ListContainersRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _OrchestratorControl_RecreateContainer_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RecreateContainerRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(OrchestratorControlServer).RecreateContainer(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: OrchestratorControl_RecreateContainer_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(OrchestratorControlServer).RecreateContainer(ctx, req.(*RecreateContainerRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // OrchestratorControl_ServiceDesc is the grpc.ServiceDesc for OrchestratorControl service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -384,6 +452,14 @@ var OrchestratorControl_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "RebuildImage",
 			Handler:    _OrchestratorControl_RebuildImage_Handler,
+		},
+		{
+			MethodName: "ListContainers",
+			Handler:    _OrchestratorControl_ListContainers_Handler,
+		},
+		{
+			MethodName: "RecreateContainer",
+			Handler:    _OrchestratorControl_RecreateContainer_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

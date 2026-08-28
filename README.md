@@ -28,7 +28,7 @@ execution.
 ```sh
 go test ./...        # Go tests (orchestrator + guest agent)
 pnpm install
-pnpm run build       # tsc -> dist/, copies proto/ -> dist/grpc/proto/
+pnpm run build       # tsc host + tsc client -> dist/, copies proto/ -> dist/grpc/proto/
 ```
 
 Protobuf bindings are generated with Buf (`buf generate`); the raw `.proto`
@@ -73,6 +73,46 @@ The plugin itself reads `DSH_PODMAN_ORCHESTRATOR_CONTROL_SOCKET`
 (default `/run/dsh-sockets/control.sock`) to reach the orchestrator. Its
 `projectsRoot` default is `/mnt/project`; both are overridable through the
 plugin's `cordis.yml` config (`controlSocket`, `defaultImage`, `projectsRoot`).
+
+## Container management UI
+
+The plugin ships a browser half (`./client`, built to `dist/client`) that
+registers a card in the dsh **Settings → Plugins** page. The card lists every
+container and built image, and offers **Stop**, **Recreate** (same image), and
+**Recreate with image** plus a **Reload** button.
+
+Data and actions travel over the settings transport:
+
+- The host half registers the `podman` settings namespace and keeps a live
+  view (`containers`, `images`, `notice`) in it.
+- The card writes an action into `command` (`refresh` / `stop` / `recreate`);
+  the host `watch` handler executes it against the orchestrator and pushes the
+  refreshed view back.
+
+The orchestrator service gained two gRPC methods to back the UI:
+`ListContainers` (enumerates every container on the Podman socket and joins it
+with stored workspace metadata) and `RecreateContainer{workspace_slug,
+image_id}` (stops, removes, and recreates the container, optionally with a new
+image; an empty `image_id` keeps the workspace's current image).
+`StopWorkspace` (existing) backs the Stop button.
+
+### Building the browser half
+
+The client half imports `@deepseek-ai/*` packages whose published versions are
+not installable (their transitive `dsh-compact` is unpublished), so local `tsc`
+resolves them from a DeepSeek Harness checkout. After `pnpm install`, run:
+
+```sh
+make link-dh DSH_ROOT=/path/to/deepseek-harness
+```
+
+This symlinks `schemastery`, `dsh-settings`, the `dsh-client-*` packages,
+`react`, and `@types/react` from the Harness pnpm store into `node_modules`.
+`pnpm run build` then runs `tsc -p tsconfig.json` (host) and
+`tsc -p tsconfig.client.json` (browser half, emitted under `dist/client`).
+The package's `dsh.client` declaration points the web bundle at
+`dist/client/index.js`, and the host half must be loaded for the `podman`
+settings namespace to exist.
 
 ## Releasing and installing from a hosted tarball
 

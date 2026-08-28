@@ -4,11 +4,24 @@
   "type": "module",
   "main": "./dist/index.js",
   "exports": {
-    ".": "./dist/index.js"
+    ".": "./dist/index.js",
+    "./client": {
+      "types": "./dist/client/index.d.ts",
+      "default": "./dist/client/index.js"
+    }
   },
   "dsh": {
     "bundle": {
       "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "inject": [
+        "@deepseek-ai/dsh-client-locale",
+        "@deepseek-ai/dsh-client-runtime",
+        "@deepseek-ai/dsh-client-ui-settings",
+        "@deepseek-ai/dsh-client-ui-slots"
+      ],
+      "platform": "web"
     }
   },
   "files": [
@@ -17,8 +30,8 @@
     "README.md"
   ],
   "scripts": {
-    "build": "tsc && node scripts/copy-proto.mjs",
-    "typecheck": "tsc --noEmit",
+    "build": "tsc -p tsconfig.json && tsc -p tsconfig.client.json && node scripts/copy-proto.mjs",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.client.json --noEmit",
     "test": "node --test dist/*.test.js"
   },
   "dependencies": {
@@ -27,10 +40,23 @@
   },
   "devDependencies": {
     "@types/node": "^24.3.0",
-    "typescript": "^5.9.2"
+    "typescript": "^5.9.2",
+    "@types/react": "^18.3.31",
+    "@deepseek-ai/schemastery": "^3.18.1"
   },
   "engines": {
     "node": ">=22"
   },
-  "packageManager": "pnpm@10.30.0"
+  "packageManager": "pnpm@10.30.0",
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "*",
+    "@deepseek-ai/dsh-client-connection": "*",
+    "@deepseek-ai/dsh-client-locale": "*",
+    "@deepseek-ai/dsh-client-runtime": "*",
+    "@deepseek-ai/dsh-client-ui-settings": "*",
+    "@deepseek-ai/dsh-client-ui-slots": "*",
+    "@deepseek-ai/dsh-settings": "*",
+    "@deepseek-ai/schemastery": "*",
+    "react": "^18.2.0"
+  }
 }

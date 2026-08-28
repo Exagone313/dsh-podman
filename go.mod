@@ -1,4 +1,4 @@
-module gitlab.com/Exagone313/dsh-container-plugin
+module gitlab.com/Exagone313/dsh-podman
 
 go 1.27
 

@@ -10,11 +10,11 @@ import (
 
 	"github.com/containers/podman/v5/pkg/bindings"
 	"github.com/containers/podman/v5/pkg/bindings/system"
-	ctl "gitlab.com/Exagone313/dsh-container-plugin/internal/genproto/dshctl/v1"
-	"gitlab.com/Exagone313/dsh-container-plugin/internal/orchestrator/grpcserver"
-	"gitlab.com/Exagone313/dsh-container-plugin/internal/orchestrator/images"
-	"gitlab.com/Exagone313/dsh-container-plugin/internal/orchestrator/podman"
-	"gitlab.com/Exagone313/dsh-container-plugin/internal/orchestrator/state"
+	ctl "gitlab.com/Exagone313/dsh-podman/internal/genproto/dshctl/v1"
+	"gitlab.com/Exagone313/dsh-podman/internal/orchestrator/grpcserver"
+	"gitlab.com/Exagone313/dsh-podman/internal/orchestrator/images"
+	"gitlab.com/Exagone313/dsh-podman/internal/orchestrator/podman"
+	"gitlab.com/Exagone313/dsh-podman/internal/orchestrator/state"
 	"google.golang.org/grpc"
 )
 

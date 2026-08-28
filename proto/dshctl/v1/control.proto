@@ -1,6 +1,6 @@
 syntax = "proto3";
 package dshctl.v1;
-option go_package = "gitlab.com/Exagone313/dsh-container-plugin/internal/genproto/dshctl/v1;dshctlv1";
+option go_package = "gitlab.com/Exagone313/dsh-podman/internal/genproto/dshctl/v1;dshctlv1";
 
 service OrchestratorControl {
   rpc ListProjects(ListProjectsRequest) returns (ListProjectsResponse);

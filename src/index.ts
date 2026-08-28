@@ -41,7 +41,7 @@ const imageParameters = {
   packages: { type: "array", items: { type: "string" } },
 };
 
-export const name = "container-plugin";
+export const name = "podman";
 export const inject = ["tools", "workspaceRegistry"];
 export interface PluginConfig {
   controlSocket?: string;

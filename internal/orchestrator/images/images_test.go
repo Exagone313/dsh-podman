@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"gitlab.com/Exagone313/dsh-container-plugin/internal/orchestrator/state"
+	"gitlab.com/Exagone313/dsh-podman/internal/orchestrator/state"
 )
 
 func TestContainerfileInstallsPackagesWithoutInlineCache(t *testing.T) {

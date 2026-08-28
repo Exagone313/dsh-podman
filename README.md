@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2026 Elouan Martinet <exa@elou.world>
+
+SPDX-License-Identifier: MIT
+-->
+
 # dsh-podman
 
 Podman-backed execution for the DeepSeek Harness (`dsh`). This repository

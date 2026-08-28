@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2026 Elouan Martinet <exa@elou.world>
+//
+// SPDX-License-Identifier: MIT
+
 // Copy the proto sources next to the compiled JS so the gRPC runtime
 // (proto-loader.loadSync) can load them from the packaged dist/.
 import { cpSync } from "node:fs";

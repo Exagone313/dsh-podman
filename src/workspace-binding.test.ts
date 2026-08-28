@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2026 Elouan Martinet <exa@elou.world>
+//
+// SPDX-License-Identifier: MIT
+
 import test from "node:test";
 import assert from "node:assert/strict";
 import { workspaceSlug } from "./workspace-binding.js";

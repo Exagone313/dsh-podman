@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2026 Elouan Martinet <exa@elou.world>
+//
+// SPDX-License-Identifier: MIT
+
 import { WorkspaceResolver } from "./workspace-binding.js";
 import { metadata } from "./workspace-binding.js";
 import { PassThrough } from "node:stream";

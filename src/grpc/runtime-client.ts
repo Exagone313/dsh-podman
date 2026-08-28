@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2026 Elouan Martinet <exa@elou.world>
+//
+// SPDX-License-Identifier: MIT
+
 import grpc from "@grpc/grpc-js";
 import loader from "@grpc/proto-loader";
 import { fileURLToPath } from "node:url";

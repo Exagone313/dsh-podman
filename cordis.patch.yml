@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 Elouan Martinet <exa@elou.world>
+#
+# SPDX-License-Identifier: MIT
+
 # dsh bundle patch: mounts the dsh-podman plugin into a profile's layer
 # stack. The subprocess/fs-sandbox rows are disabled because this plugin
 # provides the ctx.subprocess and ctx.fs providers backed by workspace

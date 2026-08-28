@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 Elouan Martinet <exa@elou.world>
+#
+# SPDX-License-Identifier: MIT
+
 GO ?= go
 GO_BUILD_TAGS = containers_image_openpgp exclude_graphdriver_btrfs exclude_graphdriver_devicemapper
 GO_BUILD_FLAGS = -tags "$(GO_BUILD_TAGS)"

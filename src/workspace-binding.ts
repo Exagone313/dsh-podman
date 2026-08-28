@@ -18,6 +18,7 @@ export interface BindingConfig {
   controlSocket: string;
   defaultImage: string;
   projectsRoot: string;
+  controlToken: string;
 }
 
 export class WorkspaceResolver {
@@ -82,18 +83,19 @@ export class WorkspaceResolver {
     projectName: string,
   ): Promise<WorkspaceBinding> {
     const control = controlClient(this.config.controlSocket);
+    const controlMetadata = metadata(this.config.controlToken);
     let workspace: any;
     try {
       workspace = await unary<any>(control, "describeWorkspace", {
         workspaceSlug: slug,
-      });
+      }, controlMetadata);
     } catch (error: any) {
       if (error.code !== grpc.status.NOT_FOUND) throw error;
       workspace = await unary<any>(control, "createWorkspace", {
         workspaceSlug: slug,
         imageId: this.config.defaultImage,
         mounts: [{ projectName, mode: "MOUNT_MODE_READ_WRITE" }],
-      });
+      }, controlMetadata);
     }
     const socket = workspace.agentSocketPath as string;
     return {
@@ -103,7 +105,12 @@ export class WorkspaceResolver {
     };
   }
   async control<T>(method: string, request: unknown): Promise<T> {
-    return unary<T>(controlClient(this.config.controlSocket), method, request);
+    return unary<T>(
+      controlClient(this.config.controlSocket),
+      method,
+      request,
+      metadata(this.config.controlToken),
+    );
   }
 }
 
@@ -140,6 +147,8 @@ export function workspaceSlug(session: unknown): string {
 const fifty = 50;
 export function metadata(token: string): grpc.Metadata {
   const result = new grpc.Metadata();
-  result.set("authorization", `bearer ${token}`);
+  if (token !== "") {
+    result.set("authorization", `bearer ${token}`);
+  }
   return result;
 }

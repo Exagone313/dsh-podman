@@ -4,8 +4,16 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
-import { workspaceSlug, metadata } from "./workspace-binding.js";
-import { grpc } from "./grpc/runtime-client.js";
+import grpc from "@grpc/grpc-js";
+import loader from "@grpc/proto-loader";
+import { fileURLToPath } from "node:url";
+import { dirname, resolve } from "node:path";
+import { tmpdir } from "node:os";
+import {
+  workspaceSlug,
+  metadata,
+  WorkspaceResolver,
+} from "./workspace-binding.js";
 
 test("workspace slugs are stable and container-safe", () => {
   assert.equal(workspaceSlug({ projectName: "my/project" }), "my-project");
@@ -50,4 +58,85 @@ test("metadata carries the bearer token", () => {
   const result = metadata("token-1");
   assert.ok(result instanceof grpc.Metadata);
   assert.equal(result.get("authorization")[0], "bearer token-1");
+});
+
+test("metadata omits the header when the token is empty", () => {
+  const result = metadata("");
+  assert.ok(result instanceof grpc.Metadata);
+  assert.equal(result.get("authorization").length, 0);
+});
+
+async function startControlServer(): Promise<{
+  socket: string;
+  received: string[];
+  stop: () => void;
+}> {
+  const protoPath = resolve(
+    dirname(fileURLToPath(import.meta.url)),
+    "grpc/proto/dshctl/v1/control.proto",
+  );
+  const definition = loader.loadSync(protoPath, {
+    longs: String,
+    enums: String,
+    defaults: true,
+  });
+  const loaded = grpc.loadPackageDefinition(definition) as any;
+  const server = new grpc.Server();
+  const received: string[] = [];
+  server.addService(loaded.dshctl.v1.OrchestratorControl.service, {
+    listWorkspaces: (call: any, callback: any) => {
+      received.push(call.metadata.get("authorization")[0]);
+      callback(null, { workspaces: [] });
+    },
+  });
+  const socket = resolve(
+    tmpdir(),
+    `dsh-control-test-${process.pid}-${Date.now()}-${Math.random()}.sock`,
+  );
+  await new Promise<void>((ok, fail) =>
+    server.bindAsync(
+      `unix:${socket}`,
+      grpc.ServerCredentials.createInsecure(),
+      (error: any) => (error ? fail(error) : ok()),
+    ),
+  );
+  return { socket, received, stop: () => server.forceShutdown() };
+}
+
+test("control calls carry the bearer token", async () => {
+  const { socket, received, stop } = await startControlServer();
+  try {
+    const resolver = new WorkspaceResolver(
+      {
+        controlSocket: socket,
+        defaultImage: "arch",
+        projectsRoot: "/mnt/project",
+        controlToken: "tok-1",
+      },
+      undefined as any,
+    );
+    await resolver.control("listWorkspaces", {});
+    assert.equal(received[0], "bearer tok-1");
+  } finally {
+    stop();
+  }
+});
+
+test("control calls omit the token when unset", async () => {
+  const { socket, received, stop } = await startControlServer();
+  try {
+    const resolver = new WorkspaceResolver(
+      {
+        controlSocket: socket,
+        defaultImage: "arch",
+        projectsRoot: "/mnt/project",
+        controlToken: "",
+      },
+      undefined as any,
+    );
+    await resolver.control("listWorkspaces", {});
+    assert.equal(received[0], undefined);
+  } finally {
+    stop();
+  }
 });

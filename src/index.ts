@@ -52,6 +52,7 @@ export interface PluginConfig {
   controlSocket?: string;
   defaultImage?: string;
   projectsRoot?: string;
+  controlToken?: string;
 }
 export function apply(ctx: any, config: PluginConfig = {}): void {
   const resolver = new WorkspaceResolver(
@@ -63,6 +64,8 @@ export function apply(ctx: any, config: PluginConfig = {}): void {
       defaultImage:
         config.defaultImage ?? process.env.DSH_PODMAN_DEFAULT_IMAGE ?? "arch-base",
       projectsRoot: config.projectsRoot ?? "/mnt/project",
+      controlToken:
+        config.controlToken ?? process.env.DSH_PODMAN_ORCHESTRATOR_TOKEN ?? "",
     },
     ctx.workspaceRegistry,
   );

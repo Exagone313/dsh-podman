@@ -19,13 +19,38 @@ import (
 	"gitlab.com/Exagone313/dsh-podman/internal/orchestrator/state"
 )
 
-var packageName = regexp.MustCompile(`^[A-Za-z0-9@+._:-]+$`)
+var packageName = regexp.MustCompile(`^[A-Za-z0-9@+._:][A-Za-z0-9@+._:-]*$`)
+var baseImageName = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9._:/@-]*$`)
+var imageIDName = regexp.MustCompile(`^[a-zA-Z0-9_][a-zA-Z0-9_.-]{0,99}$`)
+
+func validPackage(pkg string) bool {
+	return pkg != "." && pkg != ".." && packageName.MatchString(pkg)
+}
+
+func validBaseImage(base string) bool {
+	if len(base) > 255 || !baseImageName.MatchString(base) {
+		return false
+	}
+	for _, segment := range strings.Split(base, "/") {
+		if segment == "." || segment == ".." {
+			return false
+		}
+	}
+	return true
+}
+
+func validImageID(id string) bool {
+	return id != "." && id != ".." && imageIDName.MatchString(id)
+}
 
 func Containerfile(image state.Image) (string, error) {
 	for _, pkg := range image.Packages {
-		if !packageName.MatchString(pkg) {
+		if !validPackage(pkg) {
 			return "", fmt.Errorf("invalid package name %q", pkg)
 		}
+	}
+	if !validBaseImage(image.BaseImage) {
+		return "", fmt.Errorf("invalid base image %q", image.BaseImage)
 	}
 	lines := []string{"FROM " + image.BaseImage, "RUN pacman -Syu --needed --noconfirm"}
 	if len(image.Packages) > 0 {
@@ -45,6 +70,9 @@ type Builder struct {
 func (b Builder) Build(image state.Image) (string, error) {
 	if b.Context == nil {
 		return "", fmt.Errorf("podman build context is not configured")
+	}
+	if !validImageID(image.ImageID) {
+		return "", fmt.Errorf("invalid image id %q", image.ImageID)
 	}
 	contents, err := Containerfile(image)
 	if err != nil {

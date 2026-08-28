@@ -1,18 +1,22 @@
 {
   "name": "@exagone313/dsh-podman",
   "version": "0.1.0",
-  "private": true,
   "type": "module",
   "main": "./dist/index.js",
   "exports": {
     ".": "./dist/index.js"
   },
+  "files": [
+    "dist",
+    "cordis.patch.yml",
+    "README.md"
+  ],
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && node scripts/copy-proto.mjs",
+    "typecheck": "tsc --noEmit",
     "test": "node --test dist/*.test.js"
   },
   "dependencies": {
-    "@bufbuild/protobuf": "^2.6.0",
     "@grpc/grpc-js": "^1.14.0",
     "@grpc/proto-loader": "^0.8.0"
   },
@@ -22,5 +26,6 @@
   },
   "engines": {
     "node": ">=22"
-  }
+  },
+  "packageManager": "pnpm@10.30.0"
 }

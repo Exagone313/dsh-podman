@@ -24,7 +24,7 @@ function client(service: string, proto: string, socket: string): grpc.Client {
     ) as unknown as Record<string, unknown>;
     const namespace = service.startsWith("dshctl")
       ? (loaded.dshctl as Record<string, unknown>)
-      : (loaded.dshagent as Record<string, unknown>);
+      : (loaded.dshguest as Record<string, unknown>);
     const version = namespace.v1 as Record<string, unknown>;
     Constructor = version[
       service.split(".").at(-1)!
@@ -41,10 +41,10 @@ export function controlClient(socket: string): grpc.Client {
     socket,
   );
 }
-export function agentClient(socket: string): grpc.Client {
+export function guestClient(socket: string): grpc.Client {
   return client(
-    "dshagent.v1.WorkspaceAgent",
-    "dshagent/v1/agent.proto",
+    "dshguest.v1.WorkspaceGuestAgent",
+    "dshguest/v1/agent.proto",
     socket,
   );
 }

@@ -13,15 +13,15 @@ import (
 	"sync"
 	"time"
 
-	"gitlab.com/Exagone313/dsh-podman/internal/agent/exec"
-	workspacefs "gitlab.com/Exagone313/dsh-podman/internal/agent/fs"
-	agent "gitlab.com/Exagone313/dsh-podman/internal/genproto/dshagent/v1"
+	"gitlab.com/Exagone313/dsh-podman/internal/guestagent/exec"
+	workspacefs "gitlab.com/Exagone313/dsh-podman/internal/guestagent/fs"
+	guest "gitlab.com/Exagone313/dsh-podman/internal/genproto/dshguest/v1"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
 
 type Server struct {
-	agent.UnimplementedWorkspaceAgentServer
+	guest.UnimplementedWorkspaceGuestAgentServer
 	Processes *exec.Manager
 	FS        *workspacefs.WorkspaceFS
 }
@@ -30,7 +30,7 @@ func New() *Server { return &Server{Processes: exec.NewManager()} }
 
 func (s *Server) WithFS(filesystem *workspacefs.WorkspaceFS) *Server { s.FS = filesystem; return s }
 
-func (s *Server) Exec(stream agent.WorkspaceAgent_ExecServer) error {
+func (s *Server) Exec(stream guest.WorkspaceGuestAgent_ExecServer) error {
 	first, err := stream.Recv()
 	if err != nil {
 		return err
@@ -44,7 +44,7 @@ func (s *Server) Exec(stream agent.WorkspaceAgent_ExecServer) error {
 	if len(argv) > 0 {
 		argv0 = argv[0]
 	}
-	slog.Info("agent Exec started", "argv0", argv0, "argc", len(argv))
+	slog.Info("guest agent Exec started", "argv0", argv0, "argc", len(argv))
 	process, err := s.Processes.Start(stream.Context(), start.GetArgv(), start.GetCwd(), start.GetEnv())
 	if err != nil {
 		return status.Error(codes.InvalidArgument, err.Error())
@@ -66,7 +66,7 @@ func (s *Server) Exec(stream agent.WorkspaceAgent_ExecServer) error {
 		return status.Error(codes.InvalidArgument, err.Error())
 	}
 	var sendMu sync.Mutex
-	send := func(output *agent.ExecOutput) error {
+	send := func(output *guest.ExecOutput) error {
 		output.ProcessId = process.ID
 		sendMu.Lock()
 		defer sendMu.Unlock()
@@ -79,11 +79,11 @@ func (s *Server) Exec(stream agent.WorkspaceAgent_ExecServer) error {
 			n, readErr := reader.Read(buffer)
 			if n > 0 {
 				data := append([]byte(nil), buffer[:n]...)
-				output := &agent.ExecOutput{}
+				output := &guest.ExecOutput{}
 				if stderr {
-					output.Payload = &agent.ExecOutput_StderrChunk{StderrChunk: data}
+					output.Payload = &guest.ExecOutput_StderrChunk{StderrChunk: data}
 				} else {
-					output.Payload = &agent.ExecOutput_StdoutChunk{StdoutChunk: data}
+					output.Payload = &guest.ExecOutput_StdoutChunk{StdoutChunk: data}
 				}
 				if sendErr := send(output); sendErr != nil {
 					errCh <- sendErr
@@ -138,20 +138,20 @@ func (s *Server) Exec(stream agent.WorkspaceAgent_ExecServer) error {
 			}
 		}
 	}
-	if err := send(&agent.ExecOutput{Payload: &agent.ExecOutput_Exit{Exit: &agent.ExecExit{ExitCode: exit, Signaled: signaled, Signal: signalName}}}); err != nil {
+	if err := send(&guest.ExecOutput{Payload: &guest.ExecOutput_Exit{Exit: &guest.ExecExit{ExitCode: exit, Signaled: signaled, Signal: signalName}}}); err != nil {
 		return err
 	}
-	slog.Info("agent Exec completed", "exit_code", exit, "signaled", signaled)
+	slog.Info("guest agent Exec completed", "exit_code", exit, "signaled", signaled)
 	return nil
 }
 
-func (s *Server) Signal(_ context.Context, request *agent.SignalRequest) (*agent.SignalResponse, error) {
+func (s *Server) Signal(_ context.Context, request *guest.SignalRequest) (*guest.SignalResponse, error) {
 	for _, process := range s.Processes.List() {
 		if process.ID == request.GetProcessId() {
 			if err := process.Command.Process.Signal(signalForName(request.GetSignal())); err != nil {
 				return nil, status.Error(codes.Internal, err.Error())
 			}
-			return &agent.SignalResponse{}, nil
+			return &guest.SignalResponse{}, nil
 		}
 	}
 	return nil, status.Error(codes.NotFound, "process not found")
@@ -167,11 +167,11 @@ func signalForName(name string) os.Signal {
 	return os.Interrupt
 }
 
-func (s *Server) ListProcesses(context.Context, *agent.ListProcessesRequest) (*agent.ListProcessesResponse, error) {
-	result := &agent.ListProcessesResponse{}
+func (s *Server) ListProcesses(context.Context, *guest.ListProcessesRequest) (*guest.ListProcessesResponse, error) {
+	result := &guest.ListProcessesResponse{}
 	for _, process := range s.Processes.List() {
 		running := process.Command.ProcessState == nil
-		result.Processes = append(result.Processes, &agent.ProcessInfo{ProcessId: process.ID, Argv: process.Argv, Running: running})
+		result.Processes = append(result.Processes, &guest.ProcessInfo{ProcessId: process.ID, Argv: process.Argv, Running: running})
 	}
 	return result, nil
 }
@@ -188,8 +188,8 @@ func (s *Server) resolve(path string, write bool) (string, error) {
 	resolved, _, err := s.FS.Resolve(path, write)
 	return resolved, err
 }
-func (s *Server) ReadFile(request *agent.ReadFileRequest, stream agent.WorkspaceAgent_ReadFileServer) error {
-	slog.Info("agent ReadFile requested", "path", request.GetPath())
+func (s *Server) ReadFile(request *guest.ReadFileRequest, stream guest.WorkspaceGuestAgent_ReadFileServer) error {
+	slog.Info("guest agent ReadFile requested", "path", request.GetPath())
 	path, err := s.resolve(request.GetPath(), false)
 	if err != nil {
 		return status.Error(codes.PermissionDenied, err.Error())
@@ -203,7 +203,7 @@ func (s *Server) ReadFile(request *agent.ReadFileRequest, stream agent.Workspace
 	for {
 		n, readErr := file.Read(buffer)
 		if n > 0 {
-			if err := stream.Send(&agent.ReadFileChunk{Data: append([]byte(nil), buffer[:n]...)}); err != nil {
+			if err := stream.Send(&guest.ReadFileChunk{Data: append([]byte(nil), buffer[:n]...)}); err != nil {
 				return err
 			}
 		}
@@ -215,7 +215,7 @@ func (s *Server) ReadFile(request *agent.ReadFileRequest, stream agent.Workspace
 		}
 	}
 }
-func (s *Server) WriteFile(stream agent.WorkspaceAgent_WriteFileServer) error {
+func (s *Server) WriteFile(stream guest.WorkspaceGuestAgent_WriteFileServer) error {
 	first, err := stream.Recv()
 	if err != nil {
 		return err
@@ -224,7 +224,7 @@ func (s *Server) WriteFile(stream agent.WorkspaceAgent_WriteFileServer) error {
 	if start == nil {
 		return status.Error(codes.InvalidArgument, "first write message must be start")
 	}
-	slog.Info("agent WriteFile requested", "path", start.GetPath())
+	slog.Info("guest agent WriteFile requested", "path", start.GetPath())
 	path, err := s.resolve(start.GetPath(), true)
 	if err != nil {
 		return status.Error(codes.PermissionDenied, err.Error())
@@ -262,7 +262,7 @@ func (s *Server) WriteFile(stream agent.WorkspaceAgent_WriteFileServer) error {
 			if err := os.Rename(temporaryName, path); err != nil {
 				return status.Error(codes.Internal, err.Error())
 			}
-			return stream.SendAndClose(&agent.WriteFileResponse{BytesWritten: written})
+			return stream.SendAndClose(&guest.WriteFileResponse{BytesWritten: written})
 		}
 		if recvErr != nil {
 			return recvErr
@@ -276,8 +276,8 @@ func (s *Server) WriteFile(stream agent.WorkspaceAgent_WriteFileServer) error {
 		}
 	}
 }
-func (s *Server) Stat(_ context.Context, request *agent.StatRequest) (*agent.StatResponse, error) {
-	slog.Info("agent Stat requested", "path", request.GetPath())
+func (s *Server) Stat(_ context.Context, request *guest.StatRequest) (*guest.StatResponse, error) {
+	slog.Info("guest agent Stat requested", "path", request.GetPath())
 	path, err := s.resolve(request.GetPath(), false)
 	if err != nil {
 		return nil, status.Error(codes.PermissionDenied, err.Error())
@@ -285,14 +285,14 @@ func (s *Server) Stat(_ context.Context, request *agent.StatRequest) (*agent.Sta
 	info, err := os.Stat(path)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return &agent.StatResponse{}, nil
+			return &guest.StatResponse{}, nil
 		}
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	return &agent.StatResponse{Exists: true, IsDir: info.IsDir(), Size: info.Size(), Mode: info.Mode().String(), ModifiedAt: info.ModTime().UTC().Format(time.RFC3339Nano)}, nil
+	return &guest.StatResponse{Exists: true, IsDir: info.IsDir(), Size: info.Size(), Mode: info.Mode().String(), ModifiedAt: info.ModTime().UTC().Format(time.RFC3339Nano)}, nil
 }
-func (s *Server) ReadDir(_ context.Context, request *agent.ReadDirRequest) (*agent.ReadDirResponse, error) {
-	slog.Info("agent ReadDir requested", "path", request.GetPath())
+func (s *Server) ReadDir(_ context.Context, request *guest.ReadDirRequest) (*guest.ReadDirResponse, error) {
+	slog.Info("guest agent ReadDir requested", "path", request.GetPath())
 	path, err := s.resolve(request.GetPath(), false)
 	if err != nil {
 		return nil, status.Error(codes.PermissionDenied, err.Error())
@@ -301,18 +301,18 @@ func (s *Server) ReadDir(_ context.Context, request *agent.ReadDirRequest) (*age
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	result := &agent.ReadDirResponse{}
+	result := &guest.ReadDirResponse{}
 	for _, entry := range entries {
 		info, infoErr := entry.Info()
 		if infoErr != nil {
 			return nil, status.Error(codes.Internal, infoErr.Error())
 		}
-		result.Entries = append(result.Entries, &agent.DirEntry{Name: entry.Name(), IsDir: entry.IsDir(), Size: info.Size()})
+		result.Entries = append(result.Entries, &guest.DirEntry{Name: entry.Name(), IsDir: entry.IsDir(), Size: info.Size()})
 	}
 	return result, nil
 }
-func (s *Server) Mkdir(_ context.Context, request *agent.MkdirRequest) (*agent.MkdirResponse, error) {
-	slog.Info("agent Mkdir requested", "path", request.GetPath())
+func (s *Server) Mkdir(_ context.Context, request *guest.MkdirRequest) (*guest.MkdirResponse, error) {
+	slog.Info("guest agent Mkdir requested", "path", request.GetPath())
 	path, err := s.resolve(request.GetPath(), true)
 	if err != nil {
 		return nil, status.Error(codes.PermissionDenied, err.Error())
@@ -325,10 +325,10 @@ func (s *Server) Mkdir(_ context.Context, request *agent.MkdirRequest) (*agent.M
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	return &agent.MkdirResponse{}, nil
+	return &guest.MkdirResponse{}, nil
 }
-func (s *Server) Delete(_ context.Context, request *agent.DeleteRequest) (*agent.DeleteResponse, error) {
-	slog.Info("agent Delete requested", "path", request.GetPath())
+func (s *Server) Delete(_ context.Context, request *guest.DeleteRequest) (*guest.DeleteResponse, error) {
+	slog.Info("guest agent Delete requested", "path", request.GetPath())
 	path, err := s.resolve(request.GetPath(), true)
 	if err != nil {
 		return nil, status.Error(codes.PermissionDenied, err.Error())
@@ -341,11 +341,11 @@ func (s *Server) Delete(_ context.Context, request *agent.DeleteRequest) (*agent
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	return &agent.DeleteResponse{}, nil
+	return &guest.DeleteResponse{}, nil
 }
 
-func (s *Server) InstallPackages(request *agent.InstallPackagesRequest, stream agent.WorkspaceAgent_InstallPackagesServer) error {
-	slog.Info("agent InstallPackages requested", "package_count", len(request.GetPackages()))
+func (s *Server) InstallPackages(request *guest.InstallPackagesRequest, stream guest.WorkspaceGuestAgent_InstallPackagesServer) error {
+	slog.Info("guest agent InstallPackages requested", "package_count", len(request.GetPackages()))
 	if len(request.GetPackages()) == 0 {
 		return status.Error(codes.InvalidArgument, "at least one package is required")
 	}
@@ -367,13 +367,13 @@ func (s *Server) InstallPackages(request *agent.InstallPackagesRequest, stream a
 	go func() {
 		data, _ := io.ReadAll(stdout)
 		if len(data) > 0 {
-			_ = stream.Send(&agent.InstallPackagesOutput{Payload: &agent.InstallPackagesOutput_StdoutChunk{StdoutChunk: data}})
+			_ = stream.Send(&guest.InstallPackagesOutput{Payload: &guest.InstallPackagesOutput_StdoutChunk{StdoutChunk: data}})
 		}
 	}()
 	go func() {
 		data, _ := io.ReadAll(stderr)
 		if len(data) > 0 {
-			_ = stream.Send(&agent.InstallPackagesOutput{Payload: &agent.InstallPackagesOutput_StderrChunk{StderrChunk: data}})
+			_ = stream.Send(&guest.InstallPackagesOutput{Payload: &guest.InstallPackagesOutput_StderrChunk{StderrChunk: data}})
 		}
 	}()
 	waitErr := process.Command.Wait()
@@ -381,5 +381,5 @@ func (s *Server) InstallPackages(request *agent.InstallPackagesRequest, stream a
 	if waitErr != nil {
 		code = 1
 	}
-	return stream.Send(&agent.InstallPackagesOutput{Payload: &agent.InstallPackagesOutput_Exit{Exit: &agent.ExecExit{ExitCode: code}}})
+	return stream.Send(&guest.InstallPackagesOutput{Payload: &guest.InstallPackagesOutput_Exit{Exit: &guest.ExecExit{ExitCode: code}}})
 }

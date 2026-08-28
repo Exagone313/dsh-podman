@@ -1,8 +1,8 @@
 syntax = "proto3";
-package dshagent.v1;
-option go_package = "gitlab.com/Exagone313/dsh-podman/internal/genproto/dshagent/v1;dshagentv1";
+package dshguest.v1;
+option go_package = "gitlab.com/Exagone313/dsh-podman/internal/genproto/dshguest/v1;dshguestv1";
 
-service WorkspaceAgent {
+service WorkspaceGuestAgent {
   rpc Exec(stream ExecInput) returns (stream ExecOutput);
   rpc Signal(SignalRequest) returns (SignalResponse);
   rpc ListProcesses(ListProcessesRequest) returns (ListProcessesResponse);

@@ -99,7 +99,7 @@ function createSubprocessProvider(resolver: WorkspaceResolver): object {
       const terminate = (): void => {
         terminated = true;
         if (processBinding !== undefined && state.pid > 0) {
-          void unaryAgent({ binding: processBinding }, "signal", {
+          void unaryGuest({ binding: processBinding }, "signal", {
             processId: String(state.pid),
             signal: "SIGTERM",
           });
@@ -109,7 +109,7 @@ function createSubprocessProvider(resolver: WorkspaceResolver): object {
         (binding) =>
           new Promise<any>((resolveDone, reject) => {
             processBinding = binding;
-            const stream = (binding.agent as any).exec(metadata(binding.token));
+            const stream = (binding.guest as any).exec(metadata(binding.token));
             stream.on("data", (output: any) => {
               if (output.stdoutChunk) {
                 const data = Buffer.from(output.stdoutChunk);
@@ -233,7 +233,7 @@ function createFilesystemProvider(resolver: WorkspaceResolver): object {
     readText: async (target: any) => {
       const chunks: Buffer[] = [];
       await new Promise<void>((resolveDone, reject) => {
-        const call = (target.binding.agent as any).readFile(
+        const call = (target.binding.guest as any).readFile(
           { path: target.targetKey },
           metadata(target.binding.token),
         );
@@ -244,8 +244,8 @@ function createFilesystemProvider(resolver: WorkspaceResolver): object {
       return Buffer.concat(chunks).toString("utf8");
     },
     writeText: async (target: any, content: string, expected?: any) => {
-      const current = await agentStatResponse(target);
-      const currentVersion = current.exists ? agentVersion(current) : undefined;
+      const current = await guestStatResponse(target);
+      const currentVersion = current.exists ? guestVersion(current) : undefined;
       if (expected?.kind === "createIfAbsent" && current.exists) {
         throw new Error(`file already exists: ${target.displayPath}`);
       }
@@ -257,7 +257,7 @@ function createFilesystemProvider(resolver: WorkspaceResolver): object {
       }
       const before = current.exists ? await readRemoteText(target) : null;
       return new Promise((resolveDone, reject) => {
-        const call = (target.binding.agent as any).writeFile(
+        const call = (target.binding.guest as any).writeFile(
           metadata(target.binding.token),
           {},
           async (error: Error | null, _result: unknown) => {
@@ -266,10 +266,10 @@ function createFilesystemProvider(resolver: WorkspaceResolver): object {
               return;
             }
             try {
-              const after = await agentStatResponse(target);
+              const after = await guestStatResponse(target);
               resolveDone({
                 operation: current.exists ? "update" : "create",
-                version: agentVersion(after),
+                version: guestVersion(after),
                 before,
                 after: content,
               });
@@ -285,13 +285,13 @@ function createFilesystemProvider(resolver: WorkspaceResolver): object {
         call.end();
       });
     },
-    stat: async (target: any) => agentStat(target),
+    stat: async (target: any) => guestStat(target),
     listDir: async (target: any) =>
-      unaryAgent(target, "readDir", { path: target.targetKey }),
+      unaryGuest(target, "readDir", { path: target.targetKey }),
     mkdir: async (target: any, parents = true) =>
-      unaryAgent(target, "mkdir", { path: target.targetKey, parents }),
+      unaryGuest(target, "mkdir", { path: target.targetKey, parents }),
     remove: async (target: any, recursive = false) =>
-      unaryAgent(target, "delete", { path: target.targetKey, recursive }),
+      unaryGuest(target, "delete", { path: target.targetKey, recursive }),
     editText: async (target: any, edit: any) => {
       const before = await readRemoteText(target);
       if (edit.oldString.length === 0)
@@ -300,7 +300,7 @@ function createFilesystemProvider(resolver: WorkspaceResolver): object {
         ? before.split(edit.oldString).join(edit.newString)
         : before.replace(edit.oldString, edit.newString);
       if (after === before) throw new Error("oldString was not found");
-      await writeAgentFile(target, after);
+      await writeGuestFile(target, after);
       return {
         version: `agent:${createHash("sha256").update(after).digest("hex")}`,
         before,
@@ -310,13 +310,13 @@ function createFilesystemProvider(resolver: WorkspaceResolver): object {
   };
 }
 
-function agentVersion(result: any): string {
+function guestVersion(result: any): string {
   return `agent:${result.modifiedAt ?? ""}:${result.size ?? 0}:${result.mode ?? ""}`;
 }
 
-async function writeAgentFile(target: any, content: string): Promise<void> {
+async function writeGuestFile(target: any, content: string): Promise<void> {
   await new Promise<void>((resolveDone, reject) => {
-    const call = target.binding.agent.writeFile(
+    const call = target.binding.guest.writeFile(
       metadata(target.binding.token),
       {},
       (error: Error | null) => (error ? reject(error) : resolveDone()),
@@ -329,19 +329,19 @@ async function writeAgentFile(target: any, content: string): Promise<void> {
   });
 }
 
-async function agentStat(target: any): Promise<any> {
-  const result = await agentStatResponse(target);
+async function guestStat(target: any): Promise<any> {
+  const result = await guestStatResponse(target);
   if (!result.exists) return undefined;
   return {
-    version: agentVersion(result),
+    version: guestVersion(result),
     type: result.isDir ? "directory" : "file",
     ...(result.isDir ? {} : { size: Number(result.size ?? 0) }),
   };
 }
 
-async function agentStatResponse(target: any): Promise<any> {
+async function guestStatResponse(target: any): Promise<any> {
   return new Promise<any>((resolveDone, reject) =>
-    target.binding.agent.stat(
+    target.binding.guest.stat(
       { path: target.targetKey },
       metadata(target.binding.token),
       (error: Error | null, value: any) =>
@@ -353,7 +353,7 @@ async function agentStatResponse(target: any): Promise<any> {
 async function readRemoteText(target: any): Promise<string> {
   const chunks: Buffer[] = [];
   await new Promise<void>((resolveDone, reject) => {
-    const call = target.binding.agent.readFile(
+    const call = target.binding.guest.readFile(
       { path: target.targetKey },
       metadata(target.binding.token),
     );
@@ -414,7 +414,7 @@ function registerTools(ctx: any, resolver: WorkspaceResolver): void {
             ? await resolver.resolveSlug(String(input.workspace_slug ?? ""))
             : await resolver.resolve(cwd);
         return JSON.stringify(
-          await unaryAgent({ binding }, "installPackages", input),
+          await unaryGuest({ binding }, "installPackages", input),
         );
       },
     }),
@@ -436,13 +436,13 @@ async function unaryControl(
 ): Promise<unknown> {
   return resolver.control(method, input);
 }
-async function unaryAgent(
+async function unaryGuest(
   target: any,
   method: string,
   request: unknown,
 ): Promise<unknown> {
   return new Promise((resolveDone, reject) =>
-    (target.binding.agent as any)[method](
+    (target.binding.guest as any)[method](
       request,
       metadata(target.binding.token),
       (error: Error | null, result: unknown) =>

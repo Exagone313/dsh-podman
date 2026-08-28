@@ -18,15 +18,15 @@ all: build
 
 build: build-go npm-build
 
-build-go: $(BIN_DIR)/dsh-workspace-agent $(BIN_DIR)/dsh-orchestrator
+build-go: $(BIN_DIR)/dsh-guest-agent $(BIN_DIR)/dsh-orchestrator
 
 image: build-go
 	$(CONTAINER) build -f Containerfile.orchestrator -t localhost/dsh-orchestrator:latest .
 
 
-$(BIN_DIR)/dsh-workspace-agent: $(GO_SOURCES) go.mod go.sum
+$(BIN_DIR)/dsh-guest-agent: $(GO_SOURCES) go.mod go.sum
 	mkdir -p $(BIN_DIR)
-	CGO_ENABLED=0 GOOS=$(GOOS) GOARCH=$(GOARCH) $(GO) build $(GO_BUILD_FLAGS) -o $(BIN_DIR)/dsh-workspace-agent ./cmd/dsh-workspace-agent
+	CGO_ENABLED=0 GOOS=$(GOOS) GOARCH=$(GOARCH) $(GO) build $(GO_BUILD_FLAGS) -o $(BIN_DIR)/dsh-guest-agent ./cmd/dsh-guest-agent
 
 $(BIN_DIR)/dsh-orchestrator: $(GO_SOURCES) go.mod go.sum
 	mkdir -p $(BIN_DIR)

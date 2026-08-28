@@ -1,12 +1,12 @@
 import {
-  agentClient,
+  guestClient,
   controlClient,
   grpc,
   unary,
 } from "./grpc/runtime-client.js";
 
 export interface WorkspaceBinding {
-  agent: grpc.Client;
+  guest: grpc.Client;
   token: string;
   socket: string;
 }
@@ -45,11 +45,11 @@ export class WorkspaceResolver {
   ): Promise<WorkspaceBinding> {
     let binding = await this.resolveBinding(key, projectName);
     try {
-      await waitForReady(binding.agent);
+      await waitForReady(binding.guest);
     } catch {
       this.bindings.delete(key);
       binding = await this.resolveBinding(key, projectName);
-      await waitForReady(binding.agent);
+      await waitForReady(binding.guest);
     }
     return binding;
   }
@@ -87,7 +87,7 @@ export class WorkspaceResolver {
     }
     const socket = workspace.agentSocketPath as string;
     return {
-      agent: agentClient(socket),
+      guest: guestClient(socket),
       token: workspace.agentToken as string,
       socket,
     };

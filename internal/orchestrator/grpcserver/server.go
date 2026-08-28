@@ -239,7 +239,7 @@ func (s *Server) CreateWorkspace(ctx context.Context, request *ctl.CreateWorkspa
 		s.log().Error("control request failed", "method", "CreateWorkspace", "workspace_slug", request.GetWorkspaceSlug(), "error", err)
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	agentSocket := filepath.Join(s.SocketsRoot, name, "agent.sock")
+	agentSocket := filepath.Join(s.SocketsRoot, name, "guest.sock")
 	workspace := state.Workspace{WorkspaceSlug: request.GetWorkspaceSlug(), ContainerName: name, ImageID: request.GetImageId(), Mounts: mounts, Status: "running", AgentSocketPath: agentSocket, AgentToken: secret, CreatedAt: time.Now().UTC().Format(time.RFC3339)}
 	if err := s.Store.UpdateWorkspaces(func(all []state.Workspace) ([]state.Workspace, error) {
 		replaced := false

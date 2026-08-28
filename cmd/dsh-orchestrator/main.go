@@ -31,8 +31,8 @@ func main() {
 	stateDir := getenv("DSH_ORCH_STATE", "/var/lib/dsh-orchestrator")
 	hostProjectsRoot := getenv("DSH_ORCH_HOST_PROJECTS_ROOT", root)
 	hostSocketsRoot := getenv("DSH_ORCH_HOST_SOCKETS_ROOT", socketsRoot)
-	agentBinary := getenv("DSH_ORCH_AGENT_BIN", "")
-	hostAgentBinary := getenv("DSH_ORCH_HOST_AGENT_BIN", agentBinary)
+	guestBinary := getenv("DSH_ORCH_AGENT_BIN", "")
+	hostGuestBinary := getenv("DSH_ORCH_HOST_AGENT_BIN", guestBinary)
 	hostPacmanCache := getenv("DSH_ORCH_HOST_PACMAN_CACHE", "")
 	if err := os.MkdirAll(filepath.Dir(socket), 0700); err != nil {
 		panic(err)
@@ -61,7 +61,7 @@ func main() {
 			panic(fmt.Errorf("Podman API is unreachable: %w", connectionErr))
 		}
 		logger.Info("Podman API reachable", "socket", podmanSocket)
-		podmanClient, err = podman.New(context.Background(), podmanSocket, socketsRoot, agentBinary, hostSocketsRoot, root, hostAgentBinary, logger)
+		podmanClient, err = podman.New(context.Background(), podmanSocket, socketsRoot, guestBinary, hostSocketsRoot, root, hostGuestBinary, logger)
 		if err != nil {
 			panic(fmt.Errorf("initialize Podman client: %w", err))
 		}

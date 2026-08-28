@@ -4,5 +4,5 @@
 
 FROM scratch
 ENV PATH=/bin
-COPY bin/dsh-podman-orchestrator /bin/dsh-podman-orchestrator
-ENTRYPOINT ["/bin/dsh-podman-orchestrator"]
+COPY bin/dsh-podman-guest-agent /bin/dsh-podman-guest-agent
+ENTRYPOINT ["/bin/dsh-podman-guest-agent"]

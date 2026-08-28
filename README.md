@@ -64,7 +64,7 @@ guest-only values are namespaced under `DSH_PODMAN_ORCHESTRATOR_` and
 | `DSH_PODMAN_GUEST_AGENT_IMAGE` | — | Prebuilt guest-agent image baked into workspace images via a multi-stage `COPY`; unset disables the feature (binary is bind-mounted instead) |
 | `DSH_PODMAN_GUEST_AGENT_IMAGE_AGENT_BIN` | `/bin/dsh-podman-guest-agent` | Path of the guest agent binary inside the guest-agent image |
 | `DSH_PODMAN_GUEST_AGENT_IMAGE_DEST_AGENT_BIN` | `/usr/local/bin/dsh-podman-guest-agent` | Destination path for the copied binary inside built workspace images |
-| `DSH_PODMAN_ORCHESTRATOR_TOKEN` | — | Shared bearer token required on control-plane gRPC calls; when unset the control socket is unauthenticated |
+| `DSH_PODMAN_ORCHESTRATOR_TOKEN` | — | Shared secret authenticating control-plane gRPC calls; see below for the expected format |
 
 ### Guest agent (`dsh-podman-guest-agent`)
 
@@ -79,6 +79,15 @@ The plugin itself reads `DSH_PODMAN_ORCHESTRATOR_CONTROL_SOCKET`
 it. Its `projectsRoot` default is `/mnt/project`; all are overridable through
 the plugin's `cordis.yml` config (`controlSocket`, `defaultImage`,
 `projectsRoot`, `controlToken`).
+
+`DSH_PODMAN_ORCHESTRATOR_TOKEN` is an arbitrary shared secret string that the
+orchestrator and the plugin must agree on; every control-plane request must
+then carry it as the gRPC metadata header `authorization: bearer <token>`. Use
+a long, random value — for example `openssl rand -hex 32` — and set the same
+value on both sides. When the orchestrator has no token set, it accepts
+unauthenticated control-plane calls (relying on the socket's file permissions
+instead); when a token is set, requests without the matching header are
+rejected with `Unauthenticated`.
 
 ## Container management UI
 

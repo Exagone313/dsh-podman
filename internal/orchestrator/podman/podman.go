@@ -25,14 +25,12 @@ type Client struct {
 	logger                                                                *slog.Logger
 }
 
-const guestDestination = "/usr/local/bin/dsh-podman-guest-agent"
-
 func New(ctx context.Context, socket, socketRoot, guestBinary, hostSocketRoot, projectRoot, hostGuestBinary string, logger *slog.Logger) (*Client, error) {
 	connected, err := bindings.NewConnection(ctx, socket)
 	if err != nil {
 		return nil, err
 	}
-	return &Client{ctx: connected, socketRoot: socketRoot, hostSocketRoot: hostSocketRoot, projectRoot: projectRoot, guestBinary: binaryPath(guestBinary), hostGuestBinary: binaryPath(hostGuestBinary), logger: logger}, nil
+	return &Client{ctx: connected, socketRoot: socketRoot, hostSocketRoot: hostSocketRoot, projectRoot: projectRoot, guestBinary: guestBinary, hostGuestBinary: hostGuestBinary, logger: logger}, nil
 }
 
 func (c *Client) log() *slog.Logger {
@@ -42,12 +40,6 @@ func (c *Client) log() *slog.Logger {
 	return slog.Default()
 }
 
-func binaryPath(path string) string {
-	if filepath.Base(path) == "dsh-podman-guest-agent" {
-		return path
-	}
-	return filepath.Join(path, "dsh-podman-guest-agent")
-}
 func (c *Client) CreateWorkspace(name, image, token string, mounts []specs.Mount) error {
 	c.log().Info("creating workspace container", "container_name", name, "image", image, "mount_count", len(mounts))
 	socketDir := filepath.Join(c.socketRoot, name)
@@ -58,10 +50,14 @@ func (c *Client) CreateWorkspace(name, image, token string, mounts []specs.Mount
 	init := true
 	generator := specgen.NewSpecGenerator(image, false)
 	generator.Name = name
-	generator.Command = []string{guestDestination}
+	generator.Command = []string{c.guestBinary}
 	generator.Env = map[string]string{"DSH_PODMAN_GUEST_TOKEN": token, "DSH_PODMAN_GUEST_SOCKET": filepath.Join(c.socketRoot, name, "guest.sock"), "DSH_PODMAN_PROJECTS_ROOT": c.projectRoot}
 	generator.Init = &init
-	generator.Mounts = append(mounts, specs.Mount{Type: "bind", Source: c.hostGuestBinary, Destination: guestDestination, Options: []string{"ro"}}, specs.Mount{Type: "bind", Source: hostSocketDir, Destination: filepath.Join(c.socketRoot, name), Options: []string{"rw"}})
+	extraMounts := []specs.Mount{{Type: "bind", Source: hostSocketDir, Destination: filepath.Join(c.socketRoot, name), Options: []string{"rw"}}}
+	if c.hostGuestBinary != "" {
+		extraMounts = append([]specs.Mount{{Type: "bind", Source: c.hostGuestBinary, Destination: c.guestBinary, Options: []string{"ro"}}}, extraMounts...)
+	}
+	generator.Mounts = append(mounts, extraMounts...)
 	if _, err := containers.CreateWithSpec(c.ctx, generator, nil); err != nil {
 		c.log().Error("workspace container creation failed", "container_name", name, "error", err)
 		return fmt.Errorf("create container: %w", err)

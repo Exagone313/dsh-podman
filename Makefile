@@ -9,13 +9,14 @@ GOOS ?= linux
 GOARCH ?= amd64
 BIN_DIR ?= bin
 CONTAINER ?= podman
+IMAGE_PREFIX ?= localhost/dsh-podman-
 
 GO_SOURCES := $(shell find cmd internal -type f -name '*.go' -print)
 JS_SOURCES := $(shell find src -type f \( -name '*.ts' -o -name '*.tsx' \) -print)
 PROTO_SOURCES := $(shell find proto -type f -name '*.proto' -print)
 NODE_MODULES_TSC := node_modules/.bin/tsc
 
-.PHONY: all build build-go image image-guestagent pnpm-install pnpm-build pnpm-test pnpm-prune clean
+.PHONY: all build build-go image image-orchestrator image-guestagent pnpm-install pnpm-build pnpm-test pnpm-prune clean
 
 all: build
 
@@ -23,11 +24,13 @@ build: build-go pnpm-build
 
 build-go: $(BIN_DIR)/dsh-podman-guest-agent $(BIN_DIR)/dsh-podman-orchestrator
 
-image: build-go
-	$(CONTAINER) build -f Containerfile.orchestrator -t localhost/dsh-podman-orchestrator:latest .
+image: image-orchestrator image-guestagent
+
+image-orchestrator: build-go
+	$(CONTAINER) build -f Containerfile.orchestrator -t $(IMAGE_PREFIX)orchestrator:latest .
 
 image-guestagent: build-go
-	$(CONTAINER) build -f Containerfile.guestagent -t localhost/dsh-podman-guest-agent:latest .
+	$(CONTAINER) build -f Containerfile.guestagent -t $(IMAGE_PREFIX)guest-agent:latest .
 
 $(BIN_DIR)/dsh-podman-guest-agent: $(GO_SOURCES) go.mod go.sum
 	mkdir -p $(BIN_DIR)

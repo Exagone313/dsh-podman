@@ -53,11 +53,10 @@ export function apply(ctx: any, config: PluginConfig = {}): void {
     {
       controlSocket:
         config.controlSocket ??
-        process.env.DSH_ORCH_CONTROL_SOCKET ??
-        process.env.DSH_CONTROL_SOCKET ??
+        process.env.DSH_PODMAN_ORCHESTRATOR_CONTROL_SOCKET ??
         "/run/dsh-sockets/control.sock",
       defaultImage:
-        config.defaultImage ?? process.env.DSH_DEFAULT_IMAGE ?? "arch-base",
+        config.defaultImage ?? process.env.DSH_PODMAN_DEFAULT_IMAGE ?? "arch-base",
       projectsRoot: config.projectsRoot ?? "/mnt/project",
     },
     ctx.workspaceRegistry,

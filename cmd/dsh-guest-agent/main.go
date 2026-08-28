@@ -21,14 +21,14 @@ func main() {
 		fmt.Println(version)
 		return
 	}
-	socket := os.Getenv("DSH_AGENT_SOCKET")
+	socket := os.Getenv("DSH_PODMAN_GUEST_SOCKET")
 	if socket == "" {
 		socket = "/run/dsh-sockets/guest.sock"
 	}
-	token := os.Getenv("DSH_AGENT_TOKEN")
-	root := os.Getenv("DSH_WORKSPACE_ROOT")
+	token := os.Getenv("DSH_PODMAN_GUEST_TOKEN")
+	root := os.Getenv("DSH_PODMAN_PROJECTS_ROOT")
 	if root == "" {
-		root = "/workspace"
+		root = "/projects"
 	}
 	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
 	slog.SetDefault(logger)

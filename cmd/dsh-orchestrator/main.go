@@ -25,15 +25,15 @@ func main() {
 		fmt.Println(version)
 		return
 	}
-	socketsRoot := getenv("DSH_ORCH_SOCKETS_ROOT", "/run/dsh-sockets")
+	socketsRoot := getenv("DSH_PODMAN_ORCHESTRATOR_SOCKETS_ROOT", "/run/dsh-sockets")
 	socket := filepath.Join(socketsRoot, "control.sock")
-	root := getenv("DSH_ORCH_PROJECTS_ROOT", "/projects")
-	stateDir := getenv("DSH_ORCH_STATE", "/var/lib/dsh-orchestrator")
-	hostProjectsRoot := getenv("DSH_ORCH_HOST_PROJECTS_ROOT", root)
-	hostSocketsRoot := getenv("DSH_ORCH_HOST_SOCKETS_ROOT", socketsRoot)
-	guestBinary := getenv("DSH_ORCH_AGENT_BIN", "")
-	hostGuestBinary := getenv("DSH_ORCH_HOST_AGENT_BIN", guestBinary)
-	hostPacmanCache := getenv("DSH_ORCH_HOST_PACMAN_CACHE", "")
+	root := getenv("DSH_PODMAN_PROJECTS_ROOT", "/projects")
+	stateDir := getenv("DSH_PODMAN_ORCHESTRATOR_STATE", "/var/lib/dsh-orchestrator")
+	hostProjectsRoot := getenv("DSH_PODMAN_ORCHESTRATOR_HOST_PROJECTS_ROOT", root)
+	hostSocketsRoot := getenv("DSH_PODMAN_ORCHESTRATOR_HOST_SOCKETS_ROOT", socketsRoot)
+	guestBinary := getenv("DSH_PODMAN_ORCHESTRATOR_GUEST_BIN", "")
+	hostGuestBinary := getenv("DSH_PODMAN_ORCHESTRATOR_HOST_GUEST_BIN", guestBinary)
+	hostPacmanCache := getenv("DSH_PODMAN_ORCHESTRATOR_HOST_PACMAN_CACHE", "")
 	if err := os.MkdirAll(filepath.Dir(socket), 0700); err != nil {
 		panic(err)
 	}
@@ -50,7 +50,7 @@ func main() {
 	server := grpc.NewServer(grpc.UnaryInterceptor(grpcserver.UnaryLogger(logger)))
 	var podmanClient *podman.Client
 	var imageBuilder *images.Builder
-	podmanSocket := os.Getenv("DSH_ORCH_PODMAN_SOCKET")
+	podmanSocket := os.Getenv("DSH_PODMAN_ORCHESTRATOR_PODMAN_SOCKET")
 	if podmanSocket != "" {
 		logger.Info("Podman API configured", "socket", podmanSocket)
 		podmanContext, connectionErr := bindings.NewConnection(context.Background(), podmanSocket)
@@ -67,9 +67,9 @@ func main() {
 		}
 		imageBuilder = &images.Builder{Context: podmanContext, StateDir: stateDir, HostPacmanCache: hostPacmanCache, Logger: logger}
 	} else {
-		_, orchSocketSet := os.LookupEnv("DSH_ORCH_PODMAN_SOCKET")
-		logger.Error("Podman API configuration is missing", "DSH_ORCH_PODMAN_SOCKET_present", orchSocketSet, "expected", "DSH_ORCH_PODMAN_SOCKET=unix:///run/podman/podman.sock")
-		panic("Podman API is not configured: DSH_ORCH_PODMAN_SOCKET is absent or empty")
+		_, orchSocketSet := os.LookupEnv("DSH_PODMAN_ORCHESTRATOR_PODMAN_SOCKET")
+		logger.Error("Podman API configuration is missing", "DSH_PODMAN_ORCHESTRATOR_PODMAN_SOCKET_present", orchSocketSet, "expected", "DSH_PODMAN_ORCHESTRATOR_PODMAN_SOCKET=unix:///run/podman/podman.sock")
+		panic("Podman API is not configured: DSH_PODMAN_ORCHESTRATOR_PODMAN_SOCKET is absent or empty")
 	}
 	ctl.RegisterOrchestratorControlServer(server, &grpcserver.Server{ProjectsRoot: root, HostProjectsRoot: hostProjectsRoot, SocketsRoot: socketsRoot, Store: store, Podman: podmanClient, ImageBuilder: imageBuilder, Logger: logger})
 	if err := server.Serve(listener); err != nil {

@@ -1,0 +1,11 @@
+# dsh bundle patch: mounts the dsh-podman plugin into a profile's layer
+# stack. The subprocess/fs-sandbox rows are disabled because this plugin
+# provides the ctx.subprocess and ctx.fs providers backed by workspace
+# Podman containers instead.
+- id: subprocess
+  disabled: true
+- id: fs-sandbox
+  disabled: true
+- insert:
+    - id: podman
+      name: '@exagone313/dsh-podman'

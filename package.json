@@ -6,6 +6,11 @@
   "exports": {
     ".": "./dist/index.js"
   },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
   "files": [
     "dist",
     "cordis.patch.yml",

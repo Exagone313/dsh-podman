@@ -1,32 +1,124 @@
-# dsh-container-plugin
+# dsh-podman
 
-This repository contains the `dsh-orchestrator`, `dsh-workspace-agent`, and
-`@exagone313/dsh-container-plugin` Cordis plugin.
+Podman-backed execution for the DeepSeek Harness (`dsh`). This repository
+ships the `@exagone313/dsh-podman` Cordis plugin and the two Go binaries it
+delegates to: all shell execution and file access is routed through
+disposable, per-project Podman containers instead of the dsh host.
+
+## What runs where
+
+| Component | Runs | What it does |
+|---|---|---|
+| `dsh-orchestrator` | A container with access to the Podman API | Owns the control socket and persisted state; creates/removes workspace containers; builds workspace images |
+| `dsh-guest-agent` | Inside every workspace container | Serves the exec/filesystem gRPC API for one workspace |
+| `@exagone313/dsh-podman` | Inside dsh itself | Registers `ctx.subprocess` and `ctx.fs` backed by the orchestrator, plus lifecycle tools |
+
+The plugin auto-creates a missing workspace using its configured default
+image and a single read-write project mount. It never falls back to host
+execution.
 
 ## Build
 
 ```sh
-go test ./...
-npm ci
-npm run build
+go test ./...        # Go tests (orchestrator + guest agent)
+pnpm install
+pnpm run build       # tsc -> dist/, copies proto/ -> dist/grpc/proto/
 ```
 
-Protobuf bindings are generated with Buf using `buf.build/bufbuild/es` for
-TypeScript and the official Go protobuf and gRPC plugins. The control socket
-the control socket is created below `DSH_ORCH_SOCKETS_ROOT`; agent socket and
-token variables are internal to workspace containers.
+Protobuf bindings are generated with Buf (`buf generate`); the raw `.proto`
+files are copied into `dist/grpc/proto/` at build time and loaded at runtime
+by `@grpc/proto-loader`.
 
-The orchestrator deployment variables are `DSH_ORCH_STATE`,
-`DSH_ORCH_AGENT_BIN`, `DSH_ORCH_SOCKETS_ROOT`, `DSH_ORCH_PROJECTS_ROOT`,
-`DSH_ORCH_PODMAN_SOCKET`, `DSH_ORCH_HOST_PROJECTS_ROOT`,
-`DSH_ORCH_HOST_SOCKETS_ROOT`, and `DSH_ORCH_HOST_AGENT_BIN`. The optional
-`DSH_ORCH_DEFAULT_IMAGE` selects the default image ID and otherwise defaults
-to `arch-base`. `DSH_ORCH_HOST_PACMAN_CACHE` supplies the host-absolute
-Buildah cache directory used by workspace-image builds.
+## Configuration (environment variables)
 
-`DSH_ORCH_PROJECTS_ROOT` is the shared project prefix inside all containers;
-`DSH_ORCH_HOST_PROJECTS_ROOT` is the corresponding real host prefix used as
-the source of bind mounts.
+All variables use the `DSH_PODMAN_` prefix. Values shared between the
+orchestrator and the guest agents use the bare prefix; orchestrator-only and
+guest-only values are namespaced under `DSH_PODMAN_ORCHESTRATOR_` and
+`DSH_PODMAN_GUEST_` respectively.
 
-The plugin auto-creates a missing workspace using its configured default image and a
-single read-write project mount. It never falls back to host execution.
+### Shared
+
+| Variable | Default | Description |
+|---|---|---|
+| `DSH_PODMAN_PROJECTS_ROOT` | `/projects` | Project root inside every container; also the guest agent's workspace root |
+| `DSH_PODMAN_DEFAULT_IMAGE` | `arch-base` | Default workspace image id |
+
+### Orchestrator (`dsh-orchestrator`)
+
+| Variable | Default | Description |
+|---|---|---|
+| `DSH_PODMAN_ORCHESTRATOR_PODMAN_SOCKET` | required | Podman API socket, e.g. `unix:///run/podman/podman.sock` |
+| `DSH_PODMAN_ORCHESTRATOR_SOCKETS_ROOT` | `/run/dsh-sockets` | Directory for the control socket and per-workspace guest sockets |
+| `DSH_PODMAN_ORCHESTRATOR_STATE` | `/var/lib/dsh-orchestrator` | Persisted state directory |
+| `DSH_PODMAN_ORCHESTRATOR_HOST_PROJECTS_ROOT` | `DSH_PODMAN_PROJECTS_ROOT` | Host-side projects root used as the source of bind mounts |
+| `DSH_PODMAN_ORCHESTRATOR_HOST_SOCKETS_ROOT` | `DSH_PODMAN_ORCHESTRATOR_SOCKETS_ROOT` | Host-side sockets root for guest socket bind mounts |
+| `DSH_PODMAN_ORCHESTRATOR_GUEST_BIN` | — | Guest agent binary path (container-internal) |
+| `DSH_PODMAN_ORCHESTRATOR_HOST_GUEST_BIN` | `DSH_PODMAN_ORCHESTRATOR_GUEST_BIN` | Host-side guest agent binary path |
+| `DSH_PODMAN_ORCHESTRATOR_HOST_PACMAN_CACHE` | — | Host-absolute Buildah cache directory used by workspace-image builds |
+
+### Guest agent (`dsh-guest-agent`)
+
+| Variable | Default | Description |
+|---|---|---|
+| `DSH_PODMAN_GUEST_SOCKET` | `/run/dsh-sockets/guest.sock` | Unix socket the guest agent serves on |
+| `DSH_PODMAN_GUEST_TOKEN` | — | Bearer token required on every gRPC call |
+
+The plugin itself reads `DSH_PODMAN_ORCHESTRATOR_CONTROL_SOCKET`
+(default `/run/dsh-sockets/control.sock`) to reach the orchestrator. Its
+`projectsRoot` default is `/mnt/project`; both are overridable through the
+plugin's `cordis.yml` config (`controlSocket`, `defaultImage`, `projectsRoot`).
+
+## Releasing and installing from a hosted tarball
+
+The compiled output (`dist/`) is **not committed** to this repository. To
+install the plugin on another machine, build a package tarball and host it
+over HTTPS, then point `dsh plugin add` at that URL. A `.tgz` is the form
+pnpm/npm accept for remote tarball dependencies — a `.zip` archive is not
+supported as a dependency spec.
+
+**1. Build and pack** (in a checkout with dev dependencies):
+
+```sh
+pnpm install
+pnpm run build        # tsc + copy proto/ into dist/
+npm pack              # emits exagone313-dsh-podman-<version>.tgz
+```
+
+The tarball contains `package.json` (with the `dsh.bundle` declaration),
+`dist/` (the compiled plugin), `cordis.patch.yml`, and `README.md`. It
+carries **no build scripts**, so installation never runs one (pnpm ≥10
+blocks dependency build scripts by default anyway).
+
+**2. Host the `.tgz`** over HTTPS on your own server or as a release asset.
+
+**3. Install** into a dsh profile:
+
+```sh
+dsh plugin --profile web add https://your-host/dsh-podman.tgz
+```
+
+`dsh plugin` forwards the URL to pnpm, which installs the package and
+reconciles it into the profile's bundle layer stack (it declares
+`dsh.bundle`). The bundled `cordis.patch.yml` disables the built-in
+`subprocess` and `fs-sandbox` rows and mounts the plugin:
+
+```yaml
+- id: subprocess
+  disabled: true
+- id: fs-sandbox
+  disabled: true
+- insert:
+    - id: podman
+      name: '@exagone313/dsh-podman'
+```
+
+Restart dsh for the plugin to load.
+
+**Updating:** a tarball URL pins an exact artifact. Give each release a
+versioned filename (`…-0.1.1.tgz`) and re-add / `dsh plugin --profile web
+update` with the new URL; a fixed "latest" URL can serve a stale copy from
+the pnpm cache.
+
+## License
+
+MIT

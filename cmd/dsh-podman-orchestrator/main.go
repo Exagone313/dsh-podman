@@ -15,6 +15,7 @@ import (
 	"github.com/containers/podman/v5/pkg/bindings"
 	"github.com/containers/podman/v5/pkg/bindings/system"
 	ctl "gitlab.com/Exagone313/dsh-podman/internal/genproto/dshctl/v1"
+	"gitlab.com/Exagone313/dsh-podman/internal/auth"
 	"gitlab.com/Exagone313/dsh-podman/internal/orchestrator/grpcserver"
 	"gitlab.com/Exagone313/dsh-podman/internal/orchestrator/images"
 	"gitlab.com/Exagone313/dsh-podman/internal/orchestrator/podman"
@@ -38,6 +39,7 @@ func main() {
 	guestBinary := getenv("DSH_PODMAN_GUEST_AGENT_BIN", "dsh-podman-guest-agent")
 	hostGuestBinary := getenv("DSH_PODMAN_HOST_GUEST_AGENT_BIN", "")
 	hostPacmanCache := getenv("DSH_PODMAN_HOST_PACMAN_CACHE", "")
+	controlToken := getenv("DSH_PODMAN_ORCHESTRATOR_TOKEN", "")
 	if err := os.MkdirAll(filepath.Dir(socket), 0700); err != nil {
 		panic(err)
 	}
@@ -50,8 +52,18 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+	if err := os.Chmod(socket, 0600); err != nil {
+		panic(err)
+	}
 	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
-	server := grpc.NewServer(grpc.UnaryInterceptor(grpcserver.UnaryLogger(logger)))
+	var server *grpc.Server
+	if controlToken != "" {
+		logger.Info("control-plane authentication enabled")
+		server = grpc.NewServer(grpc.ChainUnaryInterceptor(auth.Unary(controlToken), grpcserver.UnaryLogger(logger)))
+	} else {
+		logger.Warn("control-plane authentication is disabled; set DSH_PODMAN_ORCHESTRATOR_TOKEN")
+		server = grpc.NewServer(grpc.UnaryInterceptor(grpcserver.UnaryLogger(logger)))
+	}
 	var podmanClient *podman.Client
 	var imageBuilder *images.Builder
 	podmanSocket := os.Getenv("DSH_PODMAN_ORCHESTRATOR_PODMAN_SOCKET")

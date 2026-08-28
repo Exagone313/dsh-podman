@@ -61,6 +61,7 @@ guest-only values are namespaced under `DSH_PODMAN_ORCHESTRATOR_` and
 | `DSH_PODMAN_GUEST_AGENT_BIN` | `dsh-podman-guest-agent` | Guest agent binary path (container-internal); resolved via the image's `PATH` when unset |
 | `DSH_PODMAN_HOST_GUEST_AGENT_BIN` | — | Host-side guest agent binary path; bind-mounted when set |
 | `DSH_PODMAN_HOST_PACMAN_CACHE` | — | Host-absolute Buildah cache directory used by workspace-image builds |
+| `DSH_PODMAN_ORCHESTRATOR_TOKEN` | — | Shared bearer token required on control-plane gRPC calls; when unset the control socket is unauthenticated |
 
 ### Guest agent (`dsh-podman-guest-agent`)
 
@@ -70,9 +71,11 @@ guest-only values are namespaced under `DSH_PODMAN_ORCHESTRATOR_` and
 | `DSH_PODMAN_GUEST_TOKEN` | — | Bearer token required on every gRPC call |
 
 The plugin itself reads `DSH_PODMAN_ORCHESTRATOR_CONTROL_SOCKET`
-(default `/run/dsh-sockets/control.sock`) to reach the orchestrator. Its
-`projectsRoot` default is `/mnt/project`; both are overridable through the
-plugin's `cordis.yml` config (`controlSocket`, `defaultImage`, `projectsRoot`).
+(default `/run/dsh-sockets/control.sock`) to reach the orchestrator, and
+`DSH_PODMAN_ORCHESTRATOR_TOKEN` to authenticate when the orchestrator requires
+it. Its `projectsRoot` default is `/mnt/project`; all are overridable through
+the plugin's `cordis.yml` config (`controlSocket`, `defaultImage`,
+`projectsRoot`, `controlToken`).
 
 ## Container management UI
 

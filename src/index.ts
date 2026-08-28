@@ -73,7 +73,25 @@ export function apply(ctx: any, config: PluginConfig = {}): void {
   installContainerSettings(ctx, resolver);
 }
 
-function createSubprocessProvider(resolver: WorkspaceResolver): object {
+export interface SubprocessProvider {
+  resolveExecutable(command: string): Promise<string>;
+  spawn(spec: any): any;
+}
+export interface FilesystemProvider {
+  resolve(path: string, opts?: any): Promise<any>;
+  processPath(target: any): string;
+  fileUrl(target: any): string;
+  contains(parent: any, child: any): boolean;
+  readText(target: any): Promise<string>;
+  writeText(target: any, content: string, expected?: any): Promise<any>;
+  stat(target: any): Promise<any>;
+  listDir(target: any): Promise<any>;
+  mkdir(target: any, parents?: boolean): Promise<any>;
+  remove(target: any, recursive?: boolean): Promise<any>;
+  editText(target: any, edit: any): Promise<any>;
+}
+
+export function createSubprocessProvider(resolver: WorkspaceResolver): SubprocessProvider {
   return {
     resolveExecutable: async (command: string) => {
       if (command.length === 0)
@@ -82,8 +100,7 @@ function createSubprocessProvider(resolver: WorkspaceResolver): object {
       if (command.includes("/"))
         throw new Error("relative executable paths are not supported");
       return `/usr/bin/${command}`;
-    },
-    spawn: (spec: any) => {
+    },    spawn: (spec: any) => {
       if (
         !Array.isArray(spec.argv) ||
         spec.argv.length === 0 ||
@@ -175,7 +192,7 @@ function createSubprocessProvider(resolver: WorkspaceResolver): object {
   };
 }
 
-function outputReader(mode: unknown):
+export function outputReader(mode: unknown):
   | {
       append: (data: Buffer) => void;
       readFrom: (offset: number) => {
@@ -208,7 +225,7 @@ function outputReader(mode: unknown):
   };
 }
 
-function remoteArgv(argv: readonly string[]): readonly string[] {
+export function remoteArgv(argv: readonly string[]): readonly string[] {
   const runner = argv[0];
   if (runner !== undefined && /(?:^|\/)rg(?:\.exe)?$/.test(runner)) {
     return ["/usr/bin/rg", ...argv.slice(1)];
@@ -219,7 +236,7 @@ function remoteArgv(argv: readonly string[]): readonly string[] {
   }
   return argv;
 }
-function createFilesystemProvider(resolver: WorkspaceResolver): object {
+export function createFilesystemProvider(resolver: WorkspaceResolver): FilesystemProvider {
   return {
     resolve: async (path: string, opts?: any) => {
       if (!path.startsWith("/") || path.split("/").includes(".."))

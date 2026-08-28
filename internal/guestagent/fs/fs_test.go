@@ -69,6 +69,19 @@ func TestResolveAllowsMount(t *testing.T) {
 	}
 }
 
+func TestResolveRejectsWriteToMountRoot(t *testing.T) {
+	root := t.TempDir()
+	w, _ := New([]Mount{{Virtual: "/workspace", Host: root}})
+	for _, path := range []string{"/workspace", "/workspace/"} {
+		if _, _, err := w.Resolve(path, true); err == nil {
+			t.Errorf("accepted write to mount root %q", path)
+		}
+	}
+	if path, _, err := w.Resolve("/workspace", false); err != nil || path != root {
+		t.Fatalf("read of mount root failed: %q %v", path, err)
+	}
+}
+
 func TestResolveAllowsNonExistentPathWithinMount(t *testing.T) {
 	root := t.TempDir()
 	w, _ := New([]Mount{{Virtual: "/workspace", Host: root}})

@@ -201,6 +201,22 @@ func TestDeleteNonRecursiveOnDirectoryFails(t *testing.T) {
 	}
 }
 
+func TestDeleteRejectsMountRoot(t *testing.T) {
+	server, _ := newTestServer(t)
+	_, err := server.Delete(context.Background(), &guest.DeleteRequest{Path: "/workspace", Recursive: true})
+	if status.Code(err) != codes.PermissionDenied {
+		t.Fatalf("expected PermissionDenied, got %v", err)
+	}
+}
+
+func TestMkdirRejectsMountRoot(t *testing.T) {
+	server, _ := newTestServer(t)
+	_, err := server.Mkdir(context.Background(), &guest.MkdirRequest{Path: "/workspace"})
+	if status.Code(err) != codes.PermissionDenied {
+		t.Fatalf("expected PermissionDenied, got %v", err)
+	}
+}
+
 func TestResolveWithoutFilesystem(t *testing.T) {
 	server := New()
 	if _, err := server.resolve("/workspace/x", false); err == nil {

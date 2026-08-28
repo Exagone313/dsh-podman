@@ -37,6 +37,9 @@ func (w *WorkspaceFS) Resolve(path string, write bool) (string, bool, error) {
 		if write && mount.ReadOnly {
 			return "", false, fmt.Errorf("mount is read-only")
 		}
+		if write && clean == mount.Virtual {
+			return "", false, fmt.Errorf("refusing to modify mount root")
+		}
 		candidate := filepath.Join(mount.Host, strings.TrimPrefix(clean, mount.Virtual))
 		resolved, err := resolveForCheck(candidate)
 		if err != nil {

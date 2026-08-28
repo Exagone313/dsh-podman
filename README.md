@@ -98,17 +98,10 @@ image; an empty `image_id` keeps the workspace's current image).
 
 ### Building the browser half
 
-The client half imports `@deepseek-ai/*` packages whose published versions are
-not installable (their transitive `dsh-compact` is unpublished), so local `tsc`
-resolves them from a DeepSeek Harness checkout. After `pnpm install`, run:
-
-```sh
-make link-dh DSH_ROOT=/path/to/deepseek-harness
-```
-
-This symlinks `schemastery`, `dsh-settings`, the `dsh-client-*` packages,
-`react`, and `@types/react` from the Harness pnpm store into `node_modules`.
-`pnpm run build` then runs `tsc -p tsconfig.json` (host) and
+The client half's `@deepseek-ai/dsh-client-*` packages are published to npm
+(at `0.1.1-rc.2`), so `pnpm install` fetches them and `pnpm run build`
+compiles both halves with no extra setup — no checkout path or symlinks
+needed. `pnpm run build` runs `tsc -p tsconfig.json` (host) and
 `tsc -p tsconfig.client.json` (browser half, emitted under `dist/client`).
 The package's `dsh.client` declaration points the web bundle at
 `dist/client/index.js`, and the host half must be loaded for the `podman`

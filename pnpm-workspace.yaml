@@ -1,4 +1,0 @@
-# Prevents pnpm from auto-installing the @deepseek-ai/* client peer packages,
-# whose published versions depend on unpublished packages (dsh-compact).
-# Local development links them from a DeepSeek Harness checkout via `make link-dh`.
-autoInstallPeers: false

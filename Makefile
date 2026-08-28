@@ -10,6 +10,7 @@ GOARCH ?= amd64
 BIN_DIR ?= bin
 CONTAINER ?= podman
 IMAGE_PREFIX ?= localhost/dsh-podman-
+IMAGE_TAG ?= latest
 
 GO_SOURCES := $(shell find cmd internal -type f -name '*.go' -print)
 JS_SOURCES := $(shell find src -type f \( -name '*.ts' -o -name '*.tsx' \) -print)
@@ -27,10 +28,10 @@ build-go: $(BIN_DIR)/dsh-podman-guest-agent $(BIN_DIR)/dsh-podman-orchestrator
 image: image-orchestrator image-guestagent
 
 image-orchestrator: build-go
-	$(CONTAINER) build -f Containerfile.orchestrator -t $(IMAGE_PREFIX)orchestrator:latest .
+	$(CONTAINER) build -f Containerfile.orchestrator -t $(IMAGE_PREFIX)orchestrator:$(IMAGE_TAG) .
 
 image-guestagent: build-go
-	$(CONTAINER) build -f Containerfile.guestagent -t $(IMAGE_PREFIX)guest-agent:latest .
+	$(CONTAINER) build -f Containerfile.guestagent -t $(IMAGE_PREFIX)guest-agent:$(IMAGE_TAG) .
 
 $(BIN_DIR)/dsh-podman-guest-agent: $(GO_SOURCES) go.mod go.sum
 	mkdir -p $(BIN_DIR)

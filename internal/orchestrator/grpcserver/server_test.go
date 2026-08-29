@@ -494,18 +494,6 @@ func TestRebuildImageRequiresBuilder(t *testing.T) {
 	}
 }
 
-func TestStopWorkspaceRequiresPodman(t *testing.T) {
-	store := newTestStore(t)
-	if err := store.SaveWorkspaces([]state.Workspace{{WorkspaceSlug: "proj", ContainerName: "dsh-workspace-proj"}}); err != nil {
-		t.Fatal(err)
-	}
-	server := &Server{Store: store, Logger: silentLogger()}
-	_, err := server.StopWorkspace(context.Background(), &ctl.StopWorkspaceRequest{WorkspaceSlug: "proj"})
-	if status.Code(err) != codes.FailedPrecondition {
-		t.Fatalf("expected FailedPrecondition, got %v", err)
-	}
-}
-
 func TestRemoveContainerRequiresPodman(t *testing.T) {
 	store := newTestStore(t)
 	if err := store.SaveWorkspaces([]state.Workspace{{WorkspaceSlug: "proj", ContainerName: "dsh-workspace-proj", Containers: []state.Container{{Name: "dev", PodmanName: "dsh-workspace-proj-dev", Status: "running"}}}}); err != nil {
@@ -523,22 +511,6 @@ func TestRemoveContainerMissingWorkspace(t *testing.T) {
 	_, err := server.RemoveContainer(context.Background(), &ctl.RemoveContainerRequest{WorkspaceSlug: "nope", Container: "dev"})
 	if status.Code(err) != codes.NotFound {
 		t.Fatalf("expected NotFound, got %v", err)
-	}
-}
-
-func TestStopWorkspaceMissingWorkspace(t *testing.T) {
-	server := &Server{Store: newTestStore(t), Logger: silentLogger()}
-	_, err := server.StopWorkspace(context.Background(), &ctl.StopWorkspaceRequest{WorkspaceSlug: "nope"})
-	if status.Code(err) != codes.NotFound {
-		t.Fatalf("expected NotFound, got %v", err)
-	}
-}
-
-func TestRecreateWorkspaceNotImplemented(t *testing.T) {
-	server := &Server{Logger: silentLogger()}
-	_, err := server.RecreateWorkspace(context.Background(), &ctl.RecreateWorkspaceRequest{})
-	if status.Code(err) != codes.Unimplemented {
-		t.Fatalf("expected Unimplemented, got %v", err)
 	}
 }
 

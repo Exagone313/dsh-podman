@@ -9,7 +9,6 @@ option go_package = "gitlab.com/Exagone313/dsh-podman/internal/genproto/dshguest
 service WorkspaceGuestAgent {
   rpc Exec(stream ExecInput) returns (stream ExecOutput);
   rpc Signal(SignalRequest) returns (SignalResponse);
-  rpc ListProcesses(ListProcessesRequest) returns (ListProcessesResponse);
   rpc ReadFile(ReadFileRequest) returns (stream ReadFileChunk);
   rpc WriteFile(stream WriteFileChunk) returns (WriteFileResponse);
   rpc Stat(StatRequest) returns (StatResponse);
@@ -23,14 +22,11 @@ service WorkspaceGuestAgent {
   rpc DaemonLogs(DaemonLogsRequest) returns (DaemonLogsResponse);
 }
 message ExecInput { oneof payload { ExecStart start = 1; bytes stdin_chunk = 2; } }
-message ExecStart { repeated string argv = 1; string cwd = 2; map<string, string> env = 3; bool run_in_background = 4; }
+message ExecStart { repeated string argv = 1; string cwd = 2; map<string, string> env = 3; }
 message ExecOutput { oneof payload { bytes stdout_chunk = 1; bytes stderr_chunk = 2; ExecExit exit = 3; } string process_id = 4; }
 message ExecExit { int32 exit_code = 1; bool signaled = 2; string signal = 3; }
 message SignalRequest { string process_id = 1; string signal = 2; }
 message SignalResponse {}
-message ListProcessesRequest {}
-message ListProcessesResponse { repeated ProcessInfo processes = 1; }
-message ProcessInfo { string process_id = 1; repeated string argv = 2; bool running = 3; }
 message ReadFileRequest { string path = 1; }
 message ReadFileChunk { bytes data = 1; }
 message WriteFileChunk { oneof payload { WriteFileStart start = 1; bytes data_chunk = 2; } }

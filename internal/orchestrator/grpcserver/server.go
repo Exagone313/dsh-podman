@@ -217,10 +217,6 @@ func (s *Server) ListImages(context.Context, *ctl.ListImagesRequest) (*ctl.ListI
 	s.log().Info("control request completed", "method", "ListImages", "count", len(result.Images))
 	return result, nil
 }
-func (s *Server) RecreateWorkspace(context.Context, *ctl.RecreateWorkspaceRequest) (*ctl.Workspace, error) {
-	s.log().Warn("control request failed", "method", "RecreateWorkspace", "reason", "not implemented")
-	return nil, status.Error(codes.Unimplemented, "workspace recreation is not configured")
-}
 func (s *Server) ListContainers(context.Context, *ctl.ListContainersRequest) (*ctl.ListContainersResponse, error) {
 	s.log().Info("control request", "method", "ListContainers")
 	workspaces, err := s.Store.Workspaces()
@@ -1022,22 +1018,6 @@ func imagePrefix() string {
 		prefix += "/"
 	}
 	return prefix
-}
-func (s *Server) StopWorkspace(_ context.Context, request *ctl.StopWorkspaceRequest) (*ctl.StopWorkspaceResponse, error) {
-	s.log().Info("control request", "method", "StopWorkspace", "workspace_slug", request.GetWorkspaceSlug())
-	workspace, err := s.DescribeWorkspace(context.Background(), &ctl.DescribeWorkspaceRequest{WorkspaceSlug: request.GetWorkspaceSlug()})
-	if err != nil {
-		return nil, err
-	}
-	if s.Podman == nil {
-		return nil, status.Error(codes.FailedPrecondition, "podman is not configured")
-	}
-	if err := s.Podman.Stop(workspace.GetContainerName()); err != nil {
-		s.log().Error("control request failed", "method", "StopWorkspace", "workspace_slug", request.GetWorkspaceSlug(), "error", err)
-		return nil, status.Error(codes.Internal, err.Error())
-	}
-	s.log().Info("control request completed", "method", "StopWorkspace", "workspace_slug", request.GetWorkspaceSlug())
-	return &ctl.StopWorkspaceResponse{}, nil
 }
 func (s *Server) RemoveContainer(_ context.Context, request *ctl.RemoveContainerRequest) (*ctl.RemoveContainerResponse, error) {
 	s.log().Info("control request", "method", "RemoveContainer", "workspace_slug", request.GetWorkspaceSlug(), "container", request.GetContainer())

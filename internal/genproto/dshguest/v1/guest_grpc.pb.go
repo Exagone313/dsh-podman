@@ -25,7 +25,6 @@ const _ = grpc.SupportPackageIsVersion9
 const (
 	WorkspaceGuestAgent_Exec_FullMethodName          = "/dshguest.v1.WorkspaceGuestAgent/Exec"
 	WorkspaceGuestAgent_Signal_FullMethodName        = "/dshguest.v1.WorkspaceGuestAgent/Signal"
-	WorkspaceGuestAgent_ListProcesses_FullMethodName = "/dshguest.v1.WorkspaceGuestAgent/ListProcesses"
 	WorkspaceGuestAgent_ReadFile_FullMethodName      = "/dshguest.v1.WorkspaceGuestAgent/ReadFile"
 	WorkspaceGuestAgent_WriteFile_FullMethodName     = "/dshguest.v1.WorkspaceGuestAgent/WriteFile"
 	WorkspaceGuestAgent_Stat_FullMethodName          = "/dshguest.v1.WorkspaceGuestAgent/Stat"
@@ -45,7 +44,6 @@ const (
 type WorkspaceGuestAgentClient interface {
 	Exec(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[ExecInput, ExecOutput], error)
 	Signal(ctx context.Context, in *SignalRequest, opts ...grpc.CallOption) (*SignalResponse, error)
-	ListProcesses(ctx context.Context, in *ListProcessesRequest, opts ...grpc.CallOption) (*ListProcessesResponse, error)
 	ReadFile(ctx context.Context, in *ReadFileRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ReadFileChunk], error)
 	WriteFile(ctx context.Context, opts ...grpc.CallOption) (grpc.ClientStreamingClient[WriteFileChunk, WriteFileResponse], error)
 	Stat(ctx context.Context, in *StatRequest, opts ...grpc.CallOption) (*StatResponse, error)
@@ -84,16 +82,6 @@ func (c *workspaceGuestAgentClient) Signal(ctx context.Context, in *SignalReques
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(SignalResponse)
 	err := c.cc.Invoke(ctx, WorkspaceGuestAgent_Signal_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *workspaceGuestAgentClient) ListProcesses(ctx context.Context, in *ListProcessesRequest, opts ...grpc.CallOption) (*ListProcessesResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(ListProcessesResponse)
-	err := c.cc.Invoke(ctx, WorkspaceGuestAgent_ListProcesses_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -228,7 +216,6 @@ func (c *workspaceGuestAgentClient) DaemonLogs(ctx context.Context, in *DaemonLo
 type WorkspaceGuestAgentServer interface {
 	Exec(grpc.BidiStreamingServer[ExecInput, ExecOutput]) error
 	Signal(context.Context, *SignalRequest) (*SignalResponse, error)
-	ListProcesses(context.Context, *ListProcessesRequest) (*ListProcessesResponse, error)
 	ReadFile(*ReadFileRequest, grpc.ServerStreamingServer[ReadFileChunk]) error
 	WriteFile(grpc.ClientStreamingServer[WriteFileChunk, WriteFileResponse]) error
 	Stat(context.Context, *StatRequest) (*StatResponse, error)
@@ -255,9 +242,6 @@ func (UnimplementedWorkspaceGuestAgentServer) Exec(grpc.BidiStreamingServer[Exec
 }
 func (UnimplementedWorkspaceGuestAgentServer) Signal(context.Context, *SignalRequest) (*SignalResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method Signal not implemented")
-}
-func (UnimplementedWorkspaceGuestAgentServer) ListProcesses(context.Context, *ListProcessesRequest) (*ListProcessesResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "method ListProcesses not implemented")
 }
 func (UnimplementedWorkspaceGuestAgentServer) ReadFile(*ReadFileRequest, grpc.ServerStreamingServer[ReadFileChunk]) error {
 	return status.Error(codes.Unimplemented, "method ReadFile not implemented")
@@ -334,24 +318,6 @@ func _WorkspaceGuestAgent_Signal_Handler(srv interface{}, ctx context.Context, d
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(WorkspaceGuestAgentServer).Signal(ctx, req.(*SignalRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _WorkspaceGuestAgent_ListProcesses_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(ListProcessesRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(WorkspaceGuestAgentServer).ListProcesses(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: WorkspaceGuestAgent_ListProcesses_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(WorkspaceGuestAgentServer).ListProcesses(ctx, req.(*ListProcessesRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -546,10 +512,6 @@ var WorkspaceGuestAgent_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Signal",
 			Handler:    _WorkspaceGuestAgent_Signal_Handler,
-		},
-		{
-			MethodName: "ListProcesses",
-			Handler:    _WorkspaceGuestAgent_ListProcesses_Handler,
 		},
 		{
 			MethodName: "Stat",

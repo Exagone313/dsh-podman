@@ -27,8 +27,6 @@ const (
 	OrchestratorControl_CreateWorkspace_FullMethodName      = "/dshctl.v1.OrchestratorControl/CreateWorkspace"
 	OrchestratorControl_DescribeWorkspace_FullMethodName    = "/dshctl.v1.OrchestratorControl/DescribeWorkspace"
 	OrchestratorControl_ListWorkspaces_FullMethodName       = "/dshctl.v1.OrchestratorControl/ListWorkspaces"
-	OrchestratorControl_RecreateWorkspace_FullMethodName    = "/dshctl.v1.OrchestratorControl/RecreateWorkspace"
-	OrchestratorControl_StopWorkspace_FullMethodName        = "/dshctl.v1.OrchestratorControl/StopWorkspace"
 	OrchestratorControl_ListImages_FullMethodName           = "/dshctl.v1.OrchestratorControl/ListImages"
 	OrchestratorControl_GetImage_FullMethodName             = "/dshctl.v1.OrchestratorControl/GetImage"
 	OrchestratorControl_BuildImage_FullMethodName           = "/dshctl.v1.OrchestratorControl/BuildImage"
@@ -50,8 +48,6 @@ type OrchestratorControlClient interface {
 	CreateWorkspace(ctx context.Context, in *CreateWorkspaceRequest, opts ...grpc.CallOption) (*Workspace, error)
 	DescribeWorkspace(ctx context.Context, in *DescribeWorkspaceRequest, opts ...grpc.CallOption) (*Workspace, error)
 	ListWorkspaces(ctx context.Context, in *ListWorkspacesRequest, opts ...grpc.CallOption) (*ListWorkspacesResponse, error)
-	RecreateWorkspace(ctx context.Context, in *RecreateWorkspaceRequest, opts ...grpc.CallOption) (*Workspace, error)
-	StopWorkspace(ctx context.Context, in *StopWorkspaceRequest, opts ...grpc.CallOption) (*StopWorkspaceResponse, error)
 	ListImages(ctx context.Context, in *ListImagesRequest, opts ...grpc.CallOption) (*ListImagesResponse, error)
 	GetImage(ctx context.Context, in *GetImageRequest, opts ...grpc.CallOption) (*Image, error)
 	BuildImage(ctx context.Context, in *BuildImageRequest, opts ...grpc.CallOption) (*Image, error)
@@ -107,26 +103,6 @@ func (c *orchestratorControlClient) ListWorkspaces(ctx context.Context, in *List
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(ListWorkspacesResponse)
 	err := c.cc.Invoke(ctx, OrchestratorControl_ListWorkspaces_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *orchestratorControlClient) RecreateWorkspace(ctx context.Context, in *RecreateWorkspaceRequest, opts ...grpc.CallOption) (*Workspace, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(Workspace)
-	err := c.cc.Invoke(ctx, OrchestratorControl_RecreateWorkspace_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *orchestratorControlClient) StopWorkspace(ctx context.Context, in *StopWorkspaceRequest, opts ...grpc.CallOption) (*StopWorkspaceResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(StopWorkspaceResponse)
-	err := c.cc.Invoke(ctx, OrchestratorControl_StopWorkspace_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -251,8 +227,6 @@ type OrchestratorControlServer interface {
 	CreateWorkspace(context.Context, *CreateWorkspaceRequest) (*Workspace, error)
 	DescribeWorkspace(context.Context, *DescribeWorkspaceRequest) (*Workspace, error)
 	ListWorkspaces(context.Context, *ListWorkspacesRequest) (*ListWorkspacesResponse, error)
-	RecreateWorkspace(context.Context, *RecreateWorkspaceRequest) (*Workspace, error)
-	StopWorkspace(context.Context, *StopWorkspaceRequest) (*StopWorkspaceResponse, error)
 	ListImages(context.Context, *ListImagesRequest) (*ListImagesResponse, error)
 	GetImage(context.Context, *GetImageRequest) (*Image, error)
 	BuildImage(context.Context, *BuildImageRequest) (*Image, error)
@@ -285,12 +259,6 @@ func (UnimplementedOrchestratorControlServer) DescribeWorkspace(context.Context,
 }
 func (UnimplementedOrchestratorControlServer) ListWorkspaces(context.Context, *ListWorkspacesRequest) (*ListWorkspacesResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListWorkspaces not implemented")
-}
-func (UnimplementedOrchestratorControlServer) RecreateWorkspace(context.Context, *RecreateWorkspaceRequest) (*Workspace, error) {
-	return nil, status.Error(codes.Unimplemented, "method RecreateWorkspace not implemented")
-}
-func (UnimplementedOrchestratorControlServer) StopWorkspace(context.Context, *StopWorkspaceRequest) (*StopWorkspaceResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "method StopWorkspace not implemented")
 }
 func (UnimplementedOrchestratorControlServer) ListImages(context.Context, *ListImagesRequest) (*ListImagesResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListImages not implemented")
@@ -414,42 +382,6 @@ func _OrchestratorControl_ListWorkspaces_Handler(srv interface{}, ctx context.Co
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(OrchestratorControlServer).ListWorkspaces(ctx, req.(*ListWorkspacesRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _OrchestratorControl_RecreateWorkspace_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(RecreateWorkspaceRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(OrchestratorControlServer).RecreateWorkspace(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: OrchestratorControl_RecreateWorkspace_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(OrchestratorControlServer).RecreateWorkspace(ctx, req.(*RecreateWorkspaceRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _OrchestratorControl_StopWorkspace_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(StopWorkspaceRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(OrchestratorControlServer).StopWorkspace(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: OrchestratorControl_StopWorkspace_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(OrchestratorControlServer).StopWorkspace(ctx, req.(*StopWorkspaceRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -674,14 +606,6 @@ var OrchestratorControl_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ListWorkspaces",
 			Handler:    _OrchestratorControl_ListWorkspaces_Handler,
-		},
-		{
-			MethodName: "RecreateWorkspace",
-			Handler:    _OrchestratorControl_RecreateWorkspace_Handler,
-		},
-		{
-			MethodName: "StopWorkspace",
-			Handler:    _OrchestratorControl_StopWorkspace_Handler,
 		},
 		{
 			MethodName: "ListImages",

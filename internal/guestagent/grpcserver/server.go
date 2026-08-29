@@ -172,15 +172,6 @@ func signalForName(name string) os.Signal {
 	return os.Interrupt
 }
 
-func (s *Server) ListProcesses(context.Context, *guest.ListProcessesRequest) (*guest.ListProcessesResponse, error) {
-	result := &guest.ListProcessesResponse{}
-	for _, process := range s.Processes.List() {
-		running := process.Command.ProcessState == nil
-		result.Processes = append(result.Processes, &guest.ProcessInfo{ProcessId: process.ID, Argv: process.Argv, Running: running})
-	}
-	return result, nil
-}
-
 func daemonInfoProto(d daemon.Daemon) *guest.DaemonInfo {
 	return &guest.DaemonInfo{
 		Name:      d.Name,

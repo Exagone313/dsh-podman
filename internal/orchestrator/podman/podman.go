@@ -134,16 +134,6 @@ func (c *Client) ContainerExists(name string) (bool, error) {
 	}
 	return exists, err
 }
-func (c *Client) List() ([]entities.ListContainer, error) {
-	c.log().Info("listing containers")
-	result, err := containers.List(c.ctx, &containers.ListOptions{All: boolPtr(true)})
-	if err != nil {
-		c.log().Error("container list failed", "error", err)
-		return nil, err
-	}
-	c.log().Info("container list completed", "count", len(result))
-	return result, nil
-}
 
 func boolPtr(value bool) *bool {
 	return &value

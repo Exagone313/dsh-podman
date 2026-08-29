@@ -8,7 +8,8 @@
     "./client": {
       "types": "./dist/client/index.d.ts",
       "default": "./dist/client/index.js"
-    }
+    },
+    "./package.json": "./package.json"
   },
   "dsh": {
     "bundle": {

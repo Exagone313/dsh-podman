@@ -138,16 +138,6 @@ const actions: React.CSSProperties = {
   gap: "8px",
   alignItems: "center",
 };
-const imageRow: React.CSSProperties = {
-  display: "flex",
-  flexWrap: "wrap",
-  alignItems: "center",
-  gap: "8px 12px",
-  padding: "10px 12px",
-  border: "1px solid var(--dsw-alias-border-l2)",
-  borderRadius: "10px",
-  marginBottom: "8px",
-};
 const footerRow: React.CSSProperties = {
   display: "flex",
   justifyContent: "flex-end",
@@ -386,50 +376,37 @@ function WorkspaceSection(props: {
   );
 }
 
-function ImagesSection(props: {
+function ImageItem(props: {
   t: (key: ContainerPluginKey) => string;
-  images: readonly ImageView[];
+  image: ImageView;
 }): ReactNode {
-  const { t, images } = props;
+  const { t, image } = props;
   const [open, setOpen] = useState(false);
   return (
-    <div style={{ marginTop: "16px" }}>
-      <DisclosureRow
-        icon={<span />}
-        title={t("imagesTitle")}
-        open={open}
-        expandable
-        onToggle={() => setOpen(!open)}
-      >
+    <DisclosureRow
+      icon={<span />}
+      title={image.imageId}
+      open={open}
+      expandable
+      onToggle={() => setOpen(!open)}
+    >
       <div style={wsBody}>
-        {images.length === 0 ? (
-          <p style={hint}>{t("none")}</p>
-        ) : (
-          images.map((image) => (
-            <div key={image.imageId} style={imageRow}>
-              <strong style={{ color: "var(--dsw-alias-label-primary)" }}>
-                {image.imageId}
-              </strong>
-              <div style={meta}>
-                <span>
-                  {t("baseImage")}: {image.baseImage}
-                </span>
-                <span>
-                  {t("imageTag")}: {image.imageTag}
-                </span>
-                <span>
-                  {t("builtAt")}: {image.builtAt}
-                </span>
-                <span>
-                  {t("packages")}: {image.packages.length}
-                </span>
-              </div>
-            </div>
-          ))
-        )}
+        <div style={meta}>
+          <span>
+            {t("baseImage")}: {image.baseImage}
+          </span>
+          <span>
+            {t("imageTag")}: {image.imageTag}
+          </span>
+          <span>
+            {t("builtAt")}: {image.builtAt}
+          </span>
+          <span>
+            {t("packages")}: {image.packages.length}
+          </span>
+        </div>
       </div>
-      </DisclosureRow>
-    </div>
+    </DisclosureRow>
   );
 }
 
@@ -494,7 +471,14 @@ export function ContainerCard(props: ContainerCardProps): ReactNode {
               />
             ))
           )}
-          <ImagesSection t={t} images={state.images} />
+          <div style={sectionTitle}>{t("imagesTitle")}</div>
+          {state.images.length === 0 ? (
+            <p style={hint}>{t("none")}</p>
+          ) : (
+            state.images.map((image) => (
+              <ImageItem key={image.imageId} t={t} image={image} />
+            ))
+          )}
           <div style={sectionTitle}>{t("configTitle")}</div>
           <ConfigField
             t={t}

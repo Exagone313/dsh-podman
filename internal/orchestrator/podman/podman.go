@@ -96,7 +96,14 @@ func (c *Client) CreateWorkspace(pod, name, image, token string, mounts []specs.
 	generator.Env = map[string]string{"DSH_PODMAN_GUEST_TOKEN": token, "DSH_PODMAN_GUEST_SOCKET": filepath.Join(c.socketRoot, name, "guest.sock"), "DSH_PODMAN_PROJECTS_ROOT": c.projectRoot}
 	generator.Init = &init
 	generator.ReadOnlyFilesystem = boolPtr(true)
-	generator.Mounts = append(mounts, guestAgentMounts(hostSocketDir, c.socketRoot, name, c.hostGuestBinary, c.guestBinary)...)
+	ociMounts, volumes := classifyMounts(mounts)
+	for _, volume := range volumes {
+		if err := c.ensureVolume(volume.Name); err != nil {
+			return err
+		}
+		generator.Volumes = append(generator.Volumes, volume)
+	}
+	generator.Mounts = append(ociMounts, guestAgentMounts(hostSocketDir, c.socketRoot, name, c.hostGuestBinary, c.guestBinary)...)
 	if _, err := containers.CreateWithSpec(c.ctx, generator, nil); err != nil {
 		c.log().Error("guest container creation failed", "pod_name", pod, "container_name", name, "error", err)
 		return fmt.Errorf("create container: %w", err)
@@ -107,6 +114,21 @@ func (c *Client) CreateWorkspace(pod, name, image, token string, mounts []specs.
 	}
 	c.log().Info("guest container started", "pod_name", pod, "container_name", name)
 	return nil
+}
+
+// classifyMounts separates raw OCI mounts (bind, tmpfs) from named-volume
+// mounts. Named volumes cannot be handed to the runtime as OCI mounts (crun
+// rejects the "volume" type); podman must mount them through its own volume
+// mechanism instead.
+func classifyMounts(mounts []specs.Mount) (oci []specs.Mount, volumes []*specgen.NamedVolume) {
+	for _, mount := range mounts {
+		if mount.Type == "volume" {
+			volumes = append(volumes, &specgen.NamedVolume{Name: mount.Source, Dest: mount.Destination, Options: mount.Options})
+			continue
+		}
+		oci = append(oci, mount)
+	}
+	return oci, volumes
 }
 
 func guestAgentMounts(hostSocketDir, socketRoot, name, hostGuestBinary, guestBinary string) []specs.Mount {
@@ -173,6 +195,18 @@ func (c *Client) RecreateWorkspace(pod, name, image, token string, mounts []spec
 
 func (c *Client) VolumeExists(name string) (bool, error) {
 	return volumes.Exists(c.ctx, name, nil)
+}
+
+// ensureVolume auto-creates a named volume when it does not already exist.
+func (c *Client) ensureVolume(name string) error {
+	exists, err := c.VolumeExists(name)
+	if err != nil {
+		return err
+	}
+	if exists {
+		return nil
+	}
+	return c.VolumeCreate(name)
 }
 
 func (c *Client) VolumeCreate(name string) error {

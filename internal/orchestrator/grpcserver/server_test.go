@@ -803,3 +803,45 @@ func TestCreateWorkspacePreservesDefaultContainerMounts(t *testing.T) {
 		t.Fatalf("preserved default container mounts should win over invalid request mounts, expected FailedPrecondition, got %v", err)
 	}
 }
+
+func TestStopContainerDaemonsUnreachable(t *testing.T) {
+	server := &Server{Logger: silentLogger()}
+	server.stopContainerDaemons(context.Background(), state.Container{AgentSocketPath: "/nonexistent/guest.sock", AgentToken: "tok"})
+}
+
+func TestStopContainerDaemonsMissingSocketOrToken(t *testing.T) {
+	server := &Server{Logger: silentLogger()}
+	server.stopContainerDaemons(context.Background(), state.Container{PodmanName: "dsh-workspace-proj"})
+	server.stopContainerDaemons(context.Background(), state.Container{PodmanName: "dsh-workspace-proj", AgentSocketPath: "/nonexistent/guest.sock"})
+	server.stopContainerDaemons(context.Background(), state.Container{PodmanName: "dsh-workspace-proj", AgentToken: "tok"})
+}
+
+func TestRecreateContainerStopsDaemons(t *testing.T) {
+	t.Setenv("DSH_PODMAN_DEFAULT_IMAGE", "arch-base")
+	store := newTestStore(t)
+	if err := store.SaveImages([]state.Image{{ImageID: "arch-base", ImageTag: "t1"}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.SaveWorkspaces([]state.Workspace{{
+		WorkspaceSlug: "proj",
+		Containers: []state.Container{{
+			Name: "default", PodmanName: "dsh-workspace-proj", ImageID: "arch-base", Status: "running",
+		}},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	server := &Server{Store: store, Logger: silentLogger()}
+
+	_, err := server.RecreateContainer(context.Background(), &ctl.RecreateContainerRequest{WorkspaceSlug: "proj", Container: "Bad", ImageId: "arch-base"})
+	if status.Code(err) != codes.InvalidArgument {
+		t.Fatalf("invalid container name: expected InvalidArgument, got %v", err)
+	}
+	_, err = server.RecreateContainer(context.Background(), &ctl.RecreateContainerRequest{WorkspaceSlug: "nope", ImageId: "arch-base"})
+	if status.Code(err) != codes.NotFound {
+		t.Fatalf("unknown workspace: expected NotFound, got %v", err)
+	}
+	_, err = server.RecreateContainer(context.Background(), &ctl.RecreateContainerRequest{WorkspaceSlug: "proj", ImageId: "arch-base"})
+	if status.Code(err) != codes.FailedPrecondition {
+		t.Fatalf("nil Podman: expected FailedPrecondition, got %v", err)
+	}
+}

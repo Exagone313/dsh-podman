@@ -14,10 +14,12 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/opencontainers/runtime-spec/specs-go"
 	ctl "gitlab.com/Exagone313/dsh-podman/internal/genproto/dshctl/v1"
+	guest "gitlab.com/Exagone313/dsh-podman/internal/genproto/dshguest/v1"
 	imagebuild "gitlab.com/Exagone313/dsh-podman/internal/orchestrator/images"
 	"gitlab.com/Exagone313/dsh-podman/internal/orchestrator/podman"
 	"gitlab.com/Exagone313/dsh-podman/internal/orchestrator/projects"
@@ -25,6 +27,8 @@ import (
 	"gitlab.com/Exagone313/dsh-podman/internal/orchestrator/token"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 )
 
@@ -279,6 +283,66 @@ func containerRows(workspaces []state.Workspace, exists func(podmanName string) 
 	}
 	return result
 }
+
+// stopContainerDaemons gracefully stops every daemon in the guest container by
+// talking to its guest agent over its unix socket. It is best-effort: an
+// unreachable agent (container already gone/stopped) or a failed call is
+// logged and does not fail the caller.
+func (s *Server) stopContainerDaemons(ctx context.Context, record state.Container) {
+	if record.AgentSocketPath == "" || record.AgentToken == "" {
+		s.log().Warn("cannot stop container daemons", "podman_name", record.PodmanName, "reason", "missing agent socket or token")
+		return
+	}
+	conn, err := grpc.NewClient("unix://"+record.AgentSocketPath, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		s.log().Warn("daemon shutdown failed", "podman_name", record.PodmanName, "error", err)
+		return
+	}
+	defer conn.Close()
+	callCtx, cancel := context.WithTimeout(ctx, 15*time.Second)
+	defer cancel()
+	callCtx = metadata.AppendToOutgoingContext(callCtx, "authorization", "bearer "+record.AgentToken)
+	resp, err := guest.NewWorkspaceGuestAgentClient(conn).StopAllDaemons(callCtx, &guest.StopAllDaemonsRequest{})
+	if err != nil {
+		s.log().Warn("daemon shutdown failed", "podman_name", record.PodmanName, "error", err)
+		return
+	}
+	s.log().Info("daemons stopped", "podman_name", record.PodmanName, "count", len(resp.GetDaemons()))
+}
+
+// recreateContainer gracefully stops the container's daemons, then recreates
+// the podman container with the given image tag and a fresh token, using the
+// container's effective mounts.
+func (s *Server) recreateContainer(workspace state.Workspace, record *state.Container, imageTag, newToken string) error {
+	s.stopContainerDaemons(context.Background(), *record)
+	podmanMounts, err := s.podmanMounts(containerMounts(workspace, *record))
+	if err != nil {
+		return err
+	}
+	return s.Podman.RecreateWorkspace(podNameFor(workspace.WorkspaceSlug), record.PodmanName, imageTag, newToken, podmanMounts)
+}
+
+// StopAllContainerDaemons gracefully stops daemons in every container, in
+// parallel, honoring ctx (the caller supplies an overall deadline).
+func (s *Server) StopAllContainerDaemons(ctx context.Context) {
+	workspaces, err := s.Store.Workspaces()
+	if err != nil {
+		s.log().Warn("cannot list workspaces for daemon shutdown", "error", err)
+		return
+	}
+	var wg sync.WaitGroup
+	for _, workspace := range workspaces {
+		for _, container := range workspace.Containers {
+			wg.Add(1)
+			go func(container state.Container) {
+				defer wg.Done()
+				s.stopContainerDaemons(ctx, container)
+			}(container)
+		}
+	}
+	wg.Wait()
+}
+
 func (s *Server) RecreateContainer(ctx context.Context, request *ctl.RecreateContainerRequest) (*ctl.Workspace, error) {
 	s.log().Info("control request", "method", "RecreateContainer", "workspace_slug", request.GetWorkspaceSlug(), "image_id", request.GetImageId(), "container", request.GetContainer())
 	container := request.GetContainer()
@@ -308,8 +372,7 @@ func (s *Server) RecreateContainer(ctx context.Context, request *ctl.RecreateCon
 	if err != nil {
 		return nil, err
 	}
-	podmanMounts, err := s.podmanMounts(containerMounts(workspace, *record))
-	if err != nil {
+	if _, err := s.podmanMounts(containerMounts(workspace, *record)); err != nil {
 		s.log().Error("RecreateContainer project validation failed", "workspace_slug", workspace.WorkspaceSlug, "error", err)
 		return nil, err
 	}
@@ -317,7 +380,7 @@ func (s *Server) RecreateContainer(ctx context.Context, request *ctl.RecreateCon
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	if err := s.Podman.RecreateWorkspace(podNameFor(workspace.WorkspaceSlug), record.PodmanName, imageTag, secret, podmanMounts); err != nil {
+	if err := s.recreateContainer(workspace, record, imageTag, secret); err != nil {
 		s.log().Error("control request failed", "method", "RecreateContainer", "workspace_slug", request.GetWorkspaceSlug(), "container", container, "error", err)
 		return nil, status.Error(codes.Internal, err.Error())
 	}
@@ -408,8 +471,7 @@ func (s *Server) ReplaceContainer(ctx context.Context, request *ctl.ReplaceConta
 	} else {
 		record.Mounts = containerMounts(workspace, *record)
 	}
-	podmanMounts, err := s.podmanMounts(record.Mounts)
-	if err != nil {
+	if _, err := s.podmanMounts(record.Mounts); err != nil {
 		s.log().Error("ReplaceContainer project validation failed", "workspace_slug", workspace.WorkspaceSlug, "error", err)
 		return nil, err
 	}
@@ -424,7 +486,7 @@ func (s *Server) ReplaceContainer(ctx context.Context, request *ctl.ReplaceConta
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	if err := s.Podman.RecreateWorkspace(podNameFor(workspace.WorkspaceSlug), record.PodmanName, imageTag, secret, podmanMounts); err != nil {
+	if err := s.recreateContainer(workspace, record, imageTag, secret); err != nil {
 		s.log().Error("control request failed", "method", "ReplaceContainer", "workspace_slug", request.GetWorkspaceSlug(), "container", request.GetContainer(), "error", err)
 		return nil, status.Error(codes.Internal, err.Error())
 	}
@@ -469,8 +531,7 @@ func (s *Server) AddContainerMount(ctx context.Context, request *ctl.AddContaine
 		}
 	}
 	record.Mounts = append(append([]state.Mount(nil), effective...), newMount)
-	podmanMounts, err := s.podmanMounts(record.Mounts)
-	if err != nil {
+	if _, err := s.podmanMounts(record.Mounts); err != nil {
 		s.log().Error("AddContainerMount project validation failed", "workspace_slug", workspace.WorkspaceSlug, "error", err)
 		return nil, err
 	}
@@ -485,7 +546,7 @@ func (s *Server) AddContainerMount(ctx context.Context, request *ctl.AddContaine
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	if err := s.Podman.RecreateWorkspace(podNameFor(workspace.WorkspaceSlug), record.PodmanName, imageTag, secret, podmanMounts); err != nil {
+	if err := s.recreateContainer(workspace, record, imageTag, secret); err != nil {
 		s.log().Error("control request failed", "method", "AddContainerMount", "workspace_slug", request.GetWorkspaceSlug(), "container", request.GetContainer(), "error", err)
 		return nil, status.Error(codes.Internal, err.Error())
 	}
@@ -525,8 +586,7 @@ func (s *Server) RemoveContainerMount(ctx context.Context, request *ctl.RemoveCo
 		return nil, status.Error(codes.NotFound, "mount not found")
 	}
 	record.Mounts = append(append([]state.Mount(nil), effective[:index]...), effective[index+1:]...)
-	podmanMounts, err := s.podmanMounts(record.Mounts)
-	if err != nil {
+	if _, err := s.podmanMounts(record.Mounts); err != nil {
 		s.log().Error("RemoveContainerMount project validation failed", "workspace_slug", workspace.WorkspaceSlug, "error", err)
 		return nil, err
 	}
@@ -541,7 +601,7 @@ func (s *Server) RemoveContainerMount(ctx context.Context, request *ctl.RemoveCo
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	if err := s.Podman.RecreateWorkspace(podNameFor(workspace.WorkspaceSlug), record.PodmanName, imageTag, secret, podmanMounts); err != nil {
+	if err := s.recreateContainer(workspace, record, imageTag, secret); err != nil {
 		s.log().Error("control request failed", "method", "RemoveContainerMount", "workspace_slug", request.GetWorkspaceSlug(), "container", request.GetContainer(), "error", err)
 		return nil, status.Error(codes.Internal, err.Error())
 	}

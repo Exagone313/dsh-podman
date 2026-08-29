@@ -196,7 +196,10 @@ recreates the container, optionally with a new image; an empty `image_id`
 keeps the workspace's current image), `ReplaceContainer`, `RemoveContainer`,
 `AddContainerMount`, and `RemoveContainerMount`. Containers of a workspace run
 inside a shared podman pod (`dsh-pod-<slug>`) so they share a network
-namespace, and their root filesystems are mounted read-only.
+namespace, and their root filesystems are mounted read-only. Recreating a
+container or shutting down the orchestrator first asks the container's guest
+agent to gracefully stop its daemons (SIGTERM, ~10s grace) before podman tears
+the container down.
 
 ### Building the browser half
 

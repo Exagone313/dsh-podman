@@ -10,13 +10,16 @@ import (
 	"log/slog"
 	"net"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"strings"
+	"syscall"
+	"time"
 
 	"github.com/containers/podman/v5/pkg/bindings"
 	"github.com/containers/podman/v5/pkg/bindings/system"
-	ctl "gitlab.com/Exagone313/dsh-podman/internal/genproto/dshctl/v1"
 	"gitlab.com/Exagone313/dsh-podman/internal/auth"
+	ctl "gitlab.com/Exagone313/dsh-podman/internal/genproto/dshctl/v1"
 	"gitlab.com/Exagone313/dsh-podman/internal/orchestrator/grpcserver"
 	"gitlab.com/Exagone313/dsh-podman/internal/orchestrator/images"
 	"gitlab.com/Exagone313/dsh-podman/internal/orchestrator/podman"
@@ -92,7 +95,19 @@ func main() {
 		logger.Error("Podman API configuration is missing", "DSH_PODMAN_ORCHESTRATOR_PODMAN_SOCKET_present", orchSocketSet, "expected", "DSH_PODMAN_ORCHESTRATOR_PODMAN_SOCKET=unix:///run/podman/podman.sock")
 		panic("Podman API is not configured: DSH_PODMAN_ORCHESTRATOR_PODMAN_SOCKET is absent or empty")
 	}
-	ctl.RegisterOrchestratorControlServer(server, &grpcserver.Server{ProjectsRoot: root, HostProjectsRoot: hostProjectsRoot, SocketsRoot: socketsRoot, Store: store, Podman: podmanClient, ImageBuilder: imageBuilder, BuildDefaultImage: getenvBool("DSH_PODMAN_BUILD_DEFAULT_IMAGE", true), Logger: logger})
+	controlServer := &grpcserver.Server{ProjectsRoot: root, HostProjectsRoot: hostProjectsRoot, SocketsRoot: socketsRoot, Store: store, Podman: podmanClient, ImageBuilder: imageBuilder, BuildDefaultImage: getenvBool("DSH_PODMAN_BUILD_DEFAULT_IMAGE", true), Logger: logger}
+	ctl.RegisterOrchestratorControlServer(server, controlServer)
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, syscall.SIGTERM, os.Interrupt)
+	go func() {
+		sig := <-sigCh
+		logger.Info("received signal, stopping container daemons", "signal", sig.String())
+		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+		controlServer.StopAllContainerDaemons(ctx)
+		cancel()
+		logger.Info("graceful control-plane shutdown")
+		server.GracefulStop()
+	}()
 	if err := server.Serve(listener); err != nil {
 		panic(err)
 	}

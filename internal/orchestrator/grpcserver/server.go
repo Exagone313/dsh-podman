@@ -10,9 +10,11 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
+	entities "github.com/containers/podman/v5/pkg/domain/entities/types"
 	"github.com/opencontainers/runtime-spec/specs-go"
 	ctl "gitlab.com/Exagone313/dsh-podman/internal/genproto/dshctl/v1"
 	imagebuild "gitlab.com/Exagone313/dsh-podman/internal/orchestrator/images"
@@ -24,6 +26,20 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
+
+// workspaceSlugName restricts workspace slugs to characters podman accepts in
+// a container name; the container name is derived from the slug, so this is
+// the boundary against a client injecting arbitrary container names.
+var workspaceSlugName = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,62}$`)
+
+// containerNamePattern is the exact shape of orchestrator-created guest
+// containers (dsh-workspace-<slug>); any workspace state that does not match
+// it is treated as invalid rather than acted upon.
+var containerNamePattern = regexp.MustCompile(`^dsh-workspace-[a-zA-Z0-9][a-zA-Z0-9_.-]{0,62}$`)
+
+func validWorkspaceSlug(slug string) bool {
+	return slug != "." && slug != ".." && workspaceSlugName.MatchString(slug)
+}
 
 type Server struct {
 	ctl.UnimplementedOrchestratorControlServer
@@ -84,6 +100,10 @@ func (s *Server) DescribeWorkspace(_ context.Context, request *ctl.DescribeWorks
 	}
 	for _, workspace := range workspaces {
 		if workspace.WorkspaceSlug == request.GetWorkspaceSlug() {
+			if !containerNamePattern.MatchString(workspace.ContainerName) {
+				s.log().Warn("DescribeWorkspace found invalid container name", "workspace_slug", workspace.WorkspaceSlug, "container_name", workspace.ContainerName)
+				return nil, status.Error(codes.NotFound, "workspace not found")
+			}
 			if s.Podman != nil {
 				exists, containerErr := s.Podman.ContainerExists(workspace.ContainerName)
 				if containerErr != nil {
@@ -149,31 +169,38 @@ func (s *Server) ListContainers(context.Context, *ctl.ListContainersRequest) (*c
 	for _, workspace := range workspaces {
 		byName[workspace.ContainerName] = workspace
 	}
-	result := &ctl.ListContainersResponse{}
+	result := &ctl.ListContainersResponse{Containers: workspaceContainerRows(listed, byName)}
+	s.log().Info("control request completed", "method", "ListContainers", "count", len(result.Containers))
+	return result, nil
+}
+
+// workspaceContainerRows projects the podman container list onto the guest
+// containers the orchestrator owns. A container whose name does not match a
+// stored workspace — i.e. one the orchestrator did not create — is skipped, so
+// the plugin can only manage dsh workspaces.
+func workspaceContainerRows(listed []entities.ListContainer, byName map[string]state.Workspace) []*ctl.Container {
+	result := make([]*ctl.Container, 0, len(listed))
 	for _, container := range listed {
 		name := ""
 		for _, candidate := range container.Names {
 			name = strings.TrimPrefix(candidate, "/")
 			break
 		}
-		row := &ctl.Container{ContainerName: name, Status: container.State, CreatedAt: container.CreatedAt}
-		if workspace, ok := byName[name]; ok {
-			row.WorkspaceSlug = workspace.WorkspaceSlug
-			row.ImageId = workspace.ImageID
-			for _, mount := range workspace.Mounts {
-				mode := ctl.MountMode_MOUNT_MODE_READ_ONLY
-				if mount.Mode == "read_write" {
-					mode = ctl.MountMode_MOUNT_MODE_READ_WRITE
-				}
-				row.Mounts = append(row.Mounts, &ctl.ProjectMount{ProjectName: mount.ProjectName, Mode: mode})
-			}
-		} else {
-			row.ImageId = container.Image
+		workspace, ok := byName[name]
+		if !ok {
+			continue
 		}
-		result.Containers = append(result.Containers, row)
+		row := &ctl.Container{ContainerName: name, Status: container.State, CreatedAt: container.CreatedAt, WorkspaceSlug: workspace.WorkspaceSlug, ImageId: workspace.ImageID}
+		for _, mount := range workspace.Mounts {
+			mode := ctl.MountMode_MOUNT_MODE_READ_ONLY
+			if mount.Mode == "read_write" {
+				mode = ctl.MountMode_MOUNT_MODE_READ_WRITE
+			}
+			row.Mounts = append(row.Mounts, &ctl.ProjectMount{ProjectName: mount.ProjectName, Mode: mode})
+		}
+		result = append(result, row)
 	}
-	s.log().Info("control request completed", "method", "ListContainers", "count", len(result.Containers))
-	return result, nil
+	return result
 }
 func (s *Server) RecreateContainer(ctx context.Context, request *ctl.RecreateContainerRequest) (*ctl.Workspace, error) {
 	s.log().Info("control request", "method", "RecreateContainer", "workspace_slug", request.GetWorkspaceSlug(), "image_id", request.GetImageId())
@@ -261,7 +288,7 @@ func (s *Server) RecreateContainer(ctx context.Context, request *ctl.RecreateCon
 
 func (s *Server) CreateWorkspace(ctx context.Context, request *ctl.CreateWorkspaceRequest) (*ctl.Workspace, error) {
 	s.log().Info("control request", "method", "CreateWorkspace", "workspace_slug", request.GetWorkspaceSlug(), "image_id", request.GetImageId(), "mount_count", len(request.GetMounts()))
-	if request.GetWorkspaceSlug() == "" || filepath.Base(request.GetWorkspaceSlug()) != request.GetWorkspaceSlug() {
+	if !validWorkspaceSlug(request.GetWorkspaceSlug()) {
 		return nil, status.Error(codes.InvalidArgument, "invalid workspace slug")
 	}
 	images, err := s.Store.Images()

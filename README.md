@@ -173,9 +173,10 @@ directory. The control socket file is explicitly set to `0600`.
 ## Container management UI
 
 The plugin ships a browser half (`./client`, built to `dist/client`) that
-registers a card in the dsh **Settings → Plugins** page. The card lists every
-container and built image, and offers **Stop**, **Recreate** (same image), and
-**Recreate with image** plus a **Reload** button.
+registers a card in the dsh **Settings → Plugins** page. The card lists the
+orchestrator-created guest containers and the built images, and offers **Stop**,
+**Recreate** (same image), and **Recreate with image** plus a **Reload this
+view** button.
 
 Data and actions travel over the settings transport:
 
@@ -186,11 +187,13 @@ Data and actions travel over the settings transport:
   refreshed view back.
 
 The orchestrator service gained two gRPC methods to back the UI:
-`ListContainers` (enumerates every container on the Podman socket and joins it
-with stored workspace metadata) and `RecreateContainer{workspace_slug,
-image_id}` (stops, removes, and recreates the container, optionally with a new
-image; an empty `image_id` keeps the workspace's current image).
-`StopWorkspace` (existing) backs the Stop button.
+`ListContainers` (returns only the guest containers the orchestrator created —
+containers it does not own are never exposed, and a client cannot name a
+container directly; workspace slugs are validated so the container name is
+always derived server-side from `dsh-workspace-<slug>`) and
+`RecreateContainer{workspace_slug, image_id}` (stops, removes, and recreates
+the container, optionally with a new image; an empty `image_id` keeps the
+workspace's current image). `StopWorkspace` (existing) backs the Stop button.
 
 ### Building the browser half
 

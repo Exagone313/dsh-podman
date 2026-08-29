@@ -10,8 +10,10 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
+	entities "github.com/containers/podman/v5/pkg/domain/entities/types"
 	ctl "gitlab.com/Exagone313/dsh-podman/internal/genproto/dshctl/v1"
 	"gitlab.com/Exagone313/dsh-podman/internal/orchestrator/state"
 	"google.golang.org/grpc"
@@ -57,12 +59,12 @@ func TestValidateProject(t *testing.T) {
 
 func TestToProto(t *testing.T) {
 	workspace := state.Workspace{
-		WorkspaceSlug: "proj", ContainerName: "c", ImageID: "arch", Status: "running",
+		WorkspaceSlug: "proj", ContainerName: "dsh-workspace-proj", ImageID: "arch", Status: "running",
 		AgentSocketPath: "/sock", AgentToken: "tok", CreatedAt: "now",
 		Mounts: []state.Mount{{ProjectName: "a", Mode: "read_only"}, {ProjectName: "b", Mode: "read_write"}},
 	}
 	proto := toProto(workspace)
-	if proto.WorkspaceSlug != "proj" || proto.ContainerName != "c" || proto.AgentToken != "tok" {
+	if proto.WorkspaceSlug != "proj" || proto.ContainerName != "dsh-workspace-proj" || proto.AgentToken != "tok" {
 		t.Fatalf("unexpected proto: %#v", proto)
 	}
 	if len(proto.Mounts) != 2 || proto.Mounts[0].Mode != ctl.MountMode_MOUNT_MODE_READ_ONLY || proto.Mounts[1].Mode != ctl.MountMode_MOUNT_MODE_READ_WRITE {
@@ -163,7 +165,7 @@ func TestListImages(t *testing.T) {
 
 func TestDescribeWorkspace(t *testing.T) {
 	store := newTestStore(t)
-	if err := store.SaveWorkspaces([]state.Workspace{{WorkspaceSlug: "proj", ContainerName: "c", Status: "running"}}); err != nil {
+	if err := store.SaveWorkspaces([]state.Workspace{{WorkspaceSlug: "proj", ContainerName: "dsh-workspace-proj", Status: "running"}}); err != nil {
 		t.Fatal(err)
 	}
 	server := &Server{Store: store, Logger: silentLogger()}
@@ -194,11 +196,50 @@ func TestListContainersRequiresPodman(t *testing.T) {
 
 func TestCreateWorkspaceRejectsInvalidSlug(t *testing.T) {
 	server := &Server{Logger: silentLogger()}
-	for _, slug := range []string{"", "a/b", "../x"} {
+	for _, slug := range []string{"", "a/b", "../x", ".", "..", "-x", "a b", "a:b", "a\\b", "a#b", "a\nb", "x" + strings.Repeat("y", 70)} {
 		_, err := server.CreateWorkspace(context.Background(), &ctl.CreateWorkspaceRequest{WorkspaceSlug: slug, ImageId: "arch"})
 		if status.Code(err) != codes.InvalidArgument {
 			t.Errorf("slug %q: expected InvalidArgument, got %v", slug, err)
 		}
+	}
+	for _, slug := range []string{"proj", "team-app", "a_b.c", "x1", "a-b_c.9-z"} {
+		if !validWorkspaceSlug(slug) {
+			t.Errorf("rejected valid slug %q", slug)
+		}
+	}
+}
+
+func TestDescribeWorkspaceRejectsInvalidContainerName(t *testing.T) {
+	store := newTestStore(t)
+	if err := store.SaveWorkspaces([]state.Workspace{{WorkspaceSlug: "proj", ContainerName: "../escape"}}); err != nil {
+		t.Fatal(err)
+	}
+	server := &Server{Store: store, Logger: silentLogger()}
+	_, err := server.DescribeWorkspace(context.Background(), &ctl.DescribeWorkspaceRequest{WorkspaceSlug: "proj"})
+	if status.Code(err) != codes.NotFound {
+		t.Fatalf("expected NotFound, got %v", err)
+	}
+}
+
+func TestWorkspaceContainerRows(t *testing.T) {
+	byName := map[string]state.Workspace{
+		"dsh-workspace-proj": {WorkspaceSlug: "proj", ImageID: "arch", Mounts: []state.Mount{{ProjectName: "team", Mode: "read_write"}}},
+	}
+	listed := []entities.ListContainer{
+		{Names: []string{"/dsh-workspace-proj"}, State: "running", CreatedAt: "now", Image: "localhost/dsh-podman/arch-base:latest"},
+		{Names: []string{"/unrelated"}, State: "running", CreatedAt: "now", Image: "registry.example.com/other"},
+		{Names: []string{"/another"}, State: "exited"},
+	}
+	rows := workspaceContainerRows(listed, byName)
+	if len(rows) != 1 {
+		t.Fatalf("expected only the workspace container, got %#v", rows)
+	}
+	row := rows[0]
+	if row.ContainerName != "dsh-workspace-proj" || row.WorkspaceSlug != "proj" || row.ImageId != "arch" || row.Status != "running" {
+		t.Fatalf("unexpected row: %#v", row)
+	}
+	if len(row.Mounts) != 1 || row.Mounts[0].ProjectName != "team" || row.Mounts[0].Mode != ctl.MountMode_MOUNT_MODE_READ_WRITE {
+		t.Fatalf("mounts not projected: %#v", row.Mounts)
 	}
 }
 
@@ -239,7 +280,7 @@ func TestRebuildImageRequiresBuilder(t *testing.T) {
 
 func TestStopWorkspaceRequiresPodman(t *testing.T) {
 	store := newTestStore(t)
-	if err := store.SaveWorkspaces([]state.Workspace{{WorkspaceSlug: "proj", ContainerName: "c"}}); err != nil {
+	if err := store.SaveWorkspaces([]state.Workspace{{WorkspaceSlug: "proj", ContainerName: "dsh-workspace-proj"}}); err != nil {
 		t.Fatal(err)
 	}
 	server := &Server{Store: store, Logger: silentLogger()}

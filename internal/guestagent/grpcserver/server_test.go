@@ -8,7 +8,9 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
+	"time"
 
 	workspacefs "gitlab.com/Exagone313/dsh-podman/internal/guestagent/fs"
 	guest "gitlab.com/Exagone313/dsh-podman/internal/genproto/dshguest/v1"
@@ -221,5 +223,117 @@ func TestResolveWithoutFilesystem(t *testing.T) {
 	server := New()
 	if _, err := server.resolve("/workspace/x", false); err == nil {
 		t.Fatal("resolve succeeded without filesystem")
+	}
+}
+
+func waitDaemonState(t *testing.T, server *Server, name string, running bool) {
+	t.Helper()
+	deadline := time.Now().Add(5 * time.Second)
+	for time.Now().Before(deadline) {
+		response, err := server.ListDaemons(context.Background(), &guest.ListDaemonsRequest{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, d := range response.Daemons {
+			if d.Name == name && d.Running == running {
+				return
+			}
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	t.Fatalf("daemon %q did not reach running=%v in time", name, running)
+}
+
+func TestStartDaemonRejectsEmptyArgv(t *testing.T) {
+	server := New()
+	_, err := server.StartDaemon(context.Background(), &guest.StartDaemonRequest{Name: "web"})
+	if status.Code(err) != codes.InvalidArgument {
+		t.Fatalf("expected InvalidArgument, got %v", err)
+	}
+}
+
+func TestStartDaemonAndList(t *testing.T) {
+	server := New()
+	info, err := server.StartDaemon(context.Background(), &guest.StartDaemonRequest{Name: "web", Argv: []string{"sh", "-c", "sleep 30"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.Name != "web" || !info.Running {
+		t.Fatalf("unexpected daemon info: %#v", info)
+	}
+	response, err := server.ListDaemons(context.Background(), &guest.ListDaemonsRequest{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	found := false
+	for _, d := range response.Daemons {
+		if d.Name == "web" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatal("daemon not listed")
+	}
+	if _, err := server.StopDaemon(context.Background(), &guest.StopDaemonRequest{Name: "web", Signal: "SIGKILL"}); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestDaemonLogs(t *testing.T) {
+	server := New()
+	if _, err := server.StartDaemon(context.Background(), &guest.StartDaemonRequest{Name: "web", Argv: []string{"sh", "-c", "echo hi"}}); err != nil {
+		t.Fatal(err)
+	}
+	waitDaemonState(t, server, "web", false)
+	response, err := server.DaemonLogs(context.Background(), &guest.DaemonLogsRequest{Name: "web"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(response.Stdout), "hi") {
+		t.Fatalf("logs do not contain hi: %q", response.Stdout)
+	}
+}
+
+func TestStopDaemonStops(t *testing.T) {
+	server := New()
+	if _, err := server.StartDaemon(context.Background(), &guest.StartDaemonRequest{Name: "web", Argv: []string{"sh", "-c", "sleep 30"}}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := server.StopDaemon(context.Background(), &guest.StopDaemonRequest{Name: "web"}); err != nil {
+		t.Fatal(err)
+	}
+	waitDaemonState(t, server, "web", false)
+}
+
+func TestStopDaemonUnknown(t *testing.T) {
+	server := New()
+	_, err := server.StopDaemon(context.Background(), &guest.StopDaemonRequest{Name: "nope"})
+	if status.Code(err) != codes.NotFound {
+		t.Fatalf("expected NotFound, got %v", err)
+	}
+}
+
+func TestRestartDaemonReruns(t *testing.T) {
+	server := New()
+	if _, err := server.StartDaemon(context.Background(), &guest.StartDaemonRequest{Name: "web", Argv: []string{"sh", "-c", "sleep 30"}}); err != nil {
+		t.Fatal(err)
+	}
+	info, err := server.RestartDaemon(context.Background(), &guest.RestartDaemonRequest{Name: "web"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.Name != "web" || !info.Running {
+		t.Fatalf("unexpected daemon info after restart: %#v", info)
+	}
+	if _, err := server.StopDaemon(context.Background(), &guest.StopDaemonRequest{Name: "web", Signal: "SIGKILL"}); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestRestartDaemonUnknown(t *testing.T) {
+	server := New()
+	_, err := server.RestartDaemon(context.Background(), &guest.RestartDaemonRequest{Name: "nope"})
+	if status.Code(err) != codes.NotFound {
+		t.Fatalf("expected NotFound, got %v", err)
 	}
 }

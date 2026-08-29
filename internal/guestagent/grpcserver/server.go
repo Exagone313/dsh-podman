@@ -17,6 +17,7 @@ import (
 	"sync"
 	"time"
 
+	"gitlab.com/Exagone313/dsh-podman/internal/guestagent/daemon"
 	"gitlab.com/Exagone313/dsh-podman/internal/guestagent/exec"
 	workspacefs "gitlab.com/Exagone313/dsh-podman/internal/guestagent/fs"
 	guest "gitlab.com/Exagone313/dsh-podman/internal/genproto/dshguest/v1"
@@ -27,10 +28,11 @@ import (
 type Server struct {
 	guest.UnimplementedWorkspaceGuestAgentServer
 	Processes *exec.Manager
+	Daemons   *daemon.Manager
 	FS        *workspacefs.WorkspaceFS
 }
 
-func New() *Server { return &Server{Processes: exec.NewManager()} }
+func New() *Server { return &Server{Processes: exec.NewManager(), Daemons: daemon.NewManager()} }
 
 func (s *Server) WithFS(filesystem *workspacefs.WorkspaceFS) *Server { s.FS = filesystem; return s }
 
@@ -178,6 +180,90 @@ func (s *Server) ListProcesses(context.Context, *guest.ListProcessesRequest) (*g
 		result.Processes = append(result.Processes, &guest.ProcessInfo{ProcessId: process.ID, Argv: process.Argv, Running: running})
 	}
 	return result, nil
+}
+
+func daemonInfoProto(d daemon.Daemon) *guest.DaemonInfo {
+	return &guest.DaemonInfo{
+		Name:      d.Name,
+		Argv:      d.Argv,
+		Running:   d.Running,
+		ExitCode:  d.ExitCode,
+		StartedAt: d.StartedAt,
+		StoppedAt: d.StoppedAt,
+	}
+}
+
+func (s *Server) findDaemon(name string) *guest.DaemonInfo {
+	for _, d := range s.Daemons.List() {
+		if d.Name == name {
+			return daemonInfoProto(d)
+		}
+	}
+	return nil
+}
+
+func (s *Server) StartDaemon(_ context.Context, request *guest.StartDaemonRequest) (*guest.DaemonInfo, error) {
+	slog.Info("guest agent StartDaemon requested", "name", request.GetName(), "argc", len(request.GetArgv()))
+	if len(request.GetArgv()) == 0 {
+		return nil, status.Error(codes.InvalidArgument, "argv must contain a command")
+	}
+	name, err := s.Daemons.Start(request.GetName(), request.GetArgv(), request.GetCwd(), request.GetEnv())
+	if err != nil {
+		if errors.Is(err, daemon.ErrAlreadyRunning) {
+			return nil, status.Error(codes.AlreadyExists, err.Error())
+		}
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	if info := s.findDaemon(name); info != nil {
+		return info, nil
+	}
+	return nil, status.Error(codes.Internal, "daemon registered but not found")
+}
+
+func (s *Server) ListDaemons(_ context.Context, _ *guest.ListDaemonsRequest) (*guest.ListDaemonsResponse, error) {
+	slog.Info("guest agent ListDaemons requested")
+	result := &guest.ListDaemonsResponse{}
+	for _, d := range s.Daemons.List() {
+		result.Daemons = append(result.Daemons, daemonInfoProto(d))
+	}
+	return result, nil
+}
+
+func (s *Server) StopDaemon(_ context.Context, request *guest.StopDaemonRequest) (*guest.StopDaemonResponse, error) {
+	slog.Info("guest agent StopDaemon requested", "name", request.GetName())
+	if err := s.Daemons.Stop(request.GetName(), signalForName(request.GetSignal())); err != nil {
+		if errors.Is(err, daemon.ErrUnknown) {
+			return nil, status.Error(codes.NotFound, err.Error())
+		}
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	return &guest.StopDaemonResponse{}, nil
+}
+
+func (s *Server) RestartDaemon(_ context.Context, request *guest.RestartDaemonRequest) (*guest.DaemonInfo, error) {
+	slog.Info("guest agent RestartDaemon requested", "name", request.GetName())
+	if err := s.Daemons.Restart(request.GetName()); err != nil {
+		if errors.Is(err, daemon.ErrUnknown) {
+			return nil, status.Error(codes.NotFound, err.Error())
+		}
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	if info := s.findDaemon(request.GetName()); info != nil {
+		return info, nil
+	}
+	return nil, status.Error(codes.Internal, "daemon not found after restart")
+}
+
+func (s *Server) DaemonLogs(_ context.Context, request *guest.DaemonLogsRequest) (*guest.DaemonLogsResponse, error) {
+	slog.Info("guest agent DaemonLogs requested", "name", request.GetName())
+	stdout, stderr, err := s.Daemons.Logs(request.GetName(), int(request.GetTailBytes()))
+	if err != nil {
+		if errors.Is(err, daemon.ErrUnknown) {
+			return nil, status.Error(codes.NotFound, err.Error())
+		}
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	return &guest.DaemonLogsResponse{Stdout: stdout, Stderr: stderr}, nil
 }
 
 func (s *Server) ValidateProcessID(id string) bool {

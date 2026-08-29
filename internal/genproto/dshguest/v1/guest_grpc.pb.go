@@ -33,6 +33,11 @@ const (
 	WorkspaceGuestAgent_Mkdir_FullMethodName           = "/dshguest.v1.WorkspaceGuestAgent/Mkdir"
 	WorkspaceGuestAgent_Delete_FullMethodName          = "/dshguest.v1.WorkspaceGuestAgent/Delete"
 	WorkspaceGuestAgent_InstallPackages_FullMethodName = "/dshguest.v1.WorkspaceGuestAgent/InstallPackages"
+	WorkspaceGuestAgent_StartDaemon_FullMethodName     = "/dshguest.v1.WorkspaceGuestAgent/StartDaemon"
+	WorkspaceGuestAgent_ListDaemons_FullMethodName     = "/dshguest.v1.WorkspaceGuestAgent/ListDaemons"
+	WorkspaceGuestAgent_StopDaemon_FullMethodName      = "/dshguest.v1.WorkspaceGuestAgent/StopDaemon"
+	WorkspaceGuestAgent_RestartDaemon_FullMethodName   = "/dshguest.v1.WorkspaceGuestAgent/RestartDaemon"
+	WorkspaceGuestAgent_DaemonLogs_FullMethodName      = "/dshguest.v1.WorkspaceGuestAgent/DaemonLogs"
 )
 
 // WorkspaceGuestAgentClient is the client API for WorkspaceGuestAgent service.
@@ -49,6 +54,11 @@ type WorkspaceGuestAgentClient interface {
 	Mkdir(ctx context.Context, in *MkdirRequest, opts ...grpc.CallOption) (*MkdirResponse, error)
 	Delete(ctx context.Context, in *DeleteRequest, opts ...grpc.CallOption) (*DeleteResponse, error)
 	InstallPackages(ctx context.Context, in *InstallPackagesRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[InstallPackagesOutput], error)
+	StartDaemon(ctx context.Context, in *StartDaemonRequest, opts ...grpc.CallOption) (*DaemonInfo, error)
+	ListDaemons(ctx context.Context, in *ListDaemonsRequest, opts ...grpc.CallOption) (*ListDaemonsResponse, error)
+	StopDaemon(ctx context.Context, in *StopDaemonRequest, opts ...grpc.CallOption) (*StopDaemonResponse, error)
+	RestartDaemon(ctx context.Context, in *RestartDaemonRequest, opts ...grpc.CallOption) (*DaemonInfo, error)
+	DaemonLogs(ctx context.Context, in *DaemonLogsRequest, opts ...grpc.CallOption) (*DaemonLogsResponse, error)
 }
 
 type workspaceGuestAgentClient struct {
@@ -183,6 +193,56 @@ func (c *workspaceGuestAgentClient) InstallPackages(ctx context.Context, in *Ins
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type WorkspaceGuestAgent_InstallPackagesClient = grpc.ServerStreamingClient[InstallPackagesOutput]
 
+func (c *workspaceGuestAgentClient) StartDaemon(ctx context.Context, in *StartDaemonRequest, opts ...grpc.CallOption) (*DaemonInfo, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DaemonInfo)
+	err := c.cc.Invoke(ctx, WorkspaceGuestAgent_StartDaemon_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *workspaceGuestAgentClient) ListDaemons(ctx context.Context, in *ListDaemonsRequest, opts ...grpc.CallOption) (*ListDaemonsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListDaemonsResponse)
+	err := c.cc.Invoke(ctx, WorkspaceGuestAgent_ListDaemons_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *workspaceGuestAgentClient) StopDaemon(ctx context.Context, in *StopDaemonRequest, opts ...grpc.CallOption) (*StopDaemonResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(StopDaemonResponse)
+	err := c.cc.Invoke(ctx, WorkspaceGuestAgent_StopDaemon_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *workspaceGuestAgentClient) RestartDaemon(ctx context.Context, in *RestartDaemonRequest, opts ...grpc.CallOption) (*DaemonInfo, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DaemonInfo)
+	err := c.cc.Invoke(ctx, WorkspaceGuestAgent_RestartDaemon_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *workspaceGuestAgentClient) DaemonLogs(ctx context.Context, in *DaemonLogsRequest, opts ...grpc.CallOption) (*DaemonLogsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DaemonLogsResponse)
+	err := c.cc.Invoke(ctx, WorkspaceGuestAgent_DaemonLogs_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // WorkspaceGuestAgentServer is the server API for WorkspaceGuestAgent service.
 // All implementations must embed UnimplementedWorkspaceGuestAgentServer
 // for forward compatibility.
@@ -197,6 +257,11 @@ type WorkspaceGuestAgentServer interface {
 	Mkdir(context.Context, *MkdirRequest) (*MkdirResponse, error)
 	Delete(context.Context, *DeleteRequest) (*DeleteResponse, error)
 	InstallPackages(*InstallPackagesRequest, grpc.ServerStreamingServer[InstallPackagesOutput]) error
+	StartDaemon(context.Context, *StartDaemonRequest) (*DaemonInfo, error)
+	ListDaemons(context.Context, *ListDaemonsRequest) (*ListDaemonsResponse, error)
+	StopDaemon(context.Context, *StopDaemonRequest) (*StopDaemonResponse, error)
+	RestartDaemon(context.Context, *RestartDaemonRequest) (*DaemonInfo, error)
+	DaemonLogs(context.Context, *DaemonLogsRequest) (*DaemonLogsResponse, error)
 	mustEmbedUnimplementedWorkspaceGuestAgentServer()
 }
 
@@ -236,6 +301,21 @@ func (UnimplementedWorkspaceGuestAgentServer) Delete(context.Context, *DeleteReq
 }
 func (UnimplementedWorkspaceGuestAgentServer) InstallPackages(*InstallPackagesRequest, grpc.ServerStreamingServer[InstallPackagesOutput]) error {
 	return status.Error(codes.Unimplemented, "method InstallPackages not implemented")
+}
+func (UnimplementedWorkspaceGuestAgentServer) StartDaemon(context.Context, *StartDaemonRequest) (*DaemonInfo, error) {
+	return nil, status.Error(codes.Unimplemented, "method StartDaemon not implemented")
+}
+func (UnimplementedWorkspaceGuestAgentServer) ListDaemons(context.Context, *ListDaemonsRequest) (*ListDaemonsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListDaemons not implemented")
+}
+func (UnimplementedWorkspaceGuestAgentServer) StopDaemon(context.Context, *StopDaemonRequest) (*StopDaemonResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method StopDaemon not implemented")
+}
+func (UnimplementedWorkspaceGuestAgentServer) RestartDaemon(context.Context, *RestartDaemonRequest) (*DaemonInfo, error) {
+	return nil, status.Error(codes.Unimplemented, "method RestartDaemon not implemented")
+}
+func (UnimplementedWorkspaceGuestAgentServer) DaemonLogs(context.Context, *DaemonLogsRequest) (*DaemonLogsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method DaemonLogs not implemented")
 }
 func (UnimplementedWorkspaceGuestAgentServer) mustEmbedUnimplementedWorkspaceGuestAgentServer() {}
 func (UnimplementedWorkspaceGuestAgentServer) testEmbeddedByValue()                             {}
@@ -402,6 +482,96 @@ func _WorkspaceGuestAgent_InstallPackages_Handler(srv interface{}, stream grpc.S
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type WorkspaceGuestAgent_InstallPackagesServer = grpc.ServerStreamingServer[InstallPackagesOutput]
 
+func _WorkspaceGuestAgent_StartDaemon_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(StartDaemonRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(WorkspaceGuestAgentServer).StartDaemon(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: WorkspaceGuestAgent_StartDaemon_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(WorkspaceGuestAgentServer).StartDaemon(ctx, req.(*StartDaemonRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _WorkspaceGuestAgent_ListDaemons_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListDaemonsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(WorkspaceGuestAgentServer).ListDaemons(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: WorkspaceGuestAgent_ListDaemons_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(WorkspaceGuestAgentServer).ListDaemons(ctx, req.(*ListDaemonsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _WorkspaceGuestAgent_StopDaemon_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(StopDaemonRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(WorkspaceGuestAgentServer).StopDaemon(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: WorkspaceGuestAgent_StopDaemon_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(WorkspaceGuestAgentServer).StopDaemon(ctx, req.(*StopDaemonRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _WorkspaceGuestAgent_RestartDaemon_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RestartDaemonRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(WorkspaceGuestAgentServer).RestartDaemon(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: WorkspaceGuestAgent_RestartDaemon_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(WorkspaceGuestAgentServer).RestartDaemon(ctx, req.(*RestartDaemonRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _WorkspaceGuestAgent_DaemonLogs_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DaemonLogsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(WorkspaceGuestAgentServer).DaemonLogs(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: WorkspaceGuestAgent_DaemonLogs_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(WorkspaceGuestAgentServer).DaemonLogs(ctx, req.(*DaemonLogsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // WorkspaceGuestAgent_ServiceDesc is the grpc.ServiceDesc for WorkspaceGuestAgent service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -432,6 +602,26 @@ var WorkspaceGuestAgent_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Delete",
 			Handler:    _WorkspaceGuestAgent_Delete_Handler,
+		},
+		{
+			MethodName: "StartDaemon",
+			Handler:    _WorkspaceGuestAgent_StartDaemon_Handler,
+		},
+		{
+			MethodName: "ListDaemons",
+			Handler:    _WorkspaceGuestAgent_ListDaemons_Handler,
+		},
+		{
+			MethodName: "StopDaemon",
+			Handler:    _WorkspaceGuestAgent_StopDaemon_Handler,
+		},
+		{
+			MethodName: "RestartDaemon",
+			Handler:    _WorkspaceGuestAgent_RestartDaemon_Handler,
+		},
+		{
+			MethodName: "DaemonLogs",
+			Handler:    _WorkspaceGuestAgent_DaemonLogs_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{

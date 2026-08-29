@@ -15,35 +15,40 @@ const toolOutput = {
   schema: { type: "string" },
   render: (_args: unknown, value: string) => [{ type: "text", text: value }],
 };
-const workspaceParameters = {
-  workspace_slug: {
-    type: "string",
-    required: true,
-    description: "Workspace slug.",
-  },
-  mounts: {
-    type: "array",
-    items: {
-      type: "object",
-      additionalProperties: false,
-      properties: {
-        project_name: { type: "string", required: true },
-        mode: {
-          type: "string",
-          enum: ["read_only", "read_write"],
-          required: true,
+export const workspaceParameters = {
+  type: "object",
+  properties: {
+    workspace_slug: { type: "string", description: "Workspace slug." },
+    mounts: {
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          project_name: { type: "string" },
+          mode: { type: "string", enum: ["read_only", "read_write"] },
         },
+        required: ["project_name", "mode"],
       },
     },
   },
+  required: ["workspace_slug"],
 };
-const packageParameters = {
-  packages: { type: "array", required: true, items: { type: "string" } },
+export const packageParameters = {
+  type: "object",
+  properties: {
+    packages: { type: "array", items: { type: "string" } },
+  },
+  required: ["packages"],
 };
-const imageParameters = {
-  image_id: { type: "string", required: true },
-  base_image: { type: "string" },
-  packages: { type: "array", items: { type: "string" } },
+export const imageParameters = {
+  type: "object",
+  properties: {
+    image_id: { type: "string" },
+    base_image: { type: "string" },
+    packages: { type: "array", items: { type: "string" } },
+  },
+  required: ["image_id"],
 };
 
 export const name = "podman";

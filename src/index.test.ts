@@ -9,6 +9,9 @@ import {
   outputReader,
   createSubprocessProvider,
   createFilesystemProvider,
+  workspaceParameters,
+  packageParameters,
+  imageParameters,
 } from "./index.js";
 
 test("remoteArgv remaps ripgrep onto the guest path", () => {
@@ -128,4 +131,16 @@ test("filesystem provider maps targets", () => {
   assert.equal(provider.contains(parent, { targetKey: "/a/b" }), true);
   assert.equal(provider.contains(parent, { targetKey: "/a2" }), false);
   assert.equal(provider.contains(parent, { targetKey: "/b" }), false);
+});
+
+test("tool parameter schemas are object-rooted JSON Schemas", () => {
+  for (const schema of [workspaceParameters, packageParameters, imageParameters]) {
+    assert.equal(schema.type, "object");
+    assert.ok(schema.properties, "schema is missing properties");
+    assert.ok(Array.isArray(schema.required), "schema is missing required");
+    for (const property of Object.values(schema.properties)) {
+      assert.ok(typeof property === "object" && property !== null, "property must be a schema object");
+      assert.equal("required" in property, false, "required must not be a per-property key");
+    }
+  }
 });

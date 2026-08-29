@@ -57,7 +57,7 @@ function baseValue(): Record<string, unknown> {
   return {
     defaultImage: "arch-base",
     socketsRoot: "/run/dsh-podman",
-    projectsRoot: "/mnt/project",
+    projectsRoot: "/projects",
     notice: "",
     containers: [],
     images: [],
@@ -72,7 +72,7 @@ test("refresh on install publishes containers and images", async () => {
     getConfig: () => ({
       defaultImage: "arch-base",
       socketsRoot: "/run/dsh-podman",
-      projectsRoot: "/mnt/project",
+      projectsRoot: "/projects",
     }),
     setConfig: () => {},
     async control(method: string, request: unknown) {

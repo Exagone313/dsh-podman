@@ -113,7 +113,7 @@ test("control calls carry the bearer token", async () => {
       {
         socketsRoot,
         defaultImage: "arch",
-        projectsRoot: "/mnt/project",
+        projectsRoot: "/projects",
         controlToken: "tok-1",
       },
       undefined as any,
@@ -132,7 +132,7 @@ test("control calls omit the token when unset", async () => {
       {
         socketsRoot,
         defaultImage: "arch",
-        projectsRoot: "/mnt/project",
+        projectsRoot: "/projects",
         controlToken: "",
       },
       undefined as any,

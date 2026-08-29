@@ -63,7 +63,10 @@ export function apply(ctx: any, config: PluginConfig = {}): void {
         "/run/dsh-podman",
       defaultImage:
         config.defaultImage ?? process.env.DSH_PODMAN_DEFAULT_IMAGE ?? "arch-base",
-      projectsRoot: config.projectsRoot ?? "/mnt/project",
+      projectsRoot:
+        config.projectsRoot ??
+        process.env.DSH_PODMAN_PROJECTS_ROOT ??
+        "/projects",
       controlToken:
         config.controlToken ?? process.env.DSH_PODMAN_ORCHESTRATOR_TOKEN ?? "",
     },

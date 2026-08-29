@@ -47,11 +47,11 @@ each of their sections.
 |---|---|---|
 | `DSH_PODMAN_DEFAULT_IMAGE` | `arch-base` | Default workspace image id used when creating a workspace |
 | `DSH_PODMAN_ORCHESTRATOR_TOKEN` | — | Shared secret authenticating control-plane gRPC calls; see [Variable details](#variable-details) |
+| `DSH_PODMAN_PROJECTS_ROOT` | `/projects` | Project root used to resolve session working directories into a workspace |
 | `DSH_PODMAN_SOCKETS_ROOT` | `/run/dsh-podman` | Socket root the plugin derives the orchestrator control socket (`orchestrator.sock`) from |
 
-The plugin's `projectsRoot` default is `/mnt/project`; all of the above are
-overridable through the plugin's `cordis.yml` config (`socketsRoot`,
-`defaultImage`, `projectsRoot`, `controlToken`).
+All of the above are overridable through the plugin's `cordis.yml` config
+(`socketsRoot`, `defaultImage`, `projectsRoot`, `controlToken`).
 
 ### Orchestrator (`dsh-podman-orchestrator`)
 

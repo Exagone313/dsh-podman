@@ -14,6 +14,7 @@ import (
 	"github.com/containers/podman/v5/pkg/bindings"
 	"github.com/containers/podman/v5/pkg/bindings/containers"
 	"github.com/containers/podman/v5/pkg/bindings/images"
+	"github.com/containers/podman/v5/pkg/bindings/pods"
 	entities "github.com/containers/podman/v5/pkg/domain/entities/types"
 	"github.com/containers/podman/v5/pkg/specgen"
 	"github.com/opencontainers/runtime-spec/specs-go"
@@ -40,29 +41,69 @@ func (c *Client) log() *slog.Logger {
 	return slog.Default()
 }
 
-func (c *Client) CreateWorkspace(name, image, token string, mounts []specs.Mount) error {
-	c.log().Info("creating guest container", "container_name", name, "image", image, "mount_count", len(mounts))
+// EnsurePod lazily creates the pod when it does not already exist. Containers
+// created afterwards are placed inside it, sharing its network namespace.
+func (c *Client) EnsurePod(name string) error {
+	exists, err := pods.Exists(c.ctx, name, nil)
+	if err != nil {
+		return err
+	}
+	if exists {
+		return nil
+	}
+	c.log().Info("creating pod", "pod_name", name)
+	_, err = pods.CreatePodFromSpec(c.ctx, &entities.PodSpec{PodSpecGen: specgen.PodSpecGenerator{Name: name}})
+	if err != nil {
+		c.log().Error("pod creation failed", "pod_name", name, "error", err)
+		return fmt.Errorf("create pod: %w", err)
+	}
+	return nil
+}
+
+// RemovePod deletes the pod, tolerating an already-absent pod.
+func (c *Client) RemovePod(name string) error {
+	exists, err := pods.Exists(c.ctx, name, nil)
+	if err != nil {
+		return err
+	}
+	if !exists {
+		return nil
+	}
+	c.log().Info("removing pod", "pod_name", name)
+	if _, err := pods.Remove(c.ctx, name, &pods.RemoveOptions{Force: boolPtr(true)}); err != nil {
+		c.log().Error("pod removal failed", "pod_name", name, "error", err)
+		return fmt.Errorf("remove pod: %w", err)
+	}
+	return nil
+}
+
+func (c *Client) CreateWorkspace(pod, name, image, token string, mounts []specs.Mount) error {
+	c.log().Info("creating guest container", "pod_name", pod, "container_name", name, "image", image, "mount_count", len(mounts))
 	socketDir := filepath.Join(c.socketRoot, name)
 	hostSocketDir := filepath.Join(c.hostSocketRoot, name)
 	if err := os.MkdirAll(socketDir, 0700); err != nil {
 		return err
 	}
+	if err := c.EnsurePod(pod); err != nil {
+		return err
+	}
 	init := true
 	generator := specgen.NewSpecGenerator(image, false)
 	generator.Name = name
+	generator.Pod = pod
 	generator.Command = []string{c.guestBinary}
 	generator.Env = map[string]string{"DSH_PODMAN_GUEST_TOKEN": token, "DSH_PODMAN_GUEST_SOCKET": filepath.Join(c.socketRoot, name, "guest.sock"), "DSH_PODMAN_PROJECTS_ROOT": c.projectRoot}
 	generator.Init = &init
 	generator.Mounts = append(mounts, guestAgentMounts(hostSocketDir, c.socketRoot, name, c.hostGuestBinary, c.guestBinary)...)
 	if _, err := containers.CreateWithSpec(c.ctx, generator, nil); err != nil {
-		c.log().Error("guest container creation failed", "container_name", name, "error", err)
+		c.log().Error("guest container creation failed", "pod_name", pod, "container_name", name, "error", err)
 		return fmt.Errorf("create container: %w", err)
 	}
 	if err := containers.Start(c.ctx, name, nil); err != nil {
-		c.log().Error("guest container start failed", "container_name", name, "error", err)
+		c.log().Error("guest container start failed", "pod_name", pod, "container_name", name, "error", err)
 		return err
 	}
-	c.log().Info("guest container started", "container_name", name)
+	c.log().Info("guest container started", "pod_name", pod, "container_name", name)
 	return nil
 }
 
@@ -127,13 +168,13 @@ func (c *Client) Remove(name string) error {
 	return err
 }
 
-func (c *Client) RecreateWorkspace(name, image, token string, mounts []specs.Mount) error {
-	c.log().Info("recreating guest container", "container_name", name, "image", image, "mount_count", len(mounts))
+func (c *Client) RecreateWorkspace(pod, name, image, token string, mounts []specs.Mount) error {
+	c.log().Info("recreating guest container", "pod_name", pod, "container_name", name, "image", image, "mount_count", len(mounts))
 	if err := c.Stop(name); err != nil {
 		return err
 	}
 	if err := c.Remove(name); err != nil {
 		return err
 	}
-	return c.CreateWorkspace(name, image, token, mounts)
+	return c.CreateWorkspace(pod, name, image, token, mounts)
 }

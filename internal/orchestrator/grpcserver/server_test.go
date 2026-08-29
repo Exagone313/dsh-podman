@@ -314,6 +314,9 @@ func TestContainerNameHelpers(t *testing.T) {
 	if got := podmanContainerName("proj", "dev"); got != "dsh-workspace-proj-dev" {
 		t.Fatalf("named podman name mismatch: %q", got)
 	}
+	if got := podNameFor("proj"); got != "dsh-pod-proj" {
+		t.Fatalf("pod name mismatch: %q", got)
+	}
 }
 
 func TestContainerByLogical(t *testing.T) {

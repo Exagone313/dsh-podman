@@ -68,6 +68,12 @@ func podmanContainerName(slug, logical string) string {
 	return "dsh-workspace-" + slug + "-" + logical
 }
 
+// podNameFor derives the podman pod name for a workspace. All containers of a
+// workspace live in this pod, sharing its network namespace.
+func podNameFor(slug string) string {
+	return "dsh-pod-" + slug
+}
+
 // containerByLogical returns the container record for the given logical name.
 // An empty name or "default" resolves to the workspace's default container.
 func containerByLogical(ws *state.Workspace, name string) (*state.Container, bool) {
@@ -314,7 +320,7 @@ func (s *Server) RecreateContainer(ctx context.Context, request *ctl.RecreateCon
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	if err := s.Podman.RecreateWorkspace(record.PodmanName, imageTag, secret, podmanMounts); err != nil {
+	if err := s.Podman.RecreateWorkspace(podNameFor(workspace.WorkspaceSlug), record.PodmanName, imageTag, secret, podmanMounts); err != nil {
 		s.log().Error("control request failed", "method", "RecreateContainer", "workspace_slug", request.GetWorkspaceSlug(), "container", container, "error", err)
 		return nil, status.Error(codes.Internal, err.Error())
 	}
@@ -366,7 +372,7 @@ func (s *Server) StartContainer(ctx context.Context, request *ctl.StartContainer
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	if err := s.Podman.CreateWorkspace(podmanName, imageTag, secret, podmanMounts); err != nil {
+	if err := s.Podman.CreateWorkspace(podNameFor(workspace.WorkspaceSlug), podmanName, imageTag, secret, podmanMounts); err != nil {
 		s.log().Error("control request failed", "method", "StartContainer", "workspace_slug", request.GetWorkspaceSlug(), "container", request.GetContainer(), "error", err)
 		return nil, status.Error(codes.Internal, err.Error())
 	}
@@ -409,7 +415,7 @@ func (s *Server) ReplaceContainer(ctx context.Context, request *ctl.ReplaceConta
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	if err := s.Podman.RecreateWorkspace(record.PodmanName, imageTag, secret, podmanMounts); err != nil {
+	if err := s.Podman.RecreateWorkspace(podNameFor(workspace.WorkspaceSlug), record.PodmanName, imageTag, secret, podmanMounts); err != nil {
 		s.log().Error("control request failed", "method", "ReplaceContainer", "workspace_slug", request.GetWorkspaceSlug(), "container", request.GetContainer(), "error", err)
 		return nil, status.Error(codes.Internal, err.Error())
 	}
@@ -545,7 +551,7 @@ func (s *Server) CreateWorkspace(ctx context.Context, request *ctl.CreateWorkspa
 		s.log().Info("CreateWorkspace rebuilt stale default image", "image_id", image.ImageID, "image_tag", image.ImageTag)
 	}
 	name := "dsh-workspace-" + request.GetWorkspaceSlug()
-	if err := s.Podman.CreateWorkspace(name, imageTag, secret, podmanMounts); err != nil {
+	if err := s.Podman.CreateWorkspace(podNameFor(request.GetWorkspaceSlug()), name, imageTag, secret, podmanMounts); err != nil {
 		s.log().Error("control request failed", "method", "CreateWorkspace", "workspace_slug", request.GetWorkspaceSlug(), "error", err)
 		return nil, status.Error(codes.Internal, err.Error())
 	}
@@ -847,6 +853,20 @@ func (s *Server) RemoveContainer(_ context.Context, request *ctl.RemoveContainer
 		return all, nil
 	}); err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
+	}
+	remaining, err := s.Store.Workspaces()
+	if err != nil {
+		s.log().Warn("RemoveContainer workspace re-read failed", "workspace_slug", request.GetWorkspaceSlug(), "error", err)
+	}
+	for _, ws := range remaining {
+		if ws.WorkspaceSlug == workspace.WorkspaceSlug {
+			if len(ws.Containers) == 0 {
+				if podErr := s.Podman.RemovePod(podNameFor(ws.WorkspaceSlug)); podErr != nil {
+					s.log().Warn("RemoveContainer pod cleanup failed", "workspace_slug", ws.WorkspaceSlug, "error", podErr)
+				}
+			}
+			break
+		}
 	}
 	s.log().Info("control request completed", "method", "RemoveContainer", "workspace_slug", request.GetWorkspaceSlug(), "container", request.GetContainer())
 	return &ctl.RemoveContainerResponse{}, nil

@@ -234,17 +234,17 @@ const packageListParam = {
   description: "Package names to install.",
 };
 
-export const listImagesParameters = {
+export const imageListParameters = {
   type: "object",
   properties: {},
   required: [] as string[],
 };
-export const getImageParameters = {
+export const imageGetParameters = {
   type: "object",
   properties: { imageId: imageIdParam },
   required: ["imageId"],
 };
-export const buildImageParameters = {
+export const imageBuildParameters = {
   type: "object",
   properties: {
     imageId: imageIdParam,
@@ -253,17 +253,17 @@ export const buildImageParameters = {
   },
   required: ["imageId", "baseImage", "packages"],
 };
-export const rebuildImageParameters = {
+export const imageRebuildParameters = {
   type: "object",
   properties: { imageId: imageIdParam },
   required: ["imageId"],
 };
-export const listContainersParameters = {
+export const containerListParameters = {
   type: "object",
   properties: {},
   required: [] as string[],
 };
-export const startContainerParameters = {
+export const containerStartParameters = {
   type: "object",
   properties: {
     container: containerParam,
@@ -271,12 +271,12 @@ export const startContainerParameters = {
   },
   required: ["container"],
 };
-export const recreateContainerParameters = {
+export const containerRecreateParameters = {
   type: "object",
   properties: { container: containerParam },
   required: ["container"],
 };
-export const replaceContainerParameters = {
+export const containerReplaceParameters = {
   type: "object",
   properties: {
     container: containerParam,
@@ -284,7 +284,7 @@ export const replaceContainerParameters = {
   },
   required: ["container", "image"],
 };
-export const removeContainerParameters = {
+export const containerRemoveParameters = {
   type: "object",
   properties: { container: containerParam },
   required: ["container"],
@@ -429,27 +429,27 @@ export interface ToolDefinition {
 }
 
 export const TOOLS: ToolDefinition[] = [
-  { name: "list_images", parameters: listImagesParameters },
-  { name: "get_image", parameters: getImageParameters },
+  { name: "image_list", parameters: imageListParameters },
+  { name: "image_get", parameters: imageGetParameters },
   {
-    name: "build_image",
-    parameters: buildImageParameters,
+    name: "image_build",
+    parameters: imageBuildParameters,
     approval: true,
   },
-  { name: "rebuild_image", parameters: rebuildImageParameters, approval: true },
-  { name: "list_containers", parameters: listContainersParameters },
-  { name: "start_container", parameters: startContainerParameters },
+  { name: "image_rebuild", parameters: imageRebuildParameters, approval: true },
+  { name: "container_list", parameters: containerListParameters },
+  { name: "container_start", parameters: containerStartParameters },
   {
-    name: "recreate_container",
-    parameters: recreateContainerParameters,
+    name: "container_recreate",
+    parameters: containerRecreateParameters,
     approval: true,
   },
   {
-    name: "replace_container",
-    parameters: replaceContainerParameters,
+    name: "container_replace",
+    parameters: containerReplaceParameters,
     approval: true,
   },
-  { name: "remove_container", parameters: removeContainerParameters },
+  { name: "container_remove", parameters: containerRemoveParameters },
   { name: "container_bash", parameters: containerBashParameters },
   { name: "container_exec", parameters: containerExecParameters },
   { name: "container_read", parameters: containerReadParameters },
@@ -465,20 +465,20 @@ export const TOOLS: ToolDefinition[] = [
 ];
 
 const TOOL_DESCRIPTIONS: Record<string, string> = {
-  list_images: "List the images available to the current workspace.",
-  get_image: "Get details about a specific image.",
-  build_image:
+  image_list: "List the images available to the current workspace.",
+  image_get: "Get details about a specific image.",
+  image_build:
     "Build a new workspace image from a base image and a set of packages. Requires approval: building installs packages system-wide into a container image.",
-  rebuild_image:
+  image_rebuild:
     "Rebuild an existing workspace image. Requires approval: rebuilding replaces the current image content.",
-  list_containers:
+  container_list:
     "List the containers of the current workspace, including the default container that is started on demand.",
-  start_container: "Start a container in the current workspace.",
-  recreate_container:
+  container_start: "Start a container in the current workspace.",
+  container_recreate:
     "Recreate a container in the current workspace. Requires approval: recreating replaces the running container.",
-  replace_container:
+  container_replace:
     "Replace a container in the current workspace with a new image. Requires approval: replacing destroys the existing container.",
-  remove_container: "Remove a container from the current workspace.",
+  container_remove: "Remove a container from the current workspace.",
   container_bash:
     "Run a shell command inside a container of the current workspace.",
   container_exec:
@@ -505,7 +505,7 @@ const toolHandlers: Record<
   string,
   (resolver: WorkspaceResolver, input: any, exec: any) => Promise<unknown>
 > = {
-  list_images: async (resolver) => {
+  image_list: async (resolver) => {
     const result = await resolver.control<{ images?: any[] }>("listImages", {});
     const rows = (result.images ?? []).map((image: any) => {
       const packages = (image.packages ?? []).length > 0
@@ -515,17 +515,17 @@ const toolHandlers: Record<
     });
     return rows.length > 0 ? rows.join("\n") : "(no images)";
   },
-  get_image: async (resolver, input) =>
+  image_get: async (resolver, input) =>
     resolver.control("getImage", { imageId: input.imageId }),
-  build_image: async (resolver, input) =>
+  image_build: async (resolver, input) =>
     resolver.control("buildImage", {
       imageId: input.imageId,
       baseImage: input.baseImage,
       packages: input.packages,
     }),
-  rebuild_image: async (resolver, input) =>
+  image_rebuild: async (resolver, input) =>
     resolver.control("rebuildImage", { imageId: input.imageId }),
-  list_containers: async (resolver, _input, exec) => {
+  container_list: async (resolver, _input, exec) => {
     const slug = await sessionWorkspaceSlug(resolver, currentCwd(exec));
     const [containersResult, workspacesResult] = await Promise.all([
       resolver.control<{ containers?: any[] }>("listContainers", {}),
@@ -559,25 +559,25 @@ const toolHandlers: Record<
     }
     return lines.join("\n");
   },
-  start_container: async (resolver, input, exec) =>
+  container_start: async (resolver, input, exec) =>
     resolver.control("startContainer", {
       workspaceSlug: await sessionWorkspaceSlug(resolver, currentCwd(exec)),
       container: input.container,
       imageId: input.image,
     }),
-  recreate_container: async (resolver, input, exec) =>
+  container_recreate: async (resolver, input, exec) =>
     resolver.control("recreateContainer", {
       workspaceSlug: await sessionWorkspaceSlug(resolver, currentCwd(exec)),
       container: input.container,
       imageId: "",
     }),
-  replace_container: async (resolver, input, exec) =>
+  container_replace: async (resolver, input, exec) =>
     resolver.control("replaceContainer", {
       workspaceSlug: await sessionWorkspaceSlug(resolver, currentCwd(exec)),
       container: input.container,
       imageId: input.image,
     }),
-  remove_container: async (resolver, input, exec) =>
+  container_remove: async (resolver, input, exec) =>
     resolver.control("removeContainer", {
       workspaceSlug: await sessionWorkspaceSlug(resolver, currentCwd(exec)),
       container: input.container,

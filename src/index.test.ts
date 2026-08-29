@@ -132,15 +132,15 @@ test("filesystem provider maps targets", () => {
 });
 
 const EXPECTED_TOOLS = [
-  "list_images",
-  "get_image",
-  "build_image",
-  "rebuild_image",
-  "list_containers",
-  "start_container",
-  "recreate_container",
-  "replace_container",
-  "remove_container",
+  "image_list",
+  "image_get",
+  "image_build",
+  "image_rebuild",
+  "container_list",
+  "container_start",
+  "container_recreate",
+  "container_replace",
+  "container_remove",
   "container_bash",
   "container_exec",
   "container_read",
@@ -186,10 +186,10 @@ test("the four destructive mutations require approval", () => {
     .map((tool) => tool.name)
     .sort();
   assert.deepEqual(approval, [
-    "build_image",
-    "rebuild_image",
-    "recreate_container",
-    "replace_container",
+    "container_recreate",
+    "container_replace",
+    "image_build",
+    "image_rebuild",
   ]);
 });
 

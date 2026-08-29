@@ -19,6 +19,7 @@ import type {
 import type {
   ContainerCardFace,
   ContainerView,
+  ImageView,
   WorkspaceView,
 } from "./container-card-controller.js";
 import type {} from "./container-card-controller.js";
@@ -292,19 +293,24 @@ function WorkspaceSection(props: {
 }): ReactNode {
   const { t, workspace, containers, images, busy, onRemove, onRecreate } = props;
   const [open, setOpen] = useState(false);
-  const status = containers[0]?.status ?? "exited";
+  const hasContainer = containers.length > 0;
   return (
     <DisclosureRow
-      icon={<StateDot state={containerStateDot(status)} />}
+      icon={
+        hasContainer ? (
+          <StateDot state={containerStateDot(containers[0]?.status ?? "")} />
+        ) : (
+          <span />
+        )
+      }
       title={workspace.projectName}
       open={open}
       expandable
       onToggle={() => setOpen(!open)}
-      collapsedContent={<code style={greyId}>{workspace.workspaceSlug}</code>}
     >
       <div style={wsBody}>
         <code style={greyId}>{workspace.workspaceSlug}</code>
-        {containers.length === 0 ? (
+        {!hasContainer ? (
           <p style={hint}>{t("noContainers")}</p>
         ) : (
           containers.map((container) => (
@@ -321,6 +327,53 @@ function WorkspaceSection(props: {
         )}
       </div>
     </DisclosureRow>
+  );
+}
+
+function ImagesSection(props: {
+  t: (key: ContainerPluginKey) => string;
+  images: readonly ImageView[];
+}): ReactNode {
+  const { t, images } = props;
+  const [open, setOpen] = useState(false);
+  return (
+    <div style={{ marginTop: "16px" }}>
+      <DisclosureRow
+        icon={<span />}
+        title={t("imagesTitle")}
+        open={open}
+        expandable
+        onToggle={() => setOpen(!open)}
+      >
+      <div style={wsBody}>
+        {images.length === 0 ? (
+          <p style={hint}>{t("none")}</p>
+        ) : (
+          images.map((image) => (
+            <div key={image.imageId} style={imageRow}>
+              <strong style={{ color: "var(--dsw-alias-label-primary)" }}>
+                {image.imageId}
+              </strong>
+              <div style={meta}>
+                <span>
+                  {t("baseImage")}: {image.baseImage}
+                </span>
+                <span>
+                  {t("imageTag")}: {image.imageTag}
+                </span>
+                <span>
+                  {t("builtAt")}: {image.builtAt}
+                </span>
+                <span>
+                  {t("packages")}: {image.packages.length}
+                </span>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+      </DisclosureRow>
+    </div>
   );
 }
 
@@ -413,34 +466,8 @@ export function ContainerCard(props: ContainerCardProps): ReactNode {
               />
             ))
           )}
-          <div style={sectionTitle}>{t("imagesTitle")}</div>
-          {state.images.length === 0 ? (
-            <p style={hint}>{t("none")}</p>
-          ) : (
-            state.images.map((image) => (
-              <div key={image.imageId} style={imageRow}>
-                <strong style={{ color: "var(--dsw-alias-label-primary)" }}>
-                  {image.imageId}
-                </strong>
-                <div style={meta}>
-                  <span>
-                    {t("baseImage")}: {image.baseImage}
-                  </span>
-                  <span>
-                    {t("imageTag")}: {image.imageTag}
-                  </span>
-                  <span>
-                    {t("builtAt")}: {image.builtAt}
-                  </span>
-                  <span>
-                    {t("packages")}: {image.packages.length}
-                  </span>
-                </div>
-              </div>
-            ))
-          )}
-          <div style={footerRow}>
-            <Button
+          <ImagesSection t={t} images={state.images} />
+          <div style={footerRow}>            <Button
               variant="outline"
               size="sm"
               disabled={state.busy}

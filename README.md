@@ -37,62 +37,108 @@ by `@grpc/proto-loader`.
 
 ## Configuration (environment variables)
 
-All variables use the `DSH_PODMAN_` prefix. Values shared between the
-orchestrator and the guest agents use the bare prefix; orchestrator-only and
-guest-only values are namespaced under `DSH_PODMAN_ORCHESTRATOR_` and
-`DSH_PODMAN_GUEST_` respectively.
+All variables use the `DSH_PODMAN_` prefix. Variables are listed under the
+component that reads them; a variable read by several components appears in
+each of their sections.
 
-### Shared
+### Plugin (dsh client)
 
 | Variable | Default | Description |
 |---|---|---|
-| `DSH_PODMAN_PROJECTS_ROOT` | `/projects` | Project root inside every container; also the guest agent's workspace root |
-| `DSH_PODMAN_DEFAULT_IMAGE` | `arch-base` | Default workspace image id |
+| `DSH_PODMAN_DEFAULT_IMAGE` | `arch-base` | Default workspace image id used when creating a workspace |
+| `DSH_PODMAN_ORCHESTRATOR_CONTROL_SOCKET` | `/run/dsh-sockets/control.sock` | Unix socket the plugin uses to reach the orchestrator control plane |
+| `DSH_PODMAN_ORCHESTRATOR_TOKEN` | — | Shared secret authenticating control-plane gRPC calls; see [Variable details](#variable-details) |
+
+The plugin's `projectsRoot` default is `/mnt/project`; all of the above are
+overridable through the plugin's `cordis.yml` config (`controlSocket`,
+`defaultImage`, `projectsRoot`, `controlToken`).
 
 ### Orchestrator (`dsh-podman-orchestrator`)
 
 | Variable | Default | Description |
 |---|---|---|
+| `DSH_PODMAN_DEFAULT_IMAGE` | `arch-base` | Default workspace image id, auto-provisioned on first use |
+| `DSH_PODMAN_GUEST_AGENT_BIN` | `dsh-podman-guest-agent` | Guest agent binary path (container-internal); see [Variable details](#variable-details) |
+| `DSH_PODMAN_GUEST_AGENT_IMAGE` | — | Prebuilt guest-agent image baked into workspace images; unset disables the feature; see [Variable details](#variable-details) |
+| `DSH_PODMAN_GUEST_AGENT_IMAGE_AGENT_BIN` | `/bin/dsh-podman-guest-agent` | Path of the guest agent binary inside the guest-agent image; see [Variable details](#variable-details) |
+| `DSH_PODMAN_GUEST_AGENT_IMAGE_DEST_AGENT_BIN` | `/usr/local/bin/dsh-podman-guest-agent` | Destination path for the copied binary inside built workspace images; see [Variable details](#variable-details) |
+| `DSH_PODMAN_HOST_GUEST_AGENT_BIN` | — | Host-side guest agent binary path; bind-mounted when set; see [Variable details](#variable-details) |
+| `DSH_PODMAN_HOST_PACMAN_CACHE` | — | Host-absolute Buildah cache directory used by workspace-image builds |
+| `DSH_PODMAN_HOST_PROJECTS_ROOT` | `DSH_PODMAN_PROJECTS_ROOT` | Host-side projects root used as the source of bind mounts |
+| `DSH_PODMAN_HOST_SOCKETS_ROOT` | `DSH_PODMAN_ORCHESTRATOR_SOCKETS_ROOT` | Host-side sockets root for guest socket bind mounts |
 | `DSH_PODMAN_ORCHESTRATOR_PODMAN_SOCKET` | required | Podman API socket, e.g. `unix:///run/podman/podman.sock` |
 | `DSH_PODMAN_ORCHESTRATOR_SOCKETS_ROOT` | `/run/dsh-sockets` | Directory for the control socket and per-workspace guest sockets |
 | `DSH_PODMAN_ORCHESTRATOR_STATE` | `/var/lib/dsh-orchestrator` | Persisted state directory |
-| `DSH_PODMAN_HOST_PROJECTS_ROOT` | `DSH_PODMAN_PROJECTS_ROOT` | Host-side projects root used as the source of bind mounts |
-| `DSH_PODMAN_HOST_SOCKETS_ROOT` | `DSH_PODMAN_ORCHESTRATOR_SOCKETS_ROOT` | Host-side sockets root for guest socket bind mounts |
-| `DSH_PODMAN_GUEST_AGENT_BIN` | `dsh-podman-guest-agent` | Guest agent binary path (container-internal); resolved via the image's `PATH` when unset |
-| `DSH_PODMAN_HOST_GUEST_AGENT_BIN` | — | Host-side guest agent binary path; bind-mounted when set |
-| `DSH_PODMAN_HOST_PACMAN_CACHE` | — | Host-absolute Buildah cache directory used by workspace-image builds |
-| `DSH_PODMAN_GUEST_AGENT_IMAGE` | — | Prebuilt guest-agent image baked into workspace images via a multi-stage `COPY`; unset disables the feature (binary is bind-mounted instead) |
-| `DSH_PODMAN_GUEST_AGENT_IMAGE_AGENT_BIN` | `/bin/dsh-podman-guest-agent` | Path of the guest agent binary inside the guest-agent image |
-| `DSH_PODMAN_GUEST_AGENT_IMAGE_DEST_AGENT_BIN` | `/usr/local/bin/dsh-podman-guest-agent` | Destination path for the copied binary inside built workspace images |
-| `DSH_PODMAN_ORCHESTRATOR_TOKEN` | — | Shared secret authenticating control-plane gRPC calls; see below for the expected format |
+| `DSH_PODMAN_ORCHESTRATOR_TOKEN` | — | Shared secret authenticating control-plane gRPC calls; see [Variable details](#variable-details) |
+| `DSH_PODMAN_PROJECTS_ROOT` | `/projects` | Project root inside every container; also the guest agent's workspace root |
 
 ### Guest agent (`dsh-podman-guest-agent`)
 
 | Variable | Default | Description |
 |---|---|---|
 | `DSH_PODMAN_GUEST_SOCKET` | `/run/dsh-sockets/guest.sock` | Unix socket the guest agent serves on |
-| `DSH_PODMAN_GUEST_TOKEN` | — | Bearer token required on every gRPC call |
+| `DSH_PODMAN_GUEST_TOKEN` | — | Bearer token required on every gRPC call; see [Variable details](#variable-details) |
+| `DSH_PODMAN_PROJECTS_ROOT` | `/projects` | Workspace root the guest agent exposes through its filesystem API |
 
-### Plugin (dsh client)
+### Variable details
 
-| Variable | Default | Description |
-|---|---|---|
-| `DSH_PODMAN_ORCHESTRATOR_CONTROL_SOCKET` | `/run/dsh-sockets/control.sock` | Unix socket the plugin uses to reach the orchestrator control plane |
-| `DSH_PODMAN_DEFAULT_IMAGE` | `arch-base` | Default workspace image id used when creating a workspace (see also Shared) |
-| `DSH_PODMAN_ORCHESTRATOR_TOKEN` | — | Shared secret authenticating control-plane gRPC calls; see below for the expected format |
+#### `DSH_PODMAN_GUEST_AGENT_BIN` and `DSH_PODMAN_HOST_GUEST_AGENT_BIN`
 
-The plugin reads the variables above. Its `projectsRoot` default is
-`/mnt/project`; all of them are overridable through the plugin's `cordis.yml`
-config (`controlSocket`, `defaultImage`, `projectsRoot`, `controlToken`).
+A workspace container can run the guest agent either from a host binary
+bind-mounted into it, or from a binary already present in its image.
 
-`DSH_PODMAN_ORCHESTRATOR_TOKEN` is an arbitrary shared secret string that the
-orchestrator and the plugin must agree on; every control-plane request must
-then carry it as the gRPC metadata header `authorization: bearer <token>`. Use
-a long, random value — for example `openssl rand -hex 32` — and set the same
-value on both sides. When the orchestrator has no token set, it accepts
-unauthenticated control-plane calls (relying on the socket's file permissions
-instead); when a token is set, requests without the matching header are
-rejected with `Unauthenticated`.
+`DSH_PODMAN_HOST_GUEST_AGENT_BIN` is the path *on the host* of the guest agent
+binary. Setting it enables a bind mount of that binary into the workspace
+container. It is unset by default, so by default no bind mount is added and the
+binary must already be present in the image — either baked in via the
+multi-stage build below, or found through the image's `PATH`.
+
+`DSH_PODMAN_GUEST_AGENT_BIN` is the path of the guest agent binary *inside* the
+workspace container. It is both the command the orchestrator starts and the
+destination where `DSH_PODMAN_HOST_GUEST_AGENT_BIN` is bind-mounted when that
+variable is set. When no bind mount is used, a bare name (the default
+`dsh-podman-guest-agent`) is resolved through the image's `PATH`.
+
+#### `DSH_PODMAN_GUEST_AGENT_IMAGE`, `DSH_PODMAN_GUEST_AGENT_IMAGE_AGENT_BIN` and `DSH_PODMAN_GUEST_AGENT_IMAGE_DEST_AGENT_BIN`
+
+Without `DSH_PODMAN_GUEST_AGENT_IMAGE`, the workspace container must get the
+guest agent binary another way — typically a host bind mount (see the previous
+section). When it is set, workspace images are instead built as a multi-stage
+build that pulls the binary out of the prebuilt guest-agent image and bakes it
+into the base image, so no external provisioning is needed:
+
+```
+FROM <DSH_PODMAN_GUEST_AGENT_IMAGE> AS guestagent
+FROM <base-image>
+RUN pacman -Syu --needed --noconfirm <packages...>
+COPY --from=guestagent <agent_bin> <dest_agent_bin>
+ENTRYPOINT ["<dest_agent_bin>"]
+```
+
+`DSH_PODMAN_GUEST_AGENT_IMAGE_AGENT_BIN` is the path of the binary inside the
+guest-agent image (default `/bin/dsh-podman-guest-agent`), and
+`DSH_PODMAN_GUEST_AGENT_IMAGE_DEST_AGENT_BIN` is where it lands in the built
+image (default `/usr/local/bin/dsh-podman-guest-agent`). The binary is only
+baked into the base image — other images are unaffected.
+
+#### `DSH_PODMAN_GUEST_TOKEN`
+
+Shared secret required on every guest-agent gRPC call, carried as the gRPC
+metadata header `authorization: bearer <token>`. In practice the orchestrator
+generates a fresh random token for each workspace and injects it into the
+workspace container (via `DSH_PODMAN_GUEST_TOKEN`), handing the same value to
+the plugin together with the guest socket path — so it normally needs no manual
+configuration.
+
+#### `DSH_PODMAN_ORCHESTRATOR_TOKEN`
+
+An arbitrary shared secret string that the orchestrator and the plugin must
+agree on; every control-plane request carries it as the gRPC metadata header
+`authorization: bearer <token>`. Use a long, random value — for example
+`openssl rand -hex 32` — and set the same value on both sides. When the
+orchestrator has no token set, it accepts unauthenticated control-plane calls
+(relying on the socket's file permissions instead); when a token is set,
+requests without the matching header are rejected with `Unauthenticated`.
 
 ## Container management UI
 

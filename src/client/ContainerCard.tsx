@@ -426,7 +426,11 @@ function ImageItem(props: {
             </tr>
             <tr>
               <th style={thStyle} scope="row">{t("packages")}</th>
-              <td style={tdStyle}>{image.packages.length}</td>
+              <td style={tdStyle}>
+                {image.packages.length === 0
+                  ? t("none")
+                  : image.packages.join(", ")}
+              </td>
             </tr>
           </tbody>
         </table>

@@ -9,7 +9,14 @@ import type { WorkspaceResolver } from "./workspace-binding.js";
 export const CONTAINER_NS = "podman";
 
 const commandSchema = z.object({
-  op: z.union([z.const("refresh"), z.const("remove"), z.const("recreate"), z.const("create")]),
+  op: z.union([
+    z.const("refresh"),
+    z.const("remove"),
+    z.const("recreate"),
+    z.const("create"),
+    z.const("volume_create"),
+    z.const("volume_remove"),
+  ]),
   workspace: z.string().default(""),
   image: z.string().default(""),
   at: z.number().default(0),
@@ -78,11 +85,18 @@ export const settingsSchema = z.object({
       }),
     )
     .default([]),
+  volumes: z
+    .array(
+      z.object({
+        name: z.string().default(""),
+      }),
+    )
+    .default([]),
   command: z.union([commandSchema, z.const(null)]).default(null),
 }) as unknown as z<ContainerSettings>;
 
 export interface CommandRequest {
-  op: "refresh" | "remove" | "recreate" | "create";
+  op: "refresh" | "remove" | "recreate" | "create" | "volume_create" | "volume_remove";
   workspace: string;
   image: string;
   at: number;
@@ -103,6 +117,9 @@ export interface ImageView {
   builtAt: string;
   packages: readonly string[];
 }
+export interface VolumeView {
+  name: string;
+}
 export interface WorkspaceView {
   workspaceSlug: string;
   projectName: string;
@@ -120,6 +137,7 @@ export interface ContainerSettings {
   workspaces: readonly WorkspaceView[];
   containers: readonly ContainerView[];
   images: readonly ImageView[];
+  volumes: readonly VolumeView[];
   command: CommandRequest | null;
 }
 
@@ -206,10 +224,11 @@ export function installContainerSettings(
       if (refreshing) return;
       refreshing = true;
       try {
-        const [containers, images, workspaces] = await Promise.all([
+        const [containers, images, workspaces, volumes] = await Promise.all([
           resolver.control("listContainers", {}),
           resolver.control("listImages", {}),
           resolver.control("listWorkspaces", {}),
+          resolver.control("listVolumes", {}),
         ]);
         await scope.update({
           containers: (containers as any).containers ?? [],
@@ -218,6 +237,9 @@ export function installContainerSettings(
             dshWorkspaceViews(workspaceRegistry, resolver.getConfig().projectsRoot),
             orchestratorWorkspaceViews((workspaces as any).workspaces),
           ),
+          volumes: ((volumes as any).volumes ?? []).map((volume: any) => ({
+            name: volume.name ?? "",
+          })),
           notice: "",
         });
       } catch (error) {
@@ -258,6 +280,12 @@ export function installContainerSettings(
               workspaceSlug: command.workspace,
               imageId: command.image === "" ? undefined : command.image,
             });
+            break;
+          case "volume_create":
+            await resolver.control("createVolume", { name: command.workspace });
+            break;
+          case "volume_remove":
+            await resolver.control("removeVolume", { name: command.workspace });
             break;
         }
         await scope.update({ command: null });

@@ -151,6 +151,9 @@ const EXPECTED_TOOLS = [
   "container_mount_list",
   "container_mount_add",
   "container_mount_remove",
+  "volume_list",
+  "volume_create",
+  "volume_remove",
   "daemon_start",
   "daemon_list",
   "daemon_stop",
@@ -213,16 +216,65 @@ test("mount tools are registered with the expected schemas", () => {
   const addTool = TOOLS.find((entry) => entry.name === "container_mount_add");
   assert.ok(addTool, "container_mount_add registered");
   assert.equal(addTool!.approval, true, "container_mount_add must require approval");
-  assert.deepEqual(addTool!.parameters.required, ["container", "project", "mode"]);
+  assert.deepEqual(addTool!.parameters.required, ["container"]);
   assert.deepEqual(addTool!.parameters.properties.mode.enum, [
     "read_only",
     "read_write",
   ]);
+  assert.deepEqual(addTool!.parameters.properties.kind.enum, [
+    "project",
+    "tmpfs",
+    "volume",
+  ]);
+  assert.equal(
+    typeof addTool!.parameters.properties.volume,
+    "object",
+    "container_mount_add accepts a volume",
+  );
 
   const removeTool = TOOLS.find((entry) => entry.name === "container_mount_remove");
   assert.ok(removeTool, "container_mount_remove registered");
   assert.equal(removeTool!.approval, true, "container_mount_remove must require approval");
-  assert.deepEqual(removeTool!.parameters.required, ["container", "project"]);
+  assert.deepEqual(removeTool!.parameters.required, ["container"]);
+  assert.deepEqual(removeTool!.parameters.properties.kind.enum, [
+    "project",
+    "tmpfs",
+    "volume",
+  ]);
+  assert.equal(
+    typeof removeTool!.parameters.properties.volume,
+    "object",
+    "container_mount_remove accepts a volume",
+  );
+  assert.equal(
+    typeof removeTool!.parameters.properties.destination,
+    "object",
+    "container_mount_remove accepts a destination",
+  );
+});
+
+const VOLUME_TOOLS = ["volume_list", "volume_create", "volume_remove"];
+
+test("volume tools are registered with the expected schemas", () => {
+  for (const name of VOLUME_TOOLS) {
+    const tool = TOOLS.find((entry) => entry.name === name);
+    assert.ok(tool, `${name} registered`);
+    assert.notEqual(tool!.approval, true, `${name} must not require approval`);
+    assert.equal(tool!.parameters.type, "object", `${name} type`);
+    assert.equal(typeof tool!.parameters.properties, "object");
+    assert.ok(Array.isArray(tool!.parameters.required));
+  }
+
+  const listTool = TOOLS.find((entry) => entry.name === "volume_list");
+  assert.deepEqual(listTool!.parameters.required, []);
+
+  const createTool = TOOLS.find((entry) => entry.name === "volume_create");
+  assert.deepEqual(createTool!.parameters.required, ["name"]);
+  assert.equal(createTool!.parameters.properties.name.type, "string");
+
+  const removeTool = TOOLS.find((entry) => entry.name === "volume_remove");
+  assert.deepEqual(removeTool!.parameters.required, ["name"]);
+  assert.equal(removeTool!.parameters.properties.name.type, "string");
 });
 
 test("mount schemas are object-rooted without per-property required", () => {

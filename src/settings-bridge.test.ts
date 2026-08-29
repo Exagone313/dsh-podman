@@ -62,6 +62,7 @@ function baseValue(): Record<string, unknown> {
     workspaces: [],
     containers: [],
     images: [],
+    volumes: [],
     command: null,
   };
 }
@@ -87,6 +88,9 @@ test("refresh on install publishes containers, images and workspaces", async () 
       if (method === "listWorkspaces") {
         return { workspaces: [{ workspaceSlug: "w1", mounts: [{ projectName: "team/app" }] }] };
       }
+      if (method === "listVolumes") {
+        return { volumes: [{ name: "data" }, { name: "cache" }] };
+      }
       return {};
     },
   };
@@ -94,7 +98,7 @@ test("refresh on install publishes containers, images and workspaces", async () 
   await scope.update({}); // settle the queued async refresh
   assert.deepEqual(
     calls.map(([method]) => method),
-    ["listContainers", "listImages", "listWorkspaces"],
+    ["listContainers", "listImages", "listWorkspaces", "listVolumes"],
   );
   assert.equal((scope.value.containers as any[]).length, 1);
   assert.equal((scope.value.images as any[]).length, 1);
@@ -102,6 +106,7 @@ test("refresh on install publishes containers, images and workspaces", async () 
   assert.equal(workspaces.length, 1);
   assert.equal(workspaces[0].workspaceSlug, "w1");
   assert.equal(workspaces[0].projectName, "team/app");
+  assert.deepEqual(scope.value.volumes, [{ name: "data" }, { name: "cache" }]);
 });
 
 test("remove command drives removeContainer and clears the command", async () => {
@@ -183,6 +188,56 @@ test("create command drives createWorkspace with mounts and image", async () => 
     imageId: "img1",
     mounts: [{ projectName: "team", mode: "MOUNT_MODE_READ_WRITE" }],
   });
+  assert.equal(scope.value.command, null);
+});
+
+test("volume_create command drives createVolume with the name", async () => {
+  const scope = fakeScope(baseValue());
+  const calls: Array<[string, unknown]> = [];
+  const resolver: any = {
+    getConfig: () => ({}),
+    setConfig: () => {},
+    async control(method: string, request: unknown) {
+      calls.push([method, request]);
+      if (method === "listContainers") return { containers: [] };
+      if (method === "listImages") return { images: [] };
+      if (method === "listWorkspaces") return { workspaces: [] };
+      if (method === "listVolumes") return { volumes: [] };
+      return {};
+    },
+  };
+  installContainerSettings(fakeContext(scope), resolver);
+  await scope.update({
+    command: { op: "volume_create", workspace: "data", image: "", at: 3 },
+  });
+  await new Promise((resolve) => setImmediate(resolve));
+  const createCall = calls.find(([method]) => method === "createVolume");
+  assert.deepEqual(createCall?.[1], { name: "data" });
+  assert.equal(scope.value.command, null);
+});
+
+test("volume_remove command drives removeVolume with the name", async () => {
+  const scope = fakeScope(baseValue());
+  const calls: Array<[string, unknown]> = [];
+  const resolver: any = {
+    getConfig: () => ({}),
+    setConfig: () => {},
+    async control(method: string, request: unknown) {
+      calls.push([method, request]);
+      if (method === "listContainers") return { containers: [] };
+      if (method === "listImages") return { images: [] };
+      if (method === "listWorkspaces") return { workspaces: [] };
+      if (method === "listVolumes") return { volumes: [] };
+      return {};
+    },
+  };
+  installContainerSettings(fakeContext(scope), resolver);
+  await scope.update({
+    command: { op: "volume_remove", workspace: "cache", image: "", at: 4 },
+  });
+  await new Promise((resolve) => setImmediate(resolve));
+  const removeCall = calls.find(([method]) => method === "removeVolume");
+  assert.deepEqual(removeCall?.[1], { name: "cache" });
   assert.equal(scope.value.command, null);
 });
 

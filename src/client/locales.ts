@@ -38,6 +38,9 @@ export type ContainerPluginKey =
   | "imageTag"
   | "builtAt"
   | "packages"
+  | "volumesTitle"
+  | "createVolume"
+  | "removeVolume"
   | "none"
   | "unavailable"
   | "busy";
@@ -74,6 +77,9 @@ export const en: Record<ContainerPluginKey, string> = {
   imageTag: "Tag",
   builtAt: "Built at",
   packages: "Packages",
+  volumesTitle: "Volumes",
+  createVolume: "Create volume",
+  removeVolume: "Remove",
   none: "None",
   unavailable: "The container plugin is not available.",
   busy: "Working…",
@@ -111,6 +117,9 @@ export const zh: Record<ContainerPluginKey, string> = {
   imageTag: "标签",
   builtAt: "构建时间",
   packages: "软件包",
+  volumesTitle: "卷",
+  createVolume: "创建卷",
+  removeVolume: "移除",
   none: "无",
   unavailable: "容器插件不可用。",
   busy: "处理中…",

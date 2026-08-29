@@ -445,6 +445,99 @@ function ImageItem(props: {
   );
 }
 
+function VolumesSection(props: {
+  t: (key: ContainerPluginKey) => string;
+  volumes: readonly { name: string }[];
+  busy: boolean;
+  writable: boolean;
+  onCreate: (name: string) => void;
+  onRemove: (name: string) => void;
+}): ReactNode {
+  const { t, volumes, busy, writable, onCreate, onRemove } = props;
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState("");
+  const canCreate = name.trim() !== "" && !busy;
+  const submit = (): void => {
+    if (name.trim() === "") return;
+    onCreate(name.trim());
+    setName("");
+  };
+  return (
+    <DisclosureRow
+      icon={<span />}
+      title={t("volumesTitle")}
+      open={open}
+      expandable
+      onToggle={() => setOpen(!open)}
+    >
+      <div style={wsBody}>
+        {volumes.length === 0 ? (
+          <p style={{ ...hint, margin: 0 }}>{t("none")}</p>
+        ) : (
+          volumes.map((volume) => (
+            <div
+              key={volume.name}
+              style={{
+                display: "flex",
+                flexWrap: "wrap",
+                alignItems: "center",
+                gap: "8px",
+              }}
+            >
+              <code
+                style={{
+                  ...greyId,
+                  flex: 1,
+                  fontSize: "13px",
+                  color: "var(--dsw-alias-label-primary)",
+                }}
+              >
+                {volume.name}
+              </code>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={busy}
+                onClick={() => onRemove(volume.name)}
+              >
+                {t("removeVolume")}
+              </Button>
+            </div>
+          ))
+        )}
+        <div
+          style={{
+            display: "flex",
+            flexWrap: "wrap",
+            alignItems: "center",
+            gap: "8px",
+            paddingTop: "8px",
+          }}
+        >
+          <Input
+            value={name}
+            disabled={!writable || busy}
+            placeholder={t("createVolume")}
+            onChange={(event) => setName(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") submit();
+            }}
+            style={{ width: "200px" }}
+          />
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={!writable || !canCreate}
+            onClick={submit}
+          >
+            {t("createVolume")}
+          </Button>
+        </div>
+      </div>
+    </DisclosureRow>
+  );
+}
+
 export function ContainerCard(props: ContainerCardProps): ReactNode {
   const { t } = props;
   const state = props.useContainerCard((snapshot) => snapshot);
@@ -515,6 +608,15 @@ export function ContainerCard(props: ContainerCardProps): ReactNode {
               <ImageItem key={image.imageId} t={t} image={image} />
             ))
           )}
+          <div style={sectionTitle}>{t("volumesTitle")}</div>
+          <VolumesSection
+            t={t}
+            volumes={state.volumes}
+            busy={state.busy}
+            writable={state.writable}
+            onCreate={props.createVolume}
+            onRemove={props.removeVolume}
+          />
           <div style={sectionTitle}>{t("configTitle")}</div>
           <ConfigField
             t={t}

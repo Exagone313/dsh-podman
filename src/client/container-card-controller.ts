@@ -30,6 +30,9 @@ export interface ImageView {
   builtAt: string;
   packages: readonly string[];
 }
+export interface VolumeView {
+  name: string;
+}
 export interface WorkspaceView {
   workspaceSlug: string;
   projectName: string;
@@ -40,7 +43,7 @@ export interface WorkspaceView {
   mounts: readonly { projectName: string; mode: string }[];
 }
 export interface CommandRequest {
-  op: "refresh" | "remove" | "recreate" | "create";
+  op: "refresh" | "remove" | "recreate" | "create" | "volume_create" | "volume_remove";
   workspace: string;
   image: string;
   at: number;
@@ -54,6 +57,7 @@ export interface ContainerSettings {
   workspaces: readonly WorkspaceView[];
   containers: readonly ContainerView[];
   images: readonly ImageView[];
+  volumes: readonly VolumeView[];
   command: CommandRequest | null;
 }
 
@@ -71,6 +75,7 @@ export interface CardState {
   workspaces: readonly WorkspaceView[];
   containers: readonly ContainerView[];
   images: readonly ImageView[];
+  volumes: readonly VolumeView[];
 }
 
 export interface ContainerCardFace {
@@ -81,6 +86,8 @@ export interface ContainerCardFace {
   remove: (workspace: string) => void;
   recreate: (workspace: string, image: string) => void;
   createContainer: (workspace: WorkspaceView) => void;
+  createVolume: (name: string) => void;
+  removeVolume: (name: string) => void;
   editDefaultImage: (text: string) => void;
   saveDefaultImage: () => void;
   discardDefaultImage: () => void;
@@ -126,6 +133,7 @@ export class ContainerCardController {
       workspaces: value?.workspaces ?? [],
       containers: value?.containers ?? [],
       images: value?.images ?? [],
+      volumes: value?.volumes ?? [],
     };
   }
 
@@ -172,6 +180,8 @@ export class ContainerCardController {
           workspace.imageId || this.scope.getSnapshot().value?.defaultImage || "",
           workspace.mounts,
         ),
+      createVolume: (name) => this.command("volume_create", name, ""),
+      removeVolume: (name) => this.command("volume_remove", name, ""),
       editDefaultImage: (text) => this.edit("defaultImage", text),
       saveDefaultImage: () => this.save("defaultImage"),
       discardDefaultImage: () => this.discard("defaultImage"),

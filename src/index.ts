@@ -237,6 +237,11 @@ const mountModeParam = {
   enum: ["read_only", "read_write"],
   description: "Read mode of the mount.",
 };
+const mountKindParam = {
+  type: "string",
+  enum: ["project", "tmpfs", "volume"],
+  description: "Kind of mount: a project bind, a tmpfs, or a named volume.",
+};
 const projectMountItemParam = {
   type: "object",
   additionalProperties: false,
@@ -318,6 +323,7 @@ export const containerMountAddParameters = {
   type: "object",
   properties: {
     container: containerParam,
+    kind: mountKindParam,
     project: { type: "string", description: "Project name to mount." },
     path: { type: "string", description: "Path within the project to mount." },
     destination: {
@@ -325,22 +331,44 @@ export const containerMountAddParameters = {
       description: "Destination path inside the container.",
     },
     mode: mountModeParam,
+    volume: { type: "string", description: "Named volume to mount." },
   },
-  required: ["container", "project", "mode"],
+  required: ["container"],
 };
 export const containerMountRemoveParameters = {
   type: "object",
   properties: {
     container: containerParam,
+    kind: mountKindParam,
     project: { type: "string", description: "Project name to unmount." },
     path: { type: "string", description: "Path within the project to unmount." },
+    volume: { type: "string", description: "Named volume to unmount." },
+    destination: {
+      type: "string",
+      description: "Destination path inside the container.",
+    },
   },
-  required: ["container", "project"],
+  required: ["container"],
 };
 export const containerRemoveParameters = {
   type: "object",
   properties: { container: containerParam },
   required: ["container"],
+};
+export const volumeListParameters = {
+  type: "object",
+  properties: {},
+  required: [] as string[],
+};
+export const volumeCreateParameters = {
+  type: "object",
+  properties: { name: { type: "string", description: "Volume name to create." } },
+  required: ["name"],
+};
+export const volumeRemoveParameters = {
+  type: "object",
+  properties: { name: { type: "string", description: "Volume name to remove." } },
+  required: ["name"],
 };
 export const containerBashParameters = {
   type: "object",
@@ -524,6 +552,9 @@ export const TOOLS: ToolDefinition[] = [
     parameters: containerMountRemoveParameters,
     approval: true,
   },
+  { name: "volume_list", parameters: volumeListParameters },
+  { name: "volume_create", parameters: volumeCreateParameters },
+  { name: "volume_remove", parameters: volumeRemoveParameters },
   { name: "daemon_start", parameters: daemonStartParameters },
   { name: "daemon_list", parameters: daemonListParameters },
   { name: "daemon_stop", parameters: daemonStopParameters },
@@ -563,6 +594,10 @@ const TOOL_DESCRIPTIONS: Record<string, string> = {
     "Add a project mount to a container in the current workspace. Requires approval: adding a mount changes the container filesystem view.",
   container_mount_remove:
     "Remove a project mount from a container in the current workspace. Requires approval: removing a mount changes the container filesystem view.",
+  volume_list:
+    "List the named volumes available to the current workspace.",
+  volume_create: "Create a named volume in the current workspace.",
+  volume_remove: "Remove a named volume from the current workspace.",
   daemon_start:
     "Start a daemon inside a container of the current workspace.",
   daemon_list:
@@ -778,25 +813,69 @@ const toolHandlers: Record<
       })
       .join("\n");
   },
-  container_mount_add: async (resolver, input, exec) =>
-    resolver.control("addContainerMount", {
+  container_mount_add: async (resolver, input, exec) => {
+    const kind = input.kind ?? "project";
+    const mode =
+      input.mode === "read_write"
+        ? "MOUNT_MODE_READ_WRITE"
+        : input.mode === "read_only"
+          ? "MOUNT_MODE_READ_ONLY"
+          : "MOUNT_MODE_READ_WRITE";
+    const request: Record<string, unknown> = {
       workspaceSlug: await sessionWorkspaceSlug(resolver, currentCwd(exec)),
       container: input.container,
-      project: input.project,
-      path: input.path,
-      destination: input.destination,
-      mode:
-        input.mode === "read_write"
-          ? "MOUNT_MODE_READ_WRITE"
-          : "MOUNT_MODE_READ_ONLY",
-    }),
-  container_mount_remove: async (resolver, input, exec) =>
-    resolver.control("removeContainerMount", {
+      kind:
+        kind === "tmpfs"
+          ? "MOUNT_KIND_TMPFS"
+          : kind === "volume"
+            ? "MOUNT_KIND_VOLUME"
+            : "MOUNT_KIND_PROJECT",
+    };
+    if (kind === "volume") {
+      request.volume = input.volume;
+      request.destination = input.destination;
+      request.mode = mode;
+    } else if (kind === "tmpfs") {
+      request.destination = input.destination;
+      request.mode = mode;
+    } else {
+      request.project = input.project;
+      if (input.path !== undefined) request.path = input.path;
+      if (input.destination !== undefined) request.destination = input.destination;
+      request.mode = mode;
+    }
+    return resolver.control("addContainerMount", request);
+  },
+  container_mount_remove: async (resolver, input, exec) => {
+    const kind = input.kind ?? "project";
+    const request: Record<string, unknown> = {
       workspaceSlug: await sessionWorkspaceSlug(resolver, currentCwd(exec)),
       container: input.container,
-      project: input.project,
-      path: input.path,
-    }),
+      kind:
+        kind === "tmpfs"
+          ? "MOUNT_KIND_TMPFS"
+          : kind === "volume"
+            ? "MOUNT_KIND_VOLUME"
+            : "MOUNT_KIND_PROJECT",
+    };
+    if (kind === "project") {
+      request.project = input.project;
+      if (input.path !== undefined) request.path = input.path;
+    } else if (kind === "volume") {
+      if (input.volume !== undefined) request.volume = input.volume;
+    }
+    if (input.destination !== undefined) request.destination = input.destination;
+    return resolver.control("removeContainerMount", request);
+  },
+  volume_list: async (resolver) => {
+    const result = await resolver.control<{ volumes?: any[] }>("listVolumes", {});
+    const rows = (result.volumes ?? []).map((volume: any) => volume.name);
+    return rows.length > 0 ? rows.join("\n") : "(no volumes)";
+  },
+  volume_create: async (resolver, input) =>
+    resolver.control("createVolume", { name: input.name }),
+  volume_remove: async (resolver, input) =>
+    resolver.control("removeVolume", { name: input.name }),
   daemon_start: async (resolver, input, exec) => {
     const binding = await resolveToolBinding(
       resolver,

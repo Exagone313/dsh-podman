@@ -148,6 +148,9 @@ const EXPECTED_TOOLS = [
   "container_edit",
   "container_glob",
   "container_grep",
+  "container_mount_list",
+  "container_mount_add",
+  "container_mount_remove",
   "daemon_start",
   "daemon_list",
   "daemon_stop",
@@ -181,16 +184,78 @@ test("every tool parameters is a valid JSON-Schema object", () => {
   }
 });
 
-test("the four destructive mutations require approval", () => {
+test("the destructive mutations require approval", () => {
   const approval = TOOLS.filter((tool) => tool.approval)
     .map((tool) => tool.name)
     .sort();
   assert.deepEqual(approval, [
+    "container_mount_add",
+    "container_mount_remove",
     "container_recreate",
     "container_replace",
     "image_build",
     "image_rebuild",
   ]);
+});
+
+const MOUNT_TOOLS = [
+  "container_mount_list",
+  "container_mount_add",
+  "container_mount_remove",
+];
+
+test("mount tools are registered with the expected schemas", () => {
+  const listTool = TOOLS.find((entry) => entry.name === "container_mount_list");
+  assert.ok(listTool, "container_mount_list registered");
+  assert.notEqual(listTool!.approval, true, "container_mount_list must not require approval");
+  assert.deepEqual(listTool!.parameters.required, ["container"]);
+
+  const addTool = TOOLS.find((entry) => entry.name === "container_mount_add");
+  assert.ok(addTool, "container_mount_add registered");
+  assert.equal(addTool!.approval, true, "container_mount_add must require approval");
+  assert.deepEqual(addTool!.parameters.required, ["container", "project", "mode"]);
+  assert.deepEqual(addTool!.parameters.properties.mode.enum, [
+    "read_only",
+    "read_write",
+  ]);
+
+  const removeTool = TOOLS.find((entry) => entry.name === "container_mount_remove");
+  assert.ok(removeTool, "container_mount_remove registered");
+  assert.equal(removeTool!.approval, true, "container_mount_remove must require approval");
+  assert.deepEqual(removeTool!.parameters.required, ["container", "project"]);
+});
+
+test("mount schemas are object-rooted without per-property required", () => {
+  for (const name of MOUNT_TOOLS) {
+    const tool = TOOLS.find((entry) => entry.name === name);
+    assert.ok(tool, `${name} registered`);
+    assert.equal(tool!.parameters.type, "object", `${name} type`);
+    assert.equal(typeof tool!.parameters.properties, "object");
+    assert.ok(Array.isArray(tool!.parameters.required));
+    for (const key of Object.keys(tool!.parameters.properties)) {
+      const property = tool!.parameters.properties[key];
+      assert.ok(
+        !Object.prototype.hasOwnProperty.call(property, "required"),
+        `${name}.${key} must not carry per-property required`,
+      );
+    }
+  }
+  for (const name of ["container_start", "container_replace"]) {
+    const tool = TOOLS.find((entry) => entry.name === name);
+    assert.ok(tool, `${name} registered`);
+    const mounts = tool!.parameters.properties.mounts;
+    assert.equal(mounts.type, "array", `${name}.mounts type`);
+    assert.equal(mounts.items.type, "object", `${name}.mounts items type`);
+    assert.equal(mounts.items.additionalProperties, false);
+    assert.deepEqual(mounts.items.required, ["project", "mode"]);
+    for (const key of Object.keys(mounts.items.properties)) {
+      const property = mounts.items.properties[key];
+      assert.ok(
+        !Object.prototype.hasOwnProperty.call(property, "required"),
+        `${name}.mounts.items.${key} must not carry per-property required`,
+      );
+    }
+  }
 });
 
 const DAEMON_TOOLS = [

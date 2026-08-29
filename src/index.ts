@@ -233,6 +233,30 @@ const packageListParam = {
   items: { type: "string" },
   description: "Package names to install.",
 };
+const mountModeParam = {
+  type: "string",
+  enum: ["read_only", "read_write"],
+  description: "Read mode of the mount.",
+};
+const projectMountItemParam = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    project: { type: "string", description: "Project name to mount." },
+    mode: mountModeParam,
+    path: { type: "string", description: "Path within the project to mount." },
+    destination: {
+      type: "string",
+      description: "Destination path inside the container.",
+    },
+  },
+  required: ["project", "mode"],
+};
+const mountsParam = {
+  type: "array",
+  items: projectMountItemParam,
+  description: "Optional project mounts to apply.",
+};
 
 export const imageListParameters = {
   type: "object",
@@ -268,6 +292,7 @@ export const containerStartParameters = {
   properties: {
     container: containerParam,
     image: { type: "string", description: "Optional image ID." },
+    mounts: mountsParam,
   },
   required: ["container"],
 };
@@ -281,8 +306,37 @@ export const containerReplaceParameters = {
   properties: {
     container: containerParam,
     image: { type: "string", description: "Image ID to replace with." },
+    mounts: mountsParam,
   },
   required: ["container", "image"],
+};
+export const containerMountListParameters = {
+  type: "object",
+  properties: { container: containerParam },
+  required: ["container"],
+};
+export const containerMountAddParameters = {
+  type: "object",
+  properties: {
+    container: containerParam,
+    project: { type: "string", description: "Project name to mount." },
+    path: { type: "string", description: "Path within the project to mount." },
+    destination: {
+      type: "string",
+      description: "Destination path inside the container.",
+    },
+    mode: mountModeParam,
+  },
+  required: ["container", "project", "mode"],
+};
+export const containerMountRemoveParameters = {
+  type: "object",
+  properties: {
+    container: containerParam,
+    project: { type: "string", description: "Project name to unmount." },
+    path: { type: "string", description: "Path within the project to unmount." },
+  },
+  required: ["container", "project"],
 };
 export const containerRemoveParameters = {
   type: "object",
@@ -457,6 +511,20 @@ export const TOOLS: ToolDefinition[] = [
   { name: "container_edit", parameters: containerEditParameters },
   { name: "container_glob", parameters: containerGlobParameters },
   { name: "container_grep", parameters: containerGrepParameters },
+  {
+    name: "container_mount_list",
+    parameters: containerMountListParameters,
+  },
+  {
+    name: "container_mount_add",
+    parameters: containerMountAddParameters,
+    approval: true,
+  },
+  {
+    name: "container_mount_remove",
+    parameters: containerMountRemoveParameters,
+    approval: true,
+  },
   { name: "daemon_start", parameters: daemonStartParameters },
   { name: "daemon_list", parameters: daemonListParameters },
   { name: "daemon_stop", parameters: daemonStopParameters },
@@ -490,6 +558,12 @@ const TOOL_DESCRIPTIONS: Record<string, string> = {
     "List files inside a container of the current workspace matching a pattern.",
   container_grep:
     "Search file contents inside a container of the current workspace.",
+  container_mount_list:
+    "List the project mounts of a container in the current workspace.",
+  container_mount_add:
+    "Add a project mount to a container in the current workspace. Requires approval: adding a mount changes the container filesystem view.",
+  container_mount_remove:
+    "Remove a project mount from a container in the current workspace. Requires approval: removing a mount changes the container filesystem view.",
   daemon_start:
     "Start a daemon inside a container of the current workspace.",
   daemon_list:
@@ -559,24 +633,30 @@ const toolHandlers: Record<
     }
     return lines.join("\n");
   },
-  container_start: async (resolver, input, exec) =>
-    resolver.control("startContainer", {
+  container_start: async (resolver, input, exec) => {
+    const mounts = mountsFromInput(input.mounts);
+    return resolver.control("startContainer", {
       workspaceSlug: await sessionWorkspaceSlug(resolver, currentCwd(exec)),
       container: input.container,
       imageId: input.image,
-    }),
+      ...(mounts === undefined ? {} : { mounts }),
+    });
+  },
   container_recreate: async (resolver, input, exec) =>
     resolver.control("recreateContainer", {
       workspaceSlug: await sessionWorkspaceSlug(resolver, currentCwd(exec)),
       container: input.container,
       imageId: "",
     }),
-  container_replace: async (resolver, input, exec) =>
-    resolver.control("replaceContainer", {
+  container_replace: async (resolver, input, exec) => {
+    const mounts = mountsFromInput(input.mounts);
+    return resolver.control("replaceContainer", {
       workspaceSlug: await sessionWorkspaceSlug(resolver, currentCwd(exec)),
       container: input.container,
       imageId: input.image,
-    }),
+      ...(mounts === undefined ? {} : { mounts }),
+    });
+  },
   container_remove: async (resolver, input, exec) =>
     resolver.control("removeContainer", {
       workspaceSlug: await sessionWorkspaceSlug(resolver, currentCwd(exec)),
@@ -669,6 +749,55 @@ const toolHandlers: Record<
       ...(result.stderr ? { stderr: result.stderr.trim() } : {}),
     };
   },
+  container_mount_list: async (resolver, input, exec) => {
+    const slug = await sessionWorkspaceSlug(resolver, currentCwd(exec));
+    const result = await resolver.control<{ containers?: any[] }>(
+      "listContainers",
+      {},
+    );
+    const row = (result.containers ?? []).find(
+      (candidate: any) =>
+        candidate.workspaceSlug === slug &&
+        candidate.containerName === input.container,
+    );
+    if (row === undefined) {
+      throw new Error(
+        `container ${input.container} not found in workspace ${slug}`,
+      );
+    }
+    const mounts = row.mounts ?? [];
+    if (mounts.length === 0) return "(no mounts)";
+    return mounts
+      .map((mount: any) => {
+        const parts = [
+          `project=${mount.projectName}`,
+          `mode=${mount.mode}`,
+          ...(mount.path ? [`path=${mount.path}`] : []),
+          ...(mount.destination ? [`destination=${mount.destination}`] : []),
+        ];
+        return parts.join("  ");
+      })
+      .join("\n");
+  },
+  container_mount_add: async (resolver, input, exec) =>
+    resolver.control("addContainerMount", {
+      workspaceSlug: await sessionWorkspaceSlug(resolver, currentCwd(exec)),
+      container: input.container,
+      project: input.project,
+      path: input.path,
+      destination: input.destination,
+      mode:
+        input.mode === "read_write"
+          ? "MOUNT_MODE_READ_WRITE"
+          : "MOUNT_MODE_READ_ONLY",
+    }),
+  container_mount_remove: async (resolver, input, exec) =>
+    resolver.control("removeContainerMount", {
+      workspaceSlug: await sessionWorkspaceSlug(resolver, currentCwd(exec)),
+      container: input.container,
+      project: input.project,
+      path: input.path,
+    }),
   daemon_start: async (resolver, input, exec) => {
     const binding = await resolveToolBinding(
       resolver,
@@ -740,6 +869,21 @@ const toolHandlers: Record<
     };
   },
 };
+
+function mountsFromInput(
+  mounts: unknown,
+): { projectName: string; mode: string; path?: string; destination?: string }[] | undefined {
+  if (!Array.isArray(mounts) || mounts.length === 0) return undefined;
+  return mounts.map((mount: any) => ({
+    projectName: mount.project,
+    mode:
+      mount.mode === "read_write"
+        ? "MOUNT_MODE_READ_WRITE"
+        : "MOUNT_MODE_READ_ONLY",
+    ...(mount.path ? { path: mount.path } : {}),
+    ...(mount.destination ? { destination: mount.destination } : {}),
+  }));
+}
 
 function registerTools(ctx: any, resolver: WorkspaceResolver): void {
   for (const tool of TOOLS) {

@@ -319,6 +319,23 @@ func TestContainerNameHelpers(t *testing.T) {
 	}
 }
 
+func TestPodNameNeverCollidesWithContainerName(t *testing.T) {
+	slugs := []string{"proj", "a-b_c.1", "default", "x"}
+	logicals := []string{"", "default", "dev", "a1", "x-y"}
+	for _, slug := range slugs {
+		pod := podNameFor(slug)
+		if !strings.HasPrefix(pod, "dsh-pod-") {
+			t.Fatalf("unexpected pod name %q", pod)
+		}
+		for _, logical := range logicals {
+			container := podmanContainerName(slug, logical)
+			if container == pod {
+				t.Fatalf("container name %q collides with pod name %q", container, pod)
+			}
+		}
+	}
+}
+
 func TestContainerByLogical(t *testing.T) {
 	workspace := state.Workspace{Containers: []state.Container{
 		{Name: "default", PodmanName: "dsh-workspace-proj"},

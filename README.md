@@ -216,7 +216,7 @@ blocks dependency build scripts by default anyway).
 **3. Install** into a dsh profile:
 
 ```sh
-dsh plugin --profile web add https://your-host/dsh-podman.tgz
+dsh plugin --profile web add https://your-host/dsh-podman.tgz --allow-build=protobufjs
 ```
 
 `dsh plugin` forwards the URL to pnpm, which installs the package and

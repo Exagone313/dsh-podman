@@ -252,15 +252,16 @@ func (s *Server) ListContainers(context.Context, *ctl.ListContainersRequest) (*c
 }
 
 // containerProto projects a container record onto the control plane's
-// Container message, including the workspace's project mounts.
+// Container message, including the container's effective project mounts
+// (its own list when present, else the workspace's default mounts).
 func containerProto(ws state.Workspace, c state.Container) *ctl.Container {
 	row := &ctl.Container{ContainerName: c.Name, PodmanName: c.PodmanName, WorkspaceSlug: ws.WorkspaceSlug, ImageId: c.ImageID, Status: c.Status, CreatedAt: c.CreatedAt, AgentSocketPath: c.AgentSocketPath, AgentToken: c.AgentToken}
-	for _, mount := range ws.Mounts {
+	for _, mount := range containerMounts(ws, c) {
 		mode := ctl.MountMode_MOUNT_MODE_READ_ONLY
 		if mount.Mode == "read_write" {
 			mode = ctl.MountMode_MOUNT_MODE_READ_WRITE
 		}
-		row.Mounts = append(row.Mounts, &ctl.ProjectMount{ProjectName: mount.ProjectName, Mode: mode})
+		row.Mounts = append(row.Mounts, &ctl.ProjectMount{ProjectName: mount.ProjectName, Path: mount.Path, Destination: mount.Destination, Mode: mode})
 	}
 	return row
 }
@@ -311,7 +312,7 @@ func (s *Server) RecreateContainer(ctx context.Context, request *ctl.RecreateCon
 	if err != nil {
 		return nil, err
 	}
-	podmanMounts, err := s.podmanMounts(workspace.Mounts)
+	podmanMounts, err := s.podmanMounts(containerMounts(workspace, *record))
 	if err != nil {
 		s.log().Error("RecreateContainer project validation failed", "workspace_slug", workspace.WorkspaceSlug, "error", err)
 		return nil, err
@@ -337,7 +338,7 @@ func (s *Server) RecreateContainer(ctx context.Context, request *ctl.RecreateCon
 }
 
 func (s *Server) StartContainer(ctx context.Context, request *ctl.StartContainerRequest) (*ctl.Container, error) {
-	s.log().Info("control request", "method", "StartContainer", "workspace_slug", request.GetWorkspaceSlug(), "container", request.GetContainer(), "image_id", request.GetImageId())
+	s.log().Info("control request", "method", "StartContainer", "workspace_slug", request.GetWorkspaceSlug(), "container", request.GetContainer(), "image_id", request.GetImageId(), "mount_count", len(request.GetMounts()))
 	if !validContainerName(request.GetContainer()) {
 		return nil, status.Error(codes.InvalidArgument, "invalid container name")
 	}
@@ -345,25 +346,29 @@ func (s *Server) StartContainer(ctx context.Context, request *ctl.StartContainer
 	if err != nil {
 		return nil, status.Error(codes.NotFound, "workspace not found")
 	}
-	if s.Podman == nil {
-		return nil, status.Error(codes.FailedPrecondition, "podman is not configured")
-	}
 	imageID := request.GetImageId()
 	if imageID == "" {
 		imageID = defaultImageID()
+	}
+	recordMounts := workspace.Mounts
+	if len(request.GetMounts()) > 0 {
+		recordMounts = stateMounts(request.GetMounts())
+	}
+	record := state.Container{Name: request.GetContainer(), PodmanName: podmanContainerName(workspace.WorkspaceSlug, request.GetContainer()), ImageID: imageID, Mounts: recordMounts}
+	podmanMounts, err := s.podmanMounts(containerMounts(workspace, record))
+	if err != nil {
+		s.log().Error("StartContainer project validation failed", "workspace_slug", workspace.WorkspaceSlug, "error", err)
+		return nil, err
+	}
+	if s.Podman == nil {
+		return nil, status.Error(codes.FailedPrecondition, "podman is not configured")
 	}
 	imageTag, err := s.resolveImageTag(imageID)
 	if err != nil {
 		return nil, err
 	}
-	podmanMounts, err := s.podmanMounts(workspace.Mounts)
-	if err != nil {
-		s.log().Error("StartContainer project validation failed", "workspace_slug", workspace.WorkspaceSlug, "error", err)
-		return nil, err
-	}
-	podmanName := podmanContainerName(workspace.WorkspaceSlug, request.GetContainer())
 	if _, ok := containerByLogical(&workspace, request.GetContainer()); ok {
-		if err := s.Podman.Remove(podmanName); err != nil {
+		if err := s.Podman.Remove(record.PodmanName); err != nil {
 			s.log().Error("control request failed", "method", "StartContainer", "workspace_slug", request.GetWorkspaceSlug(), "container", request.GetContainer(), "error", err)
 			return nil, status.Error(codes.Internal, err.Error())
 		}
@@ -372,21 +377,24 @@ func (s *Server) StartContainer(ctx context.Context, request *ctl.StartContainer
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	if err := s.Podman.CreateWorkspace(podNameFor(workspace.WorkspaceSlug), podmanName, imageTag, secret, podmanMounts); err != nil {
+	if err := s.Podman.CreateWorkspace(podNameFor(workspace.WorkspaceSlug), record.PodmanName, imageTag, secret, podmanMounts); err != nil {
 		s.log().Error("control request failed", "method", "StartContainer", "workspace_slug", request.GetWorkspaceSlug(), "container", request.GetContainer(), "error", err)
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	record := state.Container{Name: request.GetContainer(), PodmanName: podmanName, ImageID: imageID, Status: "running", CreatedAt: time.Now().UTC().Format(time.RFC3339), AgentSocketPath: filepath.Join(s.SocketsRoot, podmanName, "guest.sock"), AgentToken: secret}
+	record.Status = "running"
+	record.CreatedAt = time.Now().UTC().Format(time.RFC3339)
+	record.AgentSocketPath = filepath.Join(s.SocketsRoot, record.PodmanName, "guest.sock")
+	record.AgentToken = secret
 	updated, err := s.upsertContainer(workspace, record)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	s.log().Info("control request completed", "method", "StartContainer", "workspace_slug", request.GetWorkspaceSlug(), "container", request.GetContainer(), "podman_name", podmanName)
+	s.log().Info("control request completed", "method", "StartContainer", "workspace_slug", request.GetWorkspaceSlug(), "container", request.GetContainer(), "podman_name", record.PodmanName)
 	return containerProto(updated, record), nil
 }
 
 func (s *Server) ReplaceContainer(ctx context.Context, request *ctl.ReplaceContainerRequest) (*ctl.Container, error) {
-	s.log().Info("control request", "method", "ReplaceContainer", "workspace_slug", request.GetWorkspaceSlug(), "container", request.GetContainer(), "image_id", request.GetImageId())
+	s.log().Info("control request", "method", "ReplaceContainer", "workspace_slug", request.GetWorkspaceSlug(), "container", request.GetContainer(), "image_id", request.GetImageId(), "mount_count", len(request.GetMounts()))
 	if !validContainerName(request.GetContainer()) {
 		return nil, status.Error(codes.InvalidArgument, "invalid container name")
 	}
@@ -399,16 +407,21 @@ func (s *Server) ReplaceContainer(ctx context.Context, request *ctl.ReplaceConta
 		s.log().Warn("control request failed", "method", "ReplaceContainer", "workspace_slug", request.GetWorkspaceSlug(), "container", request.GetContainer(), "reason", "container not found")
 		return nil, status.Error(codes.NotFound, "container not found")
 	}
+	if len(request.GetMounts()) > 0 {
+		record.Mounts = stateMounts(request.GetMounts())
+	} else {
+		record.Mounts = containerMounts(workspace, *record)
+	}
+	podmanMounts, err := s.podmanMounts(record.Mounts)
+	if err != nil {
+		s.log().Error("ReplaceContainer project validation failed", "workspace_slug", workspace.WorkspaceSlug, "error", err)
+		return nil, err
+	}
 	if s.Podman == nil {
 		return nil, status.Error(codes.FailedPrecondition, "podman is not configured")
 	}
 	imageTag, err := s.resolveImageTag(request.GetImageId())
 	if err != nil {
-		return nil, err
-	}
-	podmanMounts, err := s.podmanMounts(workspace.Mounts)
-	if err != nil {
-		s.log().Error("ReplaceContainer project validation failed", "workspace_slug", workspace.WorkspaceSlug, "error", err)
 		return nil, err
 	}
 	secret, err := token.New()
@@ -428,6 +441,121 @@ func (s *Server) ReplaceContainer(ctx context.Context, request *ctl.ReplaceConta
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 	s.log().Info("control request completed", "method", "ReplaceContainer", "workspace_slug", request.GetWorkspaceSlug(), "container", request.GetContainer(), "image_id", request.GetImageId())
+	return containerProto(updated, *record), nil
+}
+
+// AddContainerMount adds a project mount to a container's mount list and
+// recreates the podman container so the change takes effect.
+func (s *Server) AddContainerMount(ctx context.Context, request *ctl.AddContainerMountRequest) (*ctl.Container, error) {
+	s.log().Info("control request", "method", "AddContainerMount", "workspace_slug", request.GetWorkspaceSlug(), "container", request.GetContainer(), "project", request.GetProject(), "path", request.GetPath())
+	workspace, err := workspaceBySlug(s.Store, request.GetWorkspaceSlug())
+	if err != nil {
+		return nil, status.Error(codes.NotFound, "workspace not found")
+	}
+	record, ok := containerByLogical(&workspace, request.GetContainer())
+	if !ok {
+		s.log().Warn("control request failed", "method", "AddContainerMount", "workspace_slug", request.GetWorkspaceSlug(), "container", request.GetContainer(), "reason", "container not found")
+		return nil, status.Error(codes.NotFound, "container not found")
+	}
+	mode, err := mountModeFromProto(request.GetMode())
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, "invalid mount mode")
+	}
+	newMount := state.Mount{ProjectName: request.GetProject(), Path: request.GetPath(), Destination: request.GetDestination(), Mode: mode}
+	if _, _, err := resolveMount(s.ProjectsRoot, s.HostProjectsRoot, newMount); err != nil {
+		s.log().Error("AddContainerMount project validation failed", "workspace_slug", workspace.WorkspaceSlug, "error", err)
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+	effective := containerMounts(workspace, *record)
+	for _, existing := range effective {
+		if existing.ProjectName == newMount.ProjectName && existing.Path == newMount.Path {
+			return nil, status.Error(codes.AlreadyExists, "mount already exists")
+		}
+	}
+	record.Mounts = append(append([]state.Mount(nil), effective...), newMount)
+	podmanMounts, err := s.podmanMounts(record.Mounts)
+	if err != nil {
+		s.log().Error("AddContainerMount project validation failed", "workspace_slug", workspace.WorkspaceSlug, "error", err)
+		return nil, err
+	}
+	if s.Podman == nil {
+		return nil, status.Error(codes.FailedPrecondition, "podman is not configured")
+	}
+	imageTag, err := s.resolveImageTag(record.ImageID)
+	if err != nil {
+		return nil, err
+	}
+	secret, err := token.New()
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	if err := s.Podman.RecreateWorkspace(podNameFor(workspace.WorkspaceSlug), record.PodmanName, imageTag, secret, podmanMounts); err != nil {
+		s.log().Error("control request failed", "method", "AddContainerMount", "workspace_slug", request.GetWorkspaceSlug(), "container", request.GetContainer(), "error", err)
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	record.Status = "running"
+	record.AgentToken = secret
+	updated, err := s.upsertContainer(workspace, *record)
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	s.log().Info("control request completed", "method", "AddContainerMount", "workspace_slug", request.GetWorkspaceSlug(), "container", request.GetContainer(), "project", request.GetProject(), "path", request.GetPath())
+	return containerProto(updated, *record), nil
+}
+
+// RemoveContainerMount removes a project mount from a container's mount list
+// and recreates the podman container so the change takes effect.
+func (s *Server) RemoveContainerMount(ctx context.Context, request *ctl.RemoveContainerMountRequest) (*ctl.Container, error) {
+	s.log().Info("control request", "method", "RemoveContainerMount", "workspace_slug", request.GetWorkspaceSlug(), "container", request.GetContainer(), "project", request.GetProject(), "path", request.GetPath())
+	workspace, err := workspaceBySlug(s.Store, request.GetWorkspaceSlug())
+	if err != nil {
+		return nil, status.Error(codes.NotFound, "workspace not found")
+	}
+	record, ok := containerByLogical(&workspace, request.GetContainer())
+	if !ok {
+		s.log().Warn("control request failed", "method", "RemoveContainerMount", "workspace_slug", request.GetWorkspaceSlug(), "container", request.GetContainer(), "reason", "container not found")
+		return nil, status.Error(codes.NotFound, "container not found")
+	}
+	effective := containerMounts(workspace, *record)
+	index := -1
+	for i, existing := range effective {
+		if existing.ProjectName == request.GetProject() && existing.Path == request.GetPath() {
+			index = i
+			break
+		}
+	}
+	if index < 0 {
+		s.log().Warn("control request failed", "method", "RemoveContainerMount", "workspace_slug", request.GetWorkspaceSlug(), "container", request.GetContainer(), "reason", "mount not found")
+		return nil, status.Error(codes.NotFound, "mount not found")
+	}
+	record.Mounts = append(append([]state.Mount(nil), effective[:index]...), effective[index+1:]...)
+	podmanMounts, err := s.podmanMounts(record.Mounts)
+	if err != nil {
+		s.log().Error("RemoveContainerMount project validation failed", "workspace_slug", workspace.WorkspaceSlug, "error", err)
+		return nil, err
+	}
+	if s.Podman == nil {
+		return nil, status.Error(codes.FailedPrecondition, "podman is not configured")
+	}
+	imageTag, err := s.resolveImageTag(record.ImageID)
+	if err != nil {
+		return nil, err
+	}
+	secret, err := token.New()
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	if err := s.Podman.RecreateWorkspace(podNameFor(workspace.WorkspaceSlug), record.PodmanName, imageTag, secret, podmanMounts); err != nil {
+		s.log().Error("control request failed", "method", "RemoveContainerMount", "workspace_slug", request.GetWorkspaceSlug(), "container", request.GetContainer(), "error", err)
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	record.Status = "running"
+	record.AgentToken = secret
+	updated, err := s.upsertContainer(workspace, *record)
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	s.log().Info("control request completed", "method", "RemoveContainerMount", "workspace_slug", request.GetWorkspaceSlug(), "container", request.GetContainer(), "project", request.GetProject(), "path", request.GetPath())
 	return containerProto(updated, *record), nil
 }
 
@@ -523,7 +651,18 @@ func (s *Server) CreateWorkspace(ctx context.Context, request *ctl.CreateWorkspa
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 	mounts := stateMounts(request.GetMounts())
-	podmanMounts, mountErr := s.podmanMounts(mounts)
+	defaultMounts := mounts
+	if existing, storeErr := s.Store.Workspaces(); storeErr == nil {
+		for _, workspace := range existing {
+			if workspace.WorkspaceSlug == request.GetWorkspaceSlug() {
+				if record, ok := containerByLogical(&workspace, "default"); ok && len(record.Mounts) > 0 {
+					defaultMounts = record.Mounts
+				}
+				break
+			}
+		}
+	}
+	podmanMounts, mountErr := s.podmanMounts(defaultMounts)
 	if mountErr != nil {
 		s.log().Error("CreateWorkspace project validation failed", "root", s.ProjectsRoot, "error", mountErr)
 		return nil, mountErr
@@ -557,7 +696,7 @@ func (s *Server) CreateWorkspace(ctx context.Context, request *ctl.CreateWorkspa
 	}
 	agentSocket := filepath.Join(s.SocketsRoot, name, "guest.sock")
 	createdAt := time.Now().UTC().Format(time.RFC3339)
-	workspace := state.Workspace{WorkspaceSlug: request.GetWorkspaceSlug(), ContainerName: name, ImageID: request.GetImageId(), Mounts: mounts, Status: "running", AgentSocketPath: agentSocket, AgentToken: secret, CreatedAt: createdAt, Containers: []state.Container{{Name: "default", PodmanName: name, ImageID: request.GetImageId(), Status: "running", CreatedAt: createdAt, AgentSocketPath: agentSocket, AgentToken: secret}}}
+	workspace := state.Workspace{WorkspaceSlug: request.GetWorkspaceSlug(), ContainerName: name, ImageID: request.GetImageId(), Mounts: mounts, Status: "running", AgentSocketPath: agentSocket, AgentToken: secret, CreatedAt: createdAt, Containers: []state.Container{{Name: "default", PodmanName: name, ImageID: request.GetImageId(), Mounts: defaultMounts, Status: "running", CreatedAt: createdAt, AgentSocketPath: agentSocket, AgentToken: secret}}}
 	if err := s.Store.UpdateWorkspaces(func(all []state.Workspace) ([]state.Workspace, error) {
 		replaced := false
 		for i := range all {
@@ -748,38 +887,123 @@ func (s *Server) resolveImageTag(imageID string) (string, error) {
 	return "", status.Error(codes.NotFound, "built image not found")
 }
 
+// containerMounts returns the mounts that apply to a container: its own list
+// when present, otherwise the workspace's default mounts (read-time fallback
+// for state written before per-container mounts existed).
+func containerMounts(ws state.Workspace, c state.Container) []state.Mount {
+	if len(c.Mounts) > 0 {
+		return c.Mounts
+	}
+	return ws.Mounts
+}
+
 // stateMounts projects the control plane's project mounts onto the state
 // model's read_only/read_write representation.
 func stateMounts(mounts []*ctl.ProjectMount) []state.Mount {
 	result := make([]state.Mount, 0, len(mounts))
 	for _, mount := range mounts {
-		mode := "read_only"
-		if mount.GetMode() == ctl.MountMode_MOUNT_MODE_READ_WRITE {
-			mode = "read_write"
-		}
-		result = append(result, state.Mount{ProjectName: mount.GetProjectName(), Mode: mode})
+		result = append(result, mountFromProto(mount))
 	}
 	return result
 }
 
-// podmanMounts builds the bind mounts handed to podman from the workspace's
-// stored mounts, resolving host paths through HostProjectsRoot.
+// mountFromProto maps a control plane project mount onto its state
+// representation.
+func mountFromProto(mount *ctl.ProjectMount) state.Mount {
+	mode := "read_only"
+	if mount.GetMode() == ctl.MountMode_MOUNT_MODE_READ_WRITE {
+		mode = "read_write"
+	}
+	return state.Mount{ProjectName: mount.GetProjectName(), Path: mount.GetPath(), Destination: mount.GetDestination(), Mode: mode}
+}
+
+// mountModeFromProto maps a control plane mount mode onto the state's
+// read_only/read_write representation, rejecting unspecified modes.
+func mountModeFromProto(mode ctl.MountMode) (string, error) {
+	switch mode {
+	case ctl.MountMode_MOUNT_MODE_READ_WRITE:
+		return "read_write", nil
+	case ctl.MountMode_MOUNT_MODE_READ_ONLY:
+		return "read_only", nil
+	default:
+		return "", fmt.Errorf("invalid mount mode")
+	}
+}
+
+// validMountSubpath reports whether path is an acceptable project subpath:
+// empty (the project root), or a relative path with no "." / ".." segments,
+// redundant separators, or absolute form.
+func validMountSubpath(path string) bool {
+	if path == "" {
+		return true
+	}
+	raw := filepath.FromSlash(path)
+	cleaned := filepath.Clean(raw)
+	return !filepath.IsAbs(raw) && cleaned == raw && cleaned != "." && cleaned != ".." && !strings.HasPrefix(cleaned, ".."+string(filepath.Separator))
+}
+
+// validMountDestination reports whether dest is an acceptable container mount
+// destination: an absolute path under projectsRoot with no ".." segments.
+func validMountDestination(projectsRoot, dest string) bool {
+	if !filepath.IsAbs(dest) {
+		return false
+	}
+	cleaned := filepath.Clean(dest)
+	if cleaned != dest {
+		return false
+	}
+	root := filepath.Clean(projectsRoot)
+	return cleaned == root || strings.HasPrefix(cleaned, root+string(filepath.Separator))
+}
+
+// resolveMount resolves a single stored mount to its host source path and its
+// container destination path, validating the project, the subpath, and (when
+// set) the destination. The empty destination defaults to a mirror of the host
+// source under projectsRoot.
+func resolveMount(projectsRoot, hostProjectsRoot string, mount state.Mount) (hostPath, destination string, err error) {
+	projectPath, err := ValidateProject(projectsRoot, mount.ProjectName)
+	if err != nil {
+		return "", "", err
+	}
+	if !validMountSubpath(mount.Path) {
+		return "", "", fmt.Errorf("invalid mount path")
+	}
+	subpath := filepath.FromSlash(mount.Path)
+	if info, statErr := os.Stat(filepath.Join(projectsRoot, mount.ProjectName, subpath)); statErr != nil || !info.IsDir() {
+		return "", "", fmt.Errorf("mount path %q does not exist under project %q", mount.Path, mount.ProjectName)
+	}
+	hostPath = projectPath
+	if hostProjectsRoot != "" {
+		hostPath = filepath.Join(hostProjectsRoot, filepath.FromSlash(mount.ProjectName))
+	}
+	if subpath != "" {
+		hostPath = filepath.Join(hostPath, subpath)
+	}
+	destination = filepath.Join(projectsRoot, mount.ProjectName, subpath)
+	if mount.Destination != "" {
+		if !validMountDestination(projectsRoot, mount.Destination) {
+			return "", "", fmt.Errorf("invalid mount destination")
+		}
+		destination = mount.Destination
+	}
+	return hostPath, destination, nil
+}
+
+// podmanMounts builds the bind mounts handed to podman from the stored mounts,
+// resolving host paths through HostProjectsRoot and container destinations
+// under ProjectsRoot.
 func (s *Server) podmanMounts(mounts []state.Mount) ([]specs.Mount, error) {
 	podmanMounts := make([]specs.Mount, 0, len(mounts))
 	for _, mount := range mounts {
-		path, pathErr := ValidateProject(s.ProjectsRoot, mount.ProjectName)
-		if pathErr != nil {
-			return nil, status.Error(codes.InvalidArgument, pathErr.Error())
-		}
-		hostPath := path
-		if s.HostProjectsRoot != "" {
-			hostPath = filepath.Join(s.HostProjectsRoot, filepath.FromSlash(mount.ProjectName))
+		hostPath, destination, err := resolveMount(s.ProjectsRoot, s.HostProjectsRoot, mount)
+		if err != nil {
+			return nil, status.Error(codes.InvalidArgument, err.Error())
 		}
 		options := []string{"ro"}
 		if mount.Mode == "read_write" {
 			options = []string{"rw"}
 		}
-		podmanMounts = append(podmanMounts, specs.Mount{Type: "bind", Source: hostPath, Destination: filepath.Join(s.ProjectsRoot, mount.ProjectName), Options: options})
+		podmanMounts = append(podmanMounts, specs.Mount{Type: "bind", Source: hostPath, Destination: destination, Options: options})
 	}
 	return podmanMounts, nil
 }
@@ -878,7 +1102,7 @@ func toProto(workspace state.Workspace) *ctl.Workspace {
 		if mount.Mode == "read_write" {
 			mode = ctl.MountMode_MOUNT_MODE_READ_WRITE
 		}
-		result.Mounts = append(result.Mounts, &ctl.ProjectMount{ProjectName: mount.ProjectName, Mode: mode})
+		result.Mounts = append(result.Mounts, &ctl.ProjectMount{ProjectName: mount.ProjectName, Path: mount.Path, Destination: mount.Destination, Mode: mode})
 	}
 	return result
 }

@@ -203,3 +203,35 @@ func TestNewCreatesDirectory(t *testing.T) {
 		t.Fatalf("state directory not created: %v", statErr)
 	}
 }
+
+func TestContainerMountsRoundTrip(t *testing.T) {
+	store, err := New(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	workspaces := []Workspace{{
+		WorkspaceSlug: "proj",
+		Mounts:        []Mount{{ProjectName: "team", Mode: "read_write"}},
+		Containers: []Container{{
+			Name:       "default",
+			PodmanName: "dsh-workspace-proj",
+			ImageID:    "arch",
+			Status:     "running",
+			Mounts:     []Mount{{ProjectName: "team", Mode: "read_only", Path: "src/lib", Destination: "/workspaces/team/src/lib"}},
+		}},
+	}}
+	if err := store.SaveWorkspaces(workspaces); err != nil {
+		t.Fatal(err)
+	}
+	got, err := store.Workspaces()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 1 || len(got[0].Containers) != 1 {
+		t.Fatalf("round trip mismatch: %#v", got)
+	}
+	mounts := got[0].Containers[0].Mounts
+	if len(mounts) != 1 || mounts[0].ProjectName != "team" || mounts[0].Mode != "read_only" || mounts[0].Path != "src/lib" || mounts[0].Destination != "/workspaces/team/src/lib" {
+		t.Fatalf("container mounts did not survive round trip: %#v", mounts)
+	}
+}

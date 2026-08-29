@@ -24,15 +24,18 @@ type Image struct {
 type Mount struct {
 	ProjectName string `toml:"project_name"`
 	Mode        string `toml:"mode"`
+	Path        string `toml:"path,omitempty"`
+	Destination string `toml:"destination,omitempty"`
 }
 type Container struct {
-	Name            string `toml:"name"` // "default" or logical name
-	PodmanName      string `toml:"podman_name"`
-	ImageID         string `toml:"image_id"`
-	Status          string `toml:"status"`
-	CreatedAt       string `toml:"created_at"`
-	AgentSocketPath string `toml:"agent_socket_path"`
-	AgentToken      string `toml:"agent_token"`
+	Name            string  `toml:"name"` // "default" or logical name
+	PodmanName      string  `toml:"podman_name"`
+	ImageID         string  `toml:"image_id"`
+	Status          string  `toml:"status"`
+	CreatedAt       string  `toml:"created_at"`
+	AgentSocketPath string  `toml:"agent_socket_path"`
+	AgentToken      string  `toml:"agent_token"`
+	Mounts          []Mount `toml:"mounts"`
 }
 type Workspace struct {
 	WorkspaceSlug   string      `toml:"workspace_slug"`

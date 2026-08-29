@@ -23,21 +23,23 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	OrchestratorControl_ListProjects_FullMethodName      = "/dshctl.v1.OrchestratorControl/ListProjects"
-	OrchestratorControl_CreateWorkspace_FullMethodName   = "/dshctl.v1.OrchestratorControl/CreateWorkspace"
-	OrchestratorControl_DescribeWorkspace_FullMethodName = "/dshctl.v1.OrchestratorControl/DescribeWorkspace"
-	OrchestratorControl_ListWorkspaces_FullMethodName    = "/dshctl.v1.OrchestratorControl/ListWorkspaces"
-	OrchestratorControl_RecreateWorkspace_FullMethodName = "/dshctl.v1.OrchestratorControl/RecreateWorkspace"
-	OrchestratorControl_StopWorkspace_FullMethodName     = "/dshctl.v1.OrchestratorControl/StopWorkspace"
-	OrchestratorControl_ListImages_FullMethodName        = "/dshctl.v1.OrchestratorControl/ListImages"
-	OrchestratorControl_GetImage_FullMethodName          = "/dshctl.v1.OrchestratorControl/GetImage"
-	OrchestratorControl_BuildImage_FullMethodName        = "/dshctl.v1.OrchestratorControl/BuildImage"
-	OrchestratorControl_RebuildImage_FullMethodName      = "/dshctl.v1.OrchestratorControl/RebuildImage"
-	OrchestratorControl_ListContainers_FullMethodName    = "/dshctl.v1.OrchestratorControl/ListContainers"
-	OrchestratorControl_StartContainer_FullMethodName    = "/dshctl.v1.OrchestratorControl/StartContainer"
-	OrchestratorControl_RecreateContainer_FullMethodName = "/dshctl.v1.OrchestratorControl/RecreateContainer"
-	OrchestratorControl_ReplaceContainer_FullMethodName  = "/dshctl.v1.OrchestratorControl/ReplaceContainer"
-	OrchestratorControl_RemoveContainer_FullMethodName   = "/dshctl.v1.OrchestratorControl/RemoveContainer"
+	OrchestratorControl_ListProjects_FullMethodName         = "/dshctl.v1.OrchestratorControl/ListProjects"
+	OrchestratorControl_CreateWorkspace_FullMethodName      = "/dshctl.v1.OrchestratorControl/CreateWorkspace"
+	OrchestratorControl_DescribeWorkspace_FullMethodName    = "/dshctl.v1.OrchestratorControl/DescribeWorkspace"
+	OrchestratorControl_ListWorkspaces_FullMethodName       = "/dshctl.v1.OrchestratorControl/ListWorkspaces"
+	OrchestratorControl_RecreateWorkspace_FullMethodName    = "/dshctl.v1.OrchestratorControl/RecreateWorkspace"
+	OrchestratorControl_StopWorkspace_FullMethodName        = "/dshctl.v1.OrchestratorControl/StopWorkspace"
+	OrchestratorControl_ListImages_FullMethodName           = "/dshctl.v1.OrchestratorControl/ListImages"
+	OrchestratorControl_GetImage_FullMethodName             = "/dshctl.v1.OrchestratorControl/GetImage"
+	OrchestratorControl_BuildImage_FullMethodName           = "/dshctl.v1.OrchestratorControl/BuildImage"
+	OrchestratorControl_RebuildImage_FullMethodName         = "/dshctl.v1.OrchestratorControl/RebuildImage"
+	OrchestratorControl_ListContainers_FullMethodName       = "/dshctl.v1.OrchestratorControl/ListContainers"
+	OrchestratorControl_StartContainer_FullMethodName       = "/dshctl.v1.OrchestratorControl/StartContainer"
+	OrchestratorControl_RecreateContainer_FullMethodName    = "/dshctl.v1.OrchestratorControl/RecreateContainer"
+	OrchestratorControl_ReplaceContainer_FullMethodName     = "/dshctl.v1.OrchestratorControl/ReplaceContainer"
+	OrchestratorControl_RemoveContainer_FullMethodName      = "/dshctl.v1.OrchestratorControl/RemoveContainer"
+	OrchestratorControl_AddContainerMount_FullMethodName    = "/dshctl.v1.OrchestratorControl/AddContainerMount"
+	OrchestratorControl_RemoveContainerMount_FullMethodName = "/dshctl.v1.OrchestratorControl/RemoveContainerMount"
 )
 
 // OrchestratorControlClient is the client API for OrchestratorControl service.
@@ -59,6 +61,8 @@ type OrchestratorControlClient interface {
 	RecreateContainer(ctx context.Context, in *RecreateContainerRequest, opts ...grpc.CallOption) (*Workspace, error)
 	ReplaceContainer(ctx context.Context, in *ReplaceContainerRequest, opts ...grpc.CallOption) (*Container, error)
 	RemoveContainer(ctx context.Context, in *RemoveContainerRequest, opts ...grpc.CallOption) (*RemoveContainerResponse, error)
+	AddContainerMount(ctx context.Context, in *AddContainerMountRequest, opts ...grpc.CallOption) (*Container, error)
+	RemoveContainerMount(ctx context.Context, in *RemoveContainerMountRequest, opts ...grpc.CallOption) (*Container, error)
 }
 
 type orchestratorControlClient struct {
@@ -219,6 +223,26 @@ func (c *orchestratorControlClient) RemoveContainer(ctx context.Context, in *Rem
 	return out, nil
 }
 
+func (c *orchestratorControlClient) AddContainerMount(ctx context.Context, in *AddContainerMountRequest, opts ...grpc.CallOption) (*Container, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(Container)
+	err := c.cc.Invoke(ctx, OrchestratorControl_AddContainerMount_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *orchestratorControlClient) RemoveContainerMount(ctx context.Context, in *RemoveContainerMountRequest, opts ...grpc.CallOption) (*Container, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(Container)
+	err := c.cc.Invoke(ctx, OrchestratorControl_RemoveContainerMount_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // OrchestratorControlServer is the server API for OrchestratorControl service.
 // All implementations must embed UnimplementedOrchestratorControlServer
 // for forward compatibility.
@@ -238,6 +262,8 @@ type OrchestratorControlServer interface {
 	RecreateContainer(context.Context, *RecreateContainerRequest) (*Workspace, error)
 	ReplaceContainer(context.Context, *ReplaceContainerRequest) (*Container, error)
 	RemoveContainer(context.Context, *RemoveContainerRequest) (*RemoveContainerResponse, error)
+	AddContainerMount(context.Context, *AddContainerMountRequest) (*Container, error)
+	RemoveContainerMount(context.Context, *RemoveContainerMountRequest) (*Container, error)
 	mustEmbedUnimplementedOrchestratorControlServer()
 }
 
@@ -292,6 +318,12 @@ func (UnimplementedOrchestratorControlServer) ReplaceContainer(context.Context, 
 }
 func (UnimplementedOrchestratorControlServer) RemoveContainer(context.Context, *RemoveContainerRequest) (*RemoveContainerResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method RemoveContainer not implemented")
+}
+func (UnimplementedOrchestratorControlServer) AddContainerMount(context.Context, *AddContainerMountRequest) (*Container, error) {
+	return nil, status.Error(codes.Unimplemented, "method AddContainerMount not implemented")
+}
+func (UnimplementedOrchestratorControlServer) RemoveContainerMount(context.Context, *RemoveContainerMountRequest) (*Container, error) {
+	return nil, status.Error(codes.Unimplemented, "method RemoveContainerMount not implemented")
 }
 func (UnimplementedOrchestratorControlServer) mustEmbedUnimplementedOrchestratorControlServer() {}
 func (UnimplementedOrchestratorControlServer) testEmbeddedByValue()                             {}
@@ -584,6 +616,42 @@ func _OrchestratorControl_RemoveContainer_Handler(srv interface{}, ctx context.C
 	return interceptor(ctx, in, info, handler)
 }
 
+func _OrchestratorControl_AddContainerMount_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(AddContainerMountRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(OrchestratorControlServer).AddContainerMount(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: OrchestratorControl_AddContainerMount_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(OrchestratorControlServer).AddContainerMount(ctx, req.(*AddContainerMountRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _OrchestratorControl_RemoveContainerMount_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RemoveContainerMountRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(OrchestratorControlServer).RemoveContainerMount(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: OrchestratorControl_RemoveContainerMount_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(OrchestratorControlServer).RemoveContainerMount(ctx, req.(*RemoveContainerMountRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // OrchestratorControl_ServiceDesc is the grpc.ServiceDesc for OrchestratorControl service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -650,6 +718,14 @@ var OrchestratorControl_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "RemoveContainer",
 			Handler:    _OrchestratorControl_RemoveContainer_Handler,
+		},
+		{
+			MethodName: "AddContainerMount",
+			Handler:    _OrchestratorControl_AddContainerMount_Handler,
+		},
+		{
+			MethodName: "RemoveContainerMount",
+			Handler:    _OrchestratorControl_RemoveContainerMount_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

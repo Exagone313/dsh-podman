@@ -22,13 +22,20 @@ service OrchestratorControl {
   rpc RecreateContainer(RecreateContainerRequest) returns (Workspace);
   rpc ReplaceContainer(ReplaceContainerRequest) returns (Container);
   rpc RemoveContainer(RemoveContainerRequest) returns (RemoveContainerResponse);
+  rpc AddContainerMount(AddContainerMountRequest) returns (Container);
+  rpc RemoveContainerMount(RemoveContainerMountRequest) returns (Container);
 }
 
 message ListProjectsRequest {}
 message ListProjectsResponse { repeated Project projects = 1; }
 message Project { string name = 1; string host_path = 2; }
 enum MountMode { MOUNT_MODE_UNSPECIFIED = 0; MOUNT_MODE_READ_ONLY = 1; MOUNT_MODE_READ_WRITE = 2; }
-message ProjectMount { string project_name = 1; MountMode mode = 2; }
+message ProjectMount {
+  string project_name = 1;
+  MountMode mode = 2;
+  string path = 3;
+  string destination = 4;
+}
 message CreateWorkspaceRequest { string workspace_slug = 1; string image_id = 2; repeated ProjectMount mounts = 3; }
 message DescribeWorkspaceRequest { string workspace_slug = 1; }
 message ListWorkspacesRequest {}
@@ -65,8 +72,10 @@ message Container {
   string agent_socket_path = 8;
   string agent_token = 9;
 }
-message StartContainerRequest { string workspace_slug = 1; string container = 2; string image_id = 3; }
+message StartContainerRequest { string workspace_slug = 1; string container = 2; string image_id = 3; repeated ProjectMount mounts = 4; }
 message RecreateContainerRequest { string workspace_slug = 1; string image_id = 2; string container = 3; }
-message ReplaceContainerRequest { string workspace_slug = 1; string container = 2; string image_id = 3; }
+message ReplaceContainerRequest { string workspace_slug = 1; string container = 2; string image_id = 3; repeated ProjectMount mounts = 4; }
 message RemoveContainerRequest { string workspace_slug = 1; string container = 2; }
 message RemoveContainerResponse {}
+message AddContainerMountRequest { string workspace_slug = 1; string container = 2; string project = 3; string path = 4; string destination = 5; MountMode mode = 6; }
+message RemoveContainerMountRequest { string workspace_slug = 1; string container = 2; string project = 3; string path = 4; }

@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	entities "github.com/containers/podman/v5/pkg/domain/entities/types"
 	ctl "gitlab.com/Exagone313/dsh-podman/internal/genproto/dshctl/v1"
@@ -226,7 +227,7 @@ func TestWorkspaceContainerRows(t *testing.T) {
 		"dsh-workspace-proj": {WorkspaceSlug: "proj", ImageID: "arch", Mounts: []state.Mount{{ProjectName: "team", Mode: "read_write"}}},
 	}
 	listed := []entities.ListContainer{
-		{Names: []string{"/dsh-workspace-proj"}, State: "running", CreatedAt: "now", Image: "localhost/dsh-podman/arch-base:latest"},
+		{Names: []string{"/dsh-workspace-proj"}, State: "running", Created: time.Date(2026, 8, 29, 10, 0, 0, 0, time.UTC), CreatedAt: "ignored", Image: "localhost/dsh-podman/arch-base:latest"},
 		{Names: []string{"/unrelated"}, State: "running", CreatedAt: "now", Image: "registry.example.com/other"},
 		{Names: []string{"/another"}, State: "exited"},
 	}
@@ -238,8 +239,24 @@ func TestWorkspaceContainerRows(t *testing.T) {
 	if row.ContainerName != "dsh-workspace-proj" || row.WorkspaceSlug != "proj" || row.ImageId != "arch" || row.Status != "running" {
 		t.Fatalf("unexpected row: %#v", row)
 	}
+	if row.CreatedAt != "2026-08-29T10:00:00Z" {
+		t.Fatalf("unexpected createdAt: %q", row.CreatedAt)
+	}
 	if len(row.Mounts) != 1 || row.Mounts[0].ProjectName != "team" || row.Mounts[0].Mode != ctl.MountMode_MOUNT_MODE_READ_WRITE {
 		t.Fatalf("mounts not projected: %#v", row.Mounts)
+	}
+}
+
+func TestWorkspaceContainerRowsFallsBackToCreatedAt(t *testing.T) {
+	byName := map[string]state.Workspace{
+		"dsh-workspace-proj": {WorkspaceSlug: "proj"},
+	}
+	listed := []entities.ListContainer{
+		{Names: []string{"/dsh-workspace-proj"}, State: "running", CreatedAt: "2026-08-29 10:00:00 +0000 UTC"},
+	}
+	rows := workspaceContainerRows(listed, byName)
+	if len(rows) != 1 || rows[0].CreatedAt != "2026-08-29 10:00:00 +0000 UTC" {
+		t.Fatalf("unexpected fallback createdAt: %#v", rows)
 	}
 }
 

@@ -43,14 +43,14 @@ func validWorkspaceSlug(slug string) bool {
 
 type Server struct {
 	ctl.UnimplementedOrchestratorControlServer
-	ProjectsRoot     string
-	HostProjectsRoot string
-	SocketsRoot      string
-	Store            *state.Store
-	Podman           *podman.Client
-	ImageBuilder     *imagebuild.Builder
+	ProjectsRoot      string
+	HostProjectsRoot  string
+	SocketsRoot       string
+	Store             *state.Store
+	Podman            *podman.Client
+	ImageBuilder      *imagebuild.Builder
 	BuildDefaultImage bool
-	Logger           *slog.Logger
+	Logger            *slog.Logger
 }
 
 var defaultPackages = []string{"base-devel", "git", "python", "curl", "wget", "openssh", "ca-certificates", "ripgrep", "fd", "jq", "unzip", "zstd", "less", "procps-ng", "diffutils", "patch", "tree"}
@@ -190,7 +190,11 @@ func workspaceContainerRows(listed []entities.ListContainer, byName map[string]s
 		if !ok {
 			continue
 		}
-		row := &ctl.Container{ContainerName: name, Status: container.State, CreatedAt: container.CreatedAt, WorkspaceSlug: workspace.WorkspaceSlug, ImageId: workspace.ImageID}
+		createdAt := container.CreatedAt
+		if !container.Created.IsZero() {
+			createdAt = container.Created.UTC().Format(time.RFC3339)
+		}
+		row := &ctl.Container{ContainerName: name, Status: container.State, CreatedAt: createdAt, WorkspaceSlug: workspace.WorkspaceSlug, ImageId: workspace.ImageID}
 		for _, mount := range workspace.Mounts {
 			mode := ctl.MountMode_MOUNT_MODE_READ_ONLY
 			if mount.Mode == "read_write" {
@@ -323,6 +327,7 @@ func (s *Server) CreateWorkspace(ctx context.Context, request *ctl.CreateWorkspa
 		if err != nil {
 			return nil, status.Error(codes.Internal, fmt.Sprintf("build default image: %v", err))
 		}
+		image.BuiltAt = time.Now().UTC().Format(time.RFC3339)
 		images = append(images, image)
 		imageIndex = len(images) - 1
 		s.log().Info("CreateWorkspace auto-provisioned image", "image_id", image.ImageID, "image_tag", image.ImageTag)

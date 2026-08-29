@@ -145,6 +145,25 @@ const footerRow: React.CSSProperties = {
   marginTop: "12px",
   borderTop: "1px solid var(--dsw-alias-border-l2)",
 };
+const tableStyle: React.CSSProperties = {
+  width: "100%",
+  borderCollapse: "collapse",
+  fontSize: "13px",
+};
+const thStyle: React.CSSProperties = {
+  textAlign: "left",
+  padding: "6px 10px",
+  borderBottom: "1px solid var(--dsw-alias-border-l2)",
+  color: "var(--dsw-alias-label-secondary)",
+  fontWeight: 600,
+  whiteSpace: "nowrap",
+};
+const tdStyle: React.CSSProperties = {
+  padding: "6px 10px",
+  borderBottom: "1px solid var(--dsw-alias-border-l2)",
+  color: "var(--dsw-alias-label-primary)",
+  verticalAlign: "top",
+};
 const imageSelect: React.CSSProperties = {
   appearance: "none",
   padding: "4px 8px",
@@ -391,20 +410,26 @@ function ImageItem(props: {
       onToggle={() => setOpen(!open)}
     >
       <div style={wsBody}>
-        <div style={meta}>
-          <span>
-            {t("baseImage")}: {image.baseImage}
-          </span>
-          <span>
-            {t("imageTag")}: {image.imageTag}
-          </span>
-          <span>
-            {t("builtAt")}: {image.builtAt}
-          </span>
-          <span>
-            {t("packages")}: {image.packages.length}
-          </span>
-        </div>
+        <table style={tableStyle}>
+          <tbody>
+            <tr>
+              <th style={thStyle} scope="row">{t("baseImage")}</th>
+              <td style={tdStyle}>{image.baseImage}</td>
+            </tr>
+            <tr>
+              <th style={thStyle} scope="row">{t("imageTag")}</th>
+              <td style={tdStyle}>{image.imageTag}</td>
+            </tr>
+            <tr>
+              <th style={thStyle} scope="row">{t("builtAt")}</th>
+              <td style={tdStyle}>{image.builtAt}</td>
+            </tr>
+            <tr>
+              <th style={thStyle} scope="row">{t("packages")}</th>
+              <td style={tdStyle}>{image.packages.length}</td>
+            </tr>
+          </tbody>
+        </table>
       </div>
     </DisclosureRow>
   );

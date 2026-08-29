@@ -459,6 +459,40 @@ func TestBuildImageMissingBase(t *testing.T) {
 	}
 }
 
+func TestResolveBaseTag(t *testing.T) {
+	t.Setenv("DSH_PODMAN_DEFAULT_IMAGE", "arch-base")
+	store := newTestStore(t)
+	images := []state.Image{
+		{ImageID: "arch-base", BaseImage: "docker.io/library/archlinux:latest", ImageTag: "localhost/dsh-podman/arch-base:latest"},
+		{ImageID: "valkey", BaseImage: "localhost/dsh-podman/arch-base:latest", ImageTag: "localhost/dsh-podman/valkey:latest"},
+	}
+	if err := store.SaveImages(images); err != nil {
+		t.Fatal(err)
+	}
+	server := &Server{Store: store, Logger: silentLogger()}
+	cases := map[string]string{
+		"arch-base":                             "localhost/dsh-podman/arch-base:latest",
+		"arch-base:latest":                      "localhost/dsh-podman/arch-base:latest",
+		"localhost/dsh-podman/arch-base":        "localhost/dsh-podman/arch-base:latest",
+		"localhost/dsh-podman/arch-base:latest": "localhost/dsh-podman/arch-base:latest",
+		"valkey":                                "localhost/dsh-podman/valkey:latest",
+		"valkey:latest":                         "localhost/dsh-podman/valkey:latest",
+		"localhost/dsh-podman/valkey:latest":    "localhost/dsh-podman/valkey:latest",
+	}
+	for in, want := range cases {
+		got, err := server.resolveBaseTag(in)
+		if err != nil {
+			t.Fatalf("resolveBaseTag(%q): %v", in, err)
+		}
+		if got != want {
+			t.Fatalf("resolveBaseTag(%q) = %q, want %q", in, got, want)
+		}
+	}
+	if _, err := server.resolveBaseTag("missing"); status.Code(err) != codes.NotFound {
+		t.Fatalf("expected NotFound for missing base, got %v", err)
+	}
+}
+
 func TestCreateWorkspaceRejectsUnknownImage(t *testing.T) {
 	t.Setenv("DSH_PODMAN_DEFAULT_IMAGE", "arch-base")
 	server := &Server{Store: newTestStore(t), Logger: silentLogger()}

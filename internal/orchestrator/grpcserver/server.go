@@ -846,19 +846,11 @@ func (s *Server) BuildImage(_ context.Context, request *ctl.BuildImageRequest) (
 		return nil, status.Error(codes.FailedPrecondition, "image builder is not configured")
 	}
 	base := request.GetBaseImage()
-	if base == defaultImageID() {
-		def, err := s.defaultImage()
-		if err != nil {
-			return nil, err
-		}
-		base = def.ImageTag
-	} else {
-		tag, err := s.resolveImageTag(base)
-		if err != nil {
-			return nil, err
-		}
-		base = tag
+	tag, err := s.resolveBaseTag(base)
+	if err != nil {
+		return nil, err
 	}
+	base = tag
 	image := state.Image{ImageID: imageID, BaseImage: base, Packages: append([]string(nil), request.GetPackages()...)}
 	stored, err := s.buildImage(imageID, image)
 	if err != nil {
@@ -964,6 +956,49 @@ func (s *Server) defaultImage() (state.Image, error) {
 	}
 	s.log().Info("auto-provisioned default image", "image_id", image.ImageID, "image_tag", image.ImageTag)
 	return image, nil
+}
+
+// resolveBaseTag resolves a base image reference from an image build request to
+// a concrete tag. The reference may be a stored image id (with or without a tag
+// suffix), a fully-qualified id, or an already-qualified tag such as
+// "localhost/dsh-podman/arch-base:latest".
+func (s *Server) resolveBaseTag(base string) (string, error) {
+	images, err := s.Store.Images()
+	if err != nil {
+		return "", status.Error(codes.Internal, err.Error())
+	}
+	// Already a concrete tag of a built image.
+	for _, image := range images {
+		if image.ImageTag == base {
+			return base, nil
+		}
+	}
+	// Normalize a trailing ":tag" so ids with and without a tag both resolve.
+	id := base
+	if stripped, _, hasTag := strings.Cut(base, ":"); hasTag {
+		id = stripped
+	}
+	if isDefaultImageID(id) {
+		def, err := s.defaultImage()
+		if err != nil {
+			return "", err
+		}
+		return def.ImageTag, nil
+	}
+	for _, image := range images {
+		if image.ImageID == id || strings.TrimPrefix(image.ImageID, imagePrefix()) == strings.TrimPrefix(id, imagePrefix()) {
+			if image.ImageTag != "" {
+				return image.ImageTag, nil
+			}
+		}
+	}
+	return "", status.Error(codes.NotFound, fmt.Sprintf("base image %q not found", base))
+}
+
+// isDefaultImageID reports whether id refers to the default (base) image, in
+// either its short or fully-qualified form.
+func isDefaultImageID(id string) bool {
+	return strings.TrimPrefix(id, imagePrefix()) == strings.TrimPrefix(defaultImageID(), imagePrefix())
 }
 
 // resolveImageTag returns the stored image tag for imageID, or a NotFound

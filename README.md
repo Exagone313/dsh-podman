@@ -140,6 +140,18 @@ orchestrator has no token set, it accepts unauthenticated control-plane calls
 (relying on the socket's file permissions instead); when a token is set,
 requests without the matching header are rejected with `Unauthenticated`.
 
+#### `DSH_PODMAN_SOCKETS_ROOT` and `DSH_PODMAN_HOST_SOCKETS_ROOT`
+
+The orchestrator listens on `<DSH_PODMAN_SOCKETS_ROOT>/orchestrator.sock` for
+control-plane calls. Each workspace container gets exactly one socket directory
+bind-mounted into it: the host directory `<DSH_PODMAN_HOST_SOCKETS_ROOT>/<container>`
+is mounted at `<DSH_PODMAN_SOCKETS_ROOT>/<container>` inside the container,
+where the guest agent creates its `guest.sock`. Because only that single
+per-workspace directory is mounted, a workspace container never sees the
+orchestrator's `orchestrator.sock` nor any other workspace's socket directory.
+On the host, the sockets root is created with mode `0700` and the control socket
+with `0600`, so only the orchestrator user can reach them.
+
 ## Container management UI
 
 The plugin ships a browser half (`./client`, built to `dist/client`) that

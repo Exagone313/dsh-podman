@@ -12,10 +12,9 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-	"time"
 
-	entities "github.com/containers/podman/v5/pkg/domain/entities/types"
 	ctl "gitlab.com/Exagone313/dsh-podman/internal/genproto/dshctl/v1"
+	imagebuild "gitlab.com/Exagone313/dsh-podman/internal/orchestrator/images"
 	"gitlab.com/Exagone313/dsh-podman/internal/orchestrator/state"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -187,11 +186,44 @@ func TestDescribeWorkspaceNotFound(t *testing.T) {
 	}
 }
 
-func TestListContainersRequiresPodman(t *testing.T) {
-	server := &Server{Store: newTestStore(t), Logger: silentLogger()}
-	_, err := server.ListContainers(context.Background(), &ctl.ListContainersRequest{})
-	if status.Code(err) != codes.FailedPrecondition {
-		t.Fatalf("expected FailedPrecondition, got %v", err)
+func TestListContainersStateDriven(t *testing.T) {
+	store := newTestStore(t)
+	if err := store.SaveWorkspaces([]state.Workspace{{WorkspaceSlug: "proj", ContainerName: "dsh-workspace-proj", Status: "running"}}); err != nil {
+		t.Fatal(err)
+	}
+	server := &Server{Store: store, Logger: silentLogger()}
+	response, err := server.ListContainers(context.Background(), &ctl.ListContainersRequest{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(response.Containers) != 1 || response.Containers[0].ContainerName != "default" || response.Containers[0].PodmanName != "dsh-workspace-proj" || response.Containers[0].WorkspaceSlug != "proj" || response.Containers[0].Status != "running" {
+		t.Fatalf("unexpected containers: %#v", response.Containers)
+	}
+}
+
+func TestListContainersSorted(t *testing.T) {
+	store := newTestStore(t)
+	workspaces := []state.Workspace{
+		{WorkspaceSlug: "b", Containers: []state.Container{{Name: "default", PodmanName: "dsh-workspace-b", Status: "running"}}},
+		{WorkspaceSlug: "a", Containers: []state.Container{
+			{Name: "dev", PodmanName: "dsh-workspace-a-dev", Status: "running"},
+			{Name: "default", PodmanName: "dsh-workspace-a", Status: "running"},
+		}},
+	}
+	if err := store.SaveWorkspaces(workspaces); err != nil {
+		t.Fatal(err)
+	}
+	server := &Server{Store: store, Logger: silentLogger()}
+	response, err := server.ListContainers(context.Background(), &ctl.ListContainersRequest{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var names []string
+	for _, container := range response.Containers {
+		names = append(names, container.WorkspaceSlug+":"+container.ContainerName)
+	}
+	if got, want := strings.Join(names, ","), "a:default,a:dev,b:default"; got != want {
+		t.Fatalf("containers not sorted: %v, want %v", got, want)
 	}
 }
 
@@ -222,41 +254,188 @@ func TestDescribeWorkspaceRejectsInvalidContainerName(t *testing.T) {
 	}
 }
 
-func TestWorkspaceContainerRows(t *testing.T) {
-	byName := map[string]state.Workspace{
-		"dsh-workspace-proj": {WorkspaceSlug: "proj", ImageID: "arch", Mounts: []state.Mount{{ProjectName: "team", Mode: "read_write"}}},
+func TestContainerRows(t *testing.T) {
+	workspaces := []state.Workspace{{
+		WorkspaceSlug: "proj",
+		Mounts:        []state.Mount{{ProjectName: "team", Mode: "read_write"}},
+		Containers: []state.Container{
+			{Name: "default", PodmanName: "dsh-workspace-proj", ImageID: "arch", Status: "running", CreatedAt: "now", AgentSocketPath: "/sock/default", AgentToken: "tok-default"},
+			{Name: "dev", PodmanName: "dsh-workspace-proj-dev", ImageID: "devimg", Status: "running", CreatedAt: "later", AgentSocketPath: "/sock/dev", AgentToken: "tok-dev"},
+		},
+	}}
+	exists := func(podmanName string) bool {
+		return podmanName == "dsh-workspace-proj-dev"
 	}
-	listed := []entities.ListContainer{
-		{Names: []string{"/dsh-workspace-proj"}, State: "running", Created: time.Date(2026, 8, 29, 10, 0, 0, 0, time.UTC), CreatedAt: "ignored", Image: "localhost/dsh-podman/arch-base:latest"},
-		{Names: []string{"/unrelated"}, State: "running", CreatedAt: "now", Image: "registry.example.com/other"},
-		{Names: []string{"/another"}, State: "exited"},
+	rows := containerRows(workspaces, exists)
+	if len(rows) != 2 {
+		t.Fatalf("expected both containers, got %#v", rows)
 	}
-	rows := workspaceContainerRows(listed, byName)
-	if len(rows) != 1 {
-		t.Fatalf("expected only the workspace container, got %#v", rows)
+	def := rows[0]
+	if def.ContainerName != "default" || def.PodmanName != "dsh-workspace-proj" || def.WorkspaceSlug != "proj" || def.ImageId != "arch" || def.Status != "not started" || def.CreatedAt != "now" || def.AgentSocketPath != "/sock/default" || def.AgentToken != "tok-default" {
+		t.Fatalf("default row mismatch: %#v", def)
 	}
-	row := rows[0]
-	if row.ContainerName != "dsh-workspace-proj" || row.WorkspaceSlug != "proj" || row.ImageId != "arch" || row.Status != "running" {
-		t.Fatalf("unexpected row: %#v", row)
+	dev := rows[1]
+	if dev.ContainerName != "dev" || dev.PodmanName != "dsh-workspace-proj-dev" || dev.WorkspaceSlug != "proj" || dev.ImageId != "devimg" || dev.Status != "running" || dev.CreatedAt != "later" || dev.AgentSocketPath != "/sock/dev" || dev.AgentToken != "tok-dev" {
+		t.Fatalf("named row mismatch: %#v", dev)
 	}
-	if row.CreatedAt != "2026-08-29T10:00:00Z" {
-		t.Fatalf("unexpected createdAt: %q", row.CreatedAt)
-	}
-	if len(row.Mounts) != 1 || row.Mounts[0].ProjectName != "team" || row.Mounts[0].Mode != ctl.MountMode_MOUNT_MODE_READ_WRITE {
-		t.Fatalf("mounts not projected: %#v", row.Mounts)
+	if len(def.Mounts) != 1 || def.Mounts[0].ProjectName != "team" || def.Mounts[0].Mode != ctl.MountMode_MOUNT_MODE_READ_WRITE {
+		t.Fatalf("mounts not projected: %#v", def.Mounts)
 	}
 }
 
-func TestWorkspaceContainerRowsFallsBackToCreatedAt(t *testing.T) {
-	byName := map[string]state.Workspace{
-		"dsh-workspace-proj": {WorkspaceSlug: "proj"},
+func TestContainerRowsNilExistsKeepsStoredStatus(t *testing.T) {
+	workspaces := []state.Workspace{{
+		WorkspaceSlug: "proj",
+		Containers:    []state.Container{{Name: "default", PodmanName: "dsh-workspace-proj", Status: "stopped"}},
+	}}
+	rows := containerRows(workspaces, nil)
+	if len(rows) != 1 || rows[0].Status != "stopped" {
+		t.Fatalf("expected stored status kept, got %#v", rows)
 	}
-	listed := []entities.ListContainer{
-		{Names: []string{"/dsh-workspace-proj"}, State: "running", CreatedAt: "2026-08-29 10:00:00 +0000 UTC"},
+}
+
+func TestContainerNameHelpers(t *testing.T) {
+	for _, valid := range []string{"dev", "web", "api-2", "x"} {
+		if !validContainerName(valid) {
+			t.Errorf("rejected valid container name %q", valid)
+		}
 	}
-	rows := workspaceContainerRows(listed, byName)
-	if len(rows) != 1 || rows[0].CreatedAt != "2026-08-29 10:00:00 +0000 UTC" {
-		t.Fatalf("unexpected fallback createdAt: %#v", rows)
+	for _, invalid := range []string{"", "default", "Dev", "dev_1", "-dev", "a-b-c-d-e-f-g-h-i-j-k-l-m-n-o-p-q-r-s-t-u-v-w-x-y-z-0"} {
+		if validContainerName(invalid) {
+			t.Errorf("accepted invalid container name %q", invalid)
+		}
+	}
+	if got := podmanContainerName("proj", ""); got != "dsh-workspace-proj" {
+		t.Fatalf("default podman name mismatch: %q", got)
+	}
+	if got := podmanContainerName("proj", "default"); got != "dsh-workspace-proj" {
+		t.Fatalf("default podman name mismatch: %q", got)
+	}
+	if got := podmanContainerName("proj", "dev"); got != "dsh-workspace-proj-dev" {
+		t.Fatalf("named podman name mismatch: %q", got)
+	}
+}
+
+func TestContainerByLogical(t *testing.T) {
+	workspace := state.Workspace{Containers: []state.Container{
+		{Name: "default", PodmanName: "dsh-workspace-proj"},
+		{Name: "dev", PodmanName: "dsh-workspace-proj-dev"},
+	}}
+	for _, name := range []string{"", "default"} {
+		container, ok := containerByLogical(&workspace, name)
+		if !ok || container.Name != "default" {
+			t.Fatalf("name %q: expected default container, got %#v, %v", name, container, ok)
+		}
+	}
+	container, ok := containerByLogical(&workspace, "dev")
+	if !ok || container.PodmanName != "dsh-workspace-proj-dev" {
+		t.Fatalf("expected dev container, got %#v, %v", container, ok)
+	}
+	if _, ok := containerByLogical(&workspace, "nope"); ok {
+		t.Fatal("unexpectedly found unknown container")
+	}
+}
+
+func TestStartContainerRejectsDefault(t *testing.T) {
+	server := &Server{Logger: silentLogger()}
+	for _, name := range []string{"", "default", "Dev", "dev_1", "-dev"} {
+		_, err := server.StartContainer(context.Background(), &ctl.StartContainerRequest{WorkspaceSlug: "proj", Container: name})
+		if status.Code(err) != codes.InvalidArgument {
+			t.Errorf("container %q: expected InvalidArgument, got %v", name, err)
+		}
+	}
+}
+
+func TestStartContainerRequiresPodman(t *testing.T) {
+	store := newTestStore(t)
+	if err := store.SaveWorkspaces([]state.Workspace{{WorkspaceSlug: "proj", ContainerName: "dsh-workspace-proj"}}); err != nil {
+		t.Fatal(err)
+	}
+	server := &Server{Store: store, Logger: silentLogger()}
+	_, err := server.StartContainer(context.Background(), &ctl.StartContainerRequest{WorkspaceSlug: "proj", Container: "dev"})
+	if status.Code(err) != codes.FailedPrecondition {
+		t.Fatalf("expected FailedPrecondition, got %v", err)
+	}
+}
+
+func TestReplaceContainerRejectsDefault(t *testing.T) {
+	server := &Server{Logger: silentLogger()}
+	for _, name := range []string{"", "default"} {
+		_, err := server.ReplaceContainer(context.Background(), &ctl.ReplaceContainerRequest{WorkspaceSlug: "proj", Container: name, ImageId: "arch"})
+		if status.Code(err) != codes.InvalidArgument {
+			t.Errorf("container %q: expected InvalidArgument, got %v", name, err)
+		}
+	}
+}
+
+func TestRemoveContainerRejectsDefault(t *testing.T) {
+	server := &Server{Logger: silentLogger()}
+	for _, name := range []string{"", "default"} {
+		_, err := server.RemoveContainer(context.Background(), &ctl.RemoveContainerRequest{WorkspaceSlug: "proj", Container: name})
+		if status.Code(err) != codes.InvalidArgument {
+			t.Errorf("container %q: expected InvalidArgument, got %v", name, err)
+		}
+	}
+}
+
+func TestRemoveContainerUnknownContainer(t *testing.T) {
+	store := newTestStore(t)
+	if err := store.SaveWorkspaces([]state.Workspace{{WorkspaceSlug: "proj", ContainerName: "dsh-workspace-proj"}}); err != nil {
+		t.Fatal(err)
+	}
+	server := &Server{Store: store, Logger: silentLogger()}
+	_, err := server.RemoveContainer(context.Background(), &ctl.RemoveContainerRequest{WorkspaceSlug: "proj", Container: "dev"})
+	if status.Code(err) != codes.NotFound {
+		t.Fatalf("expected NotFound, got %v", err)
+	}
+}
+
+func TestGetImageMissing(t *testing.T) {
+	server := &Server{Store: newTestStore(t), Logger: silentLogger()}
+	_, err := server.GetImage(context.Background(), &ctl.GetImageRequest{ImageId: "nope"})
+	if status.Code(err) != codes.NotFound {
+		t.Fatalf("expected NotFound, got %v", err)
+	}
+}
+
+func TestGetImage(t *testing.T) {
+	store := newTestStore(t)
+	if err := store.SaveImages([]state.Image{{ImageID: "arch", BaseImage: "archlinux", Packages: []string{"git"}, ImageTag: "t1", BuiltAt: "now"}}); err != nil {
+		t.Fatal(err)
+	}
+	server := &Server{Store: store, Logger: silentLogger()}
+	image, err := server.GetImage(context.Background(), &ctl.GetImageRequest{ImageId: "arch"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if image.ImageId != "arch" || image.BaseImage != "archlinux" || image.ImageTag != "t1" || image.BuiltAt != "now" || len(image.Packages) != 1 || image.Packages[0] != "git" {
+		t.Fatalf("unexpected image: %#v", image)
+	}
+}
+
+func TestBuildImageRejectsBase(t *testing.T) {
+	t.Setenv("DSH_PODMAN_DEFAULT_IMAGE", "arch-base")
+	server := &Server{Logger: silentLogger()}
+	_, err := server.BuildImage(context.Background(), &ctl.BuildImageRequest{ImageId: "arch-base", BaseImage: "arch-base"})
+	if status.Code(err) != codes.InvalidArgument {
+		t.Fatalf("expected InvalidArgument, got %v", err)
+	}
+}
+
+func TestRebuildImageRejectsBase(t *testing.T) {
+	t.Setenv("DSH_PODMAN_DEFAULT_IMAGE", "arch-base")
+	server := &Server{Logger: silentLogger()}
+	_, err := server.RebuildImage(context.Background(), &ctl.RebuildImageRequest{ImageId: "arch-base"})
+	if status.Code(err) != codes.InvalidArgument {
+		t.Fatalf("expected InvalidArgument, got %v", err)
+	}
+}
+
+func TestBuildImageMissingBase(t *testing.T) {
+	server := &Server{Store: newTestStore(t), ImageBuilder: &imagebuild.Builder{}, Logger: silentLogger()}
+	_, err := server.BuildImage(context.Background(), &ctl.BuildImageRequest{ImageId: "dev", BaseImage: "missing"})
+	if status.Code(err) != codes.NotFound {
+		t.Fatalf("expected NotFound, got %v", err)
 	}
 }
 
@@ -309,11 +488,11 @@ func TestStopWorkspaceRequiresPodman(t *testing.T) {
 
 func TestRemoveContainerRequiresPodman(t *testing.T) {
 	store := newTestStore(t)
-	if err := store.SaveWorkspaces([]state.Workspace{{WorkspaceSlug: "proj", ContainerName: "dsh-workspace-proj"}}); err != nil {
+	if err := store.SaveWorkspaces([]state.Workspace{{WorkspaceSlug: "proj", ContainerName: "dsh-workspace-proj", Containers: []state.Container{{Name: "dev", PodmanName: "dsh-workspace-proj-dev", Status: "running"}}}}); err != nil {
 		t.Fatal(err)
 	}
 	server := &Server{Store: store, Logger: silentLogger()}
-	_, err := server.RemoveContainer(context.Background(), &ctl.RemoveContainerRequest{WorkspaceSlug: "proj"})
+	_, err := server.RemoveContainer(context.Background(), &ctl.RemoveContainerRequest{WorkspaceSlug: "proj", Container: "dev"})
 	if status.Code(err) != codes.FailedPrecondition {
 		t.Fatalf("expected FailedPrecondition, got %v", err)
 	}
@@ -321,7 +500,7 @@ func TestRemoveContainerRequiresPodman(t *testing.T) {
 
 func TestRemoveContainerMissingWorkspace(t *testing.T) {
 	server := &Server{Store: newTestStore(t), Logger: silentLogger()}
-	_, err := server.RemoveContainer(context.Background(), &ctl.RemoveContainerRequest{WorkspaceSlug: "nope"})
+	_, err := server.RemoveContainer(context.Background(), &ctl.RemoveContainerRequest{WorkspaceSlug: "nope", Container: "dev"})
 	if status.Code(err) != codes.NotFound {
 		t.Fatalf("expected NotFound, got %v", err)
 	}

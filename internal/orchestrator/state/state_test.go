@@ -56,6 +56,59 @@ func TestWorkspacesRoundTrip(t *testing.T) {
 	}
 }
 
+func TestLegacyWorkspaceMigratesDefaultContainer(t *testing.T) {
+	store, err := New(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	legacy := Workspace{WorkspaceSlug: "proj", ContainerName: "dsh-workspace-proj", ImageID: "arch", Status: "running", AgentSocketPath: "/run/dsh-podman/dsh-workspace-proj/guest.sock", AgentToken: "secret", CreatedAt: "now"}
+	if err := store.SaveWorkspaces([]Workspace{legacy}); err != nil {
+		t.Fatal(err)
+	}
+	got, err := store.Workspaces()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 1 || len(got[0].Containers) != 1 || got[0].Containers[0].Name != "default" {
+		t.Fatalf("legacy workspace did not migrate a default container: %#v", got)
+	}
+	container := got[0].Containers[0]
+	if container.PodmanName != "dsh-workspace-proj" || container.ImageID != "arch" || container.Status != "running" || container.AgentSocketPath != legacy.AgentSocketPath || container.AgentToken != "secret" || container.CreatedAt != "now" {
+		t.Fatalf("migrated default container projection mismatch: %#v", container)
+	}
+}
+
+func TestWorkspacesWithNamedContainersRoundTrip(t *testing.T) {
+	store, err := New(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	workspaces := []Workspace{{
+		WorkspaceSlug: "proj",
+		Mounts:        []Mount{{ProjectName: "team", Mode: "read_write"}},
+		Containers: []Container{
+			{Name: "default", PodmanName: "dsh-workspace-proj", ImageID: "arch", Status: "running", CreatedAt: "now", AgentSocketPath: "/run/dsh-podman/dsh-workspace-proj/guest.sock", AgentToken: "secret"},
+			{Name: "dev", PodmanName: "dsh-workspace-proj-dev", ImageID: "devimg", Status: "running", CreatedAt: "later", AgentSocketPath: "/run/dsh-podman/dsh-workspace-proj-dev/guest.sock", AgentToken: "devtok"},
+		},
+	}}
+	if err := store.SaveWorkspaces(workspaces); err != nil {
+		t.Fatal(err)
+	}
+	got, err := store.Workspaces()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 1 || len(got[0].Containers) != 2 {
+		t.Fatalf("named containers did not survive round trip: %#v", got)
+	}
+	if got[0].Containers[0].Name != "default" || got[0].Containers[0].PodmanName != "dsh-workspace-proj" {
+		t.Fatalf("default container mismatch: %#v", got[0].Containers[0])
+	}
+	if got[0].Containers[1].Name != "dev" || got[0].Containers[1].PodmanName != "dsh-workspace-proj-dev" || got[0].Containers[1].ImageID != "devimg" || got[0].Containers[1].AgentToken != "devtok" {
+		t.Fatalf("named container mismatch: %#v", got[0].Containers[1])
+	}
+}
+
 func TestMissingStateIsEmpty(t *testing.T) {
 	store, _ := New(t.TempDir())
 	if got, err := store.Workspaces(); err != nil || len(got) != 0 {

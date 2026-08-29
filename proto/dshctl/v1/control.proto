@@ -14,9 +14,13 @@ service OrchestratorControl {
   rpc RecreateWorkspace(RecreateWorkspaceRequest) returns (Workspace);
   rpc StopWorkspace(StopWorkspaceRequest) returns (StopWorkspaceResponse);
   rpc ListImages(ListImagesRequest) returns (ListImagesResponse);
+  rpc GetImage(GetImageRequest) returns (Image);
+  rpc BuildImage(BuildImageRequest) returns (Image);
   rpc RebuildImage(RebuildImageRequest) returns (Image);
   rpc ListContainers(ListContainersRequest) returns (ListContainersResponse);
+  rpc StartContainer(StartContainerRequest) returns (Container);
   rpc RecreateContainer(RecreateContainerRequest) returns (Workspace);
+  rpc ReplaceContainer(ReplaceContainerRequest) returns (Container);
   rpc RemoveContainer(RemoveContainerRequest) returns (RemoveContainerResponse);
 }
 
@@ -46,6 +50,8 @@ message ListImagesRequest {}
 message ListImagesResponse { repeated Image images = 1; }
 message Image { string image_id = 1; string base_image = 2; repeated string packages = 3; string image_tag = 4; string built_at = 5; }
 message RebuildImageRequest { string image_id = 1; string base_image = 2; repeated string packages = 3; }
+message GetImageRequest { string image_id = 1; }
+message BuildImageRequest { string image_id = 1; string base_image = 2; repeated string packages = 3; }
 message ListContainersRequest {}
 message ListContainersResponse { repeated Container containers = 1; }
 message Container {
@@ -55,7 +61,12 @@ message Container {
   string status = 4;
   string created_at = 5;
   repeated ProjectMount mounts = 6;
+  string podman_name = 7;
+  string agent_socket_path = 8;
+  string agent_token = 9;
 }
-message RecreateContainerRequest { string workspace_slug = 1; string image_id = 2; }
-message RemoveContainerRequest { string workspace_slug = 1; }
+message StartContainerRequest { string workspace_slug = 1; string container = 2; string image_id = 3; }
+message RecreateContainerRequest { string workspace_slug = 1; string image_id = 2; string container = 3; }
+message ReplaceContainerRequest { string workspace_slug = 1; string container = 2; string image_id = 3; }
+message RemoveContainerRequest { string workspace_slug = 1; string container = 2; }
 message RemoveContainerResponse {}

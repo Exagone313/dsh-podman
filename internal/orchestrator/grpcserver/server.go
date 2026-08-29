@@ -6,15 +6,16 @@ package grpcserver
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strings"
 	"time"
 
-	entities "github.com/containers/podman/v5/pkg/domain/entities/types"
 	"github.com/opencontainers/runtime-spec/specs-go"
 	ctl "gitlab.com/Exagone313/dsh-podman/internal/genproto/dshctl/v1"
 	imagebuild "gitlab.com/Exagone313/dsh-podman/internal/orchestrator/images"
@@ -32,13 +33,76 @@ import (
 // the boundary against a client injecting arbitrary container names.
 var workspaceSlugName = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,62}$`)
 
+// containerLogicalName restricts the logical names clients may assign to
+// named guest containers (e.g. "dev", "web", "api-2").
+var containerLogicalName = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{0,30}$`)
+
+// containerPodmanName is the exact shape of orchestrator-created guest
+// containers (dsh-workspace-<slug> or dsh-workspace-<slug>-<name>); any
+// workspace state that does not match it is treated as invalid rather than
+// acted upon.
+var containerPodmanName = regexp.MustCompile(`^dsh-workspace-[a-zA-Z0-9][a-zA-Z0-9_.-]{0,62}(?:-[a-z0-9][a-z0-9-]{0,30})?$`)
+
 // containerNamePattern is the exact shape of orchestrator-created guest
-// containers (dsh-workspace-<slug>); any workspace state that does not match
-// it is treated as invalid rather than acted upon.
-var containerNamePattern = regexp.MustCompile(`^dsh-workspace-[a-zA-Z0-9][a-zA-Z0-9_.-]{0,62}$`)
+// containers; see containerPodmanName.
+var containerNamePattern = containerPodmanName
 
 func validWorkspaceSlug(slug string) bool {
 	return slug != "." && slug != ".." && workspaceSlugName.MatchString(slug)
+}
+
+// validContainerName reports whether name is a usable logical container name:
+// non-empty, not reserved for the default container, and matching the logical
+// name shape.
+func validContainerName(name string) bool {
+	return name != "" && name != "default" && containerLogicalName.MatchString(name)
+}
+
+// podmanContainerName derives the podman container name for a workspace's
+// logical container. The "default"/"" logical name maps to the workspace's
+// default container (dsh-workspace-<slug>); named containers are suffixed.
+func podmanContainerName(slug, logical string) string {
+	if logical == "" || logical == "default" {
+		return "dsh-workspace-" + slug
+	}
+	return "dsh-workspace-" + slug + "-" + logical
+}
+
+// containerByLogical returns the container record for the given logical name.
+// An empty name or "default" resolves to the workspace's default container.
+func containerByLogical(ws *state.Workspace, name string) (*state.Container, bool) {
+	if name == "" || name == "default" {
+		for i := range ws.Containers {
+			if ws.Containers[i].Name == "default" {
+				return &ws.Containers[i], true
+			}
+		}
+		if len(ws.Containers) > 0 {
+			return &ws.Containers[0], true
+		}
+		return nil, false
+	}
+	for i := range ws.Containers {
+		if ws.Containers[i].Name == name {
+			return &ws.Containers[i], true
+		}
+	}
+	return nil, false
+}
+
+// workspaceBySlug returns the stored workspace with the given slug, or an
+// error whose message is "workspace not found" when absent.
+func workspaceBySlug(store *state.Store, slug string) (state.Workspace, error) {
+	workspaces, err := store.Workspaces()
+	if err != nil {
+		return state.Workspace{}, err
+	}
+	for _, workspace := range workspaces {
+		if workspace.WorkspaceSlug == slug {
+			return workspace, nil
+		}
+	}
+	return state.Workspace{}, errors.New("workspace not found")
 }
 
 type Server struct {
@@ -153,141 +217,257 @@ func (s *Server) RecreateWorkspace(context.Context, *ctl.RecreateWorkspaceReques
 }
 func (s *Server) ListContainers(context.Context, *ctl.ListContainersRequest) (*ctl.ListContainersResponse, error) {
 	s.log().Info("control request", "method", "ListContainers")
-	if s.Podman == nil {
-		return nil, status.Error(codes.FailedPrecondition, "podman is not configured")
-	}
-	listed, err := s.Podman.List()
+	workspaces, err := s.Store.Workspaces()
 	if err != nil {
 		s.log().Error("control request failed", "method", "ListContainers", "error", err)
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	workspaces, err := s.Store.Workspaces()
-	if err != nil {
-		return nil, status.Error(codes.Internal, err.Error())
+	var exists func(podmanName string) bool
+	if s.Podman != nil {
+		exists = func(podmanName string) bool {
+			found, containerErr := s.Podman.ContainerExists(podmanName)
+			if containerErr != nil {
+				s.log().Warn("ListContainers podman lookup failed", "podman_name", podmanName, "error", containerErr)
+				return false
+			}
+			return found
+		}
 	}
-	byName := make(map[string]state.Workspace, len(workspaces))
-	for _, workspace := range workspaces {
-		byName[workspace.ContainerName] = workspace
-	}
-	result := &ctl.ListContainersResponse{Containers: workspaceContainerRows(listed, byName)}
+	containers := containerRows(workspaces, exists)
+	sort.Slice(containers, func(i, j int) bool {
+		if containers[i].WorkspaceSlug != containers[j].WorkspaceSlug {
+			return containers[i].WorkspaceSlug < containers[j].WorkspaceSlug
+		}
+		return containers[i].ContainerName < containers[j].ContainerName
+	})
+	result := &ctl.ListContainersResponse{Containers: containers}
 	s.log().Info("control request completed", "method", "ListContainers", "count", len(result.Containers))
 	return result, nil
 }
 
-// workspaceContainerRows projects the podman container list onto the guest
-// containers the orchestrator owns. A container whose name does not match a
-// stored workspace — i.e. one the orchestrator did not create — is skipped, so
-// the plugin can only manage dsh workspaces.
-func workspaceContainerRows(listed []entities.ListContainer, byName map[string]state.Workspace) []*ctl.Container {
-	result := make([]*ctl.Container, 0, len(listed))
-	for _, container := range listed {
-		name := ""
-		for _, candidate := range container.Names {
-			name = strings.TrimPrefix(candidate, "/")
-			break
+// containerProto projects a container record onto the control plane's
+// Container message, including the workspace's project mounts.
+func containerProto(ws state.Workspace, c state.Container) *ctl.Container {
+	row := &ctl.Container{ContainerName: c.Name, PodmanName: c.PodmanName, WorkspaceSlug: ws.WorkspaceSlug, ImageId: c.ImageID, Status: c.Status, CreatedAt: c.CreatedAt, AgentSocketPath: c.AgentSocketPath, AgentToken: c.AgentToken}
+	for _, mount := range ws.Mounts {
+		mode := ctl.MountMode_MOUNT_MODE_READ_ONLY
+		if mount.Mode == "read_write" {
+			mode = ctl.MountMode_MOUNT_MODE_READ_WRITE
 		}
-		workspace, ok := byName[name]
-		if !ok {
-			continue
-		}
-		createdAt := container.CreatedAt
-		if !container.Created.IsZero() {
-			createdAt = container.Created.UTC().Format(time.RFC3339)
-		}
-		row := &ctl.Container{ContainerName: name, Status: container.State, CreatedAt: createdAt, WorkspaceSlug: workspace.WorkspaceSlug, ImageId: workspace.ImageID}
-		for _, mount := range workspace.Mounts {
-			mode := ctl.MountMode_MOUNT_MODE_READ_ONLY
-			if mount.Mode == "read_write" {
-				mode = ctl.MountMode_MOUNT_MODE_READ_WRITE
+		row.Mounts = append(row.Mounts, &ctl.ProjectMount{ProjectName: mount.ProjectName, Mode: mode})
+	}
+	return row
+}
+
+// containerRows projects stored workspace containers onto the control plane's
+// Container messages. It is state-driven: every workspace container is
+// included. When exists is non-nil and reports the podman container as
+// missing, the row is flagged as "not started".
+func containerRows(workspaces []state.Workspace, exists func(podmanName string) bool) []*ctl.Container {
+	result := make([]*ctl.Container, 0, len(workspaces))
+	for _, ws := range workspaces {
+		for _, container := range ws.Containers {
+			row := containerProto(ws, container)
+			if exists != nil && !exists(container.PodmanName) {
+				row.Status = "not started"
 			}
-			row.Mounts = append(row.Mounts, &ctl.ProjectMount{ProjectName: mount.ProjectName, Mode: mode})
+			result = append(result, row)
 		}
-		result = append(result, row)
 	}
 	return result
 }
 func (s *Server) RecreateContainer(ctx context.Context, request *ctl.RecreateContainerRequest) (*ctl.Workspace, error) {
-	s.log().Info("control request", "method", "RecreateContainer", "workspace_slug", request.GetWorkspaceSlug(), "image_id", request.GetImageId())
-	workspace, err := s.DescribeWorkspace(ctx, &ctl.DescribeWorkspaceRequest{WorkspaceSlug: request.GetWorkspaceSlug()})
+	s.log().Info("control request", "method", "RecreateContainer", "workspace_slug", request.GetWorkspaceSlug(), "image_id", request.GetImageId(), "container", request.GetContainer())
+	container := request.GetContainer()
+	if container == "" {
+		container = "default"
+	}
+	if container != "default" && !validContainerName(container) {
+		return nil, status.Error(codes.InvalidArgument, "invalid container name")
+	}
+	workspace, err := workspaceBySlug(s.Store, request.GetWorkspaceSlug())
 	if err != nil {
-		return nil, err
+		return nil, status.Error(codes.NotFound, "workspace not found")
+	}
+	record, ok := containerByLogical(&workspace, container)
+	if !ok {
+		s.log().Warn("control request failed", "method", "RecreateContainer", "workspace_slug", request.GetWorkspaceSlug(), "container", container, "reason", "container not found")
+		return nil, status.Error(codes.NotFound, "container not found")
 	}
 	if s.Podman == nil {
 		return nil, status.Error(codes.FailedPrecondition, "podman is not configured")
 	}
 	imageID := request.GetImageId()
 	if imageID == "" {
-		imageID = workspace.GetImageId()
+		imageID = record.ImageID
 	}
-	images, err := s.Store.Images()
+	imageTag, err := s.resolveImageTag(imageID)
 	if err != nil {
-		return nil, status.Error(codes.Internal, err.Error())
+		return nil, err
 	}
-	imageTag := ""
-	for _, image := range images {
-		if image.ImageID == imageID {
-			imageTag = image.ImageTag
-			break
-		}
-	}
-	if imageTag == "" {
-		s.log().Error("control request failed", "method", "RecreateContainer", "workspace_slug", request.GetWorkspaceSlug(), "reason", "built image not found", "image_id", imageID)
-		return nil, status.Error(codes.NotFound, "built image not found")
-	}
-	exists, imageErr := s.Podman.ImageExists(imageTag)
-	if imageErr != nil {
-		return nil, status.Error(codes.Internal, imageErr.Error())
-	}
-	if !exists {
-		s.log().Error("control request failed", "method", "RecreateContainer", "workspace_slug", request.GetWorkspaceSlug(), "reason", "built image tag is missing", "image_tag", imageTag)
-		return nil, status.Error(codes.NotFound, "built image tag is missing")
-	}
-	podmanMounts := make([]specs.Mount, 0, len(workspace.GetMounts()))
-	for _, mount := range workspace.GetMounts() {
-		path, pathErr := ValidateProject(s.ProjectsRoot, mount.GetProjectName())
-		if pathErr != nil {
-			s.log().Error("RecreateContainer project validation failed", "project_name", mount.GetProjectName(), "error", pathErr)
-			return nil, status.Error(codes.InvalidArgument, pathErr.Error())
-		}
-		hostPath := path
-		if s.HostProjectsRoot != "" {
-			hostPath = filepath.Join(s.HostProjectsRoot, filepath.FromSlash(mount.GetProjectName()))
-		}
-		options := []string{"ro"}
-		if mount.GetMode() == ctl.MountMode_MOUNT_MODE_READ_WRITE {
-			options = []string{"rw"}
-		}
-		podmanMounts = append(podmanMounts, specs.Mount{Type: "bind", Source: hostPath, Destination: filepath.Join(s.ProjectsRoot, mount.GetProjectName()), Options: options})
+	podmanMounts, err := s.podmanMounts(workspace.Mounts)
+	if err != nil {
+		s.log().Error("RecreateContainer project validation failed", "workspace_slug", workspace.WorkspaceSlug, "error", err)
+		return nil, err
 	}
 	secret, err := token.New()
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	if err := s.Podman.RecreateWorkspace(workspace.GetContainerName(), imageTag, secret, podmanMounts); err != nil {
-		s.log().Error("control request failed", "method", "RecreateContainer", "workspace_slug", request.GetWorkspaceSlug(), "error", err)
+	if err := s.Podman.RecreateWorkspace(record.PodmanName, imageTag, secret, podmanMounts); err != nil {
+		s.log().Error("control request failed", "method", "RecreateContainer", "workspace_slug", request.GetWorkspaceSlug(), "container", container, "error", err)
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	updated := state.Workspace{WorkspaceSlug: workspace.GetWorkspaceSlug(), ContainerName: workspace.GetContainerName(), ImageID: imageID, Status: "running", AgentSocketPath: workspace.GetAgentSocketPath(), AgentToken: secret, CreatedAt: workspace.GetCreatedAt()}
-	for _, mount := range workspace.GetMounts() {
-		mode := "read_only"
-		if mount.GetMode() == ctl.MountMode_MOUNT_MODE_READ_WRITE {
-			mode = "read_write"
-		}
-		updated.Mounts = append(updated.Mounts, state.Mount{ProjectName: mount.GetProjectName(), Mode: mode})
+	record.ImageID = imageID
+	record.Status = "running"
+	record.CreatedAt = time.Now().UTC().Format(time.RFC3339)
+	record.AgentToken = secret
+	updated, err := s.upsertContainer(workspace, *record)
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
 	}
+	s.log().Info("control request completed", "method", "RecreateContainer", "workspace_slug", request.GetWorkspaceSlug(), "container", container, "image_id", imageID)
+	return toProto(updated), nil
+}
+
+func (s *Server) StartContainer(ctx context.Context, request *ctl.StartContainerRequest) (*ctl.Container, error) {
+	s.log().Info("control request", "method", "StartContainer", "workspace_slug", request.GetWorkspaceSlug(), "container", request.GetContainer(), "image_id", request.GetImageId())
+	if !validContainerName(request.GetContainer()) {
+		return nil, status.Error(codes.InvalidArgument, "invalid container name")
+	}
+	workspace, err := workspaceBySlug(s.Store, request.GetWorkspaceSlug())
+	if err != nil {
+		return nil, status.Error(codes.NotFound, "workspace not found")
+	}
+	if s.Podman == nil {
+		return nil, status.Error(codes.FailedPrecondition, "podman is not configured")
+	}
+	imageID := request.GetImageId()
+	if imageID == "" {
+		imageID = defaultImageID()
+	}
+	imageTag, err := s.resolveImageTag(imageID)
+	if err != nil {
+		return nil, err
+	}
+	podmanMounts, err := s.podmanMounts(workspace.Mounts)
+	if err != nil {
+		s.log().Error("StartContainer project validation failed", "workspace_slug", workspace.WorkspaceSlug, "error", err)
+		return nil, err
+	}
+	podmanName := podmanContainerName(workspace.WorkspaceSlug, request.GetContainer())
+	if _, ok := containerByLogical(&workspace, request.GetContainer()); ok {
+		if err := s.Podman.Remove(podmanName); err != nil {
+			s.log().Error("control request failed", "method", "StartContainer", "workspace_slug", request.GetWorkspaceSlug(), "container", request.GetContainer(), "error", err)
+			return nil, status.Error(codes.Internal, err.Error())
+		}
+	}
+	secret, err := token.New()
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	if err := s.Podman.CreateWorkspace(podmanName, imageTag, secret, podmanMounts); err != nil {
+		s.log().Error("control request failed", "method", "StartContainer", "workspace_slug", request.GetWorkspaceSlug(), "container", request.GetContainer(), "error", err)
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	record := state.Container{Name: request.GetContainer(), PodmanName: podmanName, ImageID: imageID, Status: "running", CreatedAt: time.Now().UTC().Format(time.RFC3339), AgentSocketPath: filepath.Join(s.SocketsRoot, podmanName, "guest.sock"), AgentToken: secret}
+	updated, err := s.upsertContainer(workspace, record)
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	s.log().Info("control request completed", "method", "StartContainer", "workspace_slug", request.GetWorkspaceSlug(), "container", request.GetContainer(), "podman_name", podmanName)
+	return containerProto(updated, record), nil
+}
+
+func (s *Server) ReplaceContainer(ctx context.Context, request *ctl.ReplaceContainerRequest) (*ctl.Container, error) {
+	s.log().Info("control request", "method", "ReplaceContainer", "workspace_slug", request.GetWorkspaceSlug(), "container", request.GetContainer(), "image_id", request.GetImageId())
+	if !validContainerName(request.GetContainer()) {
+		return nil, status.Error(codes.InvalidArgument, "invalid container name")
+	}
+	workspace, err := workspaceBySlug(s.Store, request.GetWorkspaceSlug())
+	if err != nil {
+		return nil, status.Error(codes.NotFound, "workspace not found")
+	}
+	record, ok := containerByLogical(&workspace, request.GetContainer())
+	if !ok {
+		s.log().Warn("control request failed", "method", "ReplaceContainer", "workspace_slug", request.GetWorkspaceSlug(), "container", request.GetContainer(), "reason", "container not found")
+		return nil, status.Error(codes.NotFound, "container not found")
+	}
+	if s.Podman == nil {
+		return nil, status.Error(codes.FailedPrecondition, "podman is not configured")
+	}
+	imageTag, err := s.resolveImageTag(request.GetImageId())
+	if err != nil {
+		return nil, err
+	}
+	podmanMounts, err := s.podmanMounts(workspace.Mounts)
+	if err != nil {
+		s.log().Error("ReplaceContainer project validation failed", "workspace_slug", workspace.WorkspaceSlug, "error", err)
+		return nil, err
+	}
+	secret, err := token.New()
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	if err := s.Podman.RecreateWorkspace(record.PodmanName, imageTag, secret, podmanMounts); err != nil {
+		s.log().Error("control request failed", "method", "ReplaceContainer", "workspace_slug", request.GetWorkspaceSlug(), "container", request.GetContainer(), "error", err)
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	record.ImageID = request.GetImageId()
+	record.Status = "running"
+	record.CreatedAt = time.Now().UTC().Format(time.RFC3339)
+	record.AgentToken = secret
+	updated, err := s.upsertContainer(workspace, *record)
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	s.log().Info("control request completed", "method", "ReplaceContainer", "workspace_slug", request.GetWorkspaceSlug(), "container", request.GetContainer(), "image_id", request.GetImageId())
+	return containerProto(updated, *record), nil
+}
+
+// upsertContainer replaces (or appends) the container record with the same
+// logical name in the workspace, keeps the legacy default-container fields in
+// sync, and persists the workspace.
+func (s *Server) upsertContainer(workspace state.Workspace, record state.Container) (state.Workspace, error) {
+	replaced := false
+	for i := range workspace.Containers {
+		if workspace.Containers[i].Name == record.Name {
+			workspace.Containers[i] = record
+			replaced = true
+		}
+	}
+	if !replaced {
+		workspace.Containers = append(workspace.Containers, record)
+	}
+	syncDefaultFields(&workspace)
 	if err := s.Store.UpdateWorkspaces(func(all []state.Workspace) ([]state.Workspace, error) {
 		for i := range all {
-			if all[i].WorkspaceSlug == updated.WorkspaceSlug {
-				all[i] = updated
+			if all[i].WorkspaceSlug == workspace.WorkspaceSlug {
+				all[i] = workspace
 				return all, nil
 			}
 		}
-		return append(all, updated), nil
+		return append(all, workspace), nil
 	}); err != nil {
-		return nil, status.Error(codes.Internal, err.Error())
+		return state.Workspace{}, err
 	}
-	s.log().Info("control request completed", "method", "RecreateContainer", "workspace_slug", request.GetWorkspaceSlug(), "image_id", imageID)
-	return toProto(updated), nil
+	return workspace, nil
+}
+
+// syncDefaultFields projects the default container record onto the workspace's
+// legacy single-container fields so existing consumers stay consistent.
+func syncDefaultFields(ws *state.Workspace) {
+	for i := range ws.Containers {
+		if ws.Containers[i].Name == "default" {
+			ws.ContainerName = ws.Containers[i].PodmanName
+			ws.ImageID = ws.Containers[i].ImageID
+			ws.Status = ws.Containers[i].Status
+			ws.AgentSocketPath = ws.Containers[i].AgentSocketPath
+			ws.AgentToken = ws.Containers[i].AgentToken
+			ws.CreatedAt = ws.Containers[i].CreatedAt
+			return
+		}
+	}
 }
 
 func (s *Server) CreateWorkspace(ctx context.Context, request *ctl.CreateWorkspaceRequest) (*ctl.Workspace, error) {
@@ -323,51 +503,24 @@ func (s *Server) CreateWorkspace(ctx context.Context, request *ctl.CreateWorkspa
 			return nil, status.Error(codes.FailedPrecondition, "podman image builder is not configured")
 		}
 		image := state.Image{ImageID: request.GetImageId(), BaseImage: "docker.io/library/archlinux:latest", Packages: append([]string(nil), defaultPackages...)}
-		image.ImageTag, err = s.ImageBuilder.Build(image)
+		image, err = s.buildImage(request.GetImageId(), image)
 		if err != nil {
 			return nil, status.Error(codes.Internal, fmt.Sprintf("build default image: %v", err))
 		}
-		image.BuiltAt = time.Now().UTC().Format(time.RFC3339)
 		images = append(images, image)
 		imageIndex = len(images) - 1
 		s.log().Info("CreateWorkspace auto-provisioned image", "image_id", image.ImageID, "image_tag", image.ImageTag)
-		if err := s.Store.UpdateImages(func(current []state.Image) ([]state.Image, error) {
-			for i := range current {
-				if current[i].ImageID == image.ImageID {
-					current[i] = image
-					return current, nil
-				}
-			}
-			return append(current, image), nil
-		}); err != nil {
-			return nil, status.Error(codes.Internal, err.Error())
-		}
 		found = true
 	}
 	secret, err := token.New()
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	mounts := make([]state.Mount, 0, len(request.GetMounts()))
-	podmanMounts := make([]specs.Mount, 0, len(request.GetMounts()))
-	for _, mount := range request.GetMounts() {
-		s.log().Info("CreateWorkspace validating project mount", "project_name", mount.GetProjectName(), "container_projects_root", s.ProjectsRoot, "host_projects_root", s.HostProjectsRoot)
-		path, pathErr := ValidateProject(s.ProjectsRoot, mount.GetProjectName())
-		if pathErr != nil {
-			s.log().Error("CreateWorkspace project validation failed", "project_name", mount.GetProjectName(), "root", s.ProjectsRoot, "error", pathErr)
-			return nil, status.Error(codes.InvalidArgument, pathErr.Error())
-		}
-		mode := "read_only"
-		options := []string{"ro"}
-		if mount.GetMode() == ctl.MountMode_MOUNT_MODE_READ_WRITE {
-			mode, options = "read_write", []string{"rw"}
-		}
-		mounts = append(mounts, state.Mount{ProjectName: mount.GetProjectName(), Mode: mode})
-		hostPath := path
-		if s.HostProjectsRoot != "" {
-			hostPath = filepath.Join(s.HostProjectsRoot, filepath.FromSlash(mount.GetProjectName()))
-		}
-		podmanMounts = append(podmanMounts, specs.Mount{Type: "bind", Source: hostPath, Destination: filepath.Join(s.ProjectsRoot, mount.GetProjectName()), Options: options})
+	mounts := stateMounts(request.GetMounts())
+	podmanMounts, mountErr := s.podmanMounts(mounts)
+	if mountErr != nil {
+		s.log().Error("CreateWorkspace project validation failed", "root", s.ProjectsRoot, "error", mountErr)
+		return nil, mountErr
 	}
 	if s.Podman == nil {
 		return nil, status.Error(codes.FailedPrecondition, "podman is not configured")
@@ -383,23 +536,11 @@ func (s *Server) CreateWorkspace(ctx context.Context, request *ctl.CreateWorkspa
 			return nil, status.Error(codes.NotFound, "built image not found")
 		}
 		image := images[imageIndex]
-		image.ImageTag, err = s.ImageBuilder.Build(image)
+		image, err = s.buildImage(request.GetImageId(), image)
 		if err != nil {
 			return nil, status.Error(codes.Internal, fmt.Sprintf("rebuild default image: %v", err))
 		}
-		image.BuiltAt = time.Now().UTC().Format(time.RFC3339)
 		images[imageIndex] = image
-		if err := s.Store.UpdateImages(func(current []state.Image) ([]state.Image, error) {
-			for i := range current {
-				if current[i].ImageID == image.ImageID {
-					current[i] = image
-					return current, nil
-				}
-			}
-			return append(current, image), nil
-		}); err != nil {
-			return nil, status.Error(codes.Internal, err.Error())
-		}
 		imageTag = image.ImageTag
 		s.log().Info("CreateWorkspace rebuilt stale default image", "image_id", image.ImageID, "image_tag", image.ImageTag)
 	}
@@ -409,7 +550,8 @@ func (s *Server) CreateWorkspace(ctx context.Context, request *ctl.CreateWorkspa
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 	agentSocket := filepath.Join(s.SocketsRoot, name, "guest.sock")
-	workspace := state.Workspace{WorkspaceSlug: request.GetWorkspaceSlug(), ContainerName: name, ImageID: request.GetImageId(), Mounts: mounts, Status: "running", AgentSocketPath: agentSocket, AgentToken: secret, CreatedAt: time.Now().UTC().Format(time.RFC3339)}
+	createdAt := time.Now().UTC().Format(time.RFC3339)
+	workspace := state.Workspace{WorkspaceSlug: request.GetWorkspaceSlug(), ContainerName: name, ImageID: request.GetImageId(), Mounts: mounts, Status: "running", AgentSocketPath: agentSocket, AgentToken: secret, CreatedAt: createdAt, Containers: []state.Container{{Name: "default", PodmanName: name, ImageID: request.GetImageId(), Status: "running", CreatedAt: createdAt, AgentSocketPath: agentSocket, AgentToken: secret}}}
 	if err := s.Store.UpdateWorkspaces(func(all []state.Workspace) ([]state.Workspace, error) {
 		replaced := false
 		for i := range all {
@@ -429,44 +571,211 @@ func (s *Server) CreateWorkspace(ctx context.Context, request *ctl.CreateWorkspa
 	return toProto(workspace), nil
 }
 
-func (s *Server) RebuildImage(ctx context.Context, request *ctl.RebuildImageRequest) (*ctl.Image, error) {
-	s.log().Info("control request", "method", "RebuildImage", "image_id", request.GetImageId(), "base_image", request.GetBaseImage(), "package_count", len(request.GetPackages()))
+func (s *Server) GetImage(_ context.Context, request *ctl.GetImageRequest) (*ctl.Image, error) {
+	s.log().Info("control request", "method", "GetImage", "image_id", request.GetImageId())
+	images, err := s.Store.Images()
+	if err != nil {
+		s.log().Error("control request failed", "method", "GetImage", "image_id", request.GetImageId(), "error", err)
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	for _, image := range images {
+		if image.ImageID == request.GetImageId() {
+			s.log().Info("control request completed", "method", "GetImage", "image_id", request.GetImageId())
+			return imageProto(image), nil
+		}
+	}
+	s.log().Warn("control request failed", "method", "GetImage", "image_id", request.GetImageId(), "reason", "not found")
+	return nil, status.Error(codes.NotFound, "built image not found")
+}
+func (s *Server) BuildImage(_ context.Context, request *ctl.BuildImageRequest) (*ctl.Image, error) {
+	s.log().Info("control request", "method", "BuildImage", "image_id", request.GetImageId(), "base_image", request.GetBaseImage(), "package_count", len(request.GetPackages()))
+	imageID := request.GetImageId()
+	if imageID == "" {
+		return nil, status.Error(codes.InvalidArgument, "image id is required")
+	}
+	if imageID == defaultImageID() {
+		return nil, status.Error(codes.InvalidArgument, "cannot build over the base image")
+	}
 	if s.ImageBuilder == nil {
 		return nil, status.Error(codes.FailedPrecondition, "image builder is not configured")
 	}
 	base := request.GetBaseImage()
-	if base == "" {
-		base = "docker.io/library/archlinux:latest"
+	if base == defaultImageID() {
+		def, err := s.defaultImage()
+		if err != nil {
+			return nil, err
+		}
+		base = def.ImageTag
+	} else {
+		tag, err := s.resolveImageTag(base)
+		if err != nil {
+			return nil, err
+		}
+		base = tag
 	}
-	packages := append([]string(nil), request.GetPackages()...)
-	if len(packages) == 0 && request.GetImageId() == defaultImageID() {
-		packages = append([]string(nil), defaultPackages...)
-		s.log().Info("RebuildImage using default package set", "image_id", request.GetImageId(), "package_count", len(packages))
+	image := state.Image{ImageID: imageID, BaseImage: base, Packages: append([]string(nil), request.GetPackages()...)}
+	stored, err := s.buildImage(imageID, image)
+	if err != nil {
+		s.log().Error("control request failed", "method", "BuildImage", "image_id", imageID, "error", err)
+		return nil, status.Error(codes.Internal, err.Error())
 	}
-	image := state.Image{ImageID: request.GetImageId(), BaseImage: base, Packages: packages}
-	tag, err := s.ImageBuilder.Build(image)
+	s.log().Info("control request completed", "method", "BuildImage", "image_id", stored.ImageID, "image_tag", stored.ImageTag)
+	return imageProto(stored), nil
+}
+func (s *Server) RebuildImage(_ context.Context, request *ctl.RebuildImageRequest) (*ctl.Image, error) {
+	s.log().Info("control request", "method", "RebuildImage", "image_id", request.GetImageId())
+	imageID := request.GetImageId()
+	if imageID == "" {
+		return nil, status.Error(codes.InvalidArgument, "image id is required")
+	}
+	if imageID == defaultImageID() {
+		return nil, status.Error(codes.InvalidArgument, "cannot rebuild the base image")
+	}
+	if s.ImageBuilder == nil {
+		return nil, status.Error(codes.FailedPrecondition, "image builder is not configured")
+	}
+	images, err := s.Store.Images()
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	image.ImageTag, image.BuiltAt = tag, time.Now().UTC().Format(time.RFC3339)
-	if err := s.Store.UpdateImages(func(all []state.Image) ([]state.Image, error) {
-		replaced := false
-		for i := range all {
-			if all[i].ImageID == image.ImageID {
-				all[i] = image
-				replaced = true
-			}
+	var current *state.Image
+	for i := range images {
+		if images[i].ImageID == imageID {
+			current = &images[i]
+			break
 		}
-		if !replaced {
-			all = append(all, image)
-		}
-		return all, nil
-	}); err != nil {
-		s.log().Error("control request failed", "method", "RebuildImage", "image_id", image.ImageID, "error", err)
+	}
+	if current == nil {
+		return nil, status.Error(codes.NotFound, "built image not found")
+	}
+	stored, err := s.buildImage(imageID, *current)
+	if err != nil {
+		s.log().Error("control request failed", "method", "RebuildImage", "image_id", imageID, "error", err)
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	s.log().Info("control request completed", "method", "RebuildImage", "image_id", image.ImageID, "image_tag", image.ImageTag)
-	return &ctl.Image{ImageId: image.ImageID, BaseImage: image.BaseImage, Packages: image.Packages, ImageTag: image.ImageTag, BuiltAt: image.BuiltAt}, nil
+	s.log().Info("control request completed", "method", "RebuildImage", "image_id", stored.ImageID, "image_tag", stored.ImageTag)
+	return imageProto(stored), nil
+}
+
+// imageProto projects a stored image onto the control plane's Image message.
+func imageProto(image state.Image) *ctl.Image {
+	return &ctl.Image{ImageId: image.ImageID, BaseImage: image.BaseImage, Packages: image.Packages, ImageTag: image.ImageTag, BuiltAt: image.BuiltAt}
+}
+
+// buildImage builds the given image, stamps BuiltAt, upserts it in the store
+// (replacing the record with the same id, else appending), and returns the
+// stored image. The caller is responsible for builder availability checks.
+func (s *Server) buildImage(id string, image state.Image) (state.Image, error) {
+	if id != "" {
+		image.ImageID = id
+	}
+	if s.ImageBuilder == nil {
+		return state.Image{}, fmt.Errorf("podman image builder is not configured")
+	}
+	tag, err := s.ImageBuilder.Build(image)
+	if err != nil {
+		return state.Image{}, err
+	}
+	image.ImageTag = tag
+	image.BuiltAt = time.Now().UTC().Format(time.RFC3339)
+	if err := s.Store.UpdateImages(func(current []state.Image) ([]state.Image, error) {
+		for i := range current {
+			if current[i].ImageID == image.ImageID {
+				current[i] = image
+				return current, nil
+			}
+		}
+		return append(current, image), nil
+	}); err != nil {
+		return state.Image{}, err
+	}
+	return image, nil
+}
+
+// defaultImage returns the stored default (base) image, auto-provisioning it
+// when absent and enabled. The returned record's tag may be used as the base
+// for derived image builds.
+func (s *Server) defaultImage() (state.Image, error) {
+	images, err := s.Store.Images()
+	if err != nil {
+		return state.Image{}, status.Error(codes.Internal, err.Error())
+	}
+	for _, image := range images {
+		if image.ImageID == defaultImageID() && image.ImageTag != "" {
+			return image, nil
+		}
+	}
+	if !s.BuildDefaultImage {
+		return state.Image{}, status.Error(codes.NotFound, "built image not found; default image auto-build is disabled")
+	}
+	if s.ImageBuilder == nil {
+		return state.Image{}, status.Error(codes.FailedPrecondition, "podman image builder is not configured")
+	}
+	image := state.Image{ImageID: defaultImageID(), BaseImage: "docker.io/library/archlinux:latest", Packages: append([]string(nil), defaultPackages...)}
+	image, err = s.buildImage(defaultImageID(), image)
+	if err != nil {
+		return state.Image{}, status.Error(codes.Internal, fmt.Sprintf("build default image: %v", err))
+	}
+	s.log().Info("auto-provisioned default image", "image_id", image.ImageID, "image_tag", image.ImageTag)
+	return image, nil
+}
+
+// resolveImageTag returns the stored image tag for imageID, or a NotFound
+// status error when no built image with a non-empty tag is stored.
+func (s *Server) resolveImageTag(imageID string) (string, error) {
+	if imageID == defaultImageID() {
+		def, err := s.defaultImage()
+		if err != nil {
+			return "", err
+		}
+		return def.ImageTag, nil
+	}
+	images, err := s.Store.Images()
+	if err != nil {
+		return "", status.Error(codes.Internal, err.Error())
+	}
+	for _, image := range images {
+		if image.ImageID == imageID && image.ImageTag != "" {
+			return image.ImageTag, nil
+		}
+	}
+	return "", status.Error(codes.NotFound, "built image not found")
+}
+
+// stateMounts projects the control plane's project mounts onto the state
+// model's read_only/read_write representation.
+func stateMounts(mounts []*ctl.ProjectMount) []state.Mount {
+	result := make([]state.Mount, 0, len(mounts))
+	for _, mount := range mounts {
+		mode := "read_only"
+		if mount.GetMode() == ctl.MountMode_MOUNT_MODE_READ_WRITE {
+			mode = "read_write"
+		}
+		result = append(result, state.Mount{ProjectName: mount.GetProjectName(), Mode: mode})
+	}
+	return result
+}
+
+// podmanMounts builds the bind mounts handed to podman from the workspace's
+// stored mounts, resolving host paths through HostProjectsRoot.
+func (s *Server) podmanMounts(mounts []state.Mount) ([]specs.Mount, error) {
+	podmanMounts := make([]specs.Mount, 0, len(mounts))
+	for _, mount := range mounts {
+		path, pathErr := ValidateProject(s.ProjectsRoot, mount.ProjectName)
+		if pathErr != nil {
+			return nil, status.Error(codes.InvalidArgument, pathErr.Error())
+		}
+		hostPath := path
+		if s.HostProjectsRoot != "" {
+			hostPath = filepath.Join(s.HostProjectsRoot, filepath.FromSlash(mount.ProjectName))
+		}
+		options := []string{"ro"}
+		if mount.Mode == "read_write" {
+			options = []string{"rw"}
+		}
+		podmanMounts = append(podmanMounts, specs.Mount{Type: "bind", Source: hostPath, Destination: filepath.Join(s.ProjectsRoot, mount.ProjectName), Options: options})
+	}
+	return podmanMounts, nil
 }
 func defaultImageID() string {
 	if value := os.Getenv("DSH_PODMAN_DEFAULT_IMAGE"); value != "" {
@@ -501,19 +810,45 @@ func (s *Server) StopWorkspace(_ context.Context, request *ctl.StopWorkspaceRequ
 	return &ctl.StopWorkspaceResponse{}, nil
 }
 func (s *Server) RemoveContainer(_ context.Context, request *ctl.RemoveContainerRequest) (*ctl.RemoveContainerResponse, error) {
-	s.log().Info("control request", "method", "RemoveContainer", "workspace_slug", request.GetWorkspaceSlug())
-	workspace, err := s.DescribeWorkspace(context.Background(), &ctl.DescribeWorkspaceRequest{WorkspaceSlug: request.GetWorkspaceSlug()})
+	s.log().Info("control request", "method", "RemoveContainer", "workspace_slug", request.GetWorkspaceSlug(), "container", request.GetContainer())
+	if !validContainerName(request.GetContainer()) {
+		return nil, status.Error(codes.InvalidArgument, "invalid container name")
+	}
+	workspace, err := workspaceBySlug(s.Store, request.GetWorkspaceSlug())
 	if err != nil {
-		return nil, err
+		return nil, status.Error(codes.NotFound, "workspace not found")
+	}
+	record, ok := containerByLogical(&workspace, request.GetContainer())
+	if !ok {
+		s.log().Warn("control request failed", "method", "RemoveContainer", "workspace_slug", request.GetWorkspaceSlug(), "container", request.GetContainer(), "reason", "container not found")
+		return nil, status.Error(codes.NotFound, "container not found")
 	}
 	if s.Podman == nil {
 		return nil, status.Error(codes.FailedPrecondition, "podman is not configured")
 	}
-	if err := s.Podman.Remove(workspace.GetContainerName()); err != nil {
-		s.log().Error("control request failed", "method", "RemoveContainer", "workspace_slug", request.GetWorkspaceSlug(), "error", err)
+	if err := s.Podman.Remove(record.PodmanName); err != nil {
+		s.log().Error("control request failed", "method", "RemoveContainer", "workspace_slug", request.GetWorkspaceSlug(), "container", request.GetContainer(), "error", err)
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	s.log().Info("control request completed", "method", "RemoveContainer", "workspace_slug", request.GetWorkspaceSlug())
+	if err := s.Store.UpdateWorkspaces(func(all []state.Workspace) ([]state.Workspace, error) {
+		for i := range all {
+			if all[i].WorkspaceSlug == workspace.WorkspaceSlug {
+				remaining := make([]state.Container, 0, len(all[i].Containers))
+				for _, container := range all[i].Containers {
+					if container.Name != request.GetContainer() {
+						remaining = append(remaining, container)
+					}
+				}
+				all[i].Containers = remaining
+				syncDefaultFields(&all[i])
+				return all, nil
+			}
+		}
+		return all, nil
+	}); err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	s.log().Info("control request completed", "method", "RemoveContainer", "workspace_slug", request.GetWorkspaceSlug(), "container", request.GetContainer())
 	return &ctl.RemoveContainerResponse{}, nil
 }
 func toProto(workspace state.Workspace) *ctl.Workspace {

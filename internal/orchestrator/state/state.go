@@ -25,15 +25,25 @@ type Mount struct {
 	ProjectName string `toml:"project_name"`
 	Mode        string `toml:"mode"`
 }
+type Container struct {
+	Name            string `toml:"name"` // "default" or logical name
+	PodmanName      string `toml:"podman_name"`
+	ImageID         string `toml:"image_id"`
+	Status          string `toml:"status"`
+	CreatedAt       string `toml:"created_at"`
+	AgentSocketPath string `toml:"agent_socket_path"`
+	AgentToken      string `toml:"agent_token"`
+}
 type Workspace struct {
-	WorkspaceSlug   string  `toml:"workspace_slug"`
-	ContainerName   string  `toml:"container_name"`
-	ImageID         string  `toml:"image_id"`
-	Mounts          []Mount `toml:"mounts"`
-	Status          string  `toml:"status"`
-	AgentSocketPath string  `toml:"agent_socket_path"`
-	AgentToken      string  `toml:"agent_token"`
-	CreatedAt       string  `toml:"created_at"`
+	WorkspaceSlug   string      `toml:"workspace_slug"`
+	ContainerName   string      `toml:"container_name"`
+	ImageID         string      `toml:"image_id"`
+	Mounts          []Mount     `toml:"mounts"`
+	Status          string      `toml:"status"`
+	AgentSocketPath string      `toml:"agent_socket_path"`
+	AgentToken      string      `toml:"agent_token"`
+	CreatedAt       string      `toml:"created_at"`
+	Containers      []Container `toml:"containers"`
 }
 type imagesFile struct {
 	Images []Image `toml:"images"`
@@ -85,6 +95,19 @@ func (s *Store) workspaces() ([]Workspace, error) {
 	var file workspacesFile
 	if err := s.read("workspaces.toml", &file); err != nil {
 		return nil, err
+	}
+	for i := range file.Workspaces {
+		if len(file.Workspaces[i].Containers) == 0 && file.Workspaces[i].ContainerName != "" {
+			file.Workspaces[i].Containers = []Container{{
+				Name:            "default",
+				PodmanName:      file.Workspaces[i].ContainerName,
+				ImageID:         file.Workspaces[i].ImageID,
+				Status:          file.Workspaces[i].Status,
+				CreatedAt:       file.Workspaces[i].CreatedAt,
+				AgentSocketPath: file.Workspaces[i].AgentSocketPath,
+				AgentToken:      file.Workspaces[i].AgentToken,
+			}}
+		}
 	}
 	return file.Workspaces, nil
 }

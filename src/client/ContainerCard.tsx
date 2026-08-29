@@ -114,23 +114,18 @@ const wsBody: React.CSSProperties = {
 };
 const containerRow: React.CSSProperties = {
   display: "flex",
-  flexWrap: "wrap",
-  alignItems: "center",
-  gap: "8px 12px",
+  flexDirection: "column",
+  gap: "8px",
   padding: "10px 12px",
   border: "1px solid var(--dsw-alias-border-l2)",
   borderRadius: "10px",
   background: "var(--dsw-alias-bg-layer-3)",
 };
-const meta: React.CSSProperties = {
+const containerHeader: React.CSSProperties = {
   display: "flex",
   flexWrap: "wrap",
-  gap: "8px 12px",
   alignItems: "center",
-  fontSize: "12px",
-  color: "var(--dsw-alias-label-tertiary)",
-  flex: "1 1 240px",
-  minWidth: 0,
+  gap: "8px",
 };
 const actions: React.CSSProperties = {
   display: "flex",
@@ -284,23 +279,30 @@ function ContainerRow(props: {
     .join(", ");
   return (
     <div style={containerRow}>
-      <div style={meta}>
+      <div style={containerHeader}>
         <strong style={{ color: "var(--dsw-alias-label-primary)" }}>
           {container.containerName}
         </strong>
         <Pill>{container.status}</Pill>
-        <span>
-          {t("image")}: {container.imageId}
-        </span>
-        <span>
-          {t("created")}: {container.createdAt}
-        </span>
-        {projects !== "" ? (
-          <span>
-            {t("projects")}: {projects}
-          </span>
-        ) : null}
       </div>
+      <table style={tableStyle}>
+        <tbody>
+          <tr>
+            <th style={thStyle} scope="row">{t("image")}</th>
+            <td style={tdStyle}>{container.imageId}</td>
+          </tr>
+          <tr>
+            <th style={thStyle} scope="row">{t("created")}</th>
+            <td style={tdStyle}>{container.createdAt}</td>
+          </tr>
+          {projects !== "" ? (
+            <tr>
+              <th style={thStyle} scope="row">{t("projects")}</th>
+              <td style={tdStyle}>{projects}</td>
+            </tr>
+          ) : null}
+        </tbody>
+      </table>
       <div style={actions}>
         <Button
           variant="outline"

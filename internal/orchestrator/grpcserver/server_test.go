@@ -371,10 +371,31 @@ func TestStartContainerRequiresPodman(t *testing.T) {
 	if err := store.SaveWorkspaces([]state.Workspace{{WorkspaceSlug: "proj", ContainerName: "dsh-workspace-proj"}}); err != nil {
 		t.Fatal(err)
 	}
+	if err := store.SaveImages([]state.Image{{ImageID: "arch", ImageTag: "localhost/dsh-podman/arch:latest"}}); err != nil {
+		t.Fatal(err)
+	}
 	server := &Server{Store: store, Logger: silentLogger()}
-	_, err := server.StartContainer(context.Background(), &ctl.StartContainerRequest{WorkspaceSlug: "proj", Container: "dev"})
+	_, err := server.StartContainer(context.Background(), &ctl.StartContainerRequest{WorkspaceSlug: "proj", Container: "dev", ImageId: "arch"})
 	if status.Code(err) != codes.FailedPrecondition {
 		t.Fatalf("expected FailedPrecondition, got %v", err)
+	}
+}
+
+func TestStartContainerRejectsUnknownImage(t *testing.T) {
+	store := newTestStore(t)
+	if err := store.SaveWorkspaces([]state.Workspace{{WorkspaceSlug: "proj"}}); err != nil {
+		t.Fatal(err)
+	}
+	server := &Server{Store: store, Logger: silentLogger()}
+	for _, image := range []string{
+		"docker.io/library/nginx:latest",
+		"localhost/dsh-podman/not-built",
+		"arbitrary",
+	} {
+		_, err := server.StartContainer(context.Background(), &ctl.StartContainerRequest{WorkspaceSlug: "proj", Container: "web", ImageId: image})
+		if status.Code(err) != codes.NotFound {
+			t.Errorf("image %q: expected NotFound (arbitrary image rejected), got %v", image, err)
+		}
 	}
 }
 
@@ -843,12 +864,15 @@ func TestStartContainerMountsValidation(t *testing.T) {
 	if err := store.SaveWorkspaces([]state.Workspace{{WorkspaceSlug: "proj", ContainerName: "dsh-workspace-proj"}}); err != nil {
 		t.Fatal(err)
 	}
+	if err := store.SaveImages([]state.Image{{ImageID: "arch", ImageTag: "localhost/dsh-podman/arch:latest"}}); err != nil {
+		t.Fatal(err)
+	}
 	server := &Server{Store: store, ProjectsRoot: root, Logger: silentLogger()}
 	_, err := server.StartContainer(context.Background(), &ctl.StartContainerRequest{WorkspaceSlug: "proj", Container: "dev", Mounts: []*ctl.ProjectMount{{ProjectName: "team", Path: "../x"}}})
 	if status.Code(err) != codes.InvalidArgument {
 		t.Fatalf("invalid mount: expected InvalidArgument, got %v", err)
 	}
-	_, err = server.StartContainer(context.Background(), &ctl.StartContainerRequest{WorkspaceSlug: "proj", Container: "dev", Mounts: []*ctl.ProjectMount{{ProjectName: "team", Path: "src", Mode: ctl.MountMode_MOUNT_MODE_READ_WRITE}}})
+	_, err = server.StartContainer(context.Background(), &ctl.StartContainerRequest{WorkspaceSlug: "proj", Container: "dev", ImageId: "arch", Mounts: []*ctl.ProjectMount{{ProjectName: "team", Path: "src", Mode: ctl.MountMode_MOUNT_MODE_READ_WRITE}}})
 	if status.Code(err) != codes.FailedPrecondition {
 		t.Fatalf("valid mounts: expected FailedPrecondition, got %v", err)
 	}

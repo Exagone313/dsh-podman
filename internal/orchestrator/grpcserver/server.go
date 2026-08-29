@@ -425,12 +425,12 @@ func (s *Server) StartContainer(ctx context.Context, request *ctl.StartContainer
 		s.log().Error("StartContainer project validation failed", "workspace_slug", workspace.WorkspaceSlug, "error", err)
 		return nil, err
 	}
-	if s.Podman == nil {
-		return nil, status.Error(codes.FailedPrecondition, "podman is not configured")
-	}
 	imageTag, err := s.resolveImageTag(imageID)
 	if err != nil {
 		return nil, err
+	}
+	if s.Podman == nil {
+		return nil, status.Error(codes.FailedPrecondition, "podman is not configured")
 	}
 	if _, ok := containerByLogical(&workspace, request.GetContainer()); ok {
 		if err := s.Podman.Remove(record.PodmanName); err != nil {

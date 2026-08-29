@@ -29,6 +29,7 @@ export interface PluginConfig {
   imagePrefix?: string;
 }
 export function apply(ctx: any, config: PluginConfig = {}): void {
+  ctx.on("tools/pre-execute", preExecutePolicy);
   const imagePrefix = withTrailingSlash(
     config.imagePrefix ?? process.env.DSH_PODMAN_IMAGE_PREFIX ?? "localhost/dsh-podman/",
   );
@@ -582,6 +583,36 @@ export const TOOLS: ToolDefinition[] = [
   { name: "daemon_restart", parameters: daemonRestartParameters },
   { name: "daemon_logs", parameters: daemonLogsParameters },
 ];
+
+// The approval-gated tools. Derived from the `approval: true` flags on the
+// TOOLS entries so the flag stays the single source of truth. DSH has no
+// per-tool approval schema field: the plugin enforces approval itself through
+// a `tools/pre-execute` policy (see approvalDecision).
+const APPROVAL_TOOLS = new Set(
+  TOOLS.filter((tool) => tool.approval === true).map((tool) => tool.name),
+);
+
+// Decide whether a tool call needs approval. DSH resolves an `ask` decision
+// through its approval service (`ctx.get("approval").request(...)`), showing
+// the standard approval prompt; without one the call fails closed.
+export function approvalDecision(
+  name: string,
+): { kind: "ask"; reason: string } | undefined {
+  if (!APPROVAL_TOOLS.has(name)) return undefined;
+  return {
+    kind: "ask",
+    reason: `tool "${name}" changes the workspace environment and requires your approval`,
+  };
+}
+
+// The `tools/pre-execute` policy: asks for approval on gated tools and
+// delegates every other call to the remaining policy listeners.
+export async function preExecutePolicy(
+  exec: { name: string },
+  next: () => Promise<unknown>,
+): Promise<unknown> {
+  return approvalDecision(exec.name) ?? next();
+}
 
 const TOOL_DESCRIPTIONS: Record<string, string> = {
   image_list: "List the images available to the current workspace.",

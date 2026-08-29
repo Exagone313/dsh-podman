@@ -224,6 +224,12 @@ The plugin registers the following model-facing tools. Tools marked `✱`
 require approval. Container tools operate on a **logical container name** of
 the current workspace (`"default"` selects the workspace's default container).
 
+Approval is enforced by the plugin itself through a `tools/pre-execute`
+policy that asks DSH's approval service before a `✱` tool runs, so the call
+shows the standard approval prompt and is denied when no approval channel is
+available. The settings-card actions are direct control calls and are not
+gated.
+
 Image references (`imageId`, `baseImage`, `image`) accept a stored image id
 (short, e.g. `valkey`, or fully qualified, e.g. `localhost/dsh-podman/valkey`)
 with or without a `:tag`, or an already-qualified tag such as

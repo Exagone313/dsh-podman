@@ -12,6 +12,8 @@ import {
   TOOLS,
   toolHandlers,
   imageRemoveParameters,
+  approvalDecision,
+  preExecutePolicy,
 } from "./index.js";
 
 test("remoteArgv remaps ripgrep onto the guest path", () => {
@@ -203,6 +205,36 @@ test("the destructive mutations require approval", () => {
     "image_rebuild",
     "image_remove",
   ]);
+});
+
+test("approvalDecision gates exactly the approval-flagged tools", () => {
+  for (const tool of TOOLS) {
+    const decision = approvalDecision(tool.name);
+    if (tool.approval === true) {
+      assert.ok(decision, `${tool.name} must ask for approval`);
+      assert.equal(decision!.kind, "ask");
+      assert.ok(decision!.reason.length > 0, `${tool.name} ask reason`);
+    } else {
+      assert.equal(decision, undefined, `${tool.name} must not ask`);
+    }
+  }
+  assert.equal(approvalDecision("no_such_tool"), undefined);
+});
+
+test("preExecutePolicy asks for gated tools and delegates the rest", async () => {
+  const gated = "image_remove";
+  const asked = (await preExecutePolicy({ name: gated }, () =>
+    Promise.resolve({ kind: "allow" }),
+  )) as { kind: string };
+  assert.equal(asked.kind, "ask");
+
+  let delegated = false;
+  const allowed = (await preExecutePolicy({ name: "image_list" }, () => {
+    delegated = true;
+    return Promise.resolve({ kind: "allow" });
+  })) as { kind: string };
+  assert.equal(delegated, true, "non-gated tools must delegate to next()");
+  assert.equal(allowed.kind, "allow");
 });
 
 const MOUNT_TOOLS = [

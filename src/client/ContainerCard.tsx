@@ -355,8 +355,9 @@ function WorkspaceSection(props: {
   busy: boolean;
   onRemove: (workspace: string) => void;
   onRecreate: (workspace: string, image: string) => void;
+  onCreate: (workspace: WorkspaceView) => void;
 }): ReactNode {
-  const { t, workspace, containers, images, busy, onRemove, onRecreate } = props;
+  const { t, workspace, containers, images, busy, onRemove, onRecreate, onCreate } = props;
   const [open, setOpen] = useState(false);
   const hasContainer = containers.length > 0;
   return (
@@ -376,7 +377,17 @@ function WorkspaceSection(props: {
       <div style={wsBody}>
         <code style={greyId}>{workspace.workspaceSlug}</code>
         {!hasContainer ? (
-          <p style={hint}>{t("noContainers")}</p>
+          <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "8px" }}>
+            <p style={{ ...hint, margin: 0 }}>{t("noContainers")}</p>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={busy}
+              onClick={() => onCreate(workspace)}
+            >
+              {t("createContainer")}
+            </Button>
+          </div>
         ) : (
           containers.map((container) => (
             <ContainerRow
@@ -497,6 +508,7 @@ export function ContainerCard(props: ContainerCardProps): ReactNode {
                 busy={state.busy}
                 onRemove={props.remove}
                 onRecreate={props.recreate}
+                onCreate={props.createContainer}
               />
             ))
           )}

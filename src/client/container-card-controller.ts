@@ -37,12 +37,14 @@ export interface WorkspaceView {
   imageId: string;
   status: string;
   createdAt: string;
+  mounts: readonly { projectName: string; mode: string }[];
 }
 export interface CommandRequest {
-  op: "refresh" | "remove" | "recreate";
+  op: "refresh" | "remove" | "recreate" | "create";
   workspace: string;
   image: string;
   at: number;
+  mounts: readonly { projectName: string; mode: string }[];
 }
 export interface ContainerSettings {
   defaultImage: string;
@@ -78,6 +80,7 @@ export interface ContainerCardFace {
   reload: () => void;
   remove: (workspace: string) => void;
   recreate: (workspace: string, image: string) => void;
+  createContainer: (workspace: WorkspaceView) => void;
   editDefaultImage: (text: string) => void;
   saveDefaultImage: () => void;
   discardDefaultImage: () => void;
@@ -134,8 +137,9 @@ export class ContainerCardController {
     op: CommandRequest["op"],
     workspace: string,
     image: string,
+    mounts: readonly { projectName: string; mode: string }[] = [],
   ): void {
-    void this.scope.set("command", { op, workspace, image, at: Date.now() });
+    void this.scope.set("command", { op, workspace, image, at: Date.now(), mounts });
   }
 
   private edit(field: DraftableField, text: string): void {
@@ -161,6 +165,13 @@ export class ContainerCardController {
       remove: (workspace) => this.command("remove", workspace, ""),
       recreate: (workspace, image) =>
         this.command("recreate", workspace, image),
+      createContainer: (workspace) =>
+        this.command(
+          "create",
+          workspace.workspaceSlug,
+          workspace.imageId || this.scope.getSnapshot().value?.defaultImage || "",
+          workspace.mounts,
+        ),
       editDefaultImage: (text) => this.edit("defaultImage", text),
       saveDefaultImage: () => this.save("defaultImage"),
       discardDefaultImage: () => this.discard("defaultImage"),

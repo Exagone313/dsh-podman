@@ -8,10 +8,18 @@ import type { WorkspaceResolver } from "./workspace-binding.js";
 export const CONTAINER_NS = "podman";
 
 const commandSchema = z.object({
-  op: z.union([z.const("refresh"), z.const("remove"), z.const("recreate")]),
+  op: z.union([z.const("refresh"), z.const("remove"), z.const("recreate"), z.const("create")]),
   workspace: z.string().default(""),
   image: z.string().default(""),
   at: z.number().default(0),
+  mounts: z
+    .array(
+      z.object({
+        projectName: z.string().default(""),
+        mode: z.string().default(""),
+      }),
+    )
+    .default([]),
 });
 
 export const settingsSchema = z.object({
@@ -28,6 +36,14 @@ export const settingsSchema = z.object({
         imageId: z.string().default(""),
         status: z.string().default(""),
         createdAt: z.string().default(""),
+        mounts: z
+          .array(
+            z.object({
+              projectName: z.string().default(""),
+              mode: z.string().default(""),
+            }),
+          )
+          .default([]),
       }),
     )
     .default([]),
@@ -65,10 +81,11 @@ export const settingsSchema = z.object({
 }) as unknown as z<ContainerSettings>;
 
 export interface CommandRequest {
-  op: "refresh" | "remove" | "recreate";
+  op: "refresh" | "remove" | "recreate" | "create";
   workspace: string;
   image: string;
   at: number;
+  mounts: readonly { projectName: string; mode: string }[];
 }
 export interface ContainerView {
   containerName: string;
@@ -92,6 +109,7 @@ export interface WorkspaceView {
   imageId: string;
   status: string;
   createdAt: string;
+  mounts: readonly { projectName: string; mode: string }[];
 }
 export interface ContainerSettings {
   defaultImage: string;
@@ -150,6 +168,10 @@ export function installContainerSettings(
               imageId: workspace.imageId ?? "",
               status: workspace.status ?? "",
               createdAt: workspace.createdAt ?? "",
+              mounts: ((workspace.mounts ?? []) as any[]).map((mount) => ({
+                projectName: mount.projectName ?? "",
+                mode: mount.mode ?? "",
+              })),
             }),
           ),
           notice: "",
@@ -174,6 +196,13 @@ export function installContainerSettings(
       try {
         switch (command.op) {
           case "refresh":
+            break;
+          case "create":
+            await resolver.control("createWorkspace", {
+              workspaceSlug: command.workspace,
+              imageId: command.image === "" ? undefined : command.image,
+              mounts: command.mounts,
+            });
             break;
           case "remove":
             await resolver.control("removeContainer", {

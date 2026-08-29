@@ -21,6 +21,7 @@ export type ContainerPluginKey =
   | "discard"
   | "workspacesTitle"
   | "noContainers"
+  | "createContainer"
   | "containersTitle"
   | "containerName"
   | "workspace"
@@ -56,6 +57,7 @@ export const en: Record<ContainerPluginKey, string> = {
   discard: "Discard",
   workspacesTitle: "Workspaces",
   noContainers: "This workspace has no containers yet.",
+  createContainer: "Create container",
   containersTitle: "Containers",
   containerName: "Container",
   workspace: "Workspace",
@@ -92,6 +94,7 @@ export const zh: Record<ContainerPluginKey, string> = {
   discard: "放弃",
   workspacesTitle: "工作区",
   noContainers: "该工作区还没有容器。",
+  createContainer: "创建容器",
   containersTitle: "容器",
   containerName: "容器",
   workspace: "工作区",

@@ -151,3 +151,37 @@ test("recreate command is not re-run by the view refresh", async () => {
   assert.equal(recreateCalls.length, 1);
   assert.equal(scope.value.command, null);
 });
+
+test("create command drives createWorkspace with mounts and image", async () => {
+  const scope = fakeScope(baseValue());
+  const calls: Array<[string, unknown]> = [];
+  const resolver: any = {
+    getConfig: () => ({}),
+    setConfig: () => {},
+    async control(method: string, request: unknown) {
+      calls.push([method, request]);
+      if (method === "listContainers") return { containers: [] };
+      if (method === "listImages") return { images: [] };
+      if (method === "listWorkspaces") return { workspaces: [] };
+      return {};
+    },
+  };
+  installContainerSettings(fakeContext(scope), resolver);
+  await scope.update({
+    command: {
+      op: "create",
+      workspace: "w1",
+      image: "img1",
+      at: 1,
+      mounts: [{ projectName: "team", mode: "MOUNT_MODE_READ_WRITE" }],
+    },
+  });
+  await new Promise((resolve) => setImmediate(resolve));
+  const createCall = calls.find(([method]) => method === "createWorkspace");
+  assert.deepEqual(createCall?.[1], {
+    workspaceSlug: "w1",
+    imageId: "img1",
+    mounts: [{ projectName: "team", mode: "MOUNT_MODE_READ_WRITE" }],
+  });
+  assert.equal(scope.value.command, null);
+});

@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: MIT
 
 import { useState, type ReactNode } from "react";
+import { DisclosureRow } from "@deepseek-ai/dsh-client-ui-primitives";
 import type {
   InjectFace,
   PropsLocale,
@@ -66,6 +67,17 @@ const banner: React.CSSProperties = {
   border: "1px solid rgba(210,153,34,0.6)",
   marginBottom: "8px",
   fontSize: "13px",
+};
+const cardIconStyle: React.CSSProperties = {
+  display: "inline-block",
+  width: "14px",
+  height: "14px",
+  border: "1px solid currentColor",
+  borderRadius: "3px",
+  boxSizing: "border-box",
+};
+const bodyStyle: React.CSSProperties = {
+  padding: "8px 4px 4px",
 };
 
 function ContainerRow(props: {
@@ -153,6 +165,7 @@ function ContainerRow(props: {
 export function ContainerCard(props: ContainerCardProps): ReactNode {
   const { t } = props;
   const state = props.useContainerCard((snapshot) => snapshot);
+  const [open, setOpen] = useState(false);
   if (!state.available) {
     return (
       <p style={{ padding: "8px 0", fontSize: "13px", opacity: 0.8 }}>
@@ -161,96 +174,104 @@ export function ContainerCard(props: ContainerCardProps): ReactNode {
     );
   }
   return (
-    <div>
-      {state.notice === "" ? null : (
-        <div style={banner} role="status">
-          {t("notice")}: {state.notice}
-        </div>
-      )}
-      <div style={actions}>
-        <button
-          type="button"
-          style={button}
-          disabled={state.busy}
-          onClick={props.reload}
-        >
-          {state.busy ? t("busy") : t("reload")}
-        </button>
-      </div>
-      <div style={sectionTitle}>{t("configTitle")}</div>
-      <div style={actions}>
-        <label
-          htmlFor="plugin-config-container-default-image"
-          style={{ fontSize: "13px" }}
-        >
-          {t("defaultImage")}
-        </label>
-        <input
-          id="plugin-config-container-default-image"
-          value={state.defaultImageDraft}
-          disabled={!state.writable}
-          onChange={(event) => props.editDefaultImage(event.target.value)}
-          style={{ ...select, width: "180px" }}
-        />
-        <button
-          type="button"
-          style={button}
-          disabled={
-            !state.writable || state.defaultImageDraft === state.defaultImage
-          }
-          onClick={props.saveDefaultImage}
-        >
-          {t("save")}
-        </button>
-        <button
-          type="button"
-          style={button}
-          disabled={state.defaultImageDraft === state.defaultImage}
-          onClick={props.discardDefaultImage}
-        >
-          {t("discard")}
-        </button>
-      </div>
-      <div style={sectionTitle}>{t("containersTitle")}</div>
-      {state.containers.length === 0 ? (
-        <p style={{ fontSize: "13px", opacity: 0.8 }}>{t("none")}</p>
-      ) : (
-        state.containers.map((container) => (
-          <ContainerRow
-            key={container.containerName}
-            t={t}
-            container={container}
-            images={state.images}
-            busy={state.busy}
-            onStop={props.stop}
-            onRecreate={props.recreate}
-          />
-        ))
-      )}
-      <div style={sectionTitle}>{t("imagesTitle")}</div>
-      {state.images.length === 0 ? (
-        <p style={{ fontSize: "13px", opacity: 0.8 }}>{t("none")}</p>
-      ) : (
-        state.images.map((image) => (
-          <div key={image.imageId} style={row}>
-            <strong>{image.imageId}</strong>
-            <div style={meta}>
-              <span>
-                {t("baseImage")}: {image.baseImage}
-              </span>
-              <span>
-                {t("imageTag")}: {image.imageTag}
-              </span>
-              <span>
-                {t("builtAt")}: {image.builtAt}
-              </span>
-              <span>
-                {t("packages")}: {image.packages.length}
-              </span>
-            </div>
+    <DisclosureRow
+      icon={<span style={cardIconStyle} />}
+      title={t("cardTitle")}
+      open={open}
+      expandable
+      onToggle={() => setOpen(!open)}
+    >
+      <div style={bodyStyle}>
+        {state.notice === "" ? null : (
+          <div style={banner} role="status">
+            {t("notice")}: {state.notice}
           </div>
-        ))
-      )}
-    </div>
+        )}
+        <div style={actions}>
+          <button
+            type="button"
+            style={button}
+            disabled={state.busy}
+            onClick={props.reload}
+          >
+            {state.busy ? t("busy") : t("reload")}
+          </button>
+        </div>
+        <div style={sectionTitle}>{t("configTitle")}</div>
+        <div style={actions}>
+          <label
+            htmlFor="plugin-config-container-default-image"
+            style={{ fontSize: "13px" }}
+          >
+            {t("defaultImage")}
+          </label>
+          <input
+            id="plugin-config-container-default-image"
+            value={state.defaultImageDraft}
+            disabled={!state.writable}
+            onChange={(event) => props.editDefaultImage(event.target.value)}
+            style={{ ...select, width: "180px" }}
+          />
+          <button
+            type="button"
+            style={button}
+            disabled={
+              !state.writable || state.defaultImageDraft === state.defaultImage
+            }
+            onClick={props.saveDefaultImage}
+          >
+            {t("save")}
+          </button>
+          <button
+            type="button"
+            style={button}
+            disabled={state.defaultImageDraft === state.defaultImage}
+            onClick={props.discardDefaultImage}
+          >
+            {t("discard")}
+          </button>
+        </div>
+        <div style={sectionTitle}>{t("containersTitle")}</div>
+        {state.containers.length === 0 ? (
+          <p style={{ fontSize: "13px", opacity: 0.8 }}>{t("none")}</p>
+        ) : (
+          state.containers.map((container) => (
+            <ContainerRow
+              key={container.containerName}
+              t={t}
+              container={container}
+              images={state.images}
+              busy={state.busy}
+              onStop={props.stop}
+              onRecreate={props.recreate}
+            />
+          ))
+        )}
+        <div style={sectionTitle}>{t("imagesTitle")}</div>
+        {state.images.length === 0 ? (
+          <p style={{ fontSize: "13px", opacity: 0.8 }}>{t("none")}</p>
+        ) : (
+          state.images.map((image) => (
+            <div key={image.imageId} style={row}>
+              <strong>{image.imageId}</strong>
+              <div style={meta}>
+                <span>
+                  {t("baseImage")}: {image.baseImage}
+                </span>
+                <span>
+                  {t("imageTag")}: {image.imageTag}
+                </span>
+                <span>
+                  {t("builtAt")}: {image.builtAt}
+                </span>
+                <span>
+                  {t("packages")}: {image.packages.length}
+                </span>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+    </DisclosureRow>
   );
 }

@@ -18,6 +18,7 @@ service WorkspaceGuestAgent {
   rpc StartDaemon(StartDaemonRequest) returns (DaemonInfo);
   rpc ListDaemons(ListDaemonsRequest) returns (ListDaemonsResponse);
   rpc StopDaemon(StopDaemonRequest) returns (StopDaemonResponse);
+  rpc StopAllDaemons(StopAllDaemonsRequest) returns (StopAllDaemonsResponse);
   rpc RestartDaemon(RestartDaemonRequest) returns (DaemonInfo);
   rpc DaemonLogs(DaemonLogsRequest) returns (DaemonLogsResponse);
 }
@@ -47,6 +48,8 @@ message ListDaemonsRequest {}
 message ListDaemonsResponse { repeated DaemonInfo daemons = 1; }
 message StopDaemonRequest { string name = 1; string signal = 2; }
 message StopDaemonResponse {}
+message StopAllDaemonsRequest {}
+message StopAllDaemonsResponse { repeated string daemons = 1; }
 message RestartDaemonRequest { string name = 1; }
 message DaemonLogsRequest { string name = 1; int32 tail_bytes = 2; }
 message DaemonLogsResponse { bytes stdout = 1; bytes stderr = 2; }

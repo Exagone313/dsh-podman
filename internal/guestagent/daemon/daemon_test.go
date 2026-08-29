@@ -136,6 +136,31 @@ func TestStopTerminates(t *testing.T) {
 	waitFor(t, m, name, false)
 }
 
+func TestStopAll(t *testing.T) {
+	m := NewManager()
+	for _, name := range []string{"b", "a"} {
+		if _, err := m.Start(name, []string{"sleep", "30"}, "", nil); err != nil {
+			t.Fatal(err)
+		}
+	}
+	cleanupDaemon(t, m, "a")
+	cleanupDaemon(t, m, "b")
+	stopped := m.StopAll(syscall.SIGTERM)
+	if len(stopped) != 2 || stopped[0] != "a" || stopped[1] != "b" {
+		t.Fatalf("StopAll returned %v, want [a b]", stopped)
+	}
+	for _, name := range stopped {
+		waitFor(t, m, name, false)
+	}
+}
+
+func TestStopAllNoDaemons(t *testing.T) {
+	m := NewManager()
+	if stopped := m.StopAll(syscall.SIGTERM); len(stopped) != 0 {
+		t.Fatalf("StopAll on empty manager returned %v", stopped)
+	}
+}
+
 func TestRestartReruns(t *testing.T) {
 	m := NewManager()
 	name, err := m.Start("worker", []string{"sh", "-c", "echo one; sleep 1"}, "", nil)

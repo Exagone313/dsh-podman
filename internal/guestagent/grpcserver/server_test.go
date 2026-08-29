@@ -313,6 +313,43 @@ func TestStopDaemonUnknown(t *testing.T) {
 	}
 }
 
+func TestStopAllDaemonsStops(t *testing.T) {
+	server := New()
+	for _, name := range []string{"a", "b"} {
+		if _, err := server.StartDaemon(context.Background(), &guest.StartDaemonRequest{Name: name, Argv: []string{"sh", "-c", "sleep 30"}}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	response, err := server.StopAllDaemons(context.Background(), &guest.StopAllDaemonsRequest{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(response.Daemons) != 2 {
+		t.Fatalf("StopAllDaemons returned %v, want 2 names", response.Daemons)
+	}
+	byName := map[string]bool{}
+	for _, name := range response.Daemons {
+		byName[name] = true
+	}
+	for _, name := range []string{"a", "b"} {
+		if !byName[name] {
+			t.Fatalf("StopAllDaemons returned %v, missing %q", response.Daemons, name)
+		}
+		waitDaemonState(t, server, name, false)
+	}
+}
+
+func TestStopAllDaemonsEmpty(t *testing.T) {
+	server := New()
+	response, err := server.StopAllDaemons(context.Background(), &guest.StopAllDaemonsRequest{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(response.Daemons) != 0 {
+		t.Fatalf("StopAllDaemons returned %v, want empty", response.Daemons)
+	}
+}
+
 func TestRestartDaemonReruns(t *testing.T) {
 	server := New()
 	if _, err := server.StartDaemon(context.Background(), &guest.StartDaemonRequest{Name: "web", Argv: []string{"sh", "-c", "sleep 30"}}); err != nil {

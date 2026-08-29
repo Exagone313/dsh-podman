@@ -197,6 +197,30 @@ func (m *Manager) waitForStop(d *daemon, timeout time.Duration) bool {
 	return false
 }
 
+// StopAll stops every running daemon with the given signal, concurrently, and
+// returns the names of the daemons that were running.
+func (m *Manager) StopAll(sig os.Signal) []string {
+	m.mu.Lock()
+	names := make([]string, 0, len(m.daemons))
+	for name, d := range m.daemons {
+		if d.info.Running {
+			names = append(names, name)
+		}
+	}
+	m.mu.Unlock()
+	sort.Strings(names)
+	var wg sync.WaitGroup
+	for _, name := range names {
+		wg.Add(1)
+		go func(name string) {
+			defer wg.Done()
+			_ = m.Stop(name, sig)
+		}(name)
+	}
+	wg.Wait()
+	return names
+}
+
 // Restart stops the daemon if it is running and starts it again with the same
 // argv, working directory, and environment.
 func (m *Manager) Restart(name string) error {

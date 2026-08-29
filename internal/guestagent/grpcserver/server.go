@@ -14,6 +14,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"sync"
+	"syscall"
 	"time"
 
 	"gitlab.com/Exagone313/dsh-podman/internal/guestagent/daemon"
@@ -228,6 +229,12 @@ func (s *Server) StopDaemon(_ context.Context, request *guest.StopDaemonRequest)
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 	return &guest.StopDaemonResponse{}, nil
+}
+
+func (s *Server) StopAllDaemons(_ context.Context, _ *guest.StopAllDaemonsRequest) (*guest.StopAllDaemonsResponse, error) {
+	slog.Info("guest agent StopAllDaemons requested")
+	names := s.Daemons.StopAll(syscall.SIGTERM)
+	return &guest.StopAllDaemonsResponse{Daemons: names}, nil
 }
 
 func (s *Server) RestartDaemon(_ context.Context, request *guest.RestartDaemonRequest) (*guest.DaemonInfo, error) {

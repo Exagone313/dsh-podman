@@ -90,7 +90,7 @@ export function apply(ctx: any, config: PluginConfig = {}): void {
   ctx.provide("subprocess", createSubprocessProvider(resolver));
   ctx.provide("fs", createFilesystemProvider(resolver));
   registerTools(ctx, resolver);
-  installContainerSettings(ctx, resolver);
+  installContainerSettings(ctx, resolver, ctx.workspaceRegistry);
 }
 
 export interface SubprocessProvider {

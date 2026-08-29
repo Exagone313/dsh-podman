@@ -185,3 +185,77 @@ test("create command drives createWorkspace with mounts and image", async () => 
   });
   assert.equal(scope.value.command, null);
 });
+
+test("workspace list comes from the dsh registry even without orchestrator state", async () => {
+  const scope = fakeScope(baseValue());
+  const registry = {
+    list: () => [
+      { id: "uuid-1", path: "/projects/team/app", title: "app", createdAt: "2026-01-01T00:00:00Z" },
+    ],
+  };
+  const resolver: any = {
+    getConfig: () => ({
+      defaultImage: "arch-base",
+      socketsRoot: "/run/dsh-podman",
+      projectsRoot: "/projects",
+    }),
+    setConfig: () => {},
+    async control(method: string) {
+      if (method === "listContainers") return { containers: [] };
+      if (method === "listImages") return { images: [] };
+      if (method === "listWorkspaces") return { workspaces: [] };
+      return {};
+    },
+  };
+  installContainerSettings(fakeContext(scope), resolver, registry);
+  await scope.update({});
+  const workspaces = scope.value.workspaces as any[];
+  assert.equal(workspaces.length, 1);
+  assert.equal(workspaces[0].projectName, "team/app");
+  assert.equal(workspaces[0].containerName, "");
+  assert.deepEqual(workspaces[0].mounts, [
+    { projectName: "team/app", mode: "MOUNT_MODE_READ_WRITE" },
+  ]);
+  assert.ok(workspaces[0].workspaceSlug.length > 0);
+});
+
+test("dsh workspace layers orchestrator container info", async () => {
+  const scope = fakeScope(baseValue());
+  const registry = {
+    list: () => [
+      { id: "uuid-1", path: "/projects/team/app", title: "app", createdAt: "2026-01-01T00:00:00Z" },
+    ],
+  };
+  const resolver: any = {
+    getConfig: () => ({
+      defaultImage: "arch-base",
+      socketsRoot: "/run/dsh-podman",
+      projectsRoot: "/projects",
+    }),
+    setConfig: () => {},
+    async control(method: string) {
+      if (method === "listContainers") return { containers: [] };
+      if (method === "listImages") return { images: [] };
+      if (method === "listWorkspaces") {
+        return {
+          workspaces: [{
+            workspaceSlug: "uuid-1",
+            containerName: "dsh-workspace-uuid-1",
+            imageId: "arch",
+            status: "running",
+            mounts: [{ projectName: "team/app", mode: "MOUNT_MODE_READ_WRITE" }],
+          }],
+        };
+      }
+      return {};
+    },
+  };
+  installContainerSettings(fakeContext(scope), resolver, registry);
+  await scope.update({});
+  const workspaces = scope.value.workspaces as any[];
+  assert.equal(workspaces.length, 1);
+  assert.equal(workspaces[0].projectName, "team/app");
+  assert.equal(workspaces[0].containerName, "dsh-workspace-uuid-1");
+  assert.equal(workspaces[0].status, "running");
+  assert.equal(workspaces[0].imageId, "arch");
+});

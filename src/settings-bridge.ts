@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: MIT
 
 import z from "@deepseek-ai/schemastery";
+import { workspaceSlug } from "./workspace-binding.js";
 import type { WorkspaceResolver } from "./workspace-binding.js";
 
 export const CONTAINER_NS = "podman";
@@ -134,9 +135,62 @@ export interface ContainerSettingsScope {
   replace(section: object): Promise<void>;
 }
 
+function orchestratorWorkspaceViews(raw: unknown): WorkspaceView[] {
+  return ((raw as any[] | undefined) ?? []).map((workspace: any) => ({
+    workspaceSlug: workspace.workspaceSlug ?? "",
+    projectName: workspace.mounts?.[0]?.projectName ?? workspace.workspaceSlug ?? "",
+    containerName: workspace.containerName ?? "",
+    imageId: workspace.imageId ?? "",
+    status: workspace.status ?? "",
+    createdAt: workspace.createdAt ?? "",
+    mounts: ((workspace.mounts ?? []) as any[]).map((mount: any) => ({
+      projectName: mount.projectName ?? "",
+      mode: mount.mode ?? "",
+    })),
+  }));
+}
+
+function dshWorkspaceViews(registry: any, projectsRoot: string): WorkspaceView[] {
+  const list = registry?.list?.() ?? [];
+  return list.map((workspace: any) => {
+    const path = String(workspace.path ?? "");
+    const projectName = path.startsWith(`${projectsRoot}/`)
+      ? path.slice(projectsRoot.length + 1)
+      : path;
+    return {
+      workspaceSlug: workspaceSlug(String(workspace.id ?? "")),
+      projectName: projectName || String(workspace.title ?? "") || String(workspace.id ?? ""),
+      containerName: "",
+      imageId: "",
+      status: "",
+      createdAt: workspace.createdAt ?? "",
+      mounts: projectName !== "" ? [{ projectName, mode: "MOUNT_MODE_READ_WRITE" }] : [],
+    };
+  });
+}
+
+function mergeWorkspaceViews(
+  dhs: WorkspaceView[],
+  orchestrator: WorkspaceView[],
+): WorkspaceView[] {
+  const bySlug = new Map(orchestrator.map((workspace) => [workspace.workspaceSlug, workspace]));
+  const seen = new Set<string>();
+  const merged: WorkspaceView[] = [];
+  for (const workspace of dhs) {
+    const existing = bySlug.get(workspace.workspaceSlug);
+    merged.push(existing ? { ...workspace, ...existing } : workspace);
+    seen.add(workspace.workspaceSlug);
+  }
+  for (const workspace of orchestrator) {
+    if (!seen.has(workspace.workspaceSlug)) merged.push(workspace);
+  }
+  return merged;
+}
+
 export function installContainerSettings(
   ctx: any,
   resolver: WorkspaceResolver,
+  workspaceRegistry?: any,
 ): void {
   ctx.inject(["settings"], (sctx: any) => {
     const scope = sctx.settings.register(CONTAINER_NS, settingsSchema, {
@@ -160,19 +214,9 @@ export function installContainerSettings(
         await scope.update({
           containers: (containers as any).containers ?? [],
           images: (images as any).images ?? [],
-          workspaces: (((workspaces as any).workspaces ?? []) as any[]).map(
-            (workspace) => ({
-              workspaceSlug: workspace.workspaceSlug ?? "",
-              projectName: workspace.mounts?.[0]?.projectName ?? workspace.workspaceSlug ?? "",
-              containerName: workspace.containerName ?? "",
-              imageId: workspace.imageId ?? "",
-              status: workspace.status ?? "",
-              createdAt: workspace.createdAt ?? "",
-              mounts: ((workspace.mounts ?? []) as any[]).map((mount) => ({
-                projectName: mount.projectName ?? "",
-                mode: mount.mode ?? "",
-              })),
-            }),
+          workspaces: mergeWorkspaceViews(
+            dshWorkspaceViews(workspaceRegistry, resolver.getConfig().projectsRoot),
+            orchestratorWorkspaceViews((workspaces as any).workspaces),
           ),
           notice: "",
         });

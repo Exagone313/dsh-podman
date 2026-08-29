@@ -311,7 +311,7 @@ function ContainerRow(props: {
           {t("remove")}
         </Button>
         <Button
-          variant="ghost"
+          variant="outline"
           size="sm"
           disabled={!enabled}
           onClick={() => onRecreate(container.workspaceSlug, "")}
@@ -335,7 +335,7 @@ function ContainerRow(props: {
           ))}
         </select>
         <Button
-          variant="ghost"
+          variant="outline"
           size="sm"
           disabled={!enabled || selected === ""}
           onClick={() => onRecreate(container.workspaceSlug, selected)}

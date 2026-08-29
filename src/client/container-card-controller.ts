@@ -62,6 +62,10 @@ export interface CardState {
   notice: string;
   defaultImage: string;
   defaultImageDraft: string;
+  socketsRoot: string;
+  socketsRootDraft: string;
+  projectsRoot: string;
+  projectsRootDraft: string;
   workspaces: readonly WorkspaceView[];
   containers: readonly ContainerView[];
   images: readonly ImageView[];
@@ -77,17 +81,29 @@ export interface ContainerCardFace {
   editDefaultImage: (text: string) => void;
   saveDefaultImage: () => void;
   discardDefaultImage: () => void;
+  editSocketsRoot: (text: string) => void;
+  saveSocketsRoot: () => void;
+  discardSocketsRoot: () => void;
+  editProjectsRoot: (text: string) => void;
+  saveProjectsRoot: () => void;
+  discardProjectsRoot: () => void;
 }
+
+type DraftableField = "defaultImage" | "socketsRoot" | "projectsRoot";
 
 export class ContainerCardController {
   private readonly store: SnapshotStore<CardState>;
-  private draft: string | undefined;
+  private readonly drafts = new Map<DraftableField, string>();
 
   constructor(private readonly scope: SettingsScope<ContainerSettings>) {
     this.store = createSnapshotStore(this.project());
     scope.subscribe(() => {
       this.publish();
     });
+  }
+
+  private draft(field: DraftableField, current: string): string {
+    return this.drafts.get(field) ?? current;
   }
 
   private project(): CardState {
@@ -99,7 +115,11 @@ export class ContainerCardController {
       busy: value?.command !== null && value?.command !== undefined,
       notice: value?.notice ?? "",
       defaultImage: value?.defaultImage ?? "",
-      defaultImageDraft: this.draft ?? value?.defaultImage ?? "",
+      defaultImageDraft: this.draft("defaultImage", value?.defaultImage ?? ""),
+      socketsRoot: value?.socketsRoot ?? "",
+      socketsRootDraft: this.draft("socketsRoot", value?.socketsRoot ?? ""),
+      projectsRoot: value?.projectsRoot ?? "",
+      projectsRootDraft: this.draft("projectsRoot", value?.projectsRoot ?? ""),
       workspaces: value?.workspaces ?? [],
       containers: value?.containers ?? [],
       images: value?.images ?? [],
@@ -118,6 +138,22 @@ export class ContainerCardController {
     void this.scope.set("command", { op, workspace, image, at: Date.now() });
   }
 
+  private edit(field: DraftableField, text: string): void {
+    this.drafts.set(field, text);
+    this.publish();
+  }
+
+  private save(field: DraftableField): void {
+    const draft = this.drafts.get(field);
+    if (draft === undefined) return;
+    void this.scope.set(field, draft);
+  }
+
+  private discard(field: DraftableField): void {
+    this.drafts.delete(field);
+    this.publish();
+  }
+
   inject(): ContainerCardFace {
     return {
       hooks: { containerCard: this.store },
@@ -125,19 +161,15 @@ export class ContainerCardController {
       remove: (workspace) => this.command("remove", workspace, ""),
       recreate: (workspace, image) =>
         this.command("recreate", workspace, image),
-      editDefaultImage: (text) => {
-        this.draft = text;
-        this.publish();
-      },
-      saveDefaultImage: () => {
-        const draft = this.draft;
-        if (draft === undefined) return;
-        void this.scope.set("defaultImage", draft);
-      },
-      discardDefaultImage: () => {
-        this.draft = undefined;
-        this.publish();
-      },
+      editDefaultImage: (text) => this.edit("defaultImage", text),
+      saveDefaultImage: () => this.save("defaultImage"),
+      discardDefaultImage: () => this.discard("defaultImage"),
+      editSocketsRoot: (text) => this.edit("socketsRoot", text),
+      saveSocketsRoot: () => this.save("socketsRoot"),
+      discardSocketsRoot: () => this.discard("socketsRoot"),
+      editProjectsRoot: (text) => this.edit("projectsRoot", text),
+      saveProjectsRoot: () => this.save("projectsRoot"),
+      discardProjectsRoot: () => this.discard("projectsRoot"),
     };
   }
 }

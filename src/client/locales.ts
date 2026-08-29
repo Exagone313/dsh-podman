@@ -14,6 +14,8 @@ export type ContainerPluginKey =
   | "notice"
   | "configTitle"
   | "defaultImage"
+  | "socketsRoot"
+  | "projectsRoot"
   | "defaultImageHint"
   | "save"
   | "discard"
@@ -47,6 +49,8 @@ export const en: Record<ContainerPluginKey, string> = {
   notice: "Notice",
   configTitle: "Configuration",
   defaultImage: "Default image",
+  socketsRoot: "Sockets root",
+  projectsRoot: "Projects root",
   defaultImageHint: "Image used when a workspace has no image of its own.",
   save: "Save",
   discard: "Discard",
@@ -81,6 +85,8 @@ export const zh: Record<ContainerPluginKey, string> = {
   notice: "提示",
   configTitle: "配置",
   defaultImage: "默认镜像",
+  socketsRoot: "套接字根目录",
+  projectsRoot: "项目根目录",
   defaultImageHint: "工作区没有自带镜像时使用的镜像。",
   save: "保存",
   discard: "放弃",

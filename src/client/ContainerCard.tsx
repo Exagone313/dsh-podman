@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: MIT
 
-import { useState, type ReactNode } from "react";
+import { useId, useState, type ReactNode } from "react";
 import {
   Button,
   DisclosureRow,
@@ -201,6 +201,62 @@ function containerStateDot(status: string): StateDotState {
     default:
       return "warning";
   }
+}
+
+function ConfigField(props: {
+  t: (key: ContainerPluginKey) => string;
+  label: string;
+  value: string;
+  current: string;
+  writable: boolean;
+  onChange: (text: string) => void;
+  onSave: () => void;
+  onDiscard: () => void;
+}): ReactNode {
+  const { t, label, value, current, writable, onChange, onSave, onDiscard } = props;
+  const id = useId();
+  const dirty = value !== current;
+  return (
+    <div
+      style={{
+        display: "flex",
+        flexWrap: "wrap",
+        alignItems: "center",
+        gap: "8px",
+        padding: "8px 0",
+      }}
+    >
+      <label
+        htmlFor={id}
+        style={{ fontSize: "13px", color: "var(--dsw-alias-label-secondary)", minWidth: "110px" }}
+      >
+        {label}
+      </label>
+      <Input
+        id={id}
+        value={value}
+        disabled={!writable}
+        onChange={(event) => onChange(event.target.value)}
+        style={{ width: "200px" }}
+      />
+      <Button
+        variant="outline"
+        size="sm"
+        disabled={!writable || !dirty}
+        onClick={onSave}
+      >
+        {t("save")}
+      </Button>
+      <Button
+        variant="ghost"
+        size="sm"
+        disabled={!dirty}
+        onClick={onDiscard}
+      >
+        {t("discard")}
+      </Button>
+    </div>
+  );
 }
 
 function ContainerRow(props: {
@@ -418,34 +474,6 @@ export function ContainerCard(props: ContainerCardProps): ReactNode {
               {t("notice")}: {state.notice}
             </div>
           )}
-          <div style={sectionTitle}>{t("configTitle")}</div>
-          <div style={actions}>
-            <Input
-              value={state.defaultImageDraft}
-              disabled={!state.writable}
-              onChange={(event) => props.editDefaultImage(event.target.value)}
-              style={{ width: "180px" }}
-              aria-label={t("defaultImage")}
-            />
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={
-                !state.writable || state.defaultImageDraft === state.defaultImage
-              }
-              onClick={props.saveDefaultImage}
-            >
-              {t("save")}
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              disabled={state.defaultImageDraft === state.defaultImage}
-              onClick={props.discardDefaultImage}
-            >
-              {t("discard")}
-            </Button>
-          </div>
           <div style={sectionTitle}>{t("workspacesTitle")}</div>
           {state.workspaces.length === 0 ? (
             <p style={hint}>{t("none")}</p>
@@ -467,7 +495,39 @@ export function ContainerCard(props: ContainerCardProps): ReactNode {
             ))
           )}
           <ImagesSection t={t} images={state.images} />
-          <div style={footerRow}>            <Button
+          <div style={sectionTitle}>{t("configTitle")}</div>
+          <ConfigField
+            t={t}
+            label={t("defaultImage")}
+            value={state.defaultImageDraft}
+            current={state.defaultImage}
+            writable={state.writable}
+            onChange={props.editDefaultImage}
+            onSave={props.saveDefaultImage}
+            onDiscard={props.discardDefaultImage}
+          />
+          <ConfigField
+            t={t}
+            label={t("socketsRoot")}
+            value={state.socketsRootDraft}
+            current={state.socketsRoot}
+            writable={state.writable}
+            onChange={props.editSocketsRoot}
+            onSave={props.saveSocketsRoot}
+            onDiscard={props.discardSocketsRoot}
+          />
+          <ConfigField
+            t={t}
+            label={t("projectsRoot")}
+            value={state.projectsRootDraft}
+            current={state.projectsRoot}
+            writable={state.writable}
+            onChange={props.editProjectsRoot}
+            onSave={props.saveProjectsRoot}
+            onDiscard={props.discardProjectsRoot}
+          />
+          <div style={footerRow}>
+            <Button
               variant="outline"
               size="sm"
               disabled={state.busy}

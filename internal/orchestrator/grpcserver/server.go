@@ -432,9 +432,13 @@ func (s *Server) StartContainer(ctx context.Context, request *ctl.StartContainer
 	if s.Podman == nil {
 		return nil, status.Error(codes.FailedPrecondition, "podman is not configured")
 	}
-	if _, ok := containerByLogical(&workspace, request.GetContainer()); ok {
+	if existing, ok := containerByLogical(&workspace, request.GetContainer()); ok {
+		s.stopContainerDaemons(context.Background(), *existing)
+		if err := s.Podman.Stop(existing.PodmanName); err != nil {
+			s.log().Warn("StartContainer replace stop failed", "workspace_slug", workspace.WorkspaceSlug, "container", request.GetContainer(), "error", err)
+		}
 		if err := s.Podman.Remove(record.PodmanName); err != nil {
-			s.log().Error("control request failed", "method", "StartContainer", "workspace_slug", request.GetWorkspaceSlug(), "container", request.GetContainer(), "error", err)
+			s.log().Error("control request failed", "method", "StartContainer", "workspace_slug", workspace.WorkspaceSlug, "container", request.GetContainer(), "error", err)
 			return nil, status.Error(codes.Internal, err.Error())
 		}
 	}
@@ -1213,6 +1217,10 @@ func (s *Server) RemoveContainer(_ context.Context, request *ctl.RemoveContainer
 	}
 	if s.Podman == nil {
 		return nil, status.Error(codes.FailedPrecondition, "podman is not configured")
+	}
+	s.stopContainerDaemons(context.Background(), *record)
+	if err := s.Podman.Stop(record.PodmanName); err != nil {
+		s.log().Warn("RemoveContainer stop failed", "workspace_slug", request.GetWorkspaceSlug(), "container", request.GetContainer(), "error", err)
 	}
 	if err := s.Podman.Remove(record.PodmanName); err != nil {
 		s.log().Error("control request failed", "method", "RemoveContainer", "workspace_slug", request.GetWorkspaceSlug(), "container", request.GetContainer(), "error", err)

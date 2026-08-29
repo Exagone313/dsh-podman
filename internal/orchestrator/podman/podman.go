@@ -173,7 +173,7 @@ func (c *Client) ImageExists(name string) (bool, error) {
 }
 func (c *Client) Remove(name string) error {
 	c.log().Info("removing guest container", "container_name", name)
-	_, err := containers.Remove(c.ctx, name, &containers.RemoveOptions{})
+	_, err := containers.Remove(c.ctx, name, &containers.RemoveOptions{Force: boolPtr(true)})
 	if err != nil {
 		c.log().Error("guest container removal failed", "container_name", name, "error", err)
 	} else {

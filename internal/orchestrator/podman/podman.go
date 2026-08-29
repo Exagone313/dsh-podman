@@ -41,7 +41,7 @@ func (c *Client) log() *slog.Logger {
 }
 
 func (c *Client) CreateWorkspace(name, image, token string, mounts []specs.Mount) error {
-	c.log().Info("creating workspace container", "container_name", name, "image", image, "mount_count", len(mounts))
+	c.log().Info("creating guest container", "container_name", name, "image", image, "mount_count", len(mounts))
 	socketDir := filepath.Join(c.socketRoot, name)
 	hostSocketDir := filepath.Join(c.hostSocketRoot, name)
 	if err := os.MkdirAll(socketDir, 0700); err != nil {
@@ -55,14 +55,14 @@ func (c *Client) CreateWorkspace(name, image, token string, mounts []specs.Mount
 	generator.Init = &init
 	generator.Mounts = append(mounts, guestAgentMounts(hostSocketDir, c.socketRoot, name, c.hostGuestBinary, c.guestBinary)...)
 	if _, err := containers.CreateWithSpec(c.ctx, generator, nil); err != nil {
-		c.log().Error("workspace container creation failed", "container_name", name, "error", err)
+		c.log().Error("guest container creation failed", "container_name", name, "error", err)
 		return fmt.Errorf("create container: %w", err)
 	}
 	if err := containers.Start(c.ctx, name, nil); err != nil {
-		c.log().Error("workspace container start failed", "container_name", name, "error", err)
+		c.log().Error("guest container start failed", "container_name", name, "error", err)
 		return err
 	}
-	c.log().Info("workspace container started", "container_name", name)
+	c.log().Info("guest container started", "container_name", name)
 	return nil
 }
 
@@ -74,21 +74,21 @@ func guestAgentMounts(hostSocketDir, socketRoot, name, hostGuestBinary, guestBin
 	return mounts
 }
 func (c *Client) Stop(name string) error {
-	c.log().Info("stopping workspace container", "container_name", name)
+	c.log().Info("stopping guest container", "container_name", name)
 	err := containers.Stop(c.ctx, name, nil)
 	if err != nil {
-		c.log().Error("workspace container stop failed", "container_name", name, "error", err)
+		c.log().Error("guest container stop failed", "container_name", name, "error", err)
 	} else {
-		c.log().Info("workspace container stopped", "container_name", name)
+		c.log().Info("guest container stopped", "container_name", name)
 	}
 	return err
 }
 func (c *Client) ContainerExists(name string) (bool, error) {
 	exists, err := containers.Exists(c.ctx, name, nil)
 	if err != nil {
-		c.log().Error("workspace container lookup failed", "container_name", name, "error", err)
+		c.log().Error("guest container lookup failed", "container_name", name, "error", err)
 	} else {
-		c.log().Info("workspace container lookup completed", "container_name", name, "exists", exists)
+		c.log().Info("guest container lookup completed", "container_name", name, "exists", exists)
 	}
 	return exists, err
 }
@@ -117,18 +117,18 @@ func (c *Client) ImageExists(name string) (bool, error) {
 	return exists, err
 }
 func (c *Client) Remove(name string) error {
-	c.log().Info("removing workspace container", "container_name", name)
+	c.log().Info("removing guest container", "container_name", name)
 	_, err := containers.Remove(c.ctx, name, &containers.RemoveOptions{})
 	if err != nil {
-		c.log().Error("workspace container removal failed", "container_name", name, "error", err)
+		c.log().Error("guest container removal failed", "container_name", name, "error", err)
 	} else {
-		c.log().Info("workspace container removed", "container_name", name)
+		c.log().Info("guest container removed", "container_name", name)
 	}
 	return err
 }
 
 func (c *Client) RecreateWorkspace(name, image, token string, mounts []specs.Mount) error {
-	c.log().Info("recreating workspace container", "container_name", name, "image", image, "mount_count", len(mounts))
+	c.log().Info("recreating guest container", "container_name", name, "image", image, "mount_count", len(mounts))
 	if err := c.Stop(name); err != nil {
 		return err
 	}

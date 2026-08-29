@@ -39,7 +39,7 @@ export type ContainerPluginKey =
 
 export const en: Record<ContainerPluginKey, string> = {
   cardTitle: "Containers",
-  cardDescription: "Manage the workspace containers and their images.",
+  cardDescription: "Manage the guest containers and their images.",
   reload: "Reload",
   reloading: "Reloading…",
   notice: "Notice",

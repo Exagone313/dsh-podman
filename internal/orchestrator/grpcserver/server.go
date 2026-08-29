@@ -90,7 +90,7 @@ func (s *Server) DescribeWorkspace(_ context.Context, request *ctl.DescribeWorks
 				}
 				if !exists {
 					s.log().Warn("DescribeWorkspace found stale state", "workspace_slug", workspace.WorkspaceSlug, "container_name", workspace.ContainerName)
-					return nil, status.Error(codes.NotFound, "workspace container not found")
+					return nil, status.Error(codes.NotFound, "guest container not found")
 				}
 			}
 			s.log().Info("control request completed", "method", "DescribeWorkspace", "workspace_slug", workspace.WorkspaceSlug, "status", workspace.Status)

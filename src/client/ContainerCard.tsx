@@ -151,10 +151,10 @@ function ContainerRow(props: {
   container: ContainerView;
   images: readonly { imageId: string }[];
   busy: boolean;
-  onStop: (workspace: string) => void;
+  onRemove: (workspace: string) => void;
   onRecreate: (workspace: string, image: string) => void;
 }): ReactNode {
-  const { t, container, images, busy, onStop, onRecreate } = props;
+  const { t, container, images, busy, onRemove, onRecreate } = props;
   const [selected, setSelected] = useState(container.imageId);
   const enabled = container.workspaceSlug !== "" && !busy;
   const projects = container.mounts
@@ -188,9 +188,9 @@ function ContainerRow(props: {
           type="button"
           style={button}
           disabled={!enabled}
-          onClick={() => onStop(container.workspaceSlug)}
+          onClick={() => onRemove(container.workspaceSlug)}
         >
-          {t("stop")}
+          {t("remove")}
         </button>
         <button
           type="button"
@@ -314,7 +314,7 @@ export function ContainerCard(props: ContainerCardProps): ReactNode {
                 container={container}
                 images={state.images}
                 busy={state.busy}
-                onStop={props.stop}
+                onRemove={props.remove}
                 onRecreate={props.recreate}
               />
             ))

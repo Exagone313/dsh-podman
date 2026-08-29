@@ -174,15 +174,15 @@ directory. The control socket file is explicitly set to `0600`.
 
 The plugin ships a browser half (`./client`, built to `dist/client`) that
 registers a card in the dsh **Settings → Plugins** page. The card lists the
-orchestrator-created guest containers and the built images, and offers **Stop**,
-**Recreate** (same image), and **Recreate with image** plus a **Reload this
-view** button.
+orchestrator-created guest containers and the built images, and offers
+**Remove**, **Recreate** (same image), and **Recreate with image** plus a
+**Reload this view** button.
 
 Data and actions travel over the settings transport:
 
 - The host half registers the `podman` settings namespace and keeps a live
   view (`containers`, `images`, `notice`) in it.
-- The card writes an action into `command` (`refresh` / `stop` / `recreate`);
+- The card writes an action into `command` (`refresh` / `remove` / `recreate`);
   the host `watch` handler executes it against the orchestrator and pushes the
   refreshed view back.
 
@@ -193,7 +193,9 @@ container directly; workspace slugs are validated so the container name is
 always derived server-side from `dsh-workspace-<slug>`) and
 `RecreateContainer{workspace_slug, image_id}` (stops, removes, and recreates
 the container, optionally with a new image; an empty `image_id` keeps the
-workspace's current image). `StopWorkspace` (existing) backs the Stop button.
+workspace's current image). `RemoveContainer{workspace_slug}` removes the
+guest container from Podman (the workspace record is left for the plugin to
+recreate on next use).
 
 ### Building the browser half
 

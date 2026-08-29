@@ -24,7 +24,7 @@ export type ContainerPluginKey =
   | "status"
   | "created"
   | "projects"
-  | "stop"
+  | "remove"
   | "recreate"
   | "recreateWithImage"
   | "imagesTitle"
@@ -55,7 +55,7 @@ export const en: Record<ContainerPluginKey, string> = {
   status: "Status",
   created: "Created",
   projects: "Projects",
-  stop: "Stop",
+  remove: "Remove",
   recreate: "Recreate",
   recreateWithImage: "Recreate with image",
   imagesTitle: "Images",
@@ -87,7 +87,7 @@ export const zh: Record<ContainerPluginKey, string> = {
   status: "状态",
   created: "创建时间",
   projects: "项目",
-  stop: "停止",
+  remove: "移除",
   recreate: "重建",
   recreateWithImage: "使用镜像重建",
   imagesTitle: "镜像",

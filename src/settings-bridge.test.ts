@@ -96,7 +96,7 @@ test("refresh on install publishes containers and images", async () => {
   assert.equal((scope.value.images as any[]).length, 1);
 });
 
-test("stop command drives stopWorkspace and clears the command", async () => {
+test("remove command drives removeContainer and clears the command", async () => {
   const scope = fakeScope(baseValue());
   const calls: Array<[string, unknown]> = [];
   const resolver: any = {
@@ -111,11 +111,11 @@ test("stop command drives stopWorkspace and clears the command", async () => {
   };
   installContainerSettings(fakeContext(scope), resolver);
   await scope.update({
-    command: { op: "stop", workspace: "w1", image: "", at: 1 },
+    command: { op: "remove", workspace: "w1", image: "", at: 1 },
   });
   await new Promise((resolve) => setImmediate(resolve));
-  const stopCall = calls.find(([method]) => method === "stopWorkspace");
-  assert.deepEqual(stopCall?.[1], { workspaceSlug: "w1" });
+  const removeCall = calls.find(([method]) => method === "removeContainer");
+  assert.deepEqual(removeCall?.[1], { workspaceSlug: "w1" });
   assert.equal(scope.value.command, null);
 });
 

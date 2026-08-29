@@ -8,7 +8,7 @@ import type { WorkspaceResolver } from "./workspace-binding.js";
 export const CONTAINER_NS = "podman";
 
 const commandSchema = z.object({
-  op: z.union([z.const("refresh"), z.const("stop"), z.const("recreate")]),
+  op: z.union([z.const("refresh"), z.const("remove"), z.const("recreate")]),
   workspace: z.string().default(""),
   image: z.string().default(""),
   at: z.number().default(0),
@@ -53,7 +53,7 @@ export const settingsSchema = z.object({
 }) as unknown as z<ContainerSettings>;
 
 export interface CommandRequest {
-  op: "refresh" | "stop" | "recreate";
+  op: "refresh" | "remove" | "recreate";
   workspace: string;
   image: string;
   at: number;
@@ -143,8 +143,8 @@ export function installContainerSettings(
         switch (command.op) {
           case "refresh":
             break;
-          case "stop":
-            await resolver.control("stopWorkspace", {
+          case "remove":
+            await resolver.control("removeContainer", {
               workspaceSlug: command.workspace,
             });
             break;

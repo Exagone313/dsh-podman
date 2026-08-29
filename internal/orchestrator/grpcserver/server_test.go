@@ -290,6 +290,26 @@ func TestStopWorkspaceRequiresPodman(t *testing.T) {
 	}
 }
 
+func TestRemoveContainerRequiresPodman(t *testing.T) {
+	store := newTestStore(t)
+	if err := store.SaveWorkspaces([]state.Workspace{{WorkspaceSlug: "proj", ContainerName: "dsh-workspace-proj"}}); err != nil {
+		t.Fatal(err)
+	}
+	server := &Server{Store: store, Logger: silentLogger()}
+	_, err := server.RemoveContainer(context.Background(), &ctl.RemoveContainerRequest{WorkspaceSlug: "proj"})
+	if status.Code(err) != codes.FailedPrecondition {
+		t.Fatalf("expected FailedPrecondition, got %v", err)
+	}
+}
+
+func TestRemoveContainerMissingWorkspace(t *testing.T) {
+	server := &Server{Store: newTestStore(t), Logger: silentLogger()}
+	_, err := server.RemoveContainer(context.Background(), &ctl.RemoveContainerRequest{WorkspaceSlug: "nope"})
+	if status.Code(err) != codes.NotFound {
+		t.Fatalf("expected NotFound, got %v", err)
+	}
+}
+
 func TestStopWorkspaceMissingWorkspace(t *testing.T) {
 	server := &Server{Store: newTestStore(t), Logger: silentLogger()}
 	_, err := server.StopWorkspace(context.Background(), &ctl.StopWorkspaceRequest{WorkspaceSlug: "nope"})

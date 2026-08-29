@@ -33,6 +33,7 @@ const (
 	OrchestratorControl_RebuildImage_FullMethodName      = "/dshctl.v1.OrchestratorControl/RebuildImage"
 	OrchestratorControl_ListContainers_FullMethodName    = "/dshctl.v1.OrchestratorControl/ListContainers"
 	OrchestratorControl_RecreateContainer_FullMethodName = "/dshctl.v1.OrchestratorControl/RecreateContainer"
+	OrchestratorControl_RemoveContainer_FullMethodName   = "/dshctl.v1.OrchestratorControl/RemoveContainer"
 )
 
 // OrchestratorControlClient is the client API for OrchestratorControl service.
@@ -49,6 +50,7 @@ type OrchestratorControlClient interface {
 	RebuildImage(ctx context.Context, in *RebuildImageRequest, opts ...grpc.CallOption) (*Image, error)
 	ListContainers(ctx context.Context, in *ListContainersRequest, opts ...grpc.CallOption) (*ListContainersResponse, error)
 	RecreateContainer(ctx context.Context, in *RecreateContainerRequest, opts ...grpc.CallOption) (*Workspace, error)
+	RemoveContainer(ctx context.Context, in *RemoveContainerRequest, opts ...grpc.CallOption) (*RemoveContainerResponse, error)
 }
 
 type orchestratorControlClient struct {
@@ -159,6 +161,16 @@ func (c *orchestratorControlClient) RecreateContainer(ctx context.Context, in *R
 	return out, nil
 }
 
+func (c *orchestratorControlClient) RemoveContainer(ctx context.Context, in *RemoveContainerRequest, opts ...grpc.CallOption) (*RemoveContainerResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RemoveContainerResponse)
+	err := c.cc.Invoke(ctx, OrchestratorControl_RemoveContainer_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // OrchestratorControlServer is the server API for OrchestratorControl service.
 // All implementations must embed UnimplementedOrchestratorControlServer
 // for forward compatibility.
@@ -173,6 +185,7 @@ type OrchestratorControlServer interface {
 	RebuildImage(context.Context, *RebuildImageRequest) (*Image, error)
 	ListContainers(context.Context, *ListContainersRequest) (*ListContainersResponse, error)
 	RecreateContainer(context.Context, *RecreateContainerRequest) (*Workspace, error)
+	RemoveContainer(context.Context, *RemoveContainerRequest) (*RemoveContainerResponse, error)
 	mustEmbedUnimplementedOrchestratorControlServer()
 }
 
@@ -212,6 +225,9 @@ func (UnimplementedOrchestratorControlServer) ListContainers(context.Context, *L
 }
 func (UnimplementedOrchestratorControlServer) RecreateContainer(context.Context, *RecreateContainerRequest) (*Workspace, error) {
 	return nil, status.Error(codes.Unimplemented, "method RecreateContainer not implemented")
+}
+func (UnimplementedOrchestratorControlServer) RemoveContainer(context.Context, *RemoveContainerRequest) (*RemoveContainerResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method RemoveContainer not implemented")
 }
 func (UnimplementedOrchestratorControlServer) mustEmbedUnimplementedOrchestratorControlServer() {}
 func (UnimplementedOrchestratorControlServer) testEmbeddedByValue()                             {}
@@ -414,6 +430,24 @@ func _OrchestratorControl_RecreateContainer_Handler(srv interface{}, ctx context
 	return interceptor(ctx, in, info, handler)
 }
 
+func _OrchestratorControl_RemoveContainer_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RemoveContainerRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(OrchestratorControlServer).RemoveContainer(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: OrchestratorControl_RemoveContainer_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(OrchestratorControlServer).RemoveContainer(ctx, req.(*RemoveContainerRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // OrchestratorControl_ServiceDesc is the grpc.ServiceDesc for OrchestratorControl service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -460,6 +494,10 @@ var OrchestratorControl_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "RecreateContainer",
 			Handler:    _OrchestratorControl_RecreateContainer_Handler,
+		},
+		{
+			MethodName: "RemoveContainer",
+			Handler:    _OrchestratorControl_RemoveContainer_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

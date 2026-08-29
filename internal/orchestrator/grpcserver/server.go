@@ -495,6 +495,22 @@ func (s *Server) StopWorkspace(_ context.Context, request *ctl.StopWorkspaceRequ
 	s.log().Info("control request completed", "method", "StopWorkspace", "workspace_slug", request.GetWorkspaceSlug())
 	return &ctl.StopWorkspaceResponse{}, nil
 }
+func (s *Server) RemoveContainer(_ context.Context, request *ctl.RemoveContainerRequest) (*ctl.RemoveContainerResponse, error) {
+	s.log().Info("control request", "method", "RemoveContainer", "workspace_slug", request.GetWorkspaceSlug())
+	workspace, err := s.DescribeWorkspace(context.Background(), &ctl.DescribeWorkspaceRequest{WorkspaceSlug: request.GetWorkspaceSlug()})
+	if err != nil {
+		return nil, err
+	}
+	if s.Podman == nil {
+		return nil, status.Error(codes.FailedPrecondition, "podman is not configured")
+	}
+	if err := s.Podman.Remove(workspace.GetContainerName()); err != nil {
+		s.log().Error("control request failed", "method", "RemoveContainer", "workspace_slug", request.GetWorkspaceSlug(), "error", err)
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	s.log().Info("control request completed", "method", "RemoveContainer", "workspace_slug", request.GetWorkspaceSlug())
+	return &ctl.RemoveContainerResponse{}, nil
+}
 func toProto(workspace state.Workspace) *ctl.Workspace {
 	result := &ctl.Workspace{WorkspaceSlug: workspace.WorkspaceSlug, ContainerName: workspace.ContainerName, ImageId: workspace.ImageID, Status: workspace.Status, AgentSocketPath: workspace.AgentSocketPath, AgentToken: workspace.AgentToken, CreatedAt: workspace.CreatedAt}
 	for _, mount := range workspace.Mounts {

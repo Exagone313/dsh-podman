@@ -31,7 +31,7 @@ export interface ImageView {
   packages: readonly string[];
 }
 export interface CommandRequest {
-  op: "refresh" | "stop" | "recreate";
+  op: "refresh" | "remove" | "recreate";
   workspace: string;
   image: string;
   at: number;
@@ -62,7 +62,7 @@ export interface ContainerCardFace {
     containerCard: SnapshotStore<CardState>;
   };
   reload: () => void;
-  stop: (workspace: string) => void;
+  remove: (workspace: string) => void;
   recreate: (workspace: string, image: string) => void;
   editDefaultImage: (text: string) => void;
   saveDefaultImage: () => void;
@@ -111,7 +111,7 @@ export class ContainerCardController {
     return {
       hooks: { containerCard: this.store },
       reload: () => this.command("refresh", "", ""),
-      stop: (workspace) => this.command("stop", workspace, ""),
+      remove: (workspace) => this.command("remove", workspace, ""),
       recreate: (workspace, image) =>
         this.command("recreate", workspace, image),
       editDefaultImage: (text) => {

@@ -17,6 +17,7 @@ service OrchestratorControl {
   rpc RebuildImage(RebuildImageRequest) returns (Image);
   rpc ListContainers(ListContainersRequest) returns (ListContainersResponse);
   rpc RecreateContainer(RecreateContainerRequest) returns (Workspace);
+  rpc RemoveContainer(RemoveContainerRequest) returns (RemoveContainerResponse);
 }
 
 message ListProjectsRequest {}
@@ -56,3 +57,5 @@ message Container {
   repeated ProjectMount mounts = 6;
 }
 message RecreateContainerRequest { string workspace_slug = 1; string image_id = 2; }
+message RemoveContainerRequest { string workspace_slug = 1; }
+message RemoveContainerResponse {}

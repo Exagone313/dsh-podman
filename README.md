@@ -15,8 +15,8 @@ disposable, per-project Podman containers instead of the dsh host.
 
 | Component | Runs | What it does |
 |---|---|---|
-| `dsh-podman-orchestrator` | A container with access to the Podman API | Owns the control socket and persisted state; creates/removes workspace containers; builds workspace images |
-| `dsh-podman-guest-agent` | Inside every workspace container | Serves the exec/filesystem gRPC API for one workspace |
+| `dsh-podman-orchestrator` | A container with access to the Podman API | Owns the control socket and persisted state; creates/removes guest containers; builds workspace images |
+| `dsh-podman-guest-agent` | Inside every guest container | Serves the exec/filesystem gRPC API for one workspace |
 | `@exagone313/dsh-podman` | Inside dsh itself | Registers `ctx.subprocess` and `ctx.fs` backed by the orchestrator, plus lifecycle tools |
 
 The plugin auto-creates a missing workspace using its configured default
@@ -84,7 +84,7 @@ overridable through the plugin's `cordis.yml` config (`socketsRoot`,
 
 #### `DSH_PODMAN_GUEST_AGENT_BIN` and `DSH_PODMAN_HOST_GUEST_AGENT_BIN`
 
-A workspace container can run the guest agent either from a host binary
+A guest container can run the guest agent either from a host binary
 bind-mounted into it, or from a binary already present in its image.
 
 `DSH_PODMAN_HOST_GUEST_AGENT_BIN` is the path *on the host* of the guest agent
@@ -94,14 +94,14 @@ binary must already be present in the image — either baked in via the
 multi-stage build below, or found through the image's `PATH`.
 
 `DSH_PODMAN_GUEST_AGENT_BIN` is the path of the guest agent binary *inside* the
-workspace container. It is both the command the orchestrator starts and the
+guest container. It is both the command the orchestrator starts and the
 destination where `DSH_PODMAN_HOST_GUEST_AGENT_BIN` is bind-mounted when that
 variable is set. When no bind mount is used, a bare name (the default
 `dsh-podman-guest-agent`) is resolved through the image's `PATH`.
 
 #### `DSH_PODMAN_GUEST_AGENT_IMAGE`, `DSH_PODMAN_GUEST_AGENT_IMAGE_AGENT_BIN` and `DSH_PODMAN_GUEST_AGENT_IMAGE_DEST_AGENT_BIN`
 
-Without `DSH_PODMAN_GUEST_AGENT_IMAGE`, the workspace container must get the
+Without `DSH_PODMAN_GUEST_AGENT_IMAGE`, the guest container must get the
 guest agent binary another way — typically a host bind mount (see the previous
 section). When it is set, workspace images are instead built as a multi-stage
 build that pulls the binary out of the prebuilt guest-agent image and bakes it
@@ -126,7 +126,7 @@ baked into the base image — other images are unaffected.
 Shared secret required on every guest-agent gRPC call, carried as the gRPC
 metadata header `authorization: bearer <token>`. In practice the orchestrator
 generates a fresh random token for each workspace and injects it into the
-workspace container (via `DSH_PODMAN_GUEST_TOKEN`), handing the same value to
+guest container (via `DSH_PODMAN_GUEST_TOKEN`), handing the same value to
 the plugin together with the guest socket path — so it normally needs no manual
 configuration.
 
@@ -143,17 +143,17 @@ requests without the matching header are rejected with `Unauthenticated`.
 #### `DSH_PODMAN_SOCKETS_ROOT` and `DSH_PODMAN_HOST_SOCKETS_ROOT`
 
 `DSH_PODMAN_SOCKETS_ROOT` is the socket root directory shared by the
-orchestrator and the workspace containers. It holds the orchestrator control
+orchestrator and the guest containers. It holds the orchestrator control
 socket (`orchestrator.sock`) and one subdirectory per workspace, where each
 guest agent creates its `guest.sock`.
 
 The directory needs to be bind-mounted in the orchestrator container. Its mode
 should be `0700`, but that is not enforced by the orchestrator.
 
-Each workspace container gets exactly one socket directory bind-mounted into
+Each guest container gets exactly one socket directory bind-mounted into
 it: the host directory `<DSH_PODMAN_HOST_SOCKETS_ROOT>/<container>` is mounted
 at `<DSH_PODMAN_SOCKETS_ROOT>/<container>` inside the container. Because only
-that single per-workspace directory is mounted, a workspace container never
+that single per-workspace directory is mounted, a guest container never
 sees the orchestrator's `orchestrator.sock` nor any other workspace's socket
 directory. The control socket file is explicitly set to `0600`.
 

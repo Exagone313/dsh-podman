@@ -17,7 +17,7 @@ disposable, per-project Podman containers instead of the dsh host.
 |---|---|---|
 | `dsh-podman-orchestrator` | A container with access to the Podman API | Owns the control socket and persisted state; creates/removes guest containers; builds workspace images |
 | `dsh-podman-guest-agent` | Inside every guest container | Serves the exec/filesystem gRPC API for one workspace |
-| `@exagone313/dsh-podman` | Inside dsh itself | Registers `ctx.subprocess` and `ctx.fs` backed by the orchestrator, plus lifecycle tools |
+| `@exagone313/dsh-podman` | Inside dsh itself | Registers `ctx.subprocess` and `ctx.fs` backed by the orchestrator |
 
 The plugin auto-creates a missing workspace using its configured default
 image and a single read-write project mount. It never falls back to host

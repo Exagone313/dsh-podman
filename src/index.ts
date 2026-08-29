@@ -8,54 +8,12 @@ import { metadata } from "./workspace-binding.js";
 import { PassThrough } from "node:stream";
 import { createHash } from "node:crypto";
 
-function defineTool<T>(definition: T): T {
-  return definition;
-}
-const toolOutput = {
-  schema: { type: "string" },
-  render: (_args: unknown, value: string) => [{ type: "text", text: value }],
-};
 function withTrailingSlash(value: string): string {
   return value.endsWith("/") ? value : `${value}/`;
 }
-export const workspaceParameters = {
-  type: "object",
-  properties: {
-    workspace_slug: { type: "string", description: "Workspace slug." },
-    mounts: {
-      type: "array",
-      items: {
-        type: "object",
-        additionalProperties: false,
-        properties: {
-          project_name: { type: "string" },
-          mode: { type: "string", enum: ["read_only", "read_write"] },
-        },
-        required: ["project_name", "mode"],
-      },
-    },
-  },
-  required: ["workspace_slug"],
-};
-export const packageParameters = {
-  type: "object",
-  properties: {
-    packages: { type: "array", items: { type: "string" } },
-  },
-  required: ["packages"],
-};
-export const imageParameters = {
-  type: "object",
-  properties: {
-    image_id: { type: "string" },
-    base_image: { type: "string" },
-    packages: { type: "array", items: { type: "string" } },
-  },
-  required: ["image_id"],
-};
 
 export const name = "podman";
-export const inject = ["tools", "workspaceRegistry"];
+export const inject = ["workspaceRegistry"];
 export interface PluginConfig {
   socketsRoot?: string;
   defaultImage?: string;
@@ -89,7 +47,6 @@ export function apply(ctx: any, config: PluginConfig = {}): void {
   ctx.provide("workspaceResolver", resolver);
   ctx.provide("subprocess", createSubprocessProvider(resolver));
   ctx.provide("fs", createFilesystemProvider(resolver));
-  registerTools(ctx, resolver);
   installContainerSettings(ctx, resolver, ctx.workspaceRegistry);
 }
 
@@ -404,79 +361,6 @@ async function readRemoteText(target: any): Promise<string> {
     call.on("end", resolveDone);
   });
   return Buffer.concat(chunks).toString("utf8");
-}
-function defineLifecycleTool(
-  ctx: any,
-  resolver: WorkspaceResolver,
-  name: string,
-  description: string,
-  method: string,
-  parameters: object,
-  approval = false,
-): void {
-  ctx.tools.register(
-    defineTool({
-      name,
-      description,
-      parameters,
-      ...(approval ? { approval: true } : {}),
-      output: toolOutput,
-      execute: async (input: any) =>
-        JSON.stringify(await unaryControl(resolver, method, input)),
-    }),
-  );
-}
-function registerTools(ctx: any, resolver: WorkspaceResolver): void {
-  defineLifecycleTool(
-    ctx,
-    resolver,
-    "recreate_workspace",
-    "Recreate the current workspace",
-    "recreateWorkspace",
-    workspaceParameters,
-  );
-  defineLifecycleTool(
-    ctx,
-    resolver,
-    "rebuild_image",
-    "Rebuild a workspace image",
-    "rebuildImage",
-    imageParameters,
-  );
-  ctx.tools.register(
-    defineTool({
-      name: "install_packages",
-      description: "Install ephemeral workspace packages",
-      parameters: packageParameters,
-      output: toolOutput,
-      execute: async (input: any, exec: any) => {
-        const cwd = exec?.agent?.session?.header?.cwd;
-        const binding =
-          cwd === undefined
-            ? await resolver.resolveSlug(String(input.workspace_slug ?? ""))
-            : await resolver.resolve(cwd);
-        return JSON.stringify(
-          await unaryGuest({ binding }, "installPackages", input),
-        );
-      },
-    }),
-  );
-  defineLifecycleTool(
-    ctx,
-    resolver,
-    "share_workspace",
-    "Request human approval before widening workspace access",
-    "recreateWorkspace",
-    workspaceParameters,
-    true,
-  );
-}
-async function unaryControl(
-  resolver: WorkspaceResolver,
-  method: string,
-  input: unknown,
-): Promise<unknown> {
-  return resolver.control(method, input);
 }
 async function unaryGuest(
   target: any,

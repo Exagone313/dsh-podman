@@ -269,16 +269,6 @@ export function ContainerCard(props: ContainerCardProps): ReactNode {
               {t("notice")}: {state.notice}
             </div>
           )}
-          <div style={actions}>
-            <button
-              type="button"
-              style={button}
-              disabled={state.busy}
-              onClick={props.reload}
-            >
-              {state.busy ? t("busy") : t("reload")}
-            </button>
-          </div>
           <div style={sectionTitle}>{t("configTitle")}</div>
           <div style={actions}>
             <label
@@ -353,6 +343,16 @@ export function ContainerCard(props: ContainerCardProps): ReactNode {
               </div>
             ))
           )}
+          <div style={{ ...actions, paddingTop: "12px", borderTop: "1px solid var(--dsw-alias-border-l2)", marginTop: "12px" }}>
+            <button
+              type="button"
+              style={button}
+              disabled={state.busy}
+              onClick={props.reload}
+            >
+              {state.busy ? t("busy") : t("reload")}
+            </button>
+          </div>
         </div>
       ) : null}
     </li>

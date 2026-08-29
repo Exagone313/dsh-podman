@@ -3,7 +3,6 @@
 // SPDX-License-Identifier: MIT
 
 import { useState, type ReactNode } from "react";
-import { DisclosureRow } from "@deepseek-ai/dsh-client-ui-primitives";
 import type {
   InjectFace,
   PropsLocale,
@@ -68,17 +67,84 @@ const banner: React.CSSProperties = {
   marginBottom: "8px",
   fontSize: "13px",
 };
-const cardIconStyle: React.CSSProperties = {
-  display: "inline-block",
-  width: "14px",
-  height: "14px",
-  border: "1px solid currentColor",
-  borderRadius: "3px",
-  boxSizing: "border-box",
+const cardStyle: React.CSSProperties = {
+  listStyle: "none",
+  border: "1px solid var(--dsw-alias-border-l2)",
+  borderRadius: "12px",
+  background: "var(--dsw-alias-bg-layer-3)",
+  transition: "border-color .16s, background .16s",
 };
-const bodyStyle: React.CSSProperties = {
-  padding: "8px 4px 4px",
+const cardOpenStyle: React.CSSProperties = {
+  background: "var(--dsw-alias-bg-layer-2)",
+  borderColor: "var(--dsw-alias-label-dimmed)",
 };
+const cardHoverStyle: React.CSSProperties = {
+  borderColor: "var(--dsw-alias-label-dimmed)",
+};
+const cardHeaderStyle: React.CSSProperties = {
+  width: "100%",
+  appearance: "none",
+  border: 0,
+  background: "none",
+  font: "inherit",
+  color: "inherit",
+  textAlign: "left",
+  cursor: "pointer",
+  display: "flex",
+  alignItems: "center",
+  gap: "12px",
+  padding: "14px 16px",
+  borderRadius: "12px",
+};
+const cardHeadTextStyle: React.CSSProperties = {
+  flex: 1,
+  minWidth: 0,
+  display: "flex",
+  flexDirection: "column",
+  gap: "4px",
+};
+const cardNameStyle: React.CSSProperties = {
+  fontSize: "15px",
+  fontWeight: 600,
+  lineHeight: 1.4,
+  color: "var(--dsw-alias-label-primary)",
+};
+const cardDescriptionStyle: React.CSSProperties = {
+  fontSize: "13px",
+  lineHeight: 1.5,
+  color: "var(--dsw-alias-label-tertiary)",
+};
+const cardBodyStyle: React.CSSProperties = {
+  borderTop: "1px solid var(--dsw-alias-border-l2)",
+  margin: "0 16px",
+  paddingBottom: "8px",
+};
+
+function CardChevron({ open }: { open: boolean }): ReactNode {
+  return (
+    <svg
+      viewBox="0 0 14 14"
+      width="14"
+      height="14"
+      aria-hidden="true"
+      style={{
+        flex: "none",
+        color: "var(--dsw-alias-label-tertiary)",
+        transition: "transform .16s",
+        transform: open ? "rotate(180deg)" : undefined,
+      }}
+    >
+      <path
+        d="M3 5l4 4 4-4"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
 
 function ContainerRow(props: {
   t: (key: ContainerPluginKey) => string;
@@ -166,6 +232,7 @@ export function ContainerCard(props: ContainerCardProps): ReactNode {
   const { t } = props;
   const state = props.useContainerCard((snapshot) => snapshot);
   const [open, setOpen] = useState(false);
+  const [hovered, setHovered] = useState(false);
   if (!state.available) {
     return (
       <p style={{ padding: "8px 0", fontSize: "13px", opacity: 0.8 }}>
@@ -174,104 +241,120 @@ export function ContainerCard(props: ContainerCardProps): ReactNode {
     );
   }
   return (
-    <DisclosureRow
-      icon={<span style={cardIconStyle} />}
-      title={t("cardTitle")}
-      open={open}
-      expandable
-      onToggle={() => setOpen(!open)}
+    <li
+      style={{
+        ...cardStyle,
+        ...(open ? cardOpenStyle : {}),
+        ...(hovered && !open ? cardHoverStyle : {}),
+      }}
+      onPointerEnter={() => setHovered(true)}
+      onPointerLeave={() => setHovered(false)}
     >
-      <div style={bodyStyle}>
-        {state.notice === "" ? null : (
-          <div style={banner} role="status">
-            {t("notice")}: {state.notice}
-          </div>
-        )}
-        <div style={actions}>
-          <button
-            type="button"
-            style={button}
-            disabled={state.busy}
-            onClick={props.reload}
-          >
-            {state.busy ? t("busy") : t("reload")}
-          </button>
-        </div>
-        <div style={sectionTitle}>{t("configTitle")}</div>
-        <div style={actions}>
-          <label
-            htmlFor="plugin-config-container-default-image"
-            style={{ fontSize: "13px" }}
-          >
-            {t("defaultImage")}
-          </label>
-          <input
-            id="plugin-config-container-default-image"
-            value={state.defaultImageDraft}
-            disabled={!state.writable}
-            onChange={(event) => props.editDefaultImage(event.target.value)}
-            style={{ ...select, width: "180px" }}
-          />
-          <button
-            type="button"
-            style={button}
-            disabled={
-              !state.writable || state.defaultImageDraft === state.defaultImage
-            }
-            onClick={props.saveDefaultImage}
-          >
-            {t("save")}
-          </button>
-          <button
-            type="button"
-            style={button}
-            disabled={state.defaultImageDraft === state.defaultImage}
-            onClick={props.discardDefaultImage}
-          >
-            {t("discard")}
-          </button>
-        </div>
-        <div style={sectionTitle}>{t("containersTitle")}</div>
-        {state.containers.length === 0 ? (
-          <p style={{ fontSize: "13px", opacity: 0.8 }}>{t("none")}</p>
-        ) : (
-          state.containers.map((container) => (
-            <ContainerRow
-              key={container.containerName}
-              t={t}
-              container={container}
-              images={state.images}
-              busy={state.busy}
-              onStop={props.stop}
-              onRecreate={props.recreate}
-            />
-          ))
-        )}
-        <div style={sectionTitle}>{t("imagesTitle")}</div>
-        {state.images.length === 0 ? (
-          <p style={{ fontSize: "13px", opacity: 0.8 }}>{t("none")}</p>
-        ) : (
-          state.images.map((image) => (
-            <div key={image.imageId} style={row}>
-              <strong>{image.imageId}</strong>
-              <div style={meta}>
-                <span>
-                  {t("baseImage")}: {image.baseImage}
-                </span>
-                <span>
-                  {t("imageTag")}: {image.imageTag}
-                </span>
-                <span>
-                  {t("builtAt")}: {image.builtAt}
-                </span>
-                <span>
-                  {t("packages")}: {image.packages.length}
-                </span>
-              </div>
+      <button
+        type="button"
+        style={cardHeaderStyle}
+        aria-expanded={open}
+        onClick={() => setOpen(!open)}
+      >
+        <span style={cardHeadTextStyle}>
+          <span style={cardNameStyle}>{t("cardTitle")}</span>
+          <span style={cardDescriptionStyle}>{t("cardDescription")}</span>
+        </span>
+        <CardChevron open={open} />
+      </button>
+      {open ? (
+        <div style={cardBodyStyle}>
+          {state.notice === "" ? null : (
+            <div style={banner} role="status">
+              {t("notice")}: {state.notice}
             </div>
-          ))
-        )}
-      </div>
-    </DisclosureRow>
+          )}
+          <div style={actions}>
+            <button
+              type="button"
+              style={button}
+              disabled={state.busy}
+              onClick={props.reload}
+            >
+              {state.busy ? t("busy") : t("reload")}
+            </button>
+          </div>
+          <div style={sectionTitle}>{t("configTitle")}</div>
+          <div style={actions}>
+            <label
+              htmlFor="plugin-config-container-default-image"
+              style={{ fontSize: "13px" }}
+            >
+              {t("defaultImage")}
+            </label>
+            <input
+              id="plugin-config-container-default-image"
+              value={state.defaultImageDraft}
+              disabled={!state.writable}
+              onChange={(event) => props.editDefaultImage(event.target.value)}
+              style={{ ...select, width: "180px" }}
+            />
+            <button
+              type="button"
+              style={button}
+              disabled={
+                !state.writable || state.defaultImageDraft === state.defaultImage
+              }
+              onClick={props.saveDefaultImage}
+            >
+              {t("save")}
+            </button>
+            <button
+              type="button"
+              style={button}
+              disabled={state.defaultImageDraft === state.defaultImage}
+              onClick={props.discardDefaultImage}
+            >
+              {t("discard")}
+            </button>
+          </div>
+          <div style={sectionTitle}>{t("containersTitle")}</div>
+          {state.containers.length === 0 ? (
+            <p style={{ fontSize: "13px", opacity: 0.8 }}>{t("none")}</p>
+          ) : (
+            state.containers.map((container) => (
+              <ContainerRow
+                key={container.containerName}
+                t={t}
+                container={container}
+                images={state.images}
+                busy={state.busy}
+                onStop={props.stop}
+                onRecreate={props.recreate}
+              />
+            ))
+          )}
+          <div style={sectionTitle}>{t("imagesTitle")}</div>
+          {state.images.length === 0 ? (
+            <p style={{ fontSize: "13px", opacity: 0.8 }}>{t("none")}</p>
+          ) : (
+            state.images.map((image) => (
+              <div key={image.imageId} style={row}>
+                <strong>{image.imageId}</strong>
+                <div style={meta}>
+                  <span>
+                    {t("baseImage")}: {image.baseImage}
+                  </span>
+                  <span>
+                    {t("imageTag")}: {image.imageTag}
+                  </span>
+                  <span>
+                    {t("builtAt")}: {image.builtAt}
+                  </span>
+                  <span>
+                    {t("packages")}: {image.packages.length}
+                  </span>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      ) : null}
+    </li>
   );
 }

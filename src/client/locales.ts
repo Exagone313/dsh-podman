@@ -38,7 +38,7 @@ export type ContainerPluginKey =
   | "busy";
 
 export const en: Record<ContainerPluginKey, string> = {
-  cardTitle: "Containers",
+  cardTitle: "Podman",
   cardDescription: "Manage the guest containers and their images.",
   reload: "Reload",
   reloading: "Reloading…",
@@ -70,7 +70,7 @@ export const en: Record<ContainerPluginKey, string> = {
 };
 
 export const zh: Record<ContainerPluginKey, string> = {
-  cardTitle: "容器",
+  cardTitle: "Podman",
   cardDescription: "管理工作区容器及其镜像。",
   reload: "刷新",
   reloading: "刷新中…",

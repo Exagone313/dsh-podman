@@ -513,6 +513,51 @@ func TestStartContainerAcceptsTagReference(t *testing.T) {
 	}
 }
 
+func TestGetImageAcceptsTagReference(t *testing.T) {
+	store := newTestStore(t)
+	if err := store.SaveImages([]state.Image{{ImageID: "valkey", ImageTag: "localhost/dsh-podman/valkey:latest"}}); err != nil {
+		t.Fatal(err)
+	}
+	server := &Server{Store: store, Logger: silentLogger()}
+	image, err := server.GetImage(context.Background(), &ctl.GetImageRequest{ImageId: "localhost/dsh-podman/valkey:latest"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if image.ImageId != "valkey" {
+		t.Fatalf("expected stored image valkey, got %q", image.ImageId)
+	}
+}
+
+func TestRebuildImageAcceptsTagReference(t *testing.T) {
+	store := newTestStore(t)
+	if err := store.SaveImages([]state.Image{{ImageID: "valkey", BaseImage: "localhost/dsh-podman/arch-base:latest", Packages: []string{"valkey"}, ImageTag: "localhost/dsh-podman/valkey:latest"}}); err != nil {
+		t.Fatal(err)
+	}
+	server := &Server{Store: store, ImageBuilder: &imagebuild.Builder{}, Logger: silentLogger()}
+	_, err := server.RebuildImage(context.Background(), &ctl.RebuildImageRequest{ImageId: "localhost/dsh-podman/valkey:latest"})
+	if status.Code(err) != codes.Internal {
+		t.Fatalf("tag reference should resolve past image lookup, expected Internal (unconfigured builder), got %v", err)
+	}
+}
+
+func TestBuildImageRejectsBaseTagForm(t *testing.T) {
+	t.Setenv("DSH_PODMAN_DEFAULT_IMAGE", "arch-base")
+	server := &Server{Logger: silentLogger()}
+	_, err := server.BuildImage(context.Background(), &ctl.BuildImageRequest{ImageId: "localhost/dsh-podman/arch-base:latest", BaseImage: "arch-base"})
+	if status.Code(err) != codes.InvalidArgument {
+		t.Fatalf("expected InvalidArgument for building over the base image, got %v", err)
+	}
+}
+
+func TestRebuildImageRejectsBaseTagForm(t *testing.T) {
+	t.Setenv("DSH_PODMAN_DEFAULT_IMAGE", "arch-base")
+	server := &Server{Logger: silentLogger()}
+	_, err := server.RebuildImage(context.Background(), &ctl.RebuildImageRequest{ImageId: "arch-base:latest"})
+	if status.Code(err) != codes.InvalidArgument {
+		t.Fatalf("expected InvalidArgument for rebuilding the base image, got %v", err)
+	}
+}
+
 func TestCreateWorkspaceRejectsUnknownImage(t *testing.T) {
 	t.Setenv("DSH_PODMAN_DEFAULT_IMAGE", "arch-base")
 	server := &Server{Store: newTestStore(t), Logger: silentLogger()}

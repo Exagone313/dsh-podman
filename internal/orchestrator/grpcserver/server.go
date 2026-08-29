@@ -786,19 +786,13 @@ func (s *Server) CreateWorkspace(ctx context.Context, request *ctl.CreateWorkspa
 
 func (s *Server) GetImage(_ context.Context, request *ctl.GetImageRequest) (*ctl.Image, error) {
 	s.log().Info("control request", "method", "GetImage", "image_id", request.GetImageId())
-	images, err := s.Store.Images()
+	resolved, err := s.resolveImage(request.GetImageId())
 	if err != nil {
-		s.log().Error("control request failed", "method", "GetImage", "image_id", request.GetImageId(), "error", err)
-		return nil, status.Error(codes.Internal, err.Error())
+		s.log().Warn("control request failed", "method", "GetImage", "image_id", request.GetImageId(), "reason", "not found")
+		return nil, err
 	}
-	for _, image := range images {
-		if image.ImageID == request.GetImageId() {
-			s.log().Info("control request completed", "method", "GetImage", "image_id", request.GetImageId())
-			return imageProto(image), nil
-		}
-	}
-	s.log().Warn("control request failed", "method", "GetImage", "image_id", request.GetImageId(), "reason", "not found")
-	return nil, status.Error(codes.NotFound, "built image not found")
+	s.log().Info("control request completed", "method", "GetImage", "image_id", request.GetImageId())
+	return imageProto(resolved), nil
 }
 func (s *Server) BuildImage(_ context.Context, request *ctl.BuildImageRequest) (*ctl.Image, error) {
 	s.log().Info("control request", "method", "BuildImage", "image_id", request.GetImageId(), "base_image", request.GetBaseImage(), "package_count", len(request.GetPackages()))
@@ -806,7 +800,7 @@ func (s *Server) BuildImage(_ context.Context, request *ctl.BuildImageRequest) (
 	if imageID == "" {
 		return nil, status.Error(codes.InvalidArgument, "image id is required")
 	}
-	if imageID == defaultImageID() {
+	if imageIDOverridesBase(imageID) {
 		return nil, status.Error(codes.InvalidArgument, "cannot build over the base image")
 	}
 	if s.ImageBuilder == nil {
@@ -839,27 +833,18 @@ func (s *Server) RebuildImage(_ context.Context, request *ctl.RebuildImageReques
 	if imageID == "" {
 		return nil, status.Error(codes.InvalidArgument, "image id is required")
 	}
-	if imageID == defaultImageID() {
+	if imageIDOverridesBase(imageID) {
 		return nil, status.Error(codes.InvalidArgument, "cannot rebuild the base image")
 	}
 	if s.ImageBuilder == nil {
 		return nil, status.Error(codes.FailedPrecondition, "image builder is not configured")
 	}
-	images, err := s.Store.Images()
+	resolved, err := s.resolveImage(imageID)
 	if err != nil {
-		return nil, status.Error(codes.Internal, err.Error())
-	}
-	var current *state.Image
-	for i := range images {
-		if images[i].ImageID == imageID {
-			current = &images[i]
-			break
-		}
-	}
-	if current == nil {
+		s.log().Warn("control request failed", "method", "RebuildImage", "image_id", imageID, "reason", "not found")
 		return nil, status.Error(codes.NotFound, "built image not found")
 	}
-	stored, err := s.buildImage(imageID, *current)
+	stored, err := s.buildImage(resolved.ImageID, resolved)
 	if err != nil {
 		s.log().Error("control request failed", "method", "RebuildImage", "image_id", imageID, "error", err)
 		return nil, status.Error(codes.Internal, err.Error())
@@ -976,6 +961,16 @@ func (s *Server) resolveImage(imageID string) (state.Image, error) {
 // either its short or fully-qualified form.
 func isDefaultImageID(id string) bool {
 	return strings.TrimPrefix(id, imagePrefix()) == strings.TrimPrefix(defaultImageID(), imagePrefix())
+}
+
+// imageIDOverridesBase reports whether an image id used as a build/rebuild
+// target refers to the default (base) image, allowing for a tag suffix and the
+// fully-qualified form.
+func imageIDOverridesBase(imageID string) bool {
+	if stripped, _, hasTag := strings.Cut(imageID, ":"); hasTag {
+		imageID = stripped
+	}
+	return isDefaultImageID(imageID)
 }
 
 // resolveImageTag returns the stored image tag for an image reference, or a

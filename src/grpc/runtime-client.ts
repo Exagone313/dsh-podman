@@ -48,7 +48,7 @@ export function controlClient(socket: string): grpc.Client {
 export function guestClient(socket: string): grpc.Client {
   return client(
     "dshguest.v1.WorkspaceGuestAgent",
-    "dshguest/v1/agent.proto",
+    "dshguest/v1/guest.proto",
     socket,
   );
 }

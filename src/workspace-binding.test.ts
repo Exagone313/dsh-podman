@@ -10,6 +10,7 @@ import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { mkdirSync } from "node:fs";
+import { controlClient, guestClient } from "./grpc/runtime-client.js";
 import {
   workspaceSlug,
   metadata,
@@ -65,6 +66,13 @@ test("metadata omits the header when the token is empty", () => {
   const result = metadata("");
   assert.ok(result instanceof grpc.Metadata);
   assert.equal(result.get("authorization").length, 0);
+});
+
+test("control and guest proto files resolve next to the runtime", () => {
+  const control = controlClient("/tmp/dsh-proto-control.sock");
+  const guest = guestClient("/tmp/dsh-proto-guest.sock");
+  control.close();
+  guest.close();
 });
 
 async function startControlServer(): Promise<{

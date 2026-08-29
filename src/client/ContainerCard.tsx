@@ -197,14 +197,7 @@ function CardChevron({ open }: { open: boolean }): ReactNode {
 }
 
 function containerStateDot(status: string): StateDotState {
-  switch (status) {
-    case "running":
-      return "ongoing";
-    case "exited":
-      return "done";
-    default:
-      return "warning";
-  }
+  return status === "running" ? "done" : "error";
 }
 
 function ConfigField(props: {

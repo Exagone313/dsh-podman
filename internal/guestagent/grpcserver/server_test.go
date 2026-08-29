@@ -12,10 +12,11 @@ import (
 	"testing"
 	"time"
 
-	workspacefs "gitlab.com/Exagone313/dsh-podman/internal/guestagent/fs"
 	guest "gitlab.com/Exagone313/dsh-podman/internal/genproto/dshguest/v1"
+	workspacefs "gitlab.com/Exagone313/dsh-podman/internal/guestagent/fs"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/wrapperspb"
 )
 
 func newTestServer(t *testing.T) (*Server, string) {
@@ -31,16 +32,16 @@ func newTestServer(t *testing.T) (*Server, string) {
 func TestValidateProcessID(t *testing.T) {
 	server := New()
 	cases := map[string]bool{
-		"1":     true,
-		"42":    true,
-		"":      false,
-		"abc":   false,
-		"12a":   false,
-		"-1":    false,
-		"1.5":   false,
-		"1e3":   false,
-		"0x1f":  false,
-		" 1":    false,
+		"1":    true,
+		"42":   true,
+		"":     false,
+		"abc":  false,
+		"12a":  false,
+		"-1":   false,
+		"1.5":  false,
+		"1e3":  false,
+		"0x1f": false,
+		" 1":   false,
 	}
 	for id, expected := range cases {
 		if got := server.ValidateProcessID(id); got != expected {
@@ -372,5 +373,64 @@ func TestRestartDaemonUnknown(t *testing.T) {
 	_, err := server.RestartDaemon(context.Background(), &guest.RestartDaemonRequest{Name: "nope"})
 	if status.Code(err) != codes.NotFound {
 		t.Fatalf("expected NotFound, got %v", err)
+	}
+}
+
+func TestStartDaemonRejectsNegativeUid(t *testing.T) {
+	server := New()
+	_, err := server.StartDaemon(context.Background(), &guest.StartDaemonRequest{
+		Name: "web",
+		Argv: []string{"sh", "-c", "sleep 30"},
+		Uid:  wrapperspb.Int32(-1),
+	})
+	if status.Code(err) != codes.InvalidArgument {
+		t.Fatalf("expected InvalidArgument, got %v", err)
+	}
+}
+
+func TestStartDaemonRejectsNegativeGid(t *testing.T) {
+	server := New()
+	_, err := server.StartDaemon(context.Background(), &guest.StartDaemonRequest{
+		Name: "web",
+		Argv: []string{"sh", "-c", "sleep 30"},
+		Gid:  wrapperspb.Int32(-1),
+	})
+	if status.Code(err) != codes.InvalidArgument {
+		t.Fatalf("expected InvalidArgument, got %v", err)
+	}
+}
+
+func TestStartDaemonUidOnlyDefaultsGid(t *testing.T) {
+	server := New()
+	info, err := server.StartDaemon(context.Background(), &guest.StartDaemonRequest{
+		Name: "web",
+		Argv: []string{"sh", "-c", "sleep 30"},
+		Uid:  wrapperspb.Int32(1000),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		_, _ = server.StopDaemon(context.Background(), &guest.StopDaemonRequest{Name: "web", Signal: "SIGKILL"})
+	})
+	if info.Uid != 1000 || info.Gid != 1000 {
+		t.Fatalf("uid=%d gid=%d, want 1000 1000", info.Uid, info.Gid)
+	}
+}
+
+func TestStartDaemonNoUidGidDefaultsZero(t *testing.T) {
+	server := New()
+	info, err := server.StartDaemon(context.Background(), &guest.StartDaemonRequest{
+		Name: "web",
+		Argv: []string{"sh", "-c", "sleep 30"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		_, _ = server.StopDaemon(context.Background(), &guest.StopDaemonRequest{Name: "web", Signal: "SIGKILL"})
+	})
+	if info.Uid != 0 || info.Gid != 0 {
+		t.Fatalf("uid=%d gid=%d, want 0 0", info.Uid, info.Gid)
 	}
 }

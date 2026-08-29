@@ -6,6 +6,8 @@ syntax = "proto3";
 package dshguest.v1;
 option go_package = "gitlab.com/Exagone313/dsh-podman/internal/genproto/dshguest/v1;dshguestv1";
 
+import "google/protobuf/wrappers.proto";
+
 service WorkspaceGuestAgent {
   rpc Exec(stream ExecInput) returns (stream ExecOutput);
   rpc Signal(SignalRequest) returns (SignalResponse);
@@ -42,8 +44,8 @@ message MkdirRequest { string path = 1; bool parents = 2; }
 message MkdirResponse {}
 message DeleteRequest { string path = 1; bool recursive = 2; }
 message DeleteResponse {}
-message StartDaemonRequest { string name = 1; repeated string argv = 2; string cwd = 3; map<string, string> env = 4; }
-message DaemonInfo { string name = 1; repeated string argv = 2; bool running = 3; int32 exit_code = 4; string started_at = 5; string stopped_at = 6; }
+message StartDaemonRequest { string name = 1; repeated string argv = 2; string cwd = 3; map<string, string> env = 4; google.protobuf.Int32Value uid = 5; google.protobuf.Int32Value gid = 6; repeated uint32 groups = 7; }
+message DaemonInfo { string name = 1; repeated string argv = 2; bool running = 3; int32 exit_code = 4; string started_at = 5; string stopped_at = 6; uint32 uid = 7; uint32 gid = 8; }
 message ListDaemonsRequest {}
 message ListDaemonsResponse { repeated DaemonInfo daemons = 1; }
 message StopDaemonRequest { string name = 1; string signal = 2; }

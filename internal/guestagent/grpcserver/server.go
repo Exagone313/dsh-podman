@@ -17,10 +17,10 @@ import (
 	"syscall"
 	"time"
 
+	guest "gitlab.com/Exagone313/dsh-podman/internal/genproto/dshguest/v1"
 	"gitlab.com/Exagone313/dsh-podman/internal/guestagent/daemon"
 	"gitlab.com/Exagone313/dsh-podman/internal/guestagent/exec"
 	workspacefs "gitlab.com/Exagone313/dsh-podman/internal/guestagent/fs"
-	guest "gitlab.com/Exagone313/dsh-podman/internal/genproto/dshguest/v1"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -181,6 +181,8 @@ func daemonInfoProto(d daemon.Daemon) *guest.DaemonInfo {
 		ExitCode:  d.ExitCode,
 		StartedAt: d.StartedAt,
 		StoppedAt: d.StoppedAt,
+		Uid:       d.Uid,
+		Gid:       d.Gid,
 	}
 }
 
@@ -198,7 +200,22 @@ func (s *Server) StartDaemon(_ context.Context, request *guest.StartDaemonReques
 	if len(request.GetArgv()) == 0 {
 		return nil, status.Error(codes.InvalidArgument, "argv must contain a command")
 	}
-	name, err := s.Daemons.Start(request.GetName(), request.GetArgv(), request.GetCwd(), request.GetEnv())
+	var uid, gid *uint32
+	if request.GetUid() != nil {
+		value := request.GetUid().GetValue()
+		if value < 0 {
+			return nil, status.Error(codes.InvalidArgument, "uid must not be negative")
+		}
+		uid = uint32Ptr(uint32(value))
+	}
+	if request.GetGid() != nil {
+		value := request.GetGid().GetValue()
+		if value < 0 {
+			return nil, status.Error(codes.InvalidArgument, "gid must not be negative")
+		}
+		gid = uint32Ptr(uint32(value))
+	}
+	name, err := s.Daemons.Start(request.GetName(), request.GetArgv(), request.GetCwd(), request.GetEnv(), daemon.StartOptions{Uid: uid, Gid: gid, Groups: request.GetGroups()})
 	if err != nil {
 		if errors.Is(err, daemon.ErrAlreadyRunning) {
 			return nil, status.Error(codes.AlreadyExists, err.Error())
@@ -210,6 +227,8 @@ func (s *Server) StartDaemon(_ context.Context, request *guest.StartDaemonReques
 	}
 	return nil, status.Error(codes.Internal, "daemon registered but not found")
 }
+
+func uint32Ptr(value uint32) *uint32 { return &value }
 
 func (s *Server) ListDaemons(_ context.Context, _ *guest.ListDaemonsRequest) (*guest.ListDaemonsResponse, error) {
 	slog.Info("guest agent ListDaemons requested")

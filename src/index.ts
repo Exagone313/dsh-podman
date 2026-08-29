@@ -461,6 +461,21 @@ export const daemonStartParameters = {
       additionalProperties: { type: "string" },
       description: "Environment variables.",
     },
+    uid: {
+      type: "integer",
+      minimum: 0,
+      description: "Run the daemon as this uid (defaults to the container user).",
+    },
+    gid: {
+      type: "integer",
+      minimum: 0,
+      description: "Run the daemon as this gid. Defaults to the uid when uid is set.",
+    },
+    groups: {
+      type: "array",
+      items: { type: "integer", minimum: 0 },
+      description: "Supplementary group ids.",
+    },
   },
   required: ["container", "argv"],
 };
@@ -599,7 +614,7 @@ const TOOL_DESCRIPTIONS: Record<string, string> = {
   volume_create: "Create a named volume in the current workspace.",
   volume_remove: "Remove a named volume from the current workspace.",
   daemon_start:
-    "Start a daemon inside a container of the current workspace.",
+    "Start a daemon inside a container of the current workspace. Optionally run it as a specific uid/gid (with optional supplementary groups).",
   daemon_list:
     "List the daemons running inside a container of the current workspace.",
   daemon_stop: "Stop a daemon inside a container of the current workspace.",
@@ -882,11 +897,35 @@ const toolHandlers: Record<
       currentCwd(exec),
       input.container,
     );
-    const info = await unaryGuest(
-      { binding },
-      "startDaemon",
-      { name: input.name, argv: input.argv, cwd: input.cwd, env: input.env },
-    );
+    const request: Record<string, unknown> = { argv: input.argv };
+    if (input.name !== undefined) request.name = input.name;
+    if (input.cwd !== undefined) request.cwd = input.cwd;
+    if (input.env !== undefined) request.env = input.env;
+    if (input.uid !== undefined) {
+      if (!Number.isInteger(input.uid) || input.uid < 0) {
+        throw new Error("uid must be an integer >= 0");
+      }
+      request.uid = input.uid;
+    }
+    if (input.gid !== undefined) {
+      if (!Number.isInteger(input.gid) || input.gid < 0) {
+        throw new Error("gid must be an integer >= 0");
+      }
+      request.gid = input.gid;
+    }
+    if (input.groups !== undefined) {
+      if (
+        !Array.isArray(input.groups) ||
+        input.groups.some(
+          (group: unknown) =>
+            !Number.isInteger(group) || (group as number) < 0,
+        )
+      ) {
+        throw new Error("groups must be an array of integers >= 0");
+      }
+      request.groups = input.groups;
+    }
+    const info = await unaryGuest({ binding }, "startDaemon", request);
     return formatDaemonInfo(info);
   },
   daemon_list: async (resolver, input, exec) => {

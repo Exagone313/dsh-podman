@@ -38,6 +38,16 @@ type Daemon struct {
 	ExitCode  int32
 	StartedAt string
 	StoppedAt string
+	Uid       uint32
+	Gid       uint32
+}
+
+// StartOptions carries optional process identity settings. When neither Uid
+// nor Gid is set (and no supplementary groups are requested), the process runs
+// as the container's default user.
+type StartOptions struct {
+	Uid, Gid *uint32
+	Groups   []uint32
 }
 
 type daemon struct {
@@ -45,6 +55,9 @@ type daemon struct {
 	cmd    *exec.Cmd
 	cwd    string
 	env    map[string]string
+	uid    *uint32
+	gid    *uint32
+	groups []uint32
 	stdout *ring
 	stderr *ring
 }
@@ -58,7 +71,47 @@ type Manager struct {
 
 func NewManager() *Manager { return &Manager{daemons: make(map[string]*daemon)} }
 
-func (m *Manager) Start(name string, argv []string, cwd string, env map[string]string) (string, error) {
+// credentialFor returns the process credential described by opts, or nil when
+// no identity override was requested.
+func credentialFor(opts StartOptions) *syscall.Credential {
+	if opts.Uid == nil && opts.Gid == nil && len(opts.Groups) == 0 {
+		return nil
+	}
+	cred := &syscall.Credential{}
+	switch {
+	case opts.Uid != nil && opts.Gid != nil:
+		cred.Uid = *opts.Uid
+		cred.Gid = *opts.Gid
+	case opts.Uid != nil:
+		cred.Uid = *opts.Uid
+		cred.Gid = *opts.Uid
+	case opts.Gid != nil:
+		cred.Gid = *opts.Gid
+	}
+	if len(opts.Groups) > 0 {
+		cred.Groups = opts.Groups
+	}
+	return cred
+}
+
+func effectiveUid(opts StartOptions) uint32 {
+	if opts.Uid != nil {
+		return *opts.Uid
+	}
+	return 0
+}
+
+func effectiveGid(opts StartOptions) uint32 {
+	if opts.Gid != nil {
+		return *opts.Gid
+	}
+	if opts.Uid != nil {
+		return *opts.Uid
+	}
+	return 0
+}
+
+func (m *Manager) Start(name string, argv []string, cwd string, env map[string]string, opts StartOptions) (string, error) {
 	if len(argv) == 0 || argv[0] == "" {
 		return "", fmt.Errorf("argv must contain a command")
 	}
@@ -84,6 +137,9 @@ func (m *Manager) Start(name string, argv []string, cwd string, env map[string]s
 		cmd.Env = append(cmd.Env, key+"="+value)
 	}
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	if cred := credentialFor(opts); cred != nil {
+		cmd.SysProcAttr.Credential = cred
+	}
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		return "", err
@@ -104,10 +160,15 @@ func (m *Manager) Start(name string, argv []string, cwd string, env map[string]s
 			Argv:      append([]string(nil), argv...),
 			Running:   true,
 			StartedAt: time.Now().UTC().Format(time.RFC3339),
+			Uid:       effectiveUid(opts),
+			Gid:       effectiveGid(opts),
 		},
 		cmd:    cmd,
 		cwd:    cwd,
 		env:    envCopy,
+		uid:    opts.Uid,
+		gid:    opts.Gid,
+		groups: append([]uint32(nil), opts.Groups...),
 		stdout: newRing(ringCapacity),
 		stderr: newRing(ringCapacity),
 	}
@@ -222,7 +283,7 @@ func (m *Manager) StopAll(sig os.Signal) []string {
 }
 
 // Restart stops the daemon if it is running and starts it again with the same
-// argv, working directory, and environment.
+// argv, working directory, environment, and process identity.
 func (m *Manager) Restart(name string) error {
 	m.mu.Lock()
 	d, ok := m.daemons[name]
@@ -233,6 +294,9 @@ func (m *Manager) Restart(name string) error {
 	argv := append([]string(nil), d.info.Argv...)
 	cwd := d.cwd
 	env := d.env
+	uid := d.uid
+	gid := d.gid
+	groups := append([]uint32(nil), d.groups...)
 	running := d.info.Running
 	m.mu.Unlock()
 	if running {
@@ -240,7 +304,7 @@ func (m *Manager) Restart(name string) error {
 			return err
 		}
 	}
-	_, err := m.Start(name, argv, cwd, env)
+	_, err := m.Start(name, argv, cwd, env, StartOptions{Uid: uid, Gid: gid, Groups: groups})
 	return err
 }
 

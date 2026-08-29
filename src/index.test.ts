@@ -310,6 +310,19 @@ test("mount schemas are object-rooted without per-property required", () => {
   }
 });
 
+test("daemon_start accepts optional uid, gid and groups", () => {
+  const tool = TOOLS.find((entry) => entry.name === "daemon_start");
+  assert.ok(tool, "daemon_start registered");
+  const properties = tool!.parameters.properties;
+  assert.equal(properties.uid.type, "integer");
+  assert.equal(properties.uid.minimum, 0);
+  assert.equal(properties.gid.type, "integer");
+  assert.equal(properties.gid.minimum, 0);
+  assert.equal(properties.groups.type, "array");
+  assert.equal(properties.groups.items.type, "integer");
+  assert.equal(properties.groups.items.minimum, 0);
+});
+
 const DAEMON_TOOLS = [
   "daemon_start",
   "daemon_list",

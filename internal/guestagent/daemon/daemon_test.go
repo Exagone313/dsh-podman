@@ -6,6 +6,7 @@ package daemon
 
 import (
 	"errors"
+	"os"
 	"strings"
 	"syscall"
 	"testing"
@@ -44,17 +45,17 @@ func cleanupDaemon(t *testing.T, m *Manager, name string) {
 
 func TestStartRejectsEmptyArgv(t *testing.T) {
 	m := NewManager()
-	if _, err := m.Start("a", nil, "", nil); err == nil {
+	if _, err := m.Start("a", nil, "", nil, StartOptions{}); err == nil {
 		t.Fatal("expected error for empty argv")
 	}
-	if _, err := m.Start("a", []string{""}, "", nil); err == nil {
+	if _, err := m.Start("a", []string{""}, "", nil, StartOptions{}); err == nil {
 		t.Fatal("expected error for empty argv[0]")
 	}
 }
 
 func TestStartGeneratesName(t *testing.T) {
 	m := NewManager()
-	name, err := m.Start("", []string{"true"}, "", nil)
+	name, err := m.Start("", []string{"true"}, "", nil, StartOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -68,7 +69,7 @@ func TestStartGeneratesName(t *testing.T) {
 func TestStartRejectsInvalidNames(t *testing.T) {
 	m := NewManager()
 	for _, name := range []string{"-foo", "foo bar", "a/b", "foo@bar", strings.Repeat("a", 65)} {
-		if _, err := m.Start(name, []string{"true"}, "", nil); err == nil {
+		if _, err := m.Start(name, []string{"true"}, "", nil, StartOptions{}); err == nil {
 			t.Errorf("expected error for name %q", name)
 		}
 	}
@@ -76,19 +77,19 @@ func TestStartRejectsInvalidNames(t *testing.T) {
 
 func TestStartErrAlreadyRunning(t *testing.T) {
 	m := NewManager()
-	name, err := m.Start("long", []string{"sleep", "30"}, "", nil)
+	name, err := m.Start("long", []string{"sleep", "30"}, "", nil, StartOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
 	cleanupDaemon(t, m, name)
-	if _, err := m.Start(name, []string{"true"}, "", nil); !errors.Is(err, ErrAlreadyRunning) {
+	if _, err := m.Start(name, []string{"true"}, "", nil, StartOptions{}); !errors.Is(err, ErrAlreadyRunning) {
 		t.Fatalf("expected ErrAlreadyRunning, got %v", err)
 	}
 }
 
 func TestStartStopNonRunningReturnsNil(t *testing.T) {
 	m := NewManager()
-	name, err := m.Start("quick", []string{"true"}, "", nil)
+	name, err := m.Start("quick", []string{"true"}, "", nil, StartOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -100,7 +101,7 @@ func TestStartStopNonRunningReturnsNil(t *testing.T) {
 
 func TestShortLivedCommandExitsZero(t *testing.T) {
 	m := NewManager()
-	name, err := m.Start("greet", []string{"sh", "-c", "echo hi; sleep 0.05"}, "", nil)
+	name, err := m.Start("greet", []string{"sh", "-c", "echo hi; sleep 0.05"}, "", nil, StartOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -125,7 +126,7 @@ func TestShortLivedCommandExitsZero(t *testing.T) {
 
 func TestStopTerminates(t *testing.T) {
 	m := NewManager()
-	name, err := m.Start("sleeper", []string{"sleep", "30"}, "", nil)
+	name, err := m.Start("sleeper", []string{"sleep", "30"}, "", nil, StartOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -139,7 +140,7 @@ func TestStopTerminates(t *testing.T) {
 func TestStopAll(t *testing.T) {
 	m := NewManager()
 	for _, name := range []string{"b", "a"} {
-		if _, err := m.Start(name, []string{"sleep", "30"}, "", nil); err != nil {
+		if _, err := m.Start(name, []string{"sleep", "30"}, "", nil, StartOptions{}); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -163,7 +164,7 @@ func TestStopAllNoDaemons(t *testing.T) {
 
 func TestRestartReruns(t *testing.T) {
 	m := NewManager()
-	name, err := m.Start("worker", []string{"sh", "-c", "echo one; sleep 1"}, "", nil)
+	name, err := m.Start("worker", []string{"sh", "-c", "echo one; sleep 1"}, "", nil, StartOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -182,7 +183,7 @@ func TestRestartReruns(t *testing.T) {
 
 func TestLogsTail(t *testing.T) {
 	m := NewManager()
-	name, err := m.Start("tailer", []string{"sh", "-c", "printf 'abcdefghij'"}, "", nil)
+	name, err := m.Start("tailer", []string{"sh", "-c", "printf 'abcdefghij'"}, "", nil, StartOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -212,7 +213,7 @@ func TestUnknownDaemon(t *testing.T) {
 func TestListSortedByNames(t *testing.T) {
 	m := NewManager()
 	for _, name := range []string{"zebra", "alpha", "mike"} {
-		if _, err := m.Start(name, []string{"true"}, "", nil); err != nil {
+		if _, err := m.Start(name, []string{"true"}, "", nil, StartOptions{}); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -221,5 +222,94 @@ func TestListSortedByNames(t *testing.T) {
 		if got[i].Name < got[i-1].Name {
 			t.Fatalf("list not sorted: %v", got)
 		}
+	}
+}
+
+func TestCredentialFor(t *testing.T) {
+	uid1000 := uint32(1000)
+	gid2000 := uint32(2000)
+	cases := []struct {
+		name string
+		opts StartOptions
+		want *syscall.Credential
+	}{
+		{name: "neither", opts: StartOptions{}, want: nil},
+		{name: "groups only", opts: StartOptions{Groups: []uint32{3000}}, want: &syscall.Credential{Groups: []uint32{3000}}},
+		{name: "uid only", opts: StartOptions{Uid: &uid1000}, want: &syscall.Credential{Uid: 1000, Gid: 1000}},
+		{name: "gid only", opts: StartOptions{Gid: &gid2000}, want: &syscall.Credential{Uid: 0, Gid: 2000}},
+		{name: "both", opts: StartOptions{Uid: &uid1000, Gid: &gid2000}, want: &syscall.Credential{Uid: 1000, Gid: 2000}},
+		{name: "uid with groups", opts: StartOptions{Uid: &uid1000, Groups: []uint32{3000}}, want: &syscall.Credential{Uid: 1000, Gid: 1000, Groups: []uint32{3000}}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := credentialFor(tc.opts)
+			if tc.want == nil {
+				if got != nil {
+					t.Fatalf("credentialFor() = %+v, want nil", got)
+				}
+				return
+			}
+			if got == nil {
+				t.Fatalf("credentialFor() = nil, want %+v", tc.want)
+			}
+			if got.Uid != tc.want.Uid || got.Gid != tc.want.Gid {
+				t.Fatalf("credentialFor() = %+v, want uid=%d gid=%d", got, tc.want.Uid, tc.want.Gid)
+			}
+			if len(got.Groups) != len(tc.want.Groups) {
+				t.Fatalf("credentialFor() groups = %v, want %v", got.Groups, tc.want.Groups)
+			}
+			for i := range tc.want.Groups {
+				if got.Groups[i] != tc.want.Groups[i] {
+					t.Fatalf("credentialFor() groups = %v, want %v", got.Groups, tc.want.Groups)
+				}
+			}
+		})
+	}
+}
+
+func TestStartWithUidRunsAsUser(t *testing.T) {
+	if os.Geteuid() != 0 {
+		t.Skip("requires root")
+	}
+	m := NewManager()
+	uid := uint32(1000)
+	name, err := m.Start("uidtest", []string{"id", "-u"}, "", nil, StartOptions{Uid: &uid})
+	if err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, m, name, false)
+	info := findInfo(m, name)
+	if info == nil {
+		t.Fatal("daemon not found")
+	}
+	if info.Uid != 1000 || info.Gid != 1000 {
+		t.Fatalf("uid=%d gid=%d, want 1000 1000", info.Uid, info.Gid)
+	}
+	stdout, _, err := m.Logs(name, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := strings.TrimSpace(string(stdout)); got != "1000" {
+		t.Fatalf("stdout = %q, want 1000", got)
+	}
+}
+
+func TestStartUidOnlyDefaultsGid(t *testing.T) {
+	if os.Geteuid() != 0 {
+		t.Skip("requires root")
+	}
+	m := NewManager()
+	uid := uint32(1000)
+	name, err := m.Start("uidgidtest", []string{"sh", "-c", "id -g"}, "", nil, StartOptions{Uid: &uid})
+	if err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, m, name, false)
+	stdout, _, err := m.Logs(name, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := strings.TrimSpace(string(stdout)); got != "1000" {
+		t.Fatalf("stdout = %q, want 1000", got)
 	}
 }

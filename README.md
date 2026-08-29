@@ -73,12 +73,17 @@ guest-only values are namespaced under `DSH_PODMAN_ORCHESTRATOR_` and
 | `DSH_PODMAN_GUEST_SOCKET` | `/run/dsh-sockets/guest.sock` | Unix socket the guest agent serves on |
 | `DSH_PODMAN_GUEST_TOKEN` | — | Bearer token required on every gRPC call |
 
-The plugin itself reads `DSH_PODMAN_ORCHESTRATOR_CONTROL_SOCKET`
-(default `/run/dsh-sockets/control.sock`) to reach the orchestrator, and
-`DSH_PODMAN_ORCHESTRATOR_TOKEN` to authenticate when the orchestrator requires
-it. Its `projectsRoot` default is `/mnt/project`; all are overridable through
-the plugin's `cordis.yml` config (`controlSocket`, `defaultImage`,
-`projectsRoot`, `controlToken`).
+### Plugin (dsh client)
+
+| Variable | Default | Description |
+|---|---|---|
+| `DSH_PODMAN_ORCHESTRATOR_CONTROL_SOCKET` | `/run/dsh-sockets/control.sock` | Unix socket the plugin uses to reach the orchestrator control plane |
+| `DSH_PODMAN_DEFAULT_IMAGE` | `arch-base` | Default workspace image id used when creating a workspace (see also Shared) |
+| `DSH_PODMAN_ORCHESTRATOR_TOKEN` | — | Shared secret authenticating control-plane gRPC calls; see below for the expected format |
+
+The plugin reads the variables above. Its `projectsRoot` default is
+`/mnt/project`; all of them are overridable through the plugin's `cordis.yml`
+config (`controlSocket`, `defaultImage`, `projectsRoot`, `controlToken`).
 
 `DSH_PODMAN_ORCHESTRATOR_TOKEN` is an arbitrary shared secret string that the
 orchestrator and the plugin must agree on; every control-plane request must

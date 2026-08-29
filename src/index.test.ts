@@ -11,6 +11,7 @@ import {
   createFilesystemProvider,
   TOOLS,
   toolHandlers,
+  imageRemoveParameters,
 } from "./index.js";
 
 test("remoteArgv remaps ripgrep onto the guest path", () => {
@@ -137,6 +138,7 @@ const EXPECTED_TOOLS = [
   "image_get",
   "image_build",
   "image_rebuild",
+  "image_remove",
   "container_list",
   "container_start",
   "container_recreate",
@@ -199,6 +201,7 @@ test("the destructive mutations require approval", () => {
     "container_replace",
     "image_build",
     "image_rebuild",
+    "image_remove",
   ]);
 });
 
@@ -276,6 +279,17 @@ test("volume tools are registered with the expected schemas", () => {
   const removeTool = TOOLS.find((entry) => entry.name === "volume_remove");
   assert.deepEqual(removeTool!.parameters.required, ["name"]);
   assert.equal(removeTool!.parameters.properties.name.type, "string");
+});
+
+test("image_remove is registered, requires approval and requires imageId", () => {
+  const tool = TOOLS.find((entry) => entry.name === "image_remove");
+  assert.ok(tool, "image_remove registered");
+  assert.equal(tool!.approval, true, "image_remove must require approval");
+  assert.equal(tool!.parameters.type, "object", "image_remove type");
+  assert.equal(typeof tool!.parameters.properties, "object");
+  assert.deepEqual(tool!.parameters.required, ["imageId"]);
+  assert.equal(tool!.parameters.properties.imageId.type, "string");
+  assert.deepEqual(imageRemoveParameters, tool!.parameters);
 });
 
 test("mount schemas are object-rooted without per-property required", () => {

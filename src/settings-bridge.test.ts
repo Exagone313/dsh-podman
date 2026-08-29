@@ -241,6 +241,31 @@ test("volume_remove command drives removeVolume with the name", async () => {
   assert.equal(scope.value.command, null);
 });
 
+test("image_remove command drives removeImage with the imageId", async () => {
+  const scope = fakeScope(baseValue());
+  const calls: Array<[string, unknown]> = [];
+  const resolver: any = {
+    getConfig: () => ({}),
+    setConfig: () => {},
+    async control(method: string, request: unknown) {
+      calls.push([method, request]);
+      if (method === "listContainers") return { containers: [] };
+      if (method === "listImages") return { images: [] };
+      if (method === "listWorkspaces") return { workspaces: [] };
+      if (method === "listVolumes") return { volumes: [] };
+      return {};
+    },
+  };
+  installContainerSettings(fakeContext(scope), resolver);
+  await scope.update({
+    command: { op: "image_remove", workspace: "valkey", image: "", at: 5 },
+  });
+  await new Promise((resolve) => setImmediate(resolve));
+  const removeCall = calls.find(([method]) => method === "removeImage");
+  assert.deepEqual(removeCall?.[1], { imageId: "valkey" });
+  assert.equal(scope.value.command, null);
+});
+
 test("workspace list comes from the dsh registry even without orchestrator state", async () => {
   const scope = fakeScope(baseValue());
   const registry = {

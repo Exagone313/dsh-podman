@@ -286,6 +286,11 @@ export const imageRebuildParameters = {
   properties: { imageId: imageIdParam },
   required: ["imageId"],
 };
+export const imageRemoveParameters = {
+  type: "object",
+  properties: { imageId: imageIdParam },
+  required: ["imageId"],
+};
 export const containerListParameters = {
   type: "object",
   properties: {},
@@ -533,6 +538,7 @@ export const TOOLS: ToolDefinition[] = [
     approval: true,
   },
   { name: "image_rebuild", parameters: imageRebuildParameters, approval: true },
+  { name: "image_remove", parameters: imageRemoveParameters, approval: true },
   { name: "container_list", parameters: containerListParameters },
   { name: "container_start", parameters: containerStartParameters },
   {
@@ -584,6 +590,8 @@ const TOOL_DESCRIPTIONS: Record<string, string> = {
     "Build a new workspace image from a base image and a set of packages. Requires approval: building installs packages system-wide into a container image.",
   image_rebuild:
     "Rebuild an existing workspace image. Requires approval: rebuilding replaces the current image content.",
+  image_remove:
+    "Remove a built workspace image. Requires approval: removing deletes the image so containers using it must be recreated from another image.",
   container_list:
     "List the containers of the current workspace, including the default container that is started on demand.",
   container_start: "Start a container in the current workspace.",
@@ -648,6 +656,8 @@ export const toolHandlers: Record<
     }),
   image_rebuild: async (resolver, input) =>
     resolver.control("rebuildImage", { imageId: input.imageId }),
+  image_remove: async (resolver, input) =>
+    resolver.control("removeImage", { imageId: input.imageId }),
   container_list: async (resolver, _input, exec) => {
     const slug = await sessionWorkspaceSlug(resolver, currentCwd(exec));
     const [containersResult, workspacesResult] = await Promise.all([

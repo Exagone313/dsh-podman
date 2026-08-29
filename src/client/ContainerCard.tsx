@@ -404,8 +404,10 @@ function WorkspaceSection(props: {
 function ImageItem(props: {
   t: (key: ContainerPluginKey) => string;
   image: ImageView;
+  busy: boolean;
+  onRemove: (imageId: string) => void;
 }): ReactNode {
-  const { t, image } = props;
+  const { t, image, busy, onRemove } = props;
   const [open, setOpen] = useState(false);
   return (
     <DisclosureRow
@@ -440,6 +442,14 @@ function ImageItem(props: {
             </tr>
           </tbody>
         </table>
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={busy}
+          onClick={() => onRemove(image.imageId)}
+        >
+          {t("removeImage")}
+        </Button>
       </div>
     </DisclosureRow>
   );
@@ -605,7 +615,13 @@ export function ContainerCard(props: ContainerCardProps): ReactNode {
             <p style={hint}>{t("none")}</p>
           ) : (
             state.images.map((image) => (
-              <ImageItem key={image.imageId} t={t} image={image} />
+              <ImageItem
+                key={image.imageId}
+                t={t}
+                image={image}
+                busy={state.busy}
+                onRemove={props.removeImage}
+              />
             ))
           )}
           <div style={sectionTitle}>{t("volumesTitle")}</div>

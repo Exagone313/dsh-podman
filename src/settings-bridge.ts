@@ -16,6 +16,7 @@ const commandSchema = z.object({
     z.const("create"),
     z.const("volume_create"),
     z.const("volume_remove"),
+    z.const("image_remove"),
   ]),
   workspace: z.string().default(""),
   image: z.string().default(""),
@@ -96,7 +97,7 @@ export const settingsSchema = z.object({
 }) as unknown as z<ContainerSettings>;
 
 export interface CommandRequest {
-  op: "refresh" | "remove" | "recreate" | "create" | "volume_create" | "volume_remove";
+  op: "refresh" | "remove" | "recreate" | "create" | "volume_create" | "volume_remove" | "image_remove";
   workspace: string;
   image: string;
   at: number;
@@ -286,6 +287,11 @@ export function installContainerSettings(
             break;
           case "volume_remove":
             await resolver.control("removeVolume", { name: command.workspace });
+            break;
+          case "image_remove":
+            await resolver.control("removeImage", {
+              imageId: command.workspace,
+            });
             break;
         }
         await scope.update({ command: null });

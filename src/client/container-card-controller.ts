@@ -43,7 +43,7 @@ export interface WorkspaceView {
   mounts: readonly { projectName: string; mode: string }[];
 }
 export interface CommandRequest {
-  op: "refresh" | "remove" | "recreate" | "create" | "volume_create" | "volume_remove";
+  op: "refresh" | "remove" | "recreate" | "create" | "volume_create" | "volume_remove" | "image_remove";
   workspace: string;
   image: string;
   at: number;
@@ -88,6 +88,7 @@ export interface ContainerCardFace {
   createContainer: (workspace: WorkspaceView) => void;
   createVolume: (name: string) => void;
   removeVolume: (name: string) => void;
+  removeImage: (imageId: string) => void;
   editDefaultImage: (text: string) => void;
   saveDefaultImage: () => void;
   discardDefaultImage: () => void;
@@ -182,6 +183,7 @@ export class ContainerCardController {
         ),
       createVolume: (name) => this.command("volume_create", name, ""),
       removeVolume: (name) => this.command("volume_remove", name, ""),
+      removeImage: (imageId) => this.command("image_remove", imageId, ""),
       editDefaultImage: (text) => this.edit("defaultImage", text),
       saveDefaultImage: () => this.save("defaultImage"),
       discardDefaultImage: () => this.discard("defaultImage"),

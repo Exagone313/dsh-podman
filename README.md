@@ -70,7 +70,7 @@ overridable through the plugin's `cordis.yml` config (`socketsRoot`,
 | `DSH_PODMAN_ORCHESTRATOR_STATE` | `/var/lib/dsh-orchestrator` | Persisted state directory |
 | `DSH_PODMAN_ORCHESTRATOR_TOKEN` | — | Shared secret authenticating control-plane gRPC calls; see [Variable details](#variable-details) |
 | `DSH_PODMAN_PROJECTS_ROOT` | `/projects` | Project root inside every container; also the guest agent's workspace root |
-| `DSH_PODMAN_SOCKETS_ROOT` | `/run/dsh-podman` | Socket root directory (bind-mounted from the host, must already exist); holds `orchestrator.sock` and per-workspace guest sockets; see [Variable details](#variable-details) |
+| `DSH_PODMAN_SOCKETS_ROOT` | `/run/dsh-podman` | Socket root directory (bind-mounted from the host); holds `orchestrator.sock` and per-workspace guest sockets; see [Variable details](#variable-details) |
 
 ### Guest agent (`dsh-podman-guest-agent`)
 
@@ -147,10 +147,8 @@ orchestrator and the workspace containers. It holds the orchestrator control
 socket (`orchestrator.sock`) and one subdirectory per workspace, where each
 guest agent creates its `guest.sock`.
 
-The directory must already exist when the orchestrator starts: it is expected
-to be bind-mounted from the host, and the orchestrator aborts if it is missing
-— it does not create it. Its mode should be `0700`, but that is not enforced by
-the orchestrator.
+The directory needs to be bind-mounted in the orchestrator container. Its mode
+should be `0700`, but that is not enforced by the orchestrator.
 
 Each workspace container gets exactly one socket directory bind-mounted into
 it: the host directory `<DSH_PODMAN_HOST_SOCKETS_ROOT>/<container>` is mounted

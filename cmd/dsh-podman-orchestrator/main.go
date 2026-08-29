@@ -40,7 +40,7 @@ func main() {
 	hostGuestBinary := getenv("DSH_PODMAN_HOST_GUEST_AGENT_BIN", "")
 	hostPacmanCache := getenv("DSH_PODMAN_HOST_PACMAN_CACHE", "")
 	controlToken := getenv("DSH_PODMAN_ORCHESTRATOR_TOKEN", "")
-	if err := os.MkdirAll(filepath.Dir(socket), 0700); err != nil {
+	if err := requireDirectory(filepath.Dir(socket)); err != nil {
 		panic(err)
 	}
 	_ = os.Remove(socket)
@@ -102,4 +102,15 @@ func getenv(name, fallback string) string {
 		return value
 	}
 	return fallback
+}
+
+func requireDirectory(dir string) error {
+	info, err := os.Stat(dir)
+	if err != nil {
+		return fmt.Errorf("socket root %q is not accessible: %w", dir, err)
+	}
+	if !info.IsDir() {
+		return fmt.Errorf("socket root %q is not a directory", dir)
+	}
+	return nil
 }

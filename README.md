@@ -70,7 +70,7 @@ overridable through the plugin's `cordis.yml` config (`socketsRoot`,
 | `DSH_PODMAN_ORCHESTRATOR_STATE` | `/var/lib/dsh-orchestrator` | Persisted state directory |
 | `DSH_PODMAN_ORCHESTRATOR_TOKEN` | — | Shared secret authenticating control-plane gRPC calls; see [Variable details](#variable-details) |
 | `DSH_PODMAN_PROJECTS_ROOT` | `/projects` | Project root inside every container; also the guest agent's workspace root |
-| `DSH_PODMAN_SOCKETS_ROOT` | `/run/dsh-podman` | Directory for the control socket (`orchestrator.sock`) and per-workspace guest sockets |
+| `DSH_PODMAN_SOCKETS_ROOT` | `/run/dsh-podman` | Socket root directory (bind-mounted from the host, must already exist); holds `orchestrator.sock` and per-workspace guest sockets; see [Variable details](#variable-details) |
 
 ### Guest agent (`dsh-podman-guest-agent`)
 
@@ -142,15 +142,22 @@ requests without the matching header are rejected with `Unauthenticated`.
 
 #### `DSH_PODMAN_SOCKETS_ROOT` and `DSH_PODMAN_HOST_SOCKETS_ROOT`
 
-The orchestrator listens on `<DSH_PODMAN_SOCKETS_ROOT>/orchestrator.sock` for
-control-plane calls. Each workspace container gets exactly one socket directory
-bind-mounted into it: the host directory `<DSH_PODMAN_HOST_SOCKETS_ROOT>/<container>`
-is mounted at `<DSH_PODMAN_SOCKETS_ROOT>/<container>` inside the container,
-where the guest agent creates its `guest.sock`. Because only that single
-per-workspace directory is mounted, a workspace container never sees the
-orchestrator's `orchestrator.sock` nor any other workspace's socket directory.
-On the host, the sockets root is created with mode `0700` and the control socket
-with `0600`, so only the orchestrator user can reach them.
+`DSH_PODMAN_SOCKETS_ROOT` is the socket root directory shared by the
+orchestrator and the workspace containers. It holds the orchestrator control
+socket (`orchestrator.sock`) and one subdirectory per workspace, where each
+guest agent creates its `guest.sock`.
+
+The directory must already exist when the orchestrator starts: it is expected
+to be bind-mounted from the host, and the orchestrator aborts if it is missing
+— it does not create it. Its mode should be `0700`, but that is not enforced by
+the orchestrator.
+
+Each workspace container gets exactly one socket directory bind-mounted into
+it: the host directory `<DSH_PODMAN_HOST_SOCKETS_ROOT>/<container>` is mounted
+at `<DSH_PODMAN_SOCKETS_ROOT>/<container>` inside the container. Because only
+that single per-workspace directory is mounted, a workspace container never
+sees the orchestrator's `orchestrator.sock` nor any other workspace's socket
+directory. The control socket file is explicitly set to `0600`.
 
 ## Container management UI
 

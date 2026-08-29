@@ -15,6 +15,7 @@ service OrchestratorControl {
   rpc GetImage(GetImageRequest) returns (Image);
   rpc BuildImage(BuildImageRequest) returns (Image);
   rpc RebuildImage(RebuildImageRequest) returns (Image);
+  rpc RemoveImage(RemoveImageRequest) returns (RemoveImageResponse);
   rpc ListContainers(ListContainersRequest) returns (ListContainersResponse);
   rpc StartContainer(StartContainerRequest) returns (Container);
   rpc RecreateContainer(RecreateContainerRequest) returns (Workspace);
@@ -58,6 +59,8 @@ message ListImagesRequest {}
 message ListImagesResponse { repeated Image images = 1; }
 message Image { string image_id = 1; string base_image = 2; repeated string packages = 3; string image_tag = 4; string built_at = 5; }
 message RebuildImageRequest { string image_id = 1; string base_image = 2; repeated string packages = 3; }
+message RemoveImageRequest { string image_id = 1; }
+message RemoveImageResponse {}
 message GetImageRequest { string image_id = 1; }
 message BuildImageRequest { string image_id = 1; string base_image = 2; repeated string packages = 3; }
 message ListContainersRequest {}

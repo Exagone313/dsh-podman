@@ -856,6 +856,56 @@ func (s *Server) RebuildImage(_ context.Context, request *ctl.RebuildImageReques
 	s.log().Info("control request completed", "method", "RebuildImage", "image_id", stored.ImageID, "image_tag", stored.ImageTag)
 	return imageProto(stored), nil
 }
+func (s *Server) RemoveImage(_ context.Context, request *ctl.RemoveImageRequest) (*ctl.RemoveImageResponse, error) {
+	s.log().Info("control request", "method", "RemoveImage", "image_id", request.GetImageId())
+	imageID := request.GetImageId()
+	if imageID == "" {
+		return nil, status.Error(codes.InvalidArgument, "image id is required")
+	}
+	if imageIDOverridesBase(imageID) {
+		return nil, status.Error(codes.InvalidArgument, "cannot remove the base image")
+	}
+	resolved, err := s.resolveImage(imageID)
+	if err != nil {
+		s.log().Warn("control request failed", "method", "RemoveImage", "image_id", imageID, "reason", "not found")
+		return nil, err
+	}
+	workspaces, err := s.Store.Workspaces()
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	for _, workspace := range workspaces {
+		if imageRefsMatch(workspace.ImageID, resolved.ImageID) {
+			return nil, status.Error(codes.FailedPrecondition, fmt.Sprintf("image %q is in use by workspace %q container %q", imageID, workspace.WorkspaceSlug, "default"))
+		}
+		for _, container := range workspace.Containers {
+			if imageRefsMatch(container.ImageID, resolved.ImageID) {
+				return nil, status.Error(codes.FailedPrecondition, fmt.Sprintf("image %q is in use by workspace %q container %q", imageID, workspace.WorkspaceSlug, container.Name))
+			}
+		}
+	}
+	if s.Podman == nil {
+		return nil, status.Error(codes.FailedPrecondition, "podman is not configured")
+	}
+	if err := s.Podman.ImageRemove(resolved.ImageTag); err != nil {
+		s.log().Error("control request failed", "method", "RemoveImage", "image_id", imageID, "error", err)
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	if err := s.Store.UpdateImages(func(current []state.Image) ([]state.Image, error) {
+		next := make([]state.Image, 0, len(current))
+		for _, image := range current {
+			if image.ImageID != resolved.ImageID {
+				next = append(next, image)
+			}
+		}
+		return next, nil
+	}); err != nil {
+		s.log().Error("control request failed", "method", "RemoveImage", "image_id", imageID, "error", err)
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	s.log().Info("control request completed", "method", "RemoveImage", "image_id", imageID)
+	return &ctl.RemoveImageResponse{}, nil
+}
 
 // imageProto projects a stored image onto the control plane's Image message.
 func imageProto(image state.Image) *ctl.Image {
@@ -965,6 +1015,18 @@ func (s *Server) resolveImage(imageID string) (state.Image, error) {
 // either its short or fully-qualified form.
 func isDefaultImageID(id string) bool {
 	return strings.TrimPrefix(id, imagePrefix()) == strings.TrimPrefix(defaultImageID(), imagePrefix())
+}
+
+// imageRefsMatch reports whether two stored image references denote the same
+// image, ignoring a trailing ":tag" and the registry prefix.
+func imageRefsMatch(a, b string) bool {
+	if stripped, _, hasTag := strings.Cut(a, ":"); hasTag {
+		a = stripped
+	}
+	if stripped, _, hasTag := strings.Cut(b, ":"); hasTag {
+		b = stripped
+	}
+	return strings.TrimPrefix(a, imagePrefix()) == strings.TrimPrefix(b, imagePrefix())
 }
 
 // imageIDOverridesBase reports whether an image id used as a build/rebuild

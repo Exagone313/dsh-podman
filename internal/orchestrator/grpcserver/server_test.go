@@ -579,6 +579,94 @@ func TestRebuildImageRejectsBaseTagForm(t *testing.T) {
 	}
 }
 
+func TestRemoveImageRejectsBase(t *testing.T) {
+	t.Setenv("DSH_PODMAN_DEFAULT_IMAGE", "arch-base")
+	server := &Server{Store: newTestStore(t), Logger: silentLogger()}
+	for _, image := range []string{"arch-base", "arch-base:latest", "localhost/dsh-podman/arch-base:latest"} {
+		_, err := server.RemoveImage(context.Background(), &ctl.RemoveImageRequest{ImageId: image})
+		if status.Code(err) != codes.InvalidArgument {
+			t.Errorf("image %q: expected InvalidArgument, got %v", image, err)
+		}
+	}
+}
+
+func TestRemoveImageUnknown(t *testing.T) {
+	server := &Server{Store: newTestStore(t), Logger: silentLogger()}
+	_, err := server.RemoveImage(context.Background(), &ctl.RemoveImageRequest{ImageId: "nope"})
+	if status.Code(err) != codes.NotFound {
+		t.Fatalf("expected NotFound, got %v", err)
+	}
+}
+
+func TestRemoveImageInUse(t *testing.T) {
+	store := newTestStore(t)
+	if err := store.SaveImages([]state.Image{{ImageID: "valkey", ImageTag: "localhost/dsh-podman/valkey:latest"}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.SaveWorkspaces([]state.Workspace{{
+		WorkspaceSlug: "valkey-ws",
+		Containers:    []state.Container{{Name: "valkey-ctr", ImageID: "valkey"}},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	server := &Server{Store: store, Logger: silentLogger()}
+	_, err := server.RemoveImage(context.Background(), &ctl.RemoveImageRequest{ImageId: "localhost/dsh-podman/valkey:latest"})
+	if status.Code(err) != codes.FailedPrecondition {
+		t.Fatalf("named container in use: expected FailedPrecondition, got %v", err)
+	}
+	if err := store.SaveWorkspaces([]state.Workspace{{
+		WorkspaceSlug: "valkey-ws",
+		ImageID:       "valkey",
+		Containers:    []state.Container{{Name: "default", ImageID: "valkey"}},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	_, err = server.RemoveImage(context.Background(), &ctl.RemoveImageRequest{ImageId: "valkey"})
+	if status.Code(err) != codes.FailedPrecondition {
+		t.Fatalf("workspace default container in use: expected FailedPrecondition, got %v", err)
+	}
+}
+
+func TestRemoveImageRequiresPodman(t *testing.T) {
+	store := newTestStore(t)
+	if err := store.SaveImages([]state.Image{{ImageID: "valkey", ImageTag: "localhost/dsh-podman/valkey:latest"}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.SaveWorkspaces([]state.Workspace{{
+		WorkspaceSlug: "other-ws",
+		Containers:    []state.Container{{Name: "default", ImageID: "arch"}},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	server := &Server{Store: store, Logger: silentLogger()}
+	_, err := server.RemoveImage(context.Background(), &ctl.RemoveImageRequest{ImageId: "valkey"})
+	if status.Code(err) != codes.FailedPrecondition {
+		t.Fatalf("expected FailedPrecondition, got %v", err)
+	}
+}
+
+func TestImageRefsMatch(t *testing.T) {
+	cases := []struct {
+		name  string
+		a, b  string
+		match bool
+	}{
+		{"identical short id", "valkey", "valkey", true},
+		{"short id vs qualified tag", "valkey", "localhost/dsh-podman/valkey:latest", true},
+		{"qualified vs short tag", "localhost/dsh-podman/valkey", "valkey:latest", true},
+		{"qualified vs qualified tag", "localhost/dsh-podman/valkey", "localhost/dsh-podman/valkey:latest", true},
+		{"tag vs tag", "valkey:latest", "valkey:latest", true},
+		{"differing short ids", "valkey", "redis", false},
+		{"differing qualified ids", "localhost/dsh-podman/valkey", "localhost/dsh-podman/redis", false},
+		{"different prefixes", "registry.example.com/x/valkey", "localhost/dsh-podman/valkey", false},
+	}
+	for _, tc := range cases {
+		if got := imageRefsMatch(tc.a, tc.b); got != tc.match {
+			t.Errorf("%s: imageRefsMatch(%q, %q) = %v, want %v", tc.name, tc.a, tc.b, got, tc.match)
+		}
+	}
+}
+
 func TestCreateWorkspaceRejectsUnknownImage(t *testing.T) {
 	t.Setenv("DSH_PODMAN_DEFAULT_IMAGE", "arch-base")
 	server := &Server{Store: newTestStore(t), Logger: silentLogger()}

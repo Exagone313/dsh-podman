@@ -6,6 +6,7 @@ package podman
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -170,6 +171,26 @@ func (c *Client) ImageExists(name string) (bool, error) {
 		c.log().Info("workspace image lookup completed", "image", name, "exists", exists)
 	}
 	return exists, err
+}
+
+// ImageRemove deletes the named image from local storage, tolerating an
+// already-absent image via the force option. Any non-nil errors reported by
+// images.Remove are joined into a single error.
+func (c *Client) ImageRemove(name string) error {
+	c.log().Info("removing image", "image", name)
+	_, errs := images.Remove(c.ctx, []string{name}, &images.RemoveOptions{Force: boolPtr(true)})
+	var joined error
+	for _, err := range errs {
+		if err != nil {
+			joined = errors.Join(joined, err)
+		}
+	}
+	if joined != nil {
+		c.log().Error("image removal failed", "image", name, "error", joined)
+		return joined
+	}
+	c.log().Info("image removed", "image", name)
+	return nil
 }
 func (c *Client) Remove(name string) error {
 	c.log().Info("removing guest container", "container_name", name)

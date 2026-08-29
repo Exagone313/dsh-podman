@@ -842,6 +842,86 @@ func (x *RebuildImageRequest) GetPackages() []string {
 	return nil
 }
 
+type RemoveImageRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ImageId       string                 `protobuf:"bytes,1,opt,name=image_id,json=imageId,proto3" json:"image_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RemoveImageRequest) Reset() {
+	*x = RemoveImageRequest{}
+	mi := &file_dshctl_v1_control_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RemoveImageRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RemoveImageRequest) ProtoMessage() {}
+
+func (x *RemoveImageRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_dshctl_v1_control_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RemoveImageRequest.ProtoReflect.Descriptor instead.
+func (*RemoveImageRequest) Descriptor() ([]byte, []int) {
+	return file_dshctl_v1_control_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *RemoveImageRequest) GetImageId() string {
+	if x != nil {
+		return x.ImageId
+	}
+	return ""
+}
+
+type RemoveImageResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RemoveImageResponse) Reset() {
+	*x = RemoveImageResponse{}
+	mi := &file_dshctl_v1_control_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RemoveImageResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RemoveImageResponse) ProtoMessage() {}
+
+func (x *RemoveImageResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_dshctl_v1_control_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RemoveImageResponse.ProtoReflect.Descriptor instead.
+func (*RemoveImageResponse) Descriptor() ([]byte, []int) {
+	return file_dshctl_v1_control_proto_rawDescGZIP(), []int{14}
+}
+
 type GetImageRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	ImageId       string                 `protobuf:"bytes,1,opt,name=image_id,json=imageId,proto3" json:"image_id,omitempty"`
@@ -851,7 +931,7 @@ type GetImageRequest struct {
 
 func (x *GetImageRequest) Reset() {
 	*x = GetImageRequest{}
-	mi := &file_dshctl_v1_control_proto_msgTypes[13]
+	mi := &file_dshctl_v1_control_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -863,7 +943,7 @@ func (x *GetImageRequest) String() string {
 func (*GetImageRequest) ProtoMessage() {}
 
 func (x *GetImageRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_dshctl_v1_control_proto_msgTypes[13]
+	mi := &file_dshctl_v1_control_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -876,7 +956,7 @@ func (x *GetImageRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetImageRequest.ProtoReflect.Descriptor instead.
 func (*GetImageRequest) Descriptor() ([]byte, []int) {
-	return file_dshctl_v1_control_proto_rawDescGZIP(), []int{13}
+	return file_dshctl_v1_control_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *GetImageRequest) GetImageId() string {
@@ -897,7 +977,7 @@ type BuildImageRequest struct {
 
 func (x *BuildImageRequest) Reset() {
 	*x = BuildImageRequest{}
-	mi := &file_dshctl_v1_control_proto_msgTypes[14]
+	mi := &file_dshctl_v1_control_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -909,7 +989,7 @@ func (x *BuildImageRequest) String() string {
 func (*BuildImageRequest) ProtoMessage() {}
 
 func (x *BuildImageRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_dshctl_v1_control_proto_msgTypes[14]
+	mi := &file_dshctl_v1_control_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -922,7 +1002,7 @@ func (x *BuildImageRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BuildImageRequest.ProtoReflect.Descriptor instead.
 func (*BuildImageRequest) Descriptor() ([]byte, []int) {
-	return file_dshctl_v1_control_proto_rawDescGZIP(), []int{14}
+	return file_dshctl_v1_control_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *BuildImageRequest) GetImageId() string {
@@ -954,7 +1034,7 @@ type ListContainersRequest struct {
 
 func (x *ListContainersRequest) Reset() {
 	*x = ListContainersRequest{}
-	mi := &file_dshctl_v1_control_proto_msgTypes[15]
+	mi := &file_dshctl_v1_control_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -966,7 +1046,7 @@ func (x *ListContainersRequest) String() string {
 func (*ListContainersRequest) ProtoMessage() {}
 
 func (x *ListContainersRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_dshctl_v1_control_proto_msgTypes[15]
+	mi := &file_dshctl_v1_control_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -979,7 +1059,7 @@ func (x *ListContainersRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListContainersRequest.ProtoReflect.Descriptor instead.
 func (*ListContainersRequest) Descriptor() ([]byte, []int) {
-	return file_dshctl_v1_control_proto_rawDescGZIP(), []int{15}
+	return file_dshctl_v1_control_proto_rawDescGZIP(), []int{17}
 }
 
 type ListContainersResponse struct {
@@ -991,7 +1071,7 @@ type ListContainersResponse struct {
 
 func (x *ListContainersResponse) Reset() {
 	*x = ListContainersResponse{}
-	mi := &file_dshctl_v1_control_proto_msgTypes[16]
+	mi := &file_dshctl_v1_control_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1003,7 +1083,7 @@ func (x *ListContainersResponse) String() string {
 func (*ListContainersResponse) ProtoMessage() {}
 
 func (x *ListContainersResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_dshctl_v1_control_proto_msgTypes[16]
+	mi := &file_dshctl_v1_control_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1016,7 +1096,7 @@ func (x *ListContainersResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListContainersResponse.ProtoReflect.Descriptor instead.
 func (*ListContainersResponse) Descriptor() ([]byte, []int) {
-	return file_dshctl_v1_control_proto_rawDescGZIP(), []int{16}
+	return file_dshctl_v1_control_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *ListContainersResponse) GetContainers() []*Container {
@@ -1043,7 +1123,7 @@ type Container struct {
 
 func (x *Container) Reset() {
 	*x = Container{}
-	mi := &file_dshctl_v1_control_proto_msgTypes[17]
+	mi := &file_dshctl_v1_control_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1055,7 +1135,7 @@ func (x *Container) String() string {
 func (*Container) ProtoMessage() {}
 
 func (x *Container) ProtoReflect() protoreflect.Message {
-	mi := &file_dshctl_v1_control_proto_msgTypes[17]
+	mi := &file_dshctl_v1_control_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1068,7 +1148,7 @@ func (x *Container) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Container.ProtoReflect.Descriptor instead.
 func (*Container) Descriptor() ([]byte, []int) {
-	return file_dshctl_v1_control_proto_rawDescGZIP(), []int{17}
+	return file_dshctl_v1_control_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *Container) GetContainerName() string {
@@ -1146,7 +1226,7 @@ type StartContainerRequest struct {
 
 func (x *StartContainerRequest) Reset() {
 	*x = StartContainerRequest{}
-	mi := &file_dshctl_v1_control_proto_msgTypes[18]
+	mi := &file_dshctl_v1_control_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1158,7 +1238,7 @@ func (x *StartContainerRequest) String() string {
 func (*StartContainerRequest) ProtoMessage() {}
 
 func (x *StartContainerRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_dshctl_v1_control_proto_msgTypes[18]
+	mi := &file_dshctl_v1_control_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1171,7 +1251,7 @@ func (x *StartContainerRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StartContainerRequest.ProtoReflect.Descriptor instead.
 func (*StartContainerRequest) Descriptor() ([]byte, []int) {
-	return file_dshctl_v1_control_proto_rawDescGZIP(), []int{18}
+	return file_dshctl_v1_control_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *StartContainerRequest) GetWorkspaceSlug() string {
@@ -1213,7 +1293,7 @@ type RecreateContainerRequest struct {
 
 func (x *RecreateContainerRequest) Reset() {
 	*x = RecreateContainerRequest{}
-	mi := &file_dshctl_v1_control_proto_msgTypes[19]
+	mi := &file_dshctl_v1_control_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1225,7 +1305,7 @@ func (x *RecreateContainerRequest) String() string {
 func (*RecreateContainerRequest) ProtoMessage() {}
 
 func (x *RecreateContainerRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_dshctl_v1_control_proto_msgTypes[19]
+	mi := &file_dshctl_v1_control_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1238,7 +1318,7 @@ func (x *RecreateContainerRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RecreateContainerRequest.ProtoReflect.Descriptor instead.
 func (*RecreateContainerRequest) Descriptor() ([]byte, []int) {
-	return file_dshctl_v1_control_proto_rawDescGZIP(), []int{19}
+	return file_dshctl_v1_control_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *RecreateContainerRequest) GetWorkspaceSlug() string {
@@ -1274,7 +1354,7 @@ type ReplaceContainerRequest struct {
 
 func (x *ReplaceContainerRequest) Reset() {
 	*x = ReplaceContainerRequest{}
-	mi := &file_dshctl_v1_control_proto_msgTypes[20]
+	mi := &file_dshctl_v1_control_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1286,7 +1366,7 @@ func (x *ReplaceContainerRequest) String() string {
 func (*ReplaceContainerRequest) ProtoMessage() {}
 
 func (x *ReplaceContainerRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_dshctl_v1_control_proto_msgTypes[20]
+	mi := &file_dshctl_v1_control_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1299,7 +1379,7 @@ func (x *ReplaceContainerRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReplaceContainerRequest.ProtoReflect.Descriptor instead.
 func (*ReplaceContainerRequest) Descriptor() ([]byte, []int) {
-	return file_dshctl_v1_control_proto_rawDescGZIP(), []int{20}
+	return file_dshctl_v1_control_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *ReplaceContainerRequest) GetWorkspaceSlug() string {
@@ -1340,7 +1420,7 @@ type RemoveContainerRequest struct {
 
 func (x *RemoveContainerRequest) Reset() {
 	*x = RemoveContainerRequest{}
-	mi := &file_dshctl_v1_control_proto_msgTypes[21]
+	mi := &file_dshctl_v1_control_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1352,7 +1432,7 @@ func (x *RemoveContainerRequest) String() string {
 func (*RemoveContainerRequest) ProtoMessage() {}
 
 func (x *RemoveContainerRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_dshctl_v1_control_proto_msgTypes[21]
+	mi := &file_dshctl_v1_control_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1365,7 +1445,7 @@ func (x *RemoveContainerRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RemoveContainerRequest.ProtoReflect.Descriptor instead.
 func (*RemoveContainerRequest) Descriptor() ([]byte, []int) {
-	return file_dshctl_v1_control_proto_rawDescGZIP(), []int{21}
+	return file_dshctl_v1_control_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *RemoveContainerRequest) GetWorkspaceSlug() string {
@@ -1390,7 +1470,7 @@ type RemoveContainerResponse struct {
 
 func (x *RemoveContainerResponse) Reset() {
 	*x = RemoveContainerResponse{}
-	mi := &file_dshctl_v1_control_proto_msgTypes[22]
+	mi := &file_dshctl_v1_control_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1402,7 +1482,7 @@ func (x *RemoveContainerResponse) String() string {
 func (*RemoveContainerResponse) ProtoMessage() {}
 
 func (x *RemoveContainerResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_dshctl_v1_control_proto_msgTypes[22]
+	mi := &file_dshctl_v1_control_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1415,7 +1495,7 @@ func (x *RemoveContainerResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RemoveContainerResponse.ProtoReflect.Descriptor instead.
 func (*RemoveContainerResponse) Descriptor() ([]byte, []int) {
-	return file_dshctl_v1_control_proto_rawDescGZIP(), []int{22}
+	return file_dshctl_v1_control_proto_rawDescGZIP(), []int{24}
 }
 
 type AddContainerMountRequest struct {
@@ -1434,7 +1514,7 @@ type AddContainerMountRequest struct {
 
 func (x *AddContainerMountRequest) Reset() {
 	*x = AddContainerMountRequest{}
-	mi := &file_dshctl_v1_control_proto_msgTypes[23]
+	mi := &file_dshctl_v1_control_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1446,7 +1526,7 @@ func (x *AddContainerMountRequest) String() string {
 func (*AddContainerMountRequest) ProtoMessage() {}
 
 func (x *AddContainerMountRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_dshctl_v1_control_proto_msgTypes[23]
+	mi := &file_dshctl_v1_control_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1459,7 +1539,7 @@ func (x *AddContainerMountRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AddContainerMountRequest.ProtoReflect.Descriptor instead.
 func (*AddContainerMountRequest) Descriptor() ([]byte, []int) {
-	return file_dshctl_v1_control_proto_rawDescGZIP(), []int{23}
+	return file_dshctl_v1_control_proto_rawDescGZIP(), []int{25}
 }
 
 func (x *AddContainerMountRequest) GetWorkspaceSlug() string {
@@ -1533,7 +1613,7 @@ type RemoveContainerMountRequest struct {
 
 func (x *RemoveContainerMountRequest) Reset() {
 	*x = RemoveContainerMountRequest{}
-	mi := &file_dshctl_v1_control_proto_msgTypes[24]
+	mi := &file_dshctl_v1_control_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1545,7 +1625,7 @@ func (x *RemoveContainerMountRequest) String() string {
 func (*RemoveContainerMountRequest) ProtoMessage() {}
 
 func (x *RemoveContainerMountRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_dshctl_v1_control_proto_msgTypes[24]
+	mi := &file_dshctl_v1_control_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1558,7 +1638,7 @@ func (x *RemoveContainerMountRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RemoveContainerMountRequest.ProtoReflect.Descriptor instead.
 func (*RemoveContainerMountRequest) Descriptor() ([]byte, []int) {
-	return file_dshctl_v1_control_proto_rawDescGZIP(), []int{24}
+	return file_dshctl_v1_control_proto_rawDescGZIP(), []int{26}
 }
 
 func (x *RemoveContainerMountRequest) GetWorkspaceSlug() string {
@@ -1618,7 +1698,7 @@ type ListVolumesRequest struct {
 
 func (x *ListVolumesRequest) Reset() {
 	*x = ListVolumesRequest{}
-	mi := &file_dshctl_v1_control_proto_msgTypes[25]
+	mi := &file_dshctl_v1_control_proto_msgTypes[27]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1630,7 +1710,7 @@ func (x *ListVolumesRequest) String() string {
 func (*ListVolumesRequest) ProtoMessage() {}
 
 func (x *ListVolumesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_dshctl_v1_control_proto_msgTypes[25]
+	mi := &file_dshctl_v1_control_proto_msgTypes[27]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1643,7 +1723,7 @@ func (x *ListVolumesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListVolumesRequest.ProtoReflect.Descriptor instead.
 func (*ListVolumesRequest) Descriptor() ([]byte, []int) {
-	return file_dshctl_v1_control_proto_rawDescGZIP(), []int{25}
+	return file_dshctl_v1_control_proto_rawDescGZIP(), []int{27}
 }
 
 type ListVolumesResponse struct {
@@ -1655,7 +1735,7 @@ type ListVolumesResponse struct {
 
 func (x *ListVolumesResponse) Reset() {
 	*x = ListVolumesResponse{}
-	mi := &file_dshctl_v1_control_proto_msgTypes[26]
+	mi := &file_dshctl_v1_control_proto_msgTypes[28]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1667,7 +1747,7 @@ func (x *ListVolumesResponse) String() string {
 func (*ListVolumesResponse) ProtoMessage() {}
 
 func (x *ListVolumesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_dshctl_v1_control_proto_msgTypes[26]
+	mi := &file_dshctl_v1_control_proto_msgTypes[28]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1680,7 +1760,7 @@ func (x *ListVolumesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListVolumesResponse.ProtoReflect.Descriptor instead.
 func (*ListVolumesResponse) Descriptor() ([]byte, []int) {
-	return file_dshctl_v1_control_proto_rawDescGZIP(), []int{26}
+	return file_dshctl_v1_control_proto_rawDescGZIP(), []int{28}
 }
 
 func (x *ListVolumesResponse) GetVolumes() []*Volume {
@@ -1699,7 +1779,7 @@ type Volume struct {
 
 func (x *Volume) Reset() {
 	*x = Volume{}
-	mi := &file_dshctl_v1_control_proto_msgTypes[27]
+	mi := &file_dshctl_v1_control_proto_msgTypes[29]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1711,7 +1791,7 @@ func (x *Volume) String() string {
 func (*Volume) ProtoMessage() {}
 
 func (x *Volume) ProtoReflect() protoreflect.Message {
-	mi := &file_dshctl_v1_control_proto_msgTypes[27]
+	mi := &file_dshctl_v1_control_proto_msgTypes[29]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1724,7 +1804,7 @@ func (x *Volume) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Volume.ProtoReflect.Descriptor instead.
 func (*Volume) Descriptor() ([]byte, []int) {
-	return file_dshctl_v1_control_proto_rawDescGZIP(), []int{27}
+	return file_dshctl_v1_control_proto_rawDescGZIP(), []int{29}
 }
 
 func (x *Volume) GetName() string {
@@ -1743,7 +1823,7 @@ type CreateVolumeRequest struct {
 
 func (x *CreateVolumeRequest) Reset() {
 	*x = CreateVolumeRequest{}
-	mi := &file_dshctl_v1_control_proto_msgTypes[28]
+	mi := &file_dshctl_v1_control_proto_msgTypes[30]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1755,7 +1835,7 @@ func (x *CreateVolumeRequest) String() string {
 func (*CreateVolumeRequest) ProtoMessage() {}
 
 func (x *CreateVolumeRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_dshctl_v1_control_proto_msgTypes[28]
+	mi := &file_dshctl_v1_control_proto_msgTypes[30]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1768,7 +1848,7 @@ func (x *CreateVolumeRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateVolumeRequest.ProtoReflect.Descriptor instead.
 func (*CreateVolumeRequest) Descriptor() ([]byte, []int) {
-	return file_dshctl_v1_control_proto_rawDescGZIP(), []int{28}
+	return file_dshctl_v1_control_proto_rawDescGZIP(), []int{30}
 }
 
 func (x *CreateVolumeRequest) GetName() string {
@@ -1787,7 +1867,7 @@ type RemoveVolumeRequest struct {
 
 func (x *RemoveVolumeRequest) Reset() {
 	*x = RemoveVolumeRequest{}
-	mi := &file_dshctl_v1_control_proto_msgTypes[29]
+	mi := &file_dshctl_v1_control_proto_msgTypes[31]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1799,7 +1879,7 @@ func (x *RemoveVolumeRequest) String() string {
 func (*RemoveVolumeRequest) ProtoMessage() {}
 
 func (x *RemoveVolumeRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_dshctl_v1_control_proto_msgTypes[29]
+	mi := &file_dshctl_v1_control_proto_msgTypes[31]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1812,7 +1892,7 @@ func (x *RemoveVolumeRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RemoveVolumeRequest.ProtoReflect.Descriptor instead.
 func (*RemoveVolumeRequest) Descriptor() ([]byte, []int) {
-	return file_dshctl_v1_control_proto_rawDescGZIP(), []int{29}
+	return file_dshctl_v1_control_proto_rawDescGZIP(), []int{31}
 }
 
 func (x *RemoveVolumeRequest) GetName() string {
@@ -1830,7 +1910,7 @@ type RemoveVolumeResponse struct {
 
 func (x *RemoveVolumeResponse) Reset() {
 	*x = RemoveVolumeResponse{}
-	mi := &file_dshctl_v1_control_proto_msgTypes[30]
+	mi := &file_dshctl_v1_control_proto_msgTypes[32]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1842,7 +1922,7 @@ func (x *RemoveVolumeResponse) String() string {
 func (*RemoveVolumeResponse) ProtoMessage() {}
 
 func (x *RemoveVolumeResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_dshctl_v1_control_proto_msgTypes[30]
+	mi := &file_dshctl_v1_control_proto_msgTypes[32]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1855,7 +1935,7 @@ func (x *RemoveVolumeResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RemoveVolumeResponse.ProtoReflect.Descriptor instead.
 func (*RemoveVolumeResponse) Descriptor() ([]byte, []int) {
-	return file_dshctl_v1_control_proto_rawDescGZIP(), []int{30}
+	return file_dshctl_v1_control_proto_rawDescGZIP(), []int{32}
 }
 
 var File_dshctl_v1_control_proto protoreflect.FileDescriptor
@@ -1912,7 +1992,10 @@ const file_dshctl_v1_control_proto_rawDesc = "" +
 	"\bimage_id\x18\x01 \x01(\tR\aimageId\x12\x1d\n" +
 	"\n" +
 	"base_image\x18\x02 \x01(\tR\tbaseImage\x12\x1a\n" +
-	"\bpackages\x18\x03 \x03(\tR\bpackages\",\n" +
+	"\bpackages\x18\x03 \x03(\tR\bpackages\"/\n" +
+	"\x12RemoveImageRequest\x12\x19\n" +
+	"\bimage_id\x18\x01 \x01(\tR\aimageId\"\x15\n" +
+	"\x13RemoveImageResponse\",\n" +
 	"\x0fGetImageRequest\x12\x19\n" +
 	"\bimage_id\x18\x01 \x01(\tR\aimageId\"i\n" +
 	"\x11BuildImageRequest\x12\x19\n" +
@@ -1991,8 +2074,7 @@ const file_dshctl_v1_control_proto_rawDesc = "" +
 	"\x16MOUNT_KIND_UNSPECIFIED\x10\x00\x12\x16\n" +
 	"\x12MOUNT_KIND_PROJECT\x10\x01\x12\x14\n" +
 	"\x10MOUNT_KIND_TMPFS\x10\x02\x12\x15\n" +
-	"\x11MOUNT_KIND_VOLUME\x10\x032\xff\n" +
-	"\n" +
+	"\x11MOUNT_KIND_VOLUME\x10\x032\xcd\v\n" +
 	"\x13OrchestratorControl\x12O\n" +
 	"\fListProjects\x12\x1e.dshctl.v1.ListProjectsRequest\x1a\x1f.dshctl.v1.ListProjectsResponse\x12J\n" +
 	"\x0fCreateWorkspace\x12!.dshctl.v1.CreateWorkspaceRequest\x1a\x14.dshctl.v1.Workspace\x12N\n" +
@@ -2003,7 +2085,8 @@ const file_dshctl_v1_control_proto_rawDesc = "" +
 	"\bGetImage\x12\x1a.dshctl.v1.GetImageRequest\x1a\x10.dshctl.v1.Image\x12<\n" +
 	"\n" +
 	"BuildImage\x12\x1c.dshctl.v1.BuildImageRequest\x1a\x10.dshctl.v1.Image\x12@\n" +
-	"\fRebuildImage\x12\x1e.dshctl.v1.RebuildImageRequest\x1a\x10.dshctl.v1.Image\x12U\n" +
+	"\fRebuildImage\x12\x1e.dshctl.v1.RebuildImageRequest\x1a\x10.dshctl.v1.Image\x12L\n" +
+	"\vRemoveImage\x12\x1d.dshctl.v1.RemoveImageRequest\x1a\x1e.dshctl.v1.RemoveImageResponse\x12U\n" +
 	"\x0eListContainers\x12 .dshctl.v1.ListContainersRequest\x1a!.dshctl.v1.ListContainersResponse\x12H\n" +
 	"\x0eStartContainer\x12 .dshctl.v1.StartContainerRequest\x1a\x14.dshctl.v1.Container\x12N\n" +
 	"\x11RecreateContainer\x12#.dshctl.v1.RecreateContainerRequest\x1a\x14.dshctl.v1.Workspace\x12L\n" +
@@ -2028,7 +2111,7 @@ func file_dshctl_v1_control_proto_rawDescGZIP() []byte {
 }
 
 var file_dshctl_v1_control_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_dshctl_v1_control_proto_msgTypes = make([]protoimpl.MessageInfo, 31)
+var file_dshctl_v1_control_proto_msgTypes = make([]protoimpl.MessageInfo, 33)
 var file_dshctl_v1_control_proto_goTypes = []any{
 	(MountMode)(0),                      // 0: dshctl.v1.MountMode
 	(MountKind)(0),                      // 1: dshctl.v1.MountKind
@@ -2045,24 +2128,26 @@ var file_dshctl_v1_control_proto_goTypes = []any{
 	(*ListImagesResponse)(nil),          // 12: dshctl.v1.ListImagesResponse
 	(*Image)(nil),                       // 13: dshctl.v1.Image
 	(*RebuildImageRequest)(nil),         // 14: dshctl.v1.RebuildImageRequest
-	(*GetImageRequest)(nil),             // 15: dshctl.v1.GetImageRequest
-	(*BuildImageRequest)(nil),           // 16: dshctl.v1.BuildImageRequest
-	(*ListContainersRequest)(nil),       // 17: dshctl.v1.ListContainersRequest
-	(*ListContainersResponse)(nil),      // 18: dshctl.v1.ListContainersResponse
-	(*Container)(nil),                   // 19: dshctl.v1.Container
-	(*StartContainerRequest)(nil),       // 20: dshctl.v1.StartContainerRequest
-	(*RecreateContainerRequest)(nil),    // 21: dshctl.v1.RecreateContainerRequest
-	(*ReplaceContainerRequest)(nil),     // 22: dshctl.v1.ReplaceContainerRequest
-	(*RemoveContainerRequest)(nil),      // 23: dshctl.v1.RemoveContainerRequest
-	(*RemoveContainerResponse)(nil),     // 24: dshctl.v1.RemoveContainerResponse
-	(*AddContainerMountRequest)(nil),    // 25: dshctl.v1.AddContainerMountRequest
-	(*RemoveContainerMountRequest)(nil), // 26: dshctl.v1.RemoveContainerMountRequest
-	(*ListVolumesRequest)(nil),          // 27: dshctl.v1.ListVolumesRequest
-	(*ListVolumesResponse)(nil),         // 28: dshctl.v1.ListVolumesResponse
-	(*Volume)(nil),                      // 29: dshctl.v1.Volume
-	(*CreateVolumeRequest)(nil),         // 30: dshctl.v1.CreateVolumeRequest
-	(*RemoveVolumeRequest)(nil),         // 31: dshctl.v1.RemoveVolumeRequest
-	(*RemoveVolumeResponse)(nil),        // 32: dshctl.v1.RemoveVolumeResponse
+	(*RemoveImageRequest)(nil),          // 15: dshctl.v1.RemoveImageRequest
+	(*RemoveImageResponse)(nil),         // 16: dshctl.v1.RemoveImageResponse
+	(*GetImageRequest)(nil),             // 17: dshctl.v1.GetImageRequest
+	(*BuildImageRequest)(nil),           // 18: dshctl.v1.BuildImageRequest
+	(*ListContainersRequest)(nil),       // 19: dshctl.v1.ListContainersRequest
+	(*ListContainersResponse)(nil),      // 20: dshctl.v1.ListContainersResponse
+	(*Container)(nil),                   // 21: dshctl.v1.Container
+	(*StartContainerRequest)(nil),       // 22: dshctl.v1.StartContainerRequest
+	(*RecreateContainerRequest)(nil),    // 23: dshctl.v1.RecreateContainerRequest
+	(*ReplaceContainerRequest)(nil),     // 24: dshctl.v1.ReplaceContainerRequest
+	(*RemoveContainerRequest)(nil),      // 25: dshctl.v1.RemoveContainerRequest
+	(*RemoveContainerResponse)(nil),     // 26: dshctl.v1.RemoveContainerResponse
+	(*AddContainerMountRequest)(nil),    // 27: dshctl.v1.AddContainerMountRequest
+	(*RemoveContainerMountRequest)(nil), // 28: dshctl.v1.RemoveContainerMountRequest
+	(*ListVolumesRequest)(nil),          // 29: dshctl.v1.ListVolumesRequest
+	(*ListVolumesResponse)(nil),         // 30: dshctl.v1.ListVolumesResponse
+	(*Volume)(nil),                      // 31: dshctl.v1.Volume
+	(*CreateVolumeRequest)(nil),         // 32: dshctl.v1.CreateVolumeRequest
+	(*RemoveVolumeRequest)(nil),         // 33: dshctl.v1.RemoveVolumeRequest
+	(*RemoveVolumeResponse)(nil),        // 34: dshctl.v1.RemoveVolumeResponse
 }
 var file_dshctl_v1_control_proto_depIdxs = []int32{
 	4,  // 0: dshctl.v1.ListProjectsResponse.projects:type_name -> dshctl.v1.Project
@@ -2072,52 +2157,54 @@ var file_dshctl_v1_control_proto_depIdxs = []int32{
 	10, // 4: dshctl.v1.ListWorkspacesResponse.workspaces:type_name -> dshctl.v1.Workspace
 	5,  // 5: dshctl.v1.Workspace.mounts:type_name -> dshctl.v1.ProjectMount
 	13, // 6: dshctl.v1.ListImagesResponse.images:type_name -> dshctl.v1.Image
-	19, // 7: dshctl.v1.ListContainersResponse.containers:type_name -> dshctl.v1.Container
+	21, // 7: dshctl.v1.ListContainersResponse.containers:type_name -> dshctl.v1.Container
 	5,  // 8: dshctl.v1.Container.mounts:type_name -> dshctl.v1.ProjectMount
 	5,  // 9: dshctl.v1.StartContainerRequest.mounts:type_name -> dshctl.v1.ProjectMount
 	5,  // 10: dshctl.v1.ReplaceContainerRequest.mounts:type_name -> dshctl.v1.ProjectMount
 	0,  // 11: dshctl.v1.AddContainerMountRequest.mode:type_name -> dshctl.v1.MountMode
 	1,  // 12: dshctl.v1.AddContainerMountRequest.kind:type_name -> dshctl.v1.MountKind
 	1,  // 13: dshctl.v1.RemoveContainerMountRequest.kind:type_name -> dshctl.v1.MountKind
-	29, // 14: dshctl.v1.ListVolumesResponse.volumes:type_name -> dshctl.v1.Volume
+	31, // 14: dshctl.v1.ListVolumesResponse.volumes:type_name -> dshctl.v1.Volume
 	2,  // 15: dshctl.v1.OrchestratorControl.ListProjects:input_type -> dshctl.v1.ListProjectsRequest
 	6,  // 16: dshctl.v1.OrchestratorControl.CreateWorkspace:input_type -> dshctl.v1.CreateWorkspaceRequest
 	7,  // 17: dshctl.v1.OrchestratorControl.DescribeWorkspace:input_type -> dshctl.v1.DescribeWorkspaceRequest
 	8,  // 18: dshctl.v1.OrchestratorControl.ListWorkspaces:input_type -> dshctl.v1.ListWorkspacesRequest
 	11, // 19: dshctl.v1.OrchestratorControl.ListImages:input_type -> dshctl.v1.ListImagesRequest
-	15, // 20: dshctl.v1.OrchestratorControl.GetImage:input_type -> dshctl.v1.GetImageRequest
-	16, // 21: dshctl.v1.OrchestratorControl.BuildImage:input_type -> dshctl.v1.BuildImageRequest
+	17, // 20: dshctl.v1.OrchestratorControl.GetImage:input_type -> dshctl.v1.GetImageRequest
+	18, // 21: dshctl.v1.OrchestratorControl.BuildImage:input_type -> dshctl.v1.BuildImageRequest
 	14, // 22: dshctl.v1.OrchestratorControl.RebuildImage:input_type -> dshctl.v1.RebuildImageRequest
-	17, // 23: dshctl.v1.OrchestratorControl.ListContainers:input_type -> dshctl.v1.ListContainersRequest
-	20, // 24: dshctl.v1.OrchestratorControl.StartContainer:input_type -> dshctl.v1.StartContainerRequest
-	21, // 25: dshctl.v1.OrchestratorControl.RecreateContainer:input_type -> dshctl.v1.RecreateContainerRequest
-	22, // 26: dshctl.v1.OrchestratorControl.ReplaceContainer:input_type -> dshctl.v1.ReplaceContainerRequest
-	23, // 27: dshctl.v1.OrchestratorControl.RemoveContainer:input_type -> dshctl.v1.RemoveContainerRequest
-	25, // 28: dshctl.v1.OrchestratorControl.AddContainerMount:input_type -> dshctl.v1.AddContainerMountRequest
-	26, // 29: dshctl.v1.OrchestratorControl.RemoveContainerMount:input_type -> dshctl.v1.RemoveContainerMountRequest
-	27, // 30: dshctl.v1.OrchestratorControl.ListVolumes:input_type -> dshctl.v1.ListVolumesRequest
-	30, // 31: dshctl.v1.OrchestratorControl.CreateVolume:input_type -> dshctl.v1.CreateVolumeRequest
-	31, // 32: dshctl.v1.OrchestratorControl.RemoveVolume:input_type -> dshctl.v1.RemoveVolumeRequest
-	3,  // 33: dshctl.v1.OrchestratorControl.ListProjects:output_type -> dshctl.v1.ListProjectsResponse
-	10, // 34: dshctl.v1.OrchestratorControl.CreateWorkspace:output_type -> dshctl.v1.Workspace
-	10, // 35: dshctl.v1.OrchestratorControl.DescribeWorkspace:output_type -> dshctl.v1.Workspace
-	9,  // 36: dshctl.v1.OrchestratorControl.ListWorkspaces:output_type -> dshctl.v1.ListWorkspacesResponse
-	12, // 37: dshctl.v1.OrchestratorControl.ListImages:output_type -> dshctl.v1.ListImagesResponse
-	13, // 38: dshctl.v1.OrchestratorControl.GetImage:output_type -> dshctl.v1.Image
-	13, // 39: dshctl.v1.OrchestratorControl.BuildImage:output_type -> dshctl.v1.Image
-	13, // 40: dshctl.v1.OrchestratorControl.RebuildImage:output_type -> dshctl.v1.Image
-	18, // 41: dshctl.v1.OrchestratorControl.ListContainers:output_type -> dshctl.v1.ListContainersResponse
-	19, // 42: dshctl.v1.OrchestratorControl.StartContainer:output_type -> dshctl.v1.Container
-	10, // 43: dshctl.v1.OrchestratorControl.RecreateContainer:output_type -> dshctl.v1.Workspace
-	19, // 44: dshctl.v1.OrchestratorControl.ReplaceContainer:output_type -> dshctl.v1.Container
-	24, // 45: dshctl.v1.OrchestratorControl.RemoveContainer:output_type -> dshctl.v1.RemoveContainerResponse
-	19, // 46: dshctl.v1.OrchestratorControl.AddContainerMount:output_type -> dshctl.v1.Container
-	19, // 47: dshctl.v1.OrchestratorControl.RemoveContainerMount:output_type -> dshctl.v1.Container
-	28, // 48: dshctl.v1.OrchestratorControl.ListVolumes:output_type -> dshctl.v1.ListVolumesResponse
-	29, // 49: dshctl.v1.OrchestratorControl.CreateVolume:output_type -> dshctl.v1.Volume
-	32, // 50: dshctl.v1.OrchestratorControl.RemoveVolume:output_type -> dshctl.v1.RemoveVolumeResponse
-	33, // [33:51] is the sub-list for method output_type
-	15, // [15:33] is the sub-list for method input_type
+	15, // 23: dshctl.v1.OrchestratorControl.RemoveImage:input_type -> dshctl.v1.RemoveImageRequest
+	19, // 24: dshctl.v1.OrchestratorControl.ListContainers:input_type -> dshctl.v1.ListContainersRequest
+	22, // 25: dshctl.v1.OrchestratorControl.StartContainer:input_type -> dshctl.v1.StartContainerRequest
+	23, // 26: dshctl.v1.OrchestratorControl.RecreateContainer:input_type -> dshctl.v1.RecreateContainerRequest
+	24, // 27: dshctl.v1.OrchestratorControl.ReplaceContainer:input_type -> dshctl.v1.ReplaceContainerRequest
+	25, // 28: dshctl.v1.OrchestratorControl.RemoveContainer:input_type -> dshctl.v1.RemoveContainerRequest
+	27, // 29: dshctl.v1.OrchestratorControl.AddContainerMount:input_type -> dshctl.v1.AddContainerMountRequest
+	28, // 30: dshctl.v1.OrchestratorControl.RemoveContainerMount:input_type -> dshctl.v1.RemoveContainerMountRequest
+	29, // 31: dshctl.v1.OrchestratorControl.ListVolumes:input_type -> dshctl.v1.ListVolumesRequest
+	32, // 32: dshctl.v1.OrchestratorControl.CreateVolume:input_type -> dshctl.v1.CreateVolumeRequest
+	33, // 33: dshctl.v1.OrchestratorControl.RemoveVolume:input_type -> dshctl.v1.RemoveVolumeRequest
+	3,  // 34: dshctl.v1.OrchestratorControl.ListProjects:output_type -> dshctl.v1.ListProjectsResponse
+	10, // 35: dshctl.v1.OrchestratorControl.CreateWorkspace:output_type -> dshctl.v1.Workspace
+	10, // 36: dshctl.v1.OrchestratorControl.DescribeWorkspace:output_type -> dshctl.v1.Workspace
+	9,  // 37: dshctl.v1.OrchestratorControl.ListWorkspaces:output_type -> dshctl.v1.ListWorkspacesResponse
+	12, // 38: dshctl.v1.OrchestratorControl.ListImages:output_type -> dshctl.v1.ListImagesResponse
+	13, // 39: dshctl.v1.OrchestratorControl.GetImage:output_type -> dshctl.v1.Image
+	13, // 40: dshctl.v1.OrchestratorControl.BuildImage:output_type -> dshctl.v1.Image
+	13, // 41: dshctl.v1.OrchestratorControl.RebuildImage:output_type -> dshctl.v1.Image
+	16, // 42: dshctl.v1.OrchestratorControl.RemoveImage:output_type -> dshctl.v1.RemoveImageResponse
+	20, // 43: dshctl.v1.OrchestratorControl.ListContainers:output_type -> dshctl.v1.ListContainersResponse
+	21, // 44: dshctl.v1.OrchestratorControl.StartContainer:output_type -> dshctl.v1.Container
+	10, // 45: dshctl.v1.OrchestratorControl.RecreateContainer:output_type -> dshctl.v1.Workspace
+	21, // 46: dshctl.v1.OrchestratorControl.ReplaceContainer:output_type -> dshctl.v1.Container
+	26, // 47: dshctl.v1.OrchestratorControl.RemoveContainer:output_type -> dshctl.v1.RemoveContainerResponse
+	21, // 48: dshctl.v1.OrchestratorControl.AddContainerMount:output_type -> dshctl.v1.Container
+	21, // 49: dshctl.v1.OrchestratorControl.RemoveContainerMount:output_type -> dshctl.v1.Container
+	30, // 50: dshctl.v1.OrchestratorControl.ListVolumes:output_type -> dshctl.v1.ListVolumesResponse
+	31, // 51: dshctl.v1.OrchestratorControl.CreateVolume:output_type -> dshctl.v1.Volume
+	34, // 52: dshctl.v1.OrchestratorControl.RemoveVolume:output_type -> dshctl.v1.RemoveVolumeResponse
+	34, // [34:53] is the sub-list for method output_type
+	15, // [15:34] is the sub-list for method input_type
 	15, // [15:15] is the sub-list for extension type_name
 	15, // [15:15] is the sub-list for extension extendee
 	0,  // [0:15] is the sub-list for field type_name
@@ -2134,7 +2221,7 @@ func file_dshctl_v1_control_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_dshctl_v1_control_proto_rawDesc), len(file_dshctl_v1_control_proto_rawDesc)),
 			NumEnums:      2,
-			NumMessages:   31,
+			NumMessages:   33,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

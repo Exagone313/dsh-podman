@@ -15,6 +15,7 @@ import (
 	"github.com/containers/podman/v5/pkg/bindings/containers"
 	"github.com/containers/podman/v5/pkg/bindings/images"
 	"github.com/containers/podman/v5/pkg/bindings/pods"
+	"github.com/containers/podman/v5/pkg/bindings/volumes"
 	entities "github.com/containers/podman/v5/pkg/domain/entities/types"
 	"github.com/containers/podman/v5/pkg/specgen"
 	"github.com/opencontainers/runtime-spec/specs-go"
@@ -168,4 +169,39 @@ func (c *Client) RecreateWorkspace(pod, name, image, token string, mounts []spec
 		return err
 	}
 	return c.CreateWorkspace(pod, name, image, token, mounts)
+}
+
+func (c *Client) VolumeExists(name string) (bool, error) {
+	return volumes.Exists(c.ctx, name, nil)
+}
+
+func (c *Client) VolumeCreate(name string) error {
+	_, err := volumes.Create(c.ctx, entities.VolumeCreateOptions{Name: name}, nil)
+	if err != nil {
+		c.log().Error("volume creation failed", "volume_name", name, "error", err)
+		return fmt.Errorf("create volume: %w", err)
+	}
+	c.log().Info("volume created", "volume_name", name)
+	return nil
+}
+
+func (c *Client) VolumeList() ([]string, error) {
+	reports, err := volumes.List(c.ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	names := make([]string, 0, len(reports))
+	for _, report := range reports {
+		names = append(names, report.Name)
+	}
+	return names, nil
+}
+
+func (c *Client) VolumeRemove(name string) error {
+	if err := volumes.Remove(c.ctx, name, &volumes.RemoveOptions{Force: boolPtr(true)}); err != nil {
+		c.log().Error("volume removal failed", "volume_name", name, "error", err)
+		return fmt.Errorf("remove volume: %w", err)
+	}
+	c.log().Info("volume removed", "volume_name", name)
+	return nil
 }

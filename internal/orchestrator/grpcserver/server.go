@@ -51,6 +51,11 @@ var containerPodmanName = regexp.MustCompile(`^dsh-workspace-[a-zA-Z0-9][a-zA-Z0
 // containers; see containerPodmanName.
 var containerNamePattern = containerPodmanName
 
+// volumeName restricts short named-volume names to the shape podman accepts
+// when the orchestrator prefixes them; the full podman name is never exposed
+// to clients.
+var volumeName = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,63}$`)
+
 func validWorkspaceSlug(slug string) bool {
 	return slug != "." && slug != ".." && workspaceSlugName.MatchString(slug)
 }
@@ -124,6 +129,7 @@ type Server struct {
 	Podman            *podman.Client
 	ImageBuilder      *imagebuild.Builder
 	BuildDefaultImage bool
+	VolumePrefix      string
 	Logger            *slog.Logger
 }
 
@@ -261,7 +267,7 @@ func containerProto(ws state.Workspace, c state.Container) *ctl.Container {
 		if mount.Mode == "read_write" {
 			mode = ctl.MountMode_MOUNT_MODE_READ_WRITE
 		}
-		row.Mounts = append(row.Mounts, &ctl.ProjectMount{ProjectName: mount.ProjectName, Path: mount.Path, Destination: mount.Destination, Mode: mode})
+		row.Mounts = append(row.Mounts, &ctl.ProjectMount{ProjectName: mount.ProjectName, Path: mount.Path, Destination: mount.Destination, Mode: mode, Kind: mountKindToProto(mount.Kind), Volume: mount.Volume})
 	}
 	return row
 }
@@ -502,10 +508,11 @@ func (s *Server) ReplaceContainer(ctx context.Context, request *ctl.ReplaceConta
 	return containerProto(updated, *record), nil
 }
 
-// AddContainerMount adds a project mount to a container's mount list and
-// recreates the podman container so the change takes effect.
+// AddContainerMount adds a project, tmpfs, or named-volume mount to a
+// container's mount list and recreates the podman container so the change
+// takes effect.
 func (s *Server) AddContainerMount(ctx context.Context, request *ctl.AddContainerMountRequest) (*ctl.Container, error) {
-	s.log().Info("control request", "method", "AddContainerMount", "workspace_slug", request.GetWorkspaceSlug(), "container", request.GetContainer(), "project", request.GetProject(), "path", request.GetPath())
+	s.log().Info("control request", "method", "AddContainerMount", "workspace_slug", request.GetWorkspaceSlug(), "container", request.GetContainer(), "project", request.GetProject(), "path", request.GetPath(), "kind", request.GetKind(), "volume", request.GetVolume())
 	workspace, err := workspaceBySlug(s.Store, request.GetWorkspaceSlug())
 	if err != nil {
 		return nil, status.Error(codes.NotFound, "workspace not found")
@@ -515,18 +522,42 @@ func (s *Server) AddContainerMount(ctx context.Context, request *ctl.AddContaine
 		s.log().Warn("control request failed", "method", "AddContainerMount", "workspace_slug", request.GetWorkspaceSlug(), "container", request.GetContainer(), "reason", "container not found")
 		return nil, status.Error(codes.NotFound, "container not found")
 	}
+	kind, err := mountKindFromProto(request.GetKind())
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, "invalid mount kind")
+	}
 	mode, err := mountModeFromProto(request.GetMode())
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid mount mode")
 	}
-	newMount := state.Mount{ProjectName: request.GetProject(), Path: request.GetPath(), Destination: request.GetDestination(), Mode: mode}
-	if _, _, err := resolveMount(s.ProjectsRoot, s.HostProjectsRoot, newMount); err != nil {
-		s.log().Error("AddContainerMount project validation failed", "workspace_slug", workspace.WorkspaceSlug, "error", err)
-		return nil, status.Error(codes.InvalidArgument, err.Error())
+	var newMount state.Mount
+	switch kind {
+	case "":
+		newMount = state.Mount{ProjectName: request.GetProject(), Path: request.GetPath(), Destination: request.GetDestination(), Mode: mode}
+		if _, _, err := resolveMount(s.ProjectsRoot, s.HostProjectsRoot, newMount); err != nil {
+			s.log().Error("AddContainerMount project validation failed", "workspace_slug", workspace.WorkspaceSlug, "error", err)
+			return nil, status.Error(codes.InvalidArgument, err.Error())
+		}
+	case "tmpfs":
+		if mode != "read_write" {
+			return nil, status.Error(codes.InvalidArgument, "tmpfs mounts must be read-write")
+		}
+		newMount = state.Mount{Kind: "tmpfs", Destination: request.GetDestination(), Mode: mode}
+	case "volume":
+		newMount = state.Mount{Kind: "volume", Volume: request.GetVolume(), Destination: request.GetDestination(), Mode: mode}
 	}
 	effective := containerMounts(workspace, *record)
 	for _, existing := range effective {
-		if existing.ProjectName == newMount.ProjectName && existing.Path == newMount.Path {
+		duplicate := false
+		switch kind {
+		case "":
+			duplicate = existing.ProjectName == newMount.ProjectName && existing.Path == newMount.Path
+		case "tmpfs":
+			duplicate = existing.Kind == "tmpfs" && existing.Destination == newMount.Destination
+		case "volume":
+			duplicate = existing.Kind == "volume" && existing.Volume == newMount.Volume
+		}
+		if duplicate {
 			return nil, status.Error(codes.AlreadyExists, "mount already exists")
 		}
 	}
@@ -560,10 +591,11 @@ func (s *Server) AddContainerMount(ctx context.Context, request *ctl.AddContaine
 	return containerProto(updated, *record), nil
 }
 
-// RemoveContainerMount removes a project mount from a container's mount list
-// and recreates the podman container so the change takes effect.
+// RemoveContainerMount removes a project, tmpfs, or named-volume mount from a
+// container's mount list and recreates the podman container so the change
+// takes effect.
 func (s *Server) RemoveContainerMount(ctx context.Context, request *ctl.RemoveContainerMountRequest) (*ctl.Container, error) {
-	s.log().Info("control request", "method", "RemoveContainerMount", "workspace_slug", request.GetWorkspaceSlug(), "container", request.GetContainer(), "project", request.GetProject(), "path", request.GetPath())
+	s.log().Info("control request", "method", "RemoveContainerMount", "workspace_slug", request.GetWorkspaceSlug(), "container", request.GetContainer(), "project", request.GetProject(), "path", request.GetPath(), "kind", request.GetKind(), "volume", request.GetVolume())
 	workspace, err := workspaceBySlug(s.Store, request.GetWorkspaceSlug())
 	if err != nil {
 		return nil, status.Error(codes.NotFound, "workspace not found")
@@ -573,10 +605,23 @@ func (s *Server) RemoveContainerMount(ctx context.Context, request *ctl.RemoveCo
 		s.log().Warn("control request failed", "method", "RemoveContainerMount", "workspace_slug", request.GetWorkspaceSlug(), "container", request.GetContainer(), "reason", "container not found")
 		return nil, status.Error(codes.NotFound, "container not found")
 	}
+	kind, err := mountKindFromProto(request.GetKind())
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, "invalid mount kind")
+	}
 	effective := containerMounts(workspace, *record)
 	index := -1
 	for i, existing := range effective {
-		if existing.ProjectName == request.GetProject() && existing.Path == request.GetPath() {
+		matched := false
+		switch kind {
+		case "":
+			matched = existing.Kind == "" && existing.ProjectName == request.GetProject() && existing.Path == request.GetPath()
+		case "tmpfs":
+			matched = existing.Kind == "tmpfs" && existing.Destination == request.GetDestination()
+		case "volume":
+			matched = existing.Kind == "volume" && existing.Volume == request.GetVolume()
+		}
+		if matched {
 			index = i
 			break
 		}
@@ -970,7 +1015,39 @@ func mountFromProto(mount *ctl.ProjectMount) state.Mount {
 	if mount.GetMode() == ctl.MountMode_MOUNT_MODE_READ_WRITE {
 		mode = "read_write"
 	}
-	return state.Mount{ProjectName: mount.GetProjectName(), Path: mount.GetPath(), Destination: mount.GetDestination(), Mode: mode}
+	kind, err := mountKindFromProto(mount.GetKind())
+	if err != nil {
+		kind = ""
+	}
+	return state.Mount{ProjectName: mount.GetProjectName(), Path: mount.GetPath(), Destination: mount.GetDestination(), Mode: mode, Kind: kind, Volume: mount.GetVolume()}
+}
+
+// mountKindFromProto maps a control plane mount kind onto the state's string
+// representation ("", "tmpfs", or "volume"), rejecting unknown kinds.
+func mountKindFromProto(kind ctl.MountKind) (string, error) {
+	switch kind {
+	case ctl.MountKind_MOUNT_KIND_UNSPECIFIED, ctl.MountKind_MOUNT_KIND_PROJECT:
+		return "", nil
+	case ctl.MountKind_MOUNT_KIND_TMPFS:
+		return "tmpfs", nil
+	case ctl.MountKind_MOUNT_KIND_VOLUME:
+		return "volume", nil
+	default:
+		return "", fmt.Errorf("invalid mount kind")
+	}
+}
+
+// mountKindToProto projects a state mount kind onto the control plane enum;
+// the empty kind (legacy project mounts) maps to MOUNT_KIND_PROJECT.
+func mountKindToProto(kind string) ctl.MountKind {
+	switch kind {
+	case "tmpfs":
+		return ctl.MountKind_MOUNT_KIND_TMPFS
+	case "volume":
+		return ctl.MountKind_MOUNT_KIND_VOLUME
+	default:
+		return ctl.MountKind_MOUNT_KIND_PROJECT
+	}
 }
 
 // mountModeFromProto maps a control plane mount mode onto the state's
@@ -1012,6 +1089,26 @@ func validMountDestination(projectsRoot, dest string) bool {
 	return cleaned == root || strings.HasPrefix(cleaned, root+string(filepath.Separator))
 }
 
+// nonProjectDestination validates a tmpfs or named-volume mount destination:
+// it must be absolute, already cleaned (filepath.Clean equality precludes ".."
+// segments, redundant separators, and trailing slashes), and must not be the
+// projects root nor anything under it, which would collide with project
+// mounts.
+func nonProjectDestination(projectsRoot, dest string) error {
+	if !filepath.IsAbs(dest) {
+		return fmt.Errorf("invalid mount destination")
+	}
+	cleaned := filepath.Clean(dest)
+	if cleaned != dest {
+		return fmt.Errorf("invalid mount destination")
+	}
+	root := filepath.Clean(projectsRoot)
+	if cleaned == root || strings.HasPrefix(cleaned, root+string(filepath.Separator)) {
+		return fmt.Errorf("mount destination must not be under projects root")
+	}
+	return nil
+}
+
 // resolveMount resolves a single stored mount to its host source path and its
 // container destination path, validating the project, the subpath, and (when
 // set) the destination. The empty destination defaults to a mirror of the host
@@ -1045,21 +1142,44 @@ func resolveMount(projectsRoot, hostProjectsRoot string, mount state.Mount) (hos
 	return hostPath, destination, nil
 }
 
-// podmanMounts builds the bind mounts handed to podman from the stored mounts,
-// resolving host paths through HostProjectsRoot and container destinations
-// under ProjectsRoot.
+// podmanMounts builds the mounts handed to podman from the stored mounts.
+// Project mounts resolve their host paths through HostProjectsRoot and
+// container destinations under ProjectsRoot; tmpfs and named-volume mounts
+// target arbitrary absolute container paths (never under ProjectsRoot).
 func (s *Server) podmanMounts(mounts []state.Mount) ([]specs.Mount, error) {
 	podmanMounts := make([]specs.Mount, 0, len(mounts))
 	for _, mount := range mounts {
-		hostPath, destination, err := resolveMount(s.ProjectsRoot, s.HostProjectsRoot, mount)
-		if err != nil {
-			return nil, status.Error(codes.InvalidArgument, err.Error())
+		switch mount.Kind {
+		case "", "project":
+			hostPath, destination, err := resolveMount(s.ProjectsRoot, s.HostProjectsRoot, mount)
+			if err != nil {
+				return nil, status.Error(codes.InvalidArgument, err.Error())
+			}
+			options := []string{"ro"}
+			if mount.Mode == "read_write" {
+				options = []string{"rw"}
+			}
+			podmanMounts = append(podmanMounts, specs.Mount{Type: "bind", Source: hostPath, Destination: destination, Options: options})
+		case "tmpfs":
+			if err := nonProjectDestination(s.ProjectsRoot, mount.Destination); err != nil {
+				return nil, status.Error(codes.InvalidArgument, err.Error())
+			}
+			podmanMounts = append(podmanMounts, specs.Mount{Type: "tmpfs", Destination: mount.Destination, Options: []string{"rw"}})
+		case "volume":
+			if !volumeName.MatchString(mount.Volume) {
+				return nil, status.Error(codes.InvalidArgument, "invalid volume name")
+			}
+			if err := nonProjectDestination(s.ProjectsRoot, mount.Destination); err != nil {
+				return nil, status.Error(codes.InvalidArgument, err.Error())
+			}
+			options := []string{"ro"}
+			if mount.Mode == "read_write" {
+				options = []string{"rw"}
+			}
+			podmanMounts = append(podmanMounts, specs.Mount{Type: "volume", Source: s.VolumePrefix + mount.Volume, Destination: mount.Destination, Options: options})
+		default:
+			return nil, status.Error(codes.InvalidArgument, "invalid mount kind")
 		}
-		options := []string{"ro"}
-		if mount.Mode == "read_write" {
-			options = []string{"rw"}
-		}
-		podmanMounts = append(podmanMounts, specs.Mount{Type: "bind", Source: hostPath, Destination: destination, Options: options})
 	}
 	return podmanMounts, nil
 }
@@ -1135,6 +1255,81 @@ func (s *Server) RemoveContainer(_ context.Context, request *ctl.RemoveContainer
 	s.log().Info("control request completed", "method", "RemoveContainer", "workspace_slug", request.GetWorkspaceSlug(), "container", request.GetContainer())
 	return &ctl.RemoveContainerResponse{}, nil
 }
+
+// ListVolumes lists the orchestrator-managed named volumes, exposing only
+// their unprefixed short names.
+func (s *Server) ListVolumes(_ context.Context, _ *ctl.ListVolumesRequest) (*ctl.ListVolumesResponse, error) {
+	s.log().Info("control request", "method", "ListVolumes")
+	if s.Podman == nil {
+		return nil, status.Error(codes.FailedPrecondition, "podman is not configured")
+	}
+	names, err := s.Podman.VolumeList()
+	if err != nil {
+		s.log().Error("control request failed", "method", "ListVolumes", "error", err)
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	result := &ctl.ListVolumesResponse{}
+	for _, name := range names {
+		if !strings.HasPrefix(name, s.VolumePrefix) {
+			continue
+		}
+		result.Volumes = append(result.Volumes, &ctl.Volume{Name: name[len(s.VolumePrefix):]})
+	}
+	s.log().Info("control request completed", "method", "ListVolumes", "count", len(result.Volumes))
+	return result, nil
+}
+
+// CreateVolume creates a named volume under the orchestrator's prefix.
+func (s *Server) CreateVolume(_ context.Context, request *ctl.CreateVolumeRequest) (*ctl.Volume, error) {
+	s.log().Info("control request", "method", "CreateVolume", "name", request.GetName())
+	if !volumeName.MatchString(request.GetName()) {
+		return nil, status.Error(codes.InvalidArgument, "invalid volume name")
+	}
+	if s.Podman == nil {
+		return nil, status.Error(codes.FailedPrecondition, "podman is not configured")
+	}
+	full := s.VolumePrefix + request.GetName()
+	exists, err := s.Podman.VolumeExists(full)
+	if err != nil {
+		s.log().Error("control request failed", "method", "CreateVolume", "name", request.GetName(), "error", err)
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	if exists {
+		return nil, status.Error(codes.AlreadyExists, "volume already exists")
+	}
+	if err := s.Podman.VolumeCreate(full); err != nil {
+		s.log().Error("control request failed", "method", "CreateVolume", "name", request.GetName(), "error", err)
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	s.log().Info("control request completed", "method", "CreateVolume", "name", request.GetName())
+	return &ctl.Volume{Name: request.GetName()}, nil
+}
+
+// RemoveVolume deletes a named volume under the orchestrator's prefix.
+func (s *Server) RemoveVolume(_ context.Context, request *ctl.RemoveVolumeRequest) (*ctl.RemoveVolumeResponse, error) {
+	s.log().Info("control request", "method", "RemoveVolume", "name", request.GetName())
+	if !volumeName.MatchString(request.GetName()) {
+		return nil, status.Error(codes.InvalidArgument, "invalid volume name")
+	}
+	if s.Podman == nil {
+		return nil, status.Error(codes.FailedPrecondition, "podman is not configured")
+	}
+	full := s.VolumePrefix + request.GetName()
+	exists, err := s.Podman.VolumeExists(full)
+	if err != nil {
+		s.log().Error("control request failed", "method", "RemoveVolume", "name", request.GetName(), "error", err)
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	if !exists {
+		return nil, status.Error(codes.NotFound, "volume not found")
+	}
+	if err := s.Podman.VolumeRemove(full); err != nil {
+		s.log().Error("control request failed", "method", "RemoveVolume", "name", request.GetName(), "error", err)
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	s.log().Info("control request completed", "method", "RemoveVolume", "name", request.GetName())
+	return &ctl.RemoveVolumeResponse{}, nil
+}
 func toProto(workspace state.Workspace) *ctl.Workspace {
 	result := &ctl.Workspace{WorkspaceSlug: workspace.WorkspaceSlug, ContainerName: workspace.ContainerName, ImageId: workspace.ImageID, Status: workspace.Status, AgentSocketPath: workspace.AgentSocketPath, AgentToken: workspace.AgentToken, CreatedAt: workspace.CreatedAt}
 	for _, mount := range workspace.Mounts {
@@ -1142,7 +1337,7 @@ func toProto(workspace state.Workspace) *ctl.Workspace {
 		if mount.Mode == "read_write" {
 			mode = ctl.MountMode_MOUNT_MODE_READ_WRITE
 		}
-		result.Mounts = append(result.Mounts, &ctl.ProjectMount{ProjectName: mount.ProjectName, Path: mount.Path, Destination: mount.Destination, Mode: mode})
+		result.Mounts = append(result.Mounts, &ctl.ProjectMount{ProjectName: mount.ProjectName, Path: mount.Path, Destination: mount.Destination, Mode: mode, Kind: mountKindToProto(mount.Kind), Volume: mount.Volume})
 	}
 	return result
 }

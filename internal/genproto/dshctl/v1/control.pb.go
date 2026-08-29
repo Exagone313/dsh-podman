@@ -74,6 +74,58 @@ func (MountMode) EnumDescriptor() ([]byte, []int) {
 	return file_dshctl_v1_control_proto_rawDescGZIP(), []int{0}
 }
 
+type MountKind int32
+
+const (
+	MountKind_MOUNT_KIND_UNSPECIFIED MountKind = 0
+	MountKind_MOUNT_KIND_PROJECT     MountKind = 1
+	MountKind_MOUNT_KIND_TMPFS       MountKind = 2
+	MountKind_MOUNT_KIND_VOLUME      MountKind = 3
+)
+
+// Enum value maps for MountKind.
+var (
+	MountKind_name = map[int32]string{
+		0: "MOUNT_KIND_UNSPECIFIED",
+		1: "MOUNT_KIND_PROJECT",
+		2: "MOUNT_KIND_TMPFS",
+		3: "MOUNT_KIND_VOLUME",
+	}
+	MountKind_value = map[string]int32{
+		"MOUNT_KIND_UNSPECIFIED": 0,
+		"MOUNT_KIND_PROJECT":     1,
+		"MOUNT_KIND_TMPFS":       2,
+		"MOUNT_KIND_VOLUME":      3,
+	}
+)
+
+func (x MountKind) Enum() *MountKind {
+	p := new(MountKind)
+	*p = x
+	return p
+}
+
+func (x MountKind) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (MountKind) Descriptor() protoreflect.EnumDescriptor {
+	return file_dshctl_v1_control_proto_enumTypes[1].Descriptor()
+}
+
+func (MountKind) Type() protoreflect.EnumType {
+	return &file_dshctl_v1_control_proto_enumTypes[1]
+}
+
+func (x MountKind) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use MountKind.Descriptor instead.
+func (MountKind) EnumDescriptor() ([]byte, []int) {
+	return file_dshctl_v1_control_proto_rawDescGZIP(), []int{1}
+}
+
 type ListProjectsRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	unknownFields protoimpl.UnknownFields
@@ -212,6 +264,8 @@ type ProjectMount struct {
 	Mode          MountMode              `protobuf:"varint,2,opt,name=mode,proto3,enum=dshctl.v1.MountMode" json:"mode,omitempty"`
 	Path          string                 `protobuf:"bytes,3,opt,name=path,proto3" json:"path,omitempty"`
 	Destination   string                 `protobuf:"bytes,4,opt,name=destination,proto3" json:"destination,omitempty"`
+	Kind          MountKind              `protobuf:"varint,5,opt,name=kind,proto3,enum=dshctl.v1.MountKind" json:"kind,omitempty"`
+	Volume        string                 `protobuf:"bytes,6,opt,name=volume,proto3" json:"volume,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -270,6 +324,20 @@ func (x *ProjectMount) GetPath() string {
 func (x *ProjectMount) GetDestination() string {
 	if x != nil {
 		return x.Destination
+	}
+	return ""
+}
+
+func (x *ProjectMount) GetKind() MountKind {
+	if x != nil {
+		return x.Kind
+	}
+	return MountKind_MOUNT_KIND_UNSPECIFIED
+}
+
+func (x *ProjectMount) GetVolume() string {
+	if x != nil {
+		return x.Volume
 	}
 	return ""
 }
@@ -1358,6 +1426,8 @@ type AddContainerMountRequest struct {
 	Path          string                 `protobuf:"bytes,4,opt,name=path,proto3" json:"path,omitempty"`
 	Destination   string                 `protobuf:"bytes,5,opt,name=destination,proto3" json:"destination,omitempty"`
 	Mode          MountMode              `protobuf:"varint,6,opt,name=mode,proto3,enum=dshctl.v1.MountMode" json:"mode,omitempty"`
+	Kind          MountKind              `protobuf:"varint,7,opt,name=kind,proto3,enum=dshctl.v1.MountKind" json:"kind,omitempty"`
+	Volume        string                 `protobuf:"bytes,8,opt,name=volume,proto3" json:"volume,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1434,12 +1504,29 @@ func (x *AddContainerMountRequest) GetMode() MountMode {
 	return MountMode_MOUNT_MODE_UNSPECIFIED
 }
 
+func (x *AddContainerMountRequest) GetKind() MountKind {
+	if x != nil {
+		return x.Kind
+	}
+	return MountKind_MOUNT_KIND_UNSPECIFIED
+}
+
+func (x *AddContainerMountRequest) GetVolume() string {
+	if x != nil {
+		return x.Volume
+	}
+	return ""
+}
+
 type RemoveContainerMountRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	WorkspaceSlug string                 `protobuf:"bytes,1,opt,name=workspace_slug,json=workspaceSlug,proto3" json:"workspace_slug,omitempty"`
 	Container     string                 `protobuf:"bytes,2,opt,name=container,proto3" json:"container,omitempty"`
 	Project       string                 `protobuf:"bytes,3,opt,name=project,proto3" json:"project,omitempty"`
 	Path          string                 `protobuf:"bytes,4,opt,name=path,proto3" json:"path,omitempty"`
+	Kind          MountKind              `protobuf:"varint,5,opt,name=kind,proto3,enum=dshctl.v1.MountKind" json:"kind,omitempty"`
+	Volume        string                 `protobuf:"bytes,6,opt,name=volume,proto3" json:"volume,omitempty"`
+	Destination   string                 `protobuf:"bytes,7,opt,name=destination,proto3" json:"destination,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1502,6 +1589,275 @@ func (x *RemoveContainerMountRequest) GetPath() string {
 	return ""
 }
 
+func (x *RemoveContainerMountRequest) GetKind() MountKind {
+	if x != nil {
+		return x.Kind
+	}
+	return MountKind_MOUNT_KIND_UNSPECIFIED
+}
+
+func (x *RemoveContainerMountRequest) GetVolume() string {
+	if x != nil {
+		return x.Volume
+	}
+	return ""
+}
+
+func (x *RemoveContainerMountRequest) GetDestination() string {
+	if x != nil {
+		return x.Destination
+	}
+	return ""
+}
+
+type ListVolumesRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListVolumesRequest) Reset() {
+	*x = ListVolumesRequest{}
+	mi := &file_dshctl_v1_control_proto_msgTypes[25]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListVolumesRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListVolumesRequest) ProtoMessage() {}
+
+func (x *ListVolumesRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_dshctl_v1_control_proto_msgTypes[25]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListVolumesRequest.ProtoReflect.Descriptor instead.
+func (*ListVolumesRequest) Descriptor() ([]byte, []int) {
+	return file_dshctl_v1_control_proto_rawDescGZIP(), []int{25}
+}
+
+type ListVolumesResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Volumes       []*Volume              `protobuf:"bytes,1,rep,name=volumes,proto3" json:"volumes,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListVolumesResponse) Reset() {
+	*x = ListVolumesResponse{}
+	mi := &file_dshctl_v1_control_proto_msgTypes[26]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListVolumesResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListVolumesResponse) ProtoMessage() {}
+
+func (x *ListVolumesResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_dshctl_v1_control_proto_msgTypes[26]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListVolumesResponse.ProtoReflect.Descriptor instead.
+func (*ListVolumesResponse) Descriptor() ([]byte, []int) {
+	return file_dshctl_v1_control_proto_rawDescGZIP(), []int{26}
+}
+
+func (x *ListVolumesResponse) GetVolumes() []*Volume {
+	if x != nil {
+		return x.Volumes
+	}
+	return nil
+}
+
+type Volume struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Volume) Reset() {
+	*x = Volume{}
+	mi := &file_dshctl_v1_control_proto_msgTypes[27]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Volume) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Volume) ProtoMessage() {}
+
+func (x *Volume) ProtoReflect() protoreflect.Message {
+	mi := &file_dshctl_v1_control_proto_msgTypes[27]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Volume.ProtoReflect.Descriptor instead.
+func (*Volume) Descriptor() ([]byte, []int) {
+	return file_dshctl_v1_control_proto_rawDescGZIP(), []int{27}
+}
+
+func (x *Volume) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+type CreateVolumeRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CreateVolumeRequest) Reset() {
+	*x = CreateVolumeRequest{}
+	mi := &file_dshctl_v1_control_proto_msgTypes[28]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CreateVolumeRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CreateVolumeRequest) ProtoMessage() {}
+
+func (x *CreateVolumeRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_dshctl_v1_control_proto_msgTypes[28]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CreateVolumeRequest.ProtoReflect.Descriptor instead.
+func (*CreateVolumeRequest) Descriptor() ([]byte, []int) {
+	return file_dshctl_v1_control_proto_rawDescGZIP(), []int{28}
+}
+
+func (x *CreateVolumeRequest) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+type RemoveVolumeRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RemoveVolumeRequest) Reset() {
+	*x = RemoveVolumeRequest{}
+	mi := &file_dshctl_v1_control_proto_msgTypes[29]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RemoveVolumeRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RemoveVolumeRequest) ProtoMessage() {}
+
+func (x *RemoveVolumeRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_dshctl_v1_control_proto_msgTypes[29]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RemoveVolumeRequest.ProtoReflect.Descriptor instead.
+func (*RemoveVolumeRequest) Descriptor() ([]byte, []int) {
+	return file_dshctl_v1_control_proto_rawDescGZIP(), []int{29}
+}
+
+func (x *RemoveVolumeRequest) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+type RemoveVolumeResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RemoveVolumeResponse) Reset() {
+	*x = RemoveVolumeResponse{}
+	mi := &file_dshctl_v1_control_proto_msgTypes[30]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RemoveVolumeResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RemoveVolumeResponse) ProtoMessage() {}
+
+func (x *RemoveVolumeResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_dshctl_v1_control_proto_msgTypes[30]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RemoveVolumeResponse.ProtoReflect.Descriptor instead.
+func (*RemoveVolumeResponse) Descriptor() ([]byte, []int) {
+	return file_dshctl_v1_control_proto_rawDescGZIP(), []int{30}
+}
+
 var File_dshctl_v1_control_proto protoreflect.FileDescriptor
 
 const file_dshctl_v1_control_proto_rawDesc = "" +
@@ -1512,12 +1868,14 @@ const file_dshctl_v1_control_proto_rawDesc = "" +
 	"\bprojects\x18\x01 \x03(\v2\x12.dshctl.v1.ProjectR\bprojects\":\n" +
 	"\aProject\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x1b\n" +
-	"\thost_path\x18\x02 \x01(\tR\bhostPath\"\x91\x01\n" +
+	"\thost_path\x18\x02 \x01(\tR\bhostPath\"\xd3\x01\n" +
 	"\fProjectMount\x12!\n" +
 	"\fproject_name\x18\x01 \x01(\tR\vprojectName\x12(\n" +
 	"\x04mode\x18\x02 \x01(\x0e2\x14.dshctl.v1.MountModeR\x04mode\x12\x12\n" +
 	"\x04path\x18\x03 \x01(\tR\x04path\x12 \n" +
-	"\vdestination\x18\x04 \x01(\tR\vdestination\"\x8b\x01\n" +
+	"\vdestination\x18\x04 \x01(\tR\vdestination\x12(\n" +
+	"\x04kind\x18\x05 \x01(\x0e2\x14.dshctl.v1.MountKindR\x04kind\x12\x16\n" +
+	"\x06volume\x18\x06 \x01(\tR\x06volume\"\x8b\x01\n" +
 	"\x16CreateWorkspaceRequest\x12%\n" +
 	"\x0eworkspace_slug\x18\x01 \x01(\tR\rworkspaceSlug\x12\x19\n" +
 	"\bimage_id\x18\x02 \x01(\tR\aimageId\x12/\n" +
@@ -1597,23 +1955,44 @@ const file_dshctl_v1_control_proto_rawDesc = "" +
 	"\x16RemoveContainerRequest\x12%\n" +
 	"\x0eworkspace_slug\x18\x01 \x01(\tR\rworkspaceSlug\x12\x1c\n" +
 	"\tcontainer\x18\x02 \x01(\tR\tcontainer\"\x19\n" +
-	"\x17RemoveContainerResponse\"\xd9\x01\n" +
+	"\x17RemoveContainerResponse\"\x9b\x02\n" +
 	"\x18AddContainerMountRequest\x12%\n" +
 	"\x0eworkspace_slug\x18\x01 \x01(\tR\rworkspaceSlug\x12\x1c\n" +
 	"\tcontainer\x18\x02 \x01(\tR\tcontainer\x12\x18\n" +
 	"\aproject\x18\x03 \x01(\tR\aproject\x12\x12\n" +
 	"\x04path\x18\x04 \x01(\tR\x04path\x12 \n" +
 	"\vdestination\x18\x05 \x01(\tR\vdestination\x12(\n" +
-	"\x04mode\x18\x06 \x01(\x0e2\x14.dshctl.v1.MountModeR\x04mode\"\x90\x01\n" +
+	"\x04mode\x18\x06 \x01(\x0e2\x14.dshctl.v1.MountModeR\x04mode\x12(\n" +
+	"\x04kind\x18\a \x01(\x0e2\x14.dshctl.v1.MountKindR\x04kind\x12\x16\n" +
+	"\x06volume\x18\b \x01(\tR\x06volume\"\xf4\x01\n" +
 	"\x1bRemoveContainerMountRequest\x12%\n" +
 	"\x0eworkspace_slug\x18\x01 \x01(\tR\rworkspaceSlug\x12\x1c\n" +
 	"\tcontainer\x18\x02 \x01(\tR\tcontainer\x12\x18\n" +
 	"\aproject\x18\x03 \x01(\tR\aproject\x12\x12\n" +
-	"\x04path\x18\x04 \x01(\tR\x04path*\\\n" +
+	"\x04path\x18\x04 \x01(\tR\x04path\x12(\n" +
+	"\x04kind\x18\x05 \x01(\x0e2\x14.dshctl.v1.MountKindR\x04kind\x12\x16\n" +
+	"\x06volume\x18\x06 \x01(\tR\x06volume\x12 \n" +
+	"\vdestination\x18\a \x01(\tR\vdestination\"\x14\n" +
+	"\x12ListVolumesRequest\"B\n" +
+	"\x13ListVolumesResponse\x12+\n" +
+	"\avolumes\x18\x01 \x03(\v2\x11.dshctl.v1.VolumeR\avolumes\"\x1c\n" +
+	"\x06Volume\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\")\n" +
+	"\x13CreateVolumeRequest\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\")\n" +
+	"\x13RemoveVolumeRequest\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\"\x16\n" +
+	"\x14RemoveVolumeResponse*\\\n" +
 	"\tMountMode\x12\x1a\n" +
 	"\x16MOUNT_MODE_UNSPECIFIED\x10\x00\x12\x18\n" +
 	"\x14MOUNT_MODE_READ_ONLY\x10\x01\x12\x19\n" +
-	"\x15MOUNT_MODE_READ_WRITE\x10\x022\x9d\t\n" +
+	"\x15MOUNT_MODE_READ_WRITE\x10\x02*l\n" +
+	"\tMountKind\x12\x1a\n" +
+	"\x16MOUNT_KIND_UNSPECIFIED\x10\x00\x12\x16\n" +
+	"\x12MOUNT_KIND_PROJECT\x10\x01\x12\x14\n" +
+	"\x10MOUNT_KIND_TMPFS\x10\x02\x12\x15\n" +
+	"\x11MOUNT_KIND_VOLUME\x10\x032\xff\n" +
+	"\n" +
 	"\x13OrchestratorControl\x12O\n" +
 	"\fListProjects\x12\x1e.dshctl.v1.ListProjectsRequest\x1a\x1f.dshctl.v1.ListProjectsResponse\x12J\n" +
 	"\x0fCreateWorkspace\x12!.dshctl.v1.CreateWorkspaceRequest\x1a\x14.dshctl.v1.Workspace\x12N\n" +
@@ -1631,7 +2010,10 @@ const file_dshctl_v1_control_proto_rawDesc = "" +
 	"\x10ReplaceContainer\x12\".dshctl.v1.ReplaceContainerRequest\x1a\x14.dshctl.v1.Container\x12X\n" +
 	"\x0fRemoveContainer\x12!.dshctl.v1.RemoveContainerRequest\x1a\".dshctl.v1.RemoveContainerResponse\x12N\n" +
 	"\x11AddContainerMount\x12#.dshctl.v1.AddContainerMountRequest\x1a\x14.dshctl.v1.Container\x12T\n" +
-	"\x14RemoveContainerMount\x12&.dshctl.v1.RemoveContainerMountRequest\x1a\x14.dshctl.v1.ContainerBGZEgitlab.com/Exagone313/dsh-podman/internal/genproto/dshctl/v1;dshctlv1b\x06proto3"
+	"\x14RemoveContainerMount\x12&.dshctl.v1.RemoveContainerMountRequest\x1a\x14.dshctl.v1.Container\x12L\n" +
+	"\vListVolumes\x12\x1d.dshctl.v1.ListVolumesRequest\x1a\x1e.dshctl.v1.ListVolumesResponse\x12A\n" +
+	"\fCreateVolume\x12\x1e.dshctl.v1.CreateVolumeRequest\x1a\x11.dshctl.v1.Volume\x12O\n" +
+	"\fRemoveVolume\x12\x1e.dshctl.v1.RemoveVolumeRequest\x1a\x1f.dshctl.v1.RemoveVolumeResponseBGZEgitlab.com/Exagone313/dsh-podman/internal/genproto/dshctl/v1;dshctlv1b\x06proto3"
 
 var (
 	file_dshctl_v1_control_proto_rawDescOnce sync.Once
@@ -1645,83 +2027,100 @@ func file_dshctl_v1_control_proto_rawDescGZIP() []byte {
 	return file_dshctl_v1_control_proto_rawDescData
 }
 
-var file_dshctl_v1_control_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_dshctl_v1_control_proto_msgTypes = make([]protoimpl.MessageInfo, 25)
+var file_dshctl_v1_control_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
+var file_dshctl_v1_control_proto_msgTypes = make([]protoimpl.MessageInfo, 31)
 var file_dshctl_v1_control_proto_goTypes = []any{
 	(MountMode)(0),                      // 0: dshctl.v1.MountMode
-	(*ListProjectsRequest)(nil),         // 1: dshctl.v1.ListProjectsRequest
-	(*ListProjectsResponse)(nil),        // 2: dshctl.v1.ListProjectsResponse
-	(*Project)(nil),                     // 3: dshctl.v1.Project
-	(*ProjectMount)(nil),                // 4: dshctl.v1.ProjectMount
-	(*CreateWorkspaceRequest)(nil),      // 5: dshctl.v1.CreateWorkspaceRequest
-	(*DescribeWorkspaceRequest)(nil),    // 6: dshctl.v1.DescribeWorkspaceRequest
-	(*ListWorkspacesRequest)(nil),       // 7: dshctl.v1.ListWorkspacesRequest
-	(*ListWorkspacesResponse)(nil),      // 8: dshctl.v1.ListWorkspacesResponse
-	(*Workspace)(nil),                   // 9: dshctl.v1.Workspace
-	(*ListImagesRequest)(nil),           // 10: dshctl.v1.ListImagesRequest
-	(*ListImagesResponse)(nil),          // 11: dshctl.v1.ListImagesResponse
-	(*Image)(nil),                       // 12: dshctl.v1.Image
-	(*RebuildImageRequest)(nil),         // 13: dshctl.v1.RebuildImageRequest
-	(*GetImageRequest)(nil),             // 14: dshctl.v1.GetImageRequest
-	(*BuildImageRequest)(nil),           // 15: dshctl.v1.BuildImageRequest
-	(*ListContainersRequest)(nil),       // 16: dshctl.v1.ListContainersRequest
-	(*ListContainersResponse)(nil),      // 17: dshctl.v1.ListContainersResponse
-	(*Container)(nil),                   // 18: dshctl.v1.Container
-	(*StartContainerRequest)(nil),       // 19: dshctl.v1.StartContainerRequest
-	(*RecreateContainerRequest)(nil),    // 20: dshctl.v1.RecreateContainerRequest
-	(*ReplaceContainerRequest)(nil),     // 21: dshctl.v1.ReplaceContainerRequest
-	(*RemoveContainerRequest)(nil),      // 22: dshctl.v1.RemoveContainerRequest
-	(*RemoveContainerResponse)(nil),     // 23: dshctl.v1.RemoveContainerResponse
-	(*AddContainerMountRequest)(nil),    // 24: dshctl.v1.AddContainerMountRequest
-	(*RemoveContainerMountRequest)(nil), // 25: dshctl.v1.RemoveContainerMountRequest
+	(MountKind)(0),                      // 1: dshctl.v1.MountKind
+	(*ListProjectsRequest)(nil),         // 2: dshctl.v1.ListProjectsRequest
+	(*ListProjectsResponse)(nil),        // 3: dshctl.v1.ListProjectsResponse
+	(*Project)(nil),                     // 4: dshctl.v1.Project
+	(*ProjectMount)(nil),                // 5: dshctl.v1.ProjectMount
+	(*CreateWorkspaceRequest)(nil),      // 6: dshctl.v1.CreateWorkspaceRequest
+	(*DescribeWorkspaceRequest)(nil),    // 7: dshctl.v1.DescribeWorkspaceRequest
+	(*ListWorkspacesRequest)(nil),       // 8: dshctl.v1.ListWorkspacesRequest
+	(*ListWorkspacesResponse)(nil),      // 9: dshctl.v1.ListWorkspacesResponse
+	(*Workspace)(nil),                   // 10: dshctl.v1.Workspace
+	(*ListImagesRequest)(nil),           // 11: dshctl.v1.ListImagesRequest
+	(*ListImagesResponse)(nil),          // 12: dshctl.v1.ListImagesResponse
+	(*Image)(nil),                       // 13: dshctl.v1.Image
+	(*RebuildImageRequest)(nil),         // 14: dshctl.v1.RebuildImageRequest
+	(*GetImageRequest)(nil),             // 15: dshctl.v1.GetImageRequest
+	(*BuildImageRequest)(nil),           // 16: dshctl.v1.BuildImageRequest
+	(*ListContainersRequest)(nil),       // 17: dshctl.v1.ListContainersRequest
+	(*ListContainersResponse)(nil),      // 18: dshctl.v1.ListContainersResponse
+	(*Container)(nil),                   // 19: dshctl.v1.Container
+	(*StartContainerRequest)(nil),       // 20: dshctl.v1.StartContainerRequest
+	(*RecreateContainerRequest)(nil),    // 21: dshctl.v1.RecreateContainerRequest
+	(*ReplaceContainerRequest)(nil),     // 22: dshctl.v1.ReplaceContainerRequest
+	(*RemoveContainerRequest)(nil),      // 23: dshctl.v1.RemoveContainerRequest
+	(*RemoveContainerResponse)(nil),     // 24: dshctl.v1.RemoveContainerResponse
+	(*AddContainerMountRequest)(nil),    // 25: dshctl.v1.AddContainerMountRequest
+	(*RemoveContainerMountRequest)(nil), // 26: dshctl.v1.RemoveContainerMountRequest
+	(*ListVolumesRequest)(nil),          // 27: dshctl.v1.ListVolumesRequest
+	(*ListVolumesResponse)(nil),         // 28: dshctl.v1.ListVolumesResponse
+	(*Volume)(nil),                      // 29: dshctl.v1.Volume
+	(*CreateVolumeRequest)(nil),         // 30: dshctl.v1.CreateVolumeRequest
+	(*RemoveVolumeRequest)(nil),         // 31: dshctl.v1.RemoveVolumeRequest
+	(*RemoveVolumeResponse)(nil),        // 32: dshctl.v1.RemoveVolumeResponse
 }
 var file_dshctl_v1_control_proto_depIdxs = []int32{
-	3,  // 0: dshctl.v1.ListProjectsResponse.projects:type_name -> dshctl.v1.Project
+	4,  // 0: dshctl.v1.ListProjectsResponse.projects:type_name -> dshctl.v1.Project
 	0,  // 1: dshctl.v1.ProjectMount.mode:type_name -> dshctl.v1.MountMode
-	4,  // 2: dshctl.v1.CreateWorkspaceRequest.mounts:type_name -> dshctl.v1.ProjectMount
-	9,  // 3: dshctl.v1.ListWorkspacesResponse.workspaces:type_name -> dshctl.v1.Workspace
-	4,  // 4: dshctl.v1.Workspace.mounts:type_name -> dshctl.v1.ProjectMount
-	12, // 5: dshctl.v1.ListImagesResponse.images:type_name -> dshctl.v1.Image
-	18, // 6: dshctl.v1.ListContainersResponse.containers:type_name -> dshctl.v1.Container
-	4,  // 7: dshctl.v1.Container.mounts:type_name -> dshctl.v1.ProjectMount
-	4,  // 8: dshctl.v1.StartContainerRequest.mounts:type_name -> dshctl.v1.ProjectMount
-	4,  // 9: dshctl.v1.ReplaceContainerRequest.mounts:type_name -> dshctl.v1.ProjectMount
-	0,  // 10: dshctl.v1.AddContainerMountRequest.mode:type_name -> dshctl.v1.MountMode
-	1,  // 11: dshctl.v1.OrchestratorControl.ListProjects:input_type -> dshctl.v1.ListProjectsRequest
-	5,  // 12: dshctl.v1.OrchestratorControl.CreateWorkspace:input_type -> dshctl.v1.CreateWorkspaceRequest
-	6,  // 13: dshctl.v1.OrchestratorControl.DescribeWorkspace:input_type -> dshctl.v1.DescribeWorkspaceRequest
-	7,  // 14: dshctl.v1.OrchestratorControl.ListWorkspaces:input_type -> dshctl.v1.ListWorkspacesRequest
-	10, // 15: dshctl.v1.OrchestratorControl.ListImages:input_type -> dshctl.v1.ListImagesRequest
-	14, // 16: dshctl.v1.OrchestratorControl.GetImage:input_type -> dshctl.v1.GetImageRequest
-	15, // 17: dshctl.v1.OrchestratorControl.BuildImage:input_type -> dshctl.v1.BuildImageRequest
-	13, // 18: dshctl.v1.OrchestratorControl.RebuildImage:input_type -> dshctl.v1.RebuildImageRequest
-	16, // 19: dshctl.v1.OrchestratorControl.ListContainers:input_type -> dshctl.v1.ListContainersRequest
-	19, // 20: dshctl.v1.OrchestratorControl.StartContainer:input_type -> dshctl.v1.StartContainerRequest
-	20, // 21: dshctl.v1.OrchestratorControl.RecreateContainer:input_type -> dshctl.v1.RecreateContainerRequest
-	21, // 22: dshctl.v1.OrchestratorControl.ReplaceContainer:input_type -> dshctl.v1.ReplaceContainerRequest
-	22, // 23: dshctl.v1.OrchestratorControl.RemoveContainer:input_type -> dshctl.v1.RemoveContainerRequest
-	24, // 24: dshctl.v1.OrchestratorControl.AddContainerMount:input_type -> dshctl.v1.AddContainerMountRequest
-	25, // 25: dshctl.v1.OrchestratorControl.RemoveContainerMount:input_type -> dshctl.v1.RemoveContainerMountRequest
-	2,  // 26: dshctl.v1.OrchestratorControl.ListProjects:output_type -> dshctl.v1.ListProjectsResponse
-	9,  // 27: dshctl.v1.OrchestratorControl.CreateWorkspace:output_type -> dshctl.v1.Workspace
-	9,  // 28: dshctl.v1.OrchestratorControl.DescribeWorkspace:output_type -> dshctl.v1.Workspace
-	8,  // 29: dshctl.v1.OrchestratorControl.ListWorkspaces:output_type -> dshctl.v1.ListWorkspacesResponse
-	11, // 30: dshctl.v1.OrchestratorControl.ListImages:output_type -> dshctl.v1.ListImagesResponse
-	12, // 31: dshctl.v1.OrchestratorControl.GetImage:output_type -> dshctl.v1.Image
-	12, // 32: dshctl.v1.OrchestratorControl.BuildImage:output_type -> dshctl.v1.Image
-	12, // 33: dshctl.v1.OrchestratorControl.RebuildImage:output_type -> dshctl.v1.Image
-	17, // 34: dshctl.v1.OrchestratorControl.ListContainers:output_type -> dshctl.v1.ListContainersResponse
-	18, // 35: dshctl.v1.OrchestratorControl.StartContainer:output_type -> dshctl.v1.Container
-	9,  // 36: dshctl.v1.OrchestratorControl.RecreateContainer:output_type -> dshctl.v1.Workspace
-	18, // 37: dshctl.v1.OrchestratorControl.ReplaceContainer:output_type -> dshctl.v1.Container
-	23, // 38: dshctl.v1.OrchestratorControl.RemoveContainer:output_type -> dshctl.v1.RemoveContainerResponse
-	18, // 39: dshctl.v1.OrchestratorControl.AddContainerMount:output_type -> dshctl.v1.Container
-	18, // 40: dshctl.v1.OrchestratorControl.RemoveContainerMount:output_type -> dshctl.v1.Container
-	26, // [26:41] is the sub-list for method output_type
-	11, // [11:26] is the sub-list for method input_type
-	11, // [11:11] is the sub-list for extension type_name
-	11, // [11:11] is the sub-list for extension extendee
-	0,  // [0:11] is the sub-list for field type_name
+	1,  // 2: dshctl.v1.ProjectMount.kind:type_name -> dshctl.v1.MountKind
+	5,  // 3: dshctl.v1.CreateWorkspaceRequest.mounts:type_name -> dshctl.v1.ProjectMount
+	10, // 4: dshctl.v1.ListWorkspacesResponse.workspaces:type_name -> dshctl.v1.Workspace
+	5,  // 5: dshctl.v1.Workspace.mounts:type_name -> dshctl.v1.ProjectMount
+	13, // 6: dshctl.v1.ListImagesResponse.images:type_name -> dshctl.v1.Image
+	19, // 7: dshctl.v1.ListContainersResponse.containers:type_name -> dshctl.v1.Container
+	5,  // 8: dshctl.v1.Container.mounts:type_name -> dshctl.v1.ProjectMount
+	5,  // 9: dshctl.v1.StartContainerRequest.mounts:type_name -> dshctl.v1.ProjectMount
+	5,  // 10: dshctl.v1.ReplaceContainerRequest.mounts:type_name -> dshctl.v1.ProjectMount
+	0,  // 11: dshctl.v1.AddContainerMountRequest.mode:type_name -> dshctl.v1.MountMode
+	1,  // 12: dshctl.v1.AddContainerMountRequest.kind:type_name -> dshctl.v1.MountKind
+	1,  // 13: dshctl.v1.RemoveContainerMountRequest.kind:type_name -> dshctl.v1.MountKind
+	29, // 14: dshctl.v1.ListVolumesResponse.volumes:type_name -> dshctl.v1.Volume
+	2,  // 15: dshctl.v1.OrchestratorControl.ListProjects:input_type -> dshctl.v1.ListProjectsRequest
+	6,  // 16: dshctl.v1.OrchestratorControl.CreateWorkspace:input_type -> dshctl.v1.CreateWorkspaceRequest
+	7,  // 17: dshctl.v1.OrchestratorControl.DescribeWorkspace:input_type -> dshctl.v1.DescribeWorkspaceRequest
+	8,  // 18: dshctl.v1.OrchestratorControl.ListWorkspaces:input_type -> dshctl.v1.ListWorkspacesRequest
+	11, // 19: dshctl.v1.OrchestratorControl.ListImages:input_type -> dshctl.v1.ListImagesRequest
+	15, // 20: dshctl.v1.OrchestratorControl.GetImage:input_type -> dshctl.v1.GetImageRequest
+	16, // 21: dshctl.v1.OrchestratorControl.BuildImage:input_type -> dshctl.v1.BuildImageRequest
+	14, // 22: dshctl.v1.OrchestratorControl.RebuildImage:input_type -> dshctl.v1.RebuildImageRequest
+	17, // 23: dshctl.v1.OrchestratorControl.ListContainers:input_type -> dshctl.v1.ListContainersRequest
+	20, // 24: dshctl.v1.OrchestratorControl.StartContainer:input_type -> dshctl.v1.StartContainerRequest
+	21, // 25: dshctl.v1.OrchestratorControl.RecreateContainer:input_type -> dshctl.v1.RecreateContainerRequest
+	22, // 26: dshctl.v1.OrchestratorControl.ReplaceContainer:input_type -> dshctl.v1.ReplaceContainerRequest
+	23, // 27: dshctl.v1.OrchestratorControl.RemoveContainer:input_type -> dshctl.v1.RemoveContainerRequest
+	25, // 28: dshctl.v1.OrchestratorControl.AddContainerMount:input_type -> dshctl.v1.AddContainerMountRequest
+	26, // 29: dshctl.v1.OrchestratorControl.RemoveContainerMount:input_type -> dshctl.v1.RemoveContainerMountRequest
+	27, // 30: dshctl.v1.OrchestratorControl.ListVolumes:input_type -> dshctl.v1.ListVolumesRequest
+	30, // 31: dshctl.v1.OrchestratorControl.CreateVolume:input_type -> dshctl.v1.CreateVolumeRequest
+	31, // 32: dshctl.v1.OrchestratorControl.RemoveVolume:input_type -> dshctl.v1.RemoveVolumeRequest
+	3,  // 33: dshctl.v1.OrchestratorControl.ListProjects:output_type -> dshctl.v1.ListProjectsResponse
+	10, // 34: dshctl.v1.OrchestratorControl.CreateWorkspace:output_type -> dshctl.v1.Workspace
+	10, // 35: dshctl.v1.OrchestratorControl.DescribeWorkspace:output_type -> dshctl.v1.Workspace
+	9,  // 36: dshctl.v1.OrchestratorControl.ListWorkspaces:output_type -> dshctl.v1.ListWorkspacesResponse
+	12, // 37: dshctl.v1.OrchestratorControl.ListImages:output_type -> dshctl.v1.ListImagesResponse
+	13, // 38: dshctl.v1.OrchestratorControl.GetImage:output_type -> dshctl.v1.Image
+	13, // 39: dshctl.v1.OrchestratorControl.BuildImage:output_type -> dshctl.v1.Image
+	13, // 40: dshctl.v1.OrchestratorControl.RebuildImage:output_type -> dshctl.v1.Image
+	18, // 41: dshctl.v1.OrchestratorControl.ListContainers:output_type -> dshctl.v1.ListContainersResponse
+	19, // 42: dshctl.v1.OrchestratorControl.StartContainer:output_type -> dshctl.v1.Container
+	10, // 43: dshctl.v1.OrchestratorControl.RecreateContainer:output_type -> dshctl.v1.Workspace
+	19, // 44: dshctl.v1.OrchestratorControl.ReplaceContainer:output_type -> dshctl.v1.Container
+	24, // 45: dshctl.v1.OrchestratorControl.RemoveContainer:output_type -> dshctl.v1.RemoveContainerResponse
+	19, // 46: dshctl.v1.OrchestratorControl.AddContainerMount:output_type -> dshctl.v1.Container
+	19, // 47: dshctl.v1.OrchestratorControl.RemoveContainerMount:output_type -> dshctl.v1.Container
+	28, // 48: dshctl.v1.OrchestratorControl.ListVolumes:output_type -> dshctl.v1.ListVolumesResponse
+	29, // 49: dshctl.v1.OrchestratorControl.CreateVolume:output_type -> dshctl.v1.Volume
+	32, // 50: dshctl.v1.OrchestratorControl.RemoveVolume:output_type -> dshctl.v1.RemoveVolumeResponse
+	33, // [33:51] is the sub-list for method output_type
+	15, // [15:33] is the sub-list for method input_type
+	15, // [15:15] is the sub-list for extension type_name
+	15, // [15:15] is the sub-list for extension extendee
+	0,  // [0:15] is the sub-list for field type_name
 }
 
 func init() { file_dshctl_v1_control_proto_init() }
@@ -1734,8 +2133,8 @@ func file_dshctl_v1_control_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_dshctl_v1_control_proto_rawDesc), len(file_dshctl_v1_control_proto_rawDesc)),
-			NumEnums:      1,
-			NumMessages:   25,
+			NumEnums:      2,
+			NumMessages:   31,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

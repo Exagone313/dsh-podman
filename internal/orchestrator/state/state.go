@@ -26,6 +26,8 @@ type Mount struct {
 	Mode        string `toml:"mode"`
 	Path        string `toml:"path,omitempty"`
 	Destination string `toml:"destination,omitempty"`
+	Kind        string `toml:"kind,omitempty"`
+	Volume      string `toml:"volume,omitempty"`
 }
 type Container struct {
 	Name            string  `toml:"name"` // "default" or logical name

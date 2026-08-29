@@ -38,6 +38,9 @@ const (
 	OrchestratorControl_RemoveContainer_FullMethodName      = "/dshctl.v1.OrchestratorControl/RemoveContainer"
 	OrchestratorControl_AddContainerMount_FullMethodName    = "/dshctl.v1.OrchestratorControl/AddContainerMount"
 	OrchestratorControl_RemoveContainerMount_FullMethodName = "/dshctl.v1.OrchestratorControl/RemoveContainerMount"
+	OrchestratorControl_ListVolumes_FullMethodName          = "/dshctl.v1.OrchestratorControl/ListVolumes"
+	OrchestratorControl_CreateVolume_FullMethodName         = "/dshctl.v1.OrchestratorControl/CreateVolume"
+	OrchestratorControl_RemoveVolume_FullMethodName         = "/dshctl.v1.OrchestratorControl/RemoveVolume"
 )
 
 // OrchestratorControlClient is the client API for OrchestratorControl service.
@@ -59,6 +62,9 @@ type OrchestratorControlClient interface {
 	RemoveContainer(ctx context.Context, in *RemoveContainerRequest, opts ...grpc.CallOption) (*RemoveContainerResponse, error)
 	AddContainerMount(ctx context.Context, in *AddContainerMountRequest, opts ...grpc.CallOption) (*Container, error)
 	RemoveContainerMount(ctx context.Context, in *RemoveContainerMountRequest, opts ...grpc.CallOption) (*Container, error)
+	ListVolumes(ctx context.Context, in *ListVolumesRequest, opts ...grpc.CallOption) (*ListVolumesResponse, error)
+	CreateVolume(ctx context.Context, in *CreateVolumeRequest, opts ...grpc.CallOption) (*Volume, error)
+	RemoveVolume(ctx context.Context, in *RemoveVolumeRequest, opts ...grpc.CallOption) (*RemoveVolumeResponse, error)
 }
 
 type orchestratorControlClient struct {
@@ -219,6 +225,36 @@ func (c *orchestratorControlClient) RemoveContainerMount(ctx context.Context, in
 	return out, nil
 }
 
+func (c *orchestratorControlClient) ListVolumes(ctx context.Context, in *ListVolumesRequest, opts ...grpc.CallOption) (*ListVolumesResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListVolumesResponse)
+	err := c.cc.Invoke(ctx, OrchestratorControl_ListVolumes_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *orchestratorControlClient) CreateVolume(ctx context.Context, in *CreateVolumeRequest, opts ...grpc.CallOption) (*Volume, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(Volume)
+	err := c.cc.Invoke(ctx, OrchestratorControl_CreateVolume_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *orchestratorControlClient) RemoveVolume(ctx context.Context, in *RemoveVolumeRequest, opts ...grpc.CallOption) (*RemoveVolumeResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RemoveVolumeResponse)
+	err := c.cc.Invoke(ctx, OrchestratorControl_RemoveVolume_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // OrchestratorControlServer is the server API for OrchestratorControl service.
 // All implementations must embed UnimplementedOrchestratorControlServer
 // for forward compatibility.
@@ -238,6 +274,9 @@ type OrchestratorControlServer interface {
 	RemoveContainer(context.Context, *RemoveContainerRequest) (*RemoveContainerResponse, error)
 	AddContainerMount(context.Context, *AddContainerMountRequest) (*Container, error)
 	RemoveContainerMount(context.Context, *RemoveContainerMountRequest) (*Container, error)
+	ListVolumes(context.Context, *ListVolumesRequest) (*ListVolumesResponse, error)
+	CreateVolume(context.Context, *CreateVolumeRequest) (*Volume, error)
+	RemoveVolume(context.Context, *RemoveVolumeRequest) (*RemoveVolumeResponse, error)
 	mustEmbedUnimplementedOrchestratorControlServer()
 }
 
@@ -292,6 +331,15 @@ func (UnimplementedOrchestratorControlServer) AddContainerMount(context.Context,
 }
 func (UnimplementedOrchestratorControlServer) RemoveContainerMount(context.Context, *RemoveContainerMountRequest) (*Container, error) {
 	return nil, status.Error(codes.Unimplemented, "method RemoveContainerMount not implemented")
+}
+func (UnimplementedOrchestratorControlServer) ListVolumes(context.Context, *ListVolumesRequest) (*ListVolumesResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListVolumes not implemented")
+}
+func (UnimplementedOrchestratorControlServer) CreateVolume(context.Context, *CreateVolumeRequest) (*Volume, error) {
+	return nil, status.Error(codes.Unimplemented, "method CreateVolume not implemented")
+}
+func (UnimplementedOrchestratorControlServer) RemoveVolume(context.Context, *RemoveVolumeRequest) (*RemoveVolumeResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method RemoveVolume not implemented")
 }
 func (UnimplementedOrchestratorControlServer) mustEmbedUnimplementedOrchestratorControlServer() {}
 func (UnimplementedOrchestratorControlServer) testEmbeddedByValue()                             {}
@@ -584,6 +632,60 @@ func _OrchestratorControl_RemoveContainerMount_Handler(srv interface{}, ctx cont
 	return interceptor(ctx, in, info, handler)
 }
 
+func _OrchestratorControl_ListVolumes_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListVolumesRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(OrchestratorControlServer).ListVolumes(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: OrchestratorControl_ListVolumes_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(OrchestratorControlServer).ListVolumes(ctx, req.(*ListVolumesRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _OrchestratorControl_CreateVolume_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreateVolumeRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(OrchestratorControlServer).CreateVolume(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: OrchestratorControl_CreateVolume_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(OrchestratorControlServer).CreateVolume(ctx, req.(*CreateVolumeRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _OrchestratorControl_RemoveVolume_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RemoveVolumeRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(OrchestratorControlServer).RemoveVolume(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: OrchestratorControl_RemoveVolume_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(OrchestratorControlServer).RemoveVolume(ctx, req.(*RemoveVolumeRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // OrchestratorControl_ServiceDesc is the grpc.ServiceDesc for OrchestratorControl service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -650,6 +752,18 @@ var OrchestratorControl_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "RemoveContainerMount",
 			Handler:    _OrchestratorControl_RemoveContainerMount_Handler,
+		},
+		{
+			MethodName: "ListVolumes",
+			Handler:    _OrchestratorControl_ListVolumes_Handler,
+		},
+		{
+			MethodName: "CreateVolume",
+			Handler:    _OrchestratorControl_CreateVolume_Handler,
+		},
+		{
+			MethodName: "RemoveVolume",
+			Handler:    _OrchestratorControl_RemoveVolume_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

@@ -201,6 +201,11 @@ container or shutting down the orchestrator first asks the container's guest
 agent to gracefully stop its daemons (SIGTERM, ~10s grace) before podman tears
 the container down.
 
+Beyond project mounts, a container can mount named volumes (prefixed
+`DSH_PODMAN_VOLUME_PREFIX`, default `dsh-podman-`, and auto-created by podman
+on first use) or tmpfs at arbitrary container paths — but never under the
+projects root, which is reserved for project mounts.
+
 ### Building the browser half
 
 The client half's `@deepseek-ai/dsh-client-*` packages are published to npm

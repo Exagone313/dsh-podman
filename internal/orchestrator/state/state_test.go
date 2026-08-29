@@ -235,3 +235,40 @@ func TestContainerMountsRoundTrip(t *testing.T) {
 		t.Fatalf("container mounts did not survive round trip: %#v", mounts)
 	}
 }
+
+func TestTmpfsAndVolumeMountsRoundTrip(t *testing.T) {
+	store, err := New(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	workspaces := []Workspace{{
+		WorkspaceSlug: "proj",
+		Containers: []Container{{
+			Name:       "dev",
+			PodmanName: "dsh-workspace-proj-dev",
+			ImageID:    "arch",
+			Status:     "running",
+			Mounts: []Mount{
+				{Kind: "tmpfs", Destination: "/tmp/work", Mode: "read_write"},
+				{Kind: "volume", Volume: "data", Destination: "/srv/data", Mode: "read_only"},
+			},
+		}},
+	}}
+	if err := store.SaveWorkspaces(workspaces); err != nil {
+		t.Fatal(err)
+	}
+	got, err := store.Workspaces()
+	if err != nil {
+		t.Fatal(err)
+	}
+	mounts := got[0].Containers[0].Mounts
+	if len(mounts) != 2 {
+		t.Fatalf("round trip mismatch: %#v", mounts)
+	}
+	if mounts[0].Kind != "tmpfs" || mounts[0].Destination != "/tmp/work" || mounts[0].Mode != "read_write" {
+		t.Fatalf("tmpfs mount did not survive round trip: %#v", mounts[0])
+	}
+	if mounts[1].Kind != "volume" || mounts[1].Volume != "data" || mounts[1].Destination != "/srv/data" || mounts[1].Mode != "read_only" {
+		t.Fatalf("volume mount did not survive round trip: %#v", mounts[1])
+	}
+}

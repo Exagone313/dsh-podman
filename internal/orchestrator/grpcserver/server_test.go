@@ -72,7 +72,16 @@ func TestToProto(t *testing.T) {
 
 func TestDefaultImageID(t *testing.T) {
 	t.Setenv("DSH_PODMAN_DEFAULT_IMAGE", "")
-	if got := defaultImageID(); got != "arch-base" {
+	t.Setenv("DSH_PODMAN_IMAGE_PREFIX", "")
+	if got := defaultImageID(); got != "localhost/dsh-podman/arch-base" {
+		t.Fatalf("unexpected default image id: %q", got)
+	}
+	t.Setenv("DSH_PODMAN_IMAGE_PREFIX", "registry.example.com/dsh/")
+	if got := defaultImageID(); got != "registry.example.com/dsh/arch-base" {
+		t.Fatalf("unexpected default image id: %q", got)
+	}
+	t.Setenv("DSH_PODMAN_IMAGE_PREFIX", "registry.example.com/dsh")
+	if got := defaultImageID(); got != "registry.example.com/dsh/arch-base" {
 		t.Fatalf("unexpected default image id: %q", got)
 	}
 	t.Setenv("DSH_PODMAN_DEFAULT_IMAGE", "custom")
@@ -204,10 +213,19 @@ func TestCreateWorkspaceRejectsUnknownImage(t *testing.T) {
 
 func TestCreateWorkspaceRequiresBuilderForDefaultImage(t *testing.T) {
 	t.Setenv("DSH_PODMAN_DEFAULT_IMAGE", "arch-base")
-	server := &Server{Store: newTestStore(t), Logger: silentLogger()}
+	server := &Server{Store: newTestStore(t), Logger: silentLogger(), BuildDefaultImage: true}
 	_, err := server.CreateWorkspace(context.Background(), &ctl.CreateWorkspaceRequest{WorkspaceSlug: "proj", ImageId: "arch-base"})
 	if status.Code(err) != codes.FailedPrecondition {
 		t.Fatalf("expected FailedPrecondition, got %v", err)
+	}
+}
+
+func TestCreateWorkspaceRefusesToBuildWhenDisabled(t *testing.T) {
+	t.Setenv("DSH_PODMAN_DEFAULT_IMAGE", "arch-base")
+	server := &Server{Store: newTestStore(t), Logger: silentLogger(), BuildDefaultImage: false}
+	_, err := server.CreateWorkspace(context.Background(), &ctl.CreateWorkspaceRequest{WorkspaceSlug: "proj", ImageId: "arch-base"})
+	if status.Code(err) != codes.NotFound {
+		t.Fatalf("expected NotFound, got %v", err)
 	}
 }
 

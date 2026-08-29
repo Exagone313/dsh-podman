@@ -21,7 +21,7 @@ import (
 
 var packageName = regexp.MustCompile(`^[A-Za-z0-9@+._:][A-Za-z0-9@+._:-]*$`)
 var baseImageName = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9._:/@-]*$`)
-var imageIDName = regexp.MustCompile(`^[a-zA-Z0-9_][a-zA-Z0-9_.-]{0,99}$`)
+var imageIDName = regexp.MustCompile(`^[a-zA-Z0-9_][a-zA-Z0-9_.\-/:]{0,127}$`)
 var containerPathName = regexp.MustCompile(`^/[a-zA-Z0-9._:@+=-]+(?:/[a-zA-Z0-9._:@+=-]+)*$`)
 
 func validPackage(pkg string) bool {
@@ -53,7 +53,15 @@ func validContainerPath(path string) bool {
 }
 
 func validImageID(id string) bool {
-	return id != "." && id != ".." && imageIDName.MatchString(id)
+	if id == "." || id == ".." || !imageIDName.MatchString(id) {
+		return false
+	}
+	for _, segment := range strings.Split(id, "/") {
+		if segment == "." || segment == ".." {
+			return false
+		}
+	}
+	return true
 }
 
 type GuestAgentImage struct {
@@ -117,6 +125,7 @@ type Builder struct {
 	StateDir        string
 	HostPacmanCache string
 	GuestAgentImage GuestAgentImage
+	ImagePrefix     string
 	Logger          *slog.Logger
 }
 
@@ -145,7 +154,7 @@ func (b Builder) Build(image state.Image) (string, error) {
 	if b.HostPacmanCache == "" || !filepath.IsAbs(b.HostPacmanCache) {
 		return "", fmt.Errorf("pacman cache path must be an absolute path")
 	}
-	tag := "localhost/dsh-workspace/" + image.ImageID + ":latest"
+	tag := b.tagFor(image.ImageID)
 	options := entities.BuildOptions{ContainerFiles: []string{file}, BuildOptions: define.BuildOptions{CommonBuildOpts: &define.CommonBuildOptions{}}}
 	options.ContextDirectory = dir
 	options.AdditionalTags = []string{tag}
@@ -162,4 +171,29 @@ func (b Builder) Build(image state.Image) (string, error) {
 	}
 	logger.Info("workspace image build completed", "image_id", image.ImageID, "image_tag", tag)
 	return tag, nil
+}
+
+func (b Builder) imagePrefix() string {
+	prefix := b.ImagePrefix
+	if prefix == "" {
+		prefix = "localhost/dsh-podman/"
+	}
+	if !strings.HasSuffix(prefix, "/") {
+		prefix += "/"
+	}
+	return prefix
+}
+
+func (b Builder) tagFor(imageID string) string {
+	prefix := b.imagePrefix()
+	if strings.Contains(imageID, ":") {
+		if strings.HasPrefix(imageID, prefix) {
+			return imageID
+		}
+		return prefix + imageID
+	}
+	if strings.HasPrefix(imageID, prefix) {
+		return imageID + ":latest"
+	}
+	return prefix + imageID + ":latest"
 }

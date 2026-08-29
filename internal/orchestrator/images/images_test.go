@@ -110,15 +110,45 @@ func TestContainerfileAcceptsValidBaseImages(t *testing.T) {
 }
 
 func TestValidImageID(t *testing.T) {
-	for _, id := range []string{"arch", "a-b_c.1", "A1", "x"} {
+	for _, id := range []string{"arch", "a-b_c.1", "A1", "x", "localhost/dsh-podman/arch-base", "registry.example.com/dsh/my-image", "localhost/dsh-podman/arch-base:v2", "my-image:v1"} {
 		if !validImageID(id) {
 			t.Errorf("rejected valid image id %q", id)
 		}
 	}
-	for _, id := range []string{"", ".", "..", "-x", "a/b", "a b", "a:latest", "a\nb", strings.Repeat("b", 120)} {
+	for _, id := range []string{"", ".", "..", "-x", "a b", "a@sha256:abc", "a\nb", "a/../b", "../etc", "a\\b", strings.Repeat("b", 160)} {
 		if validImageID(id) {
 			t.Errorf("accepted invalid image id %q", id)
 		}
+	}
+}
+
+func TestTagFor(t *testing.T) {
+	builder := Builder{ImagePrefix: "localhost/dsh-podman/"}
+	cases := map[string]string{
+		"arch-base":                         "localhost/dsh-podman/arch-base:latest",
+		"localhost/dsh-podman/arch-base":    "localhost/dsh-podman/arch-base:latest",
+		"my-image":                          "localhost/dsh-podman/my-image:latest",
+		"localhost/dsh-podman/arch-base:v2": "localhost/dsh-podman/arch-base:v2",
+		"my-image:v1":                       "localhost/dsh-podman/my-image:v1",
+	}
+	for id, expected := range cases {
+		if got := builder.tagFor(id); got != expected {
+			t.Errorf("tagFor(%q) = %q, want %q", id, got, expected)
+		}
+	}
+}
+
+func TestTagForNormalizesPrefix(t *testing.T) {
+	builder := Builder{ImagePrefix: "registry.example.com/dsh"}
+	if got := builder.tagFor("arch-base"); got != "registry.example.com/dsh/arch-base:latest" {
+		t.Fatalf("unexpected tag %q", got)
+	}
+	if got := builder.tagFor("arch-base:v1"); got != "registry.example.com/dsh/arch-base:v1" {
+		t.Fatalf("unexpected tag %q", got)
+	}
+	empty := Builder{}
+	if got := empty.tagFor("arch-base"); got != "localhost/dsh-podman/arch-base:latest" {
+		t.Fatalf("unexpected tag %q", got)
 	}
 }
 

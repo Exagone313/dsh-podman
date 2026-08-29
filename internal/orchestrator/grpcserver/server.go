@@ -33,6 +33,7 @@ type Server struct {
 	Store            *state.Store
 	Podman           *podman.Client
 	ImageBuilder     *imagebuild.Builder
+	BuildDefaultImage bool
 	Logger           *slog.Logger
 }
 
@@ -282,6 +283,10 @@ func (s *Server) CreateWorkspace(ctx context.Context, request *ctl.CreateWorkspa
 		if request.GetImageId() != defaultImageID() || imageIndex >= 0 {
 			return nil, status.Error(codes.NotFound, "built image not found")
 		}
+		if !s.BuildDefaultImage {
+			s.log().Error("CreateWorkspace cannot auto-provision default image", "image_id", request.GetImageId(), "reason", "DSH_PODMAN_BUILD_DEFAULT_IMAGE is disabled")
+			return nil, status.Error(codes.NotFound, "built image not found; default image auto-build is disabled")
+		}
 		if s.ImageBuilder == nil {
 			s.log().Error("CreateWorkspace cannot auto-provision default image", "image_id", request.GetImageId(), "reason", "podman image builder is not configured")
 			return nil, status.Error(codes.FailedPrecondition, "podman image builder is not configured")
@@ -342,7 +347,7 @@ func (s *Server) CreateWorkspace(ctx context.Context, request *ctl.CreateWorkspa
 	}
 	if !exists {
 		s.log().Warn("CreateWorkspace image state is stale", "image_id", request.GetImageId(), "image_tag", imageTag)
-		if request.GetImageId() != defaultImageID() || s.ImageBuilder == nil {
+		if request.GetImageId() != defaultImageID() || !s.BuildDefaultImage || s.ImageBuilder == nil {
 			return nil, status.Error(codes.NotFound, "built image not found")
 		}
 		image := images[imageIndex]
@@ -435,7 +440,17 @@ func defaultImageID() string {
 	if value := os.Getenv("DSH_PODMAN_DEFAULT_IMAGE"); value != "" {
 		return value
 	}
-	return "arch-base"
+	return imagePrefix() + "arch-base"
+}
+func imagePrefix() string {
+	prefix := os.Getenv("DSH_PODMAN_IMAGE_PREFIX")
+	if prefix == "" {
+		return "localhost/dsh-podman/"
+	}
+	if !strings.HasSuffix(prefix, "/") {
+		prefix += "/"
+	}
+	return prefix
 }
 func (s *Server) StopWorkspace(_ context.Context, request *ctl.StopWorkspaceRequest) (*ctl.StopWorkspaceResponse, error) {
 	s.log().Info("control request", "method", "StopWorkspace", "workspace_slug", request.GetWorkspaceSlug())

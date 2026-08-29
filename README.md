@@ -45,19 +45,21 @@ each of their sections.
 
 | Variable | Default | Description |
 |---|---|---|
-| `DSH_PODMAN_DEFAULT_IMAGE` | `arch-base` | Default workspace image id used when creating a workspace |
+| `DSH_PODMAN_DEFAULT_IMAGE` | `localhost/dsh-podman/arch-base` | Default workspace image reference used when creating a workspace |
+| `DSH_PODMAN_IMAGE_PREFIX` | `localhost/dsh-podman/` | Prefix prepended to workspace image references |
 | `DSH_PODMAN_ORCHESTRATOR_TOKEN` | — | Shared secret authenticating control-plane gRPC calls; see [Variable details](#variable-details) |
 | `DSH_PODMAN_PROJECTS_ROOT` | `/projects` | Project root used to resolve session working directories into a workspace |
 | `DSH_PODMAN_SOCKETS_ROOT` | `/run/dsh-podman` | Socket root the plugin derives the orchestrator control socket (`orchestrator.sock`) from |
 
 All of the above are overridable through the plugin's `cordis.yml` config
-(`socketsRoot`, `defaultImage`, `projectsRoot`, `controlToken`).
+(`socketsRoot`, `defaultImage`, `projectsRoot`, `controlToken`, `imagePrefix`).
 
 ### Orchestrator (`dsh-podman-orchestrator`)
 
 | Variable | Default | Description |
 |---|---|---|
-| `DSH_PODMAN_DEFAULT_IMAGE` | `arch-base` | Default workspace image id, auto-provisioned on first use |
+| `DSH_PODMAN_BUILD_DEFAULT_IMAGE` | `true` | Whether the orchestrator auto-builds the default workspace image when it is missing; see [Variable details](#variable-details) |
+| `DSH_PODMAN_DEFAULT_IMAGE` | `localhost/dsh-podman/arch-base` | Default workspace image reference, auto-provisioned on first use |
 | `DSH_PODMAN_GUEST_AGENT_BIN` | `dsh-podman-guest-agent` | Guest agent binary path (container-internal); see [Variable details](#variable-details) |
 | `DSH_PODMAN_GUEST_AGENT_IMAGE` | — | Prebuilt guest-agent image baked into workspace images; unset disables the feature; see [Variable details](#variable-details) |
 | `DSH_PODMAN_GUEST_AGENT_IMAGE_AGENT_BIN` | `/bin/dsh-podman-guest-agent` | Path of the guest agent binary inside the guest-agent image; see [Variable details](#variable-details) |
@@ -66,6 +68,7 @@ All of the above are overridable through the plugin's `cordis.yml` config
 | `DSH_PODMAN_HOST_PACMAN_CACHE` | — | Host-absolute Buildah cache directory used by workspace-image builds |
 | `DSH_PODMAN_HOST_PROJECTS_ROOT` | `DSH_PODMAN_PROJECTS_ROOT` | Host-side projects root used as the source of bind mounts |
 | `DSH_PODMAN_HOST_SOCKETS_ROOT` | `DSH_PODMAN_SOCKETS_ROOT` | Host-side sockets root for guest socket bind mounts |
+| `DSH_PODMAN_IMAGE_PREFIX` | `localhost/dsh-podman/` | Prefix prepended to built workspace image references |
 | `DSH_PODMAN_ORCHESTRATOR_PODMAN_SOCKET` | required | Podman API socket, e.g. `unix:///run/podman/podman.sock` |
 | `DSH_PODMAN_ORCHESTRATOR_STATE` | `/var/lib/dsh-orchestrator` | Persisted state directory |
 | `DSH_PODMAN_ORCHESTRATOR_TOKEN` | — | Shared secret authenticating control-plane gRPC calls; see [Variable details](#variable-details) |
@@ -81,6 +84,16 @@ All of the above are overridable through the plugin's `cordis.yml` config
 | `DSH_PODMAN_PROJECTS_ROOT` | `/projects` | Root where the workspace's project(s) are mounted |
 
 ### Variable details
+
+#### `DSH_PODMAN_BUILD_DEFAULT_IMAGE`
+
+Whether the orchestrator auto-builds the default workspace image
+(`DSH_PODMAN_DEFAULT_IMAGE`, default `${DSH_PODMAN_IMAGE_PREFIX}arch-base`, i.e.
+`localhost/dsh-podman/arch-base`) the first time a workspace requests it.
+Unset or a truthy value (`1`, `true`, `yes`, `on`) builds the image; a falsy
+value (`0`, `false`, `no`, `off`) makes workspace creation fail with `NotFound`
+when the image is missing instead, letting an operator pre-build and push it
+beforehand.
 
 #### `DSH_PODMAN_GUEST_AGENT_BIN` and `DSH_PODMAN_HOST_GUEST_AGENT_BIN`
 

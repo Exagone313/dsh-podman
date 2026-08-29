@@ -15,6 +15,9 @@ const toolOutput = {
   schema: { type: "string" },
   render: (_args: unknown, value: string) => [{ type: "text", text: value }],
 };
+function withTrailingSlash(value: string): string {
+  return value.endsWith("/") ? value : `${value}/`;
+}
 export const workspaceParameters = {
   type: "object",
   properties: {
@@ -58,8 +61,12 @@ export interface PluginConfig {
   defaultImage?: string;
   projectsRoot?: string;
   controlToken?: string;
+  imagePrefix?: string;
 }
 export function apply(ctx: any, config: PluginConfig = {}): void {
+  const imagePrefix = withTrailingSlash(
+    config.imagePrefix ?? process.env.DSH_PODMAN_IMAGE_PREFIX ?? "localhost/dsh-podman/",
+  );
   const resolver = new WorkspaceResolver(
     {
       socketsRoot:
@@ -67,7 +74,9 @@ export function apply(ctx: any, config: PluginConfig = {}): void {
         process.env.DSH_PODMAN_SOCKETS_ROOT ??
         "/run/dsh-podman",
       defaultImage:
-        config.defaultImage ?? process.env.DSH_PODMAN_DEFAULT_IMAGE ?? "arch-base",
+        config.defaultImage ??
+        process.env.DSH_PODMAN_DEFAULT_IMAGE ??
+        `${imagePrefix}arch-base`,
       projectsRoot:
         config.projectsRoot ??
         process.env.DSH_PODMAN_PROJECTS_ROOT ??

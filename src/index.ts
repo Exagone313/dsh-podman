@@ -147,7 +147,6 @@ export function createSubprocessProvider(resolver: WorkspaceResolver): Subproces
                 argv: remoteArgv(spec.argv),
                 cwd: spec.cwd,
                 env: spec.env ?? {},
-                runInBackground: false,
               },
             });
             if (spec.stdio?.stdin !== "pipe") stream.end();
@@ -1077,7 +1076,6 @@ async function runExec(
         argv: remoteArgv(argv),
         cwd,
         env: env ?? {},
-        runInBackground: false,
       },
     });
     stream.end();

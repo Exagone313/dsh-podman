@@ -186,16 +186,17 @@ Data and actions travel over the settings transport:
   the host `watch` handler executes it against the orchestrator and pushes the
   refreshed view back.
 
-The orchestrator service gained two gRPC methods to back the UI:
+The orchestrator service exposes gRPC methods to back the UI and the tools:
 `ListContainers` (returns only the guest containers the orchestrator created —
 containers it does not own are never exposed, and a client cannot name a
 container directly; workspace slugs are validated so the container name is
-always derived server-side from `dsh-workspace-<slug>`) and
-`RecreateContainer{workspace_slug, image_id}` (stops, removes, and recreates
-the container, optionally with a new image; an empty `image_id` keeps the
-workspace's current image). `RemoveContainer{workspace_slug}` removes the
-guest container from Podman (the workspace record is left for the plugin to
-recreate on next use).
+always derived server-side from `dsh-workspace-<slug>`), `StartContainer`,
+`RecreateContainer{workspace_slug, container, image_id}` (stops, removes, and
+recreates the container, optionally with a new image; an empty `image_id`
+keeps the workspace's current image), `ReplaceContainer`, `RemoveContainer`,
+`AddContainerMount`, and `RemoveContainerMount`. Containers of a workspace run
+inside a shared podman pod (`dsh-pod-<slug>`) so they share a network
+namespace, and their root filesystems are mounted read-only.
 
 ### Building the browser half
 

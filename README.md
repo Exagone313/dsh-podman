@@ -69,7 +69,7 @@ All of the above are overridable through the plugin's `cordis.yml` config
 | `DSH_PODMAN_ORCHESTRATOR_PODMAN_SOCKET` | required | Podman API socket, e.g. `unix:///run/podman/podman.sock` |
 | `DSH_PODMAN_ORCHESTRATOR_STATE` | `/var/lib/dsh-orchestrator` | Persisted state directory |
 | `DSH_PODMAN_ORCHESTRATOR_TOKEN` | — | Shared secret authenticating control-plane gRPC calls; see [Variable details](#variable-details) |
-| `DSH_PODMAN_PROJECTS_ROOT` | `/projects` | Project root inside every container; also the guest agent's workspace root |
+| `DSH_PODMAN_PROJECTS_ROOT` | `/projects` | Project root inside every guest container |
 | `DSH_PODMAN_SOCKETS_ROOT` | `/run/dsh-podman` | Socket root directory (bind-mounted from the host); holds `orchestrator.sock` and per-workspace guest sockets; see [Variable details](#variable-details) |
 
 ### Guest agent (`dsh-podman-guest-agent`)
@@ -78,7 +78,7 @@ All of the above are overridable through the plugin's `cordis.yml` config
 |---|---|---|
 | `DSH_PODMAN_GUEST_SOCKET` | required | Unix socket the guest agent serves on; the orchestrator sets it when starting the container |
 | `DSH_PODMAN_GUEST_TOKEN` | — | Bearer token required on every gRPC call; see [Variable details](#variable-details) |
-| `DSH_PODMAN_PROJECTS_ROOT` | `/projects` | Workspace root the guest agent exposes through its filesystem API |
+| `DSH_PODMAN_PROJECTS_ROOT` | `/projects` | Root where the workspace's project(s) are mounted |
 
 ### Variable details
 

@@ -10,6 +10,7 @@ import {
   createSubprocessProvider,
   createFilesystemProvider,
   TOOLS,
+  toolHandlers,
 } from "./index.js";
 
 test("remoteArgv remaps ripgrep onto the guest path", () => {
@@ -321,6 +322,52 @@ test("daemon_start accepts optional uid, gid and groups", () => {
   assert.equal(properties.groups.type, "array");
   assert.equal(properties.groups.items.type, "integer");
   assert.equal(properties.groups.items.minimum, 0);
+});
+
+test("daemon_start serializes uid/gid as protobuf wrapper objects", async () => {
+  let captured: Record<string, unknown> | undefined;
+  const resolver = {
+    containerBinding: async () => ({
+      guest: {
+        startDaemon: (
+          request: Record<string, unknown>,
+          _metadata: unknown,
+          callback: (error: Error | null, result: unknown) => void,
+        ) => {
+          captured = request;
+          callback(null, {
+            name: "valkey-1001",
+            running: true,
+            argv: ["valkey-server"],
+          });
+        },
+      },
+      token: "t",
+      socket: "/run/x.sock",
+    }),
+  };
+  const exec = { agent: { session: { header: { cwd: "/proj" } } } };
+  await toolHandlers.daemon_start(
+    resolver as never,
+    {
+      container: "valkey-ctr",
+      argv: ["valkey-server"],
+      uid: 1001,
+      gid: 1001,
+    },
+    exec,
+  );
+  assert.deepEqual(captured!.uid, { value: 1001 });
+  assert.deepEqual(captured!.gid, { value: 1001 });
+
+  captured = undefined;
+  await toolHandlers.daemon_start(
+    resolver as never,
+    { container: "valkey-ctr", argv: ["valkey-server"] },
+    exec,
+  );
+  assert.equal(captured!.uid, undefined);
+  assert.equal(captured!.gid, undefined);
 });
 
 const DAEMON_TOOLS = [

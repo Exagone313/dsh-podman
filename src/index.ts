@@ -624,7 +624,7 @@ const TOOL_DESCRIPTIONS: Record<string, string> = {
     "Read the captured logs of a daemon inside a container of the current workspace.",
 };
 
-const toolHandlers: Record<
+export const toolHandlers: Record<
   string,
   (resolver: WorkspaceResolver, input: any, exec: any) => Promise<unknown>
 > = {
@@ -905,13 +905,13 @@ const toolHandlers: Record<
       if (!Number.isInteger(input.uid) || input.uid < 0) {
         throw new Error("uid must be an integer >= 0");
       }
-      request.uid = input.uid;
+      request.uid = { value: input.uid };
     }
     if (input.gid !== undefined) {
       if (!Number.isInteger(input.gid) || input.gid < 0) {
         throw new Error("gid must be an integer >= 0");
       }
-      request.gid = input.gid;
+      request.gid = { value: input.gid };
     }
     if (input.groups !== undefined) {
       if (

@@ -74,6 +74,7 @@ All of the above are overridable through the plugin's `cordis.yml` config
 | `DSH_PODMAN_ORCHESTRATOR_TOKEN` | — | Shared secret authenticating control-plane gRPC calls; see [Variable details](#variable-details) |
 | `DSH_PODMAN_PROJECTS_ROOT` | `/projects` | Project root inside every guest container |
 | `DSH_PODMAN_SOCKETS_ROOT` | `/run/dsh-podman` | Socket root directory (bind-mounted from the host); holds `orchestrator.sock` and per-workspace guest sockets; see [Variable details](#variable-details) |
+| `DSH_PODMAN_VOLUME_PREFIX` | `dsh-podman-` | Prefix applied to managed named volumes (see [Mounts and volumes](#mounts-and-volumes)) |
 
 ### Guest agent (`dsh-podman-guest-agent`)
 
@@ -216,6 +217,76 @@ needed. `pnpm run build` runs `tsc -p tsconfig.json` (host) and
 The package's `dsh.client` declaration points the web bundle at
 `dist/client/index.js`, and the host half must be loaded for the `podman`
 settings namespace to exist.
+
+## Tools
+
+The plugin registers the following model-facing tools. Tools marked `✱`
+require approval. Container tools operate on a **logical container name** of
+the current workspace (`"default"` selects the workspace's default container).
+
+Image references (`imageId`, `baseImage`, `image`) accept a stored image id
+(short, e.g. `valkey`, or fully qualified, e.g. `localhost/dsh-podman/valkey`)
+with or without a `:tag`, or an already-qualified tag such as
+`localhost/dsh-podman/valkey:latest`. The base image cannot be built over,
+rebuilt, or removed.
+
+### Images
+
+| Tool | Params | Description |
+|---|---|---|
+| `image_list` | — | List the built workspace images |
+| `image_get` | `imageId` | Details for one image |
+| `image_build` ✱ | `imageId`, `baseImage`, `packages` | Build a new image from a base image and package list |
+| `image_rebuild` ✱ | `imageId` | Rebuild an existing image in place |
+| `image_remove` ✱ | `imageId` | Remove a built image; refused while a workspace or container still references it |
+
+### Containers
+
+| Tool | Params | Description |
+|---|---|---|
+| `container_list` | — | List the containers of the current workspace |
+| `container_start` | `container`, optional `image`, `mounts` | Start a container (default image when `image` is omitted) |
+| `container_recreate` ✱ | `container` | Recreate a container with the same image |
+| `container_replace` ✱ | `container`, `image`, optional `mounts` | Replace a container with a new image |
+| `container_remove` | `container` | Remove a container (stops its daemons gracefully first) |
+| `container_bash` | `container`, `command`, optional `workdir` | Run a shell command |
+| `container_exec` | `container`, `argv`, optional `cwd`, `env` | Run a program |
+| `container_read` | `container`, `path` | Read a file |
+| `container_write` | `container`, `path`, `content`, optional `create`, `truncate` | Write a file |
+| `container_edit` | `container`, `path`, `oldString`, `newString`, optional `replaceAll` | Edit a file |
+| `container_glob` | `container`, `pattern`, optional `cwd` | List files matching a pattern |
+| `container_grep` | `container`, `pattern`, optional `path`, `cwd` | Search files for a regex |
+
+### Mounts and volumes
+
+| Tool | Params | Description |
+|---|---|---|
+| `container_mount_list` | `container` | List the container's mounts |
+| `container_mount_add` ✱ | `container`, optional `kind`, `project`, `path`, `destination`, `mode`, `volume` | Add a mount; `kind` is `project` (default), `tmpfs`, or `volume` |
+| `container_mount_remove` ✱ | `container`, optional `kind`, `project`, `path`, `volume`, `destination` | Remove a mount |
+| `volume_list` | — | List the managed named volumes (short names) |
+| `volume_create` | `name` | Create a managed named volume |
+| `volume_remove` | `name` | Remove a managed named volume |
+
+A `project` mount binds a directory from the project's workspace; `tmpfs`
+mounts a writable in-memory filesystem and `volume` mounts a podman named
+volume (auto-created on first use) — both at an arbitrary absolute container
+path, never under the projects root. `mode` is `read_only` or `read_write`.
+
+### Daemons
+
+| Tool | Params | Description |
+|---|---|---|
+| `daemon_start` | `container`, `argv`, optional `name`, `cwd`, `env`, `uid`, `gid`, `groups` | Start a background daemon; optional `uid`/`gid`/`groups` run it as another user |
+| `daemon_list` | `container` | List the daemons (including their effective `uid`/`gid`) |
+| `daemon_stop` | `container`, `name`, optional `signal` | Stop a daemon |
+| `daemon_restart` | `container`, `name` | Restart a daemon with the same command, environment, and user |
+| `daemon_logs` | `container`, `name`, optional `tailBytes` | Tail a daemon's stdout/stderr |
+
+Daemons run as the container user by default. When only `uid` is set, `gid`
+defaults to the same value; when neither is set, the daemon runs without any
+uid/gid override. `daemon_list` reports the effective `uid`/`gid` of each
+daemon.
 
 ## Releasing and installing from a hosted tarball
 

@@ -9,6 +9,7 @@ import {
   outputReader,
   createSubprocessProvider,
   createFilesystemProvider,
+  TOOLS,
 } from "./index.js";
 
 test("remoteArgv remaps ripgrep onto the guest path", () => {
@@ -128,4 +129,61 @@ test("filesystem provider maps targets", () => {
   assert.equal(provider.contains(parent, { targetKey: "/a/b" }), true);
   assert.equal(provider.contains(parent, { targetKey: "/a2" }), false);
   assert.equal(provider.contains(parent, { targetKey: "/b" }), false);
+});
+
+const EXPECTED_TOOLS = [
+  "list_images",
+  "get_image",
+  "build_image",
+  "rebuild_image",
+  "list_containers",
+  "start_container",
+  "recreate_container",
+  "replace_container",
+  "remove_container",
+  "container_bash",
+  "container_exec",
+  "container_read",
+  "container_write",
+  "container_edit",
+  "container_glob",
+  "container_grep",
+];
+
+test("tool set covers the image and container surface", () => {
+  assert.deepEqual(
+    TOOLS.map((tool) => tool.name).sort(),
+    [...EXPECTED_TOOLS].sort(),
+  );
+});
+
+test("every tool parameters is a valid JSON-Schema object", () => {
+  for (const tool of TOOLS) {
+    assert.equal(tool.parameters.type, "object", `${tool.name} type`);
+    assert.equal(typeof tool.parameters.properties, "object");
+    assert.ok(Array.isArray(tool.parameters.required));
+    for (const key of Object.keys(tool.parameters.properties)) {
+      const property = tool.parameters.properties[key];
+      assert.ok(
+        !Object.prototype.hasOwnProperty.call(property, "required"),
+        `${tool.name}.${key} must not carry per-property required`,
+      );
+      assert.ok(
+        !Array.isArray(property.required),
+        `${tool.name}.${key} must not carry a required array`,
+      );
+    }
+  }
+});
+
+test("the four destructive mutations require approval", () => {
+  const approval = TOOLS.filter((tool) => tool.approval)
+    .map((tool) => tool.name)
+    .sort();
+  assert.deepEqual(approval, [
+    "build_image",
+    "rebuild_image",
+    "recreate_container",
+    "replace_container",
+  ]);
 });

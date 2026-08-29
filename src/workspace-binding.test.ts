@@ -15,6 +15,7 @@ import {
   workspaceSlug,
   metadata,
   WorkspaceResolver,
+  containerRowFor,
 } from "./workspace-binding.js";
 
 test("workspace slugs are stable and container-safe", () => {
@@ -66,6 +67,26 @@ test("metadata omits the header when the token is empty", () => {
   const result = metadata("");
   assert.ok(result instanceof grpc.Metadata);
   assert.equal(result.get("authorization").length, 0);
+});
+
+test("containerRowFor finds rows by workspace and name", () => {
+  const containers = [
+    { workspaceSlug: "team-app", containerName: "default", status: "running" },
+    { workspaceSlug: "team-app", containerName: "db", status: "stopped" },
+    { workspaceSlug: "other", containerName: "db", status: "running" },
+  ];
+  assert.deepEqual(containerRowFor(containers, "team-app", "db"), {
+    workspaceSlug: "team-app",
+    containerName: "db",
+    status: "stopped",
+  });
+  assert.deepEqual(containerRowFor(containers, "team-app", "default"), {
+    workspaceSlug: "team-app",
+    containerName: "default",
+    status: "running",
+  });
+  assert.equal(containerRowFor(containers, "team-app", "missing"), undefined);
+  assert.equal(containerRowFor([], "team-app", "default"), undefined);
 });
 
 test("control and guest proto files resolve next to the runtime", () => {

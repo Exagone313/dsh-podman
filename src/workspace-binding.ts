@@ -51,6 +51,29 @@ export class WorkspaceResolver {
   resolveSlug(key: string): Promise<WorkspaceBinding> {
     return this.ready(key, key);
   }
+  async containerBinding(
+    cwd: unknown,
+    container: string,
+  ): Promise<WorkspaceBinding> {
+    const workspace = await this.registry?.resolveByPath?.(String(cwd));
+    if (workspace === undefined) {
+      throw new Error(
+        `no DH workspace owns session cwd ${JSON.stringify(cwd)}`,
+      );
+    }
+    const slug = workspaceSlug(String(workspace.id));
+    const result = await this.control<any>("listContainers", {});
+    const row = containerRowFor(result.containers ?? [], slug, container);
+    if (row === undefined) {
+      throw new Error(`container "${container}" not found in workspace`);
+    }
+    const socket = row.agentSocketPath as string;
+    return {
+      guest: guestClient(socket),
+      token: row.agentToken as string,
+      socket,
+    };
+  }
   private async ready(
     key: string,
     projectName: string,
@@ -148,6 +171,16 @@ export function workspaceSlug(session: unknown): string {
   );
 }
 const fifty = 50;
+export function containerRowFor(
+  containers: any[],
+  slug: string,
+  container: string,
+): any | undefined {
+  return containers.find(
+    (row: any) =>
+      row.workspaceSlug === slug && row.containerName === container,
+  );
+}
 export function metadata(token: string): grpc.Metadata {
   const result = new grpc.Metadata();
   if (token !== "") {

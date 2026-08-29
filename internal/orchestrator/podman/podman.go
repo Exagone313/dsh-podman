@@ -94,6 +94,7 @@ func (c *Client) CreateWorkspace(pod, name, image, token string, mounts []specs.
 	generator.Command = []string{c.guestBinary}
 	generator.Env = map[string]string{"DSH_PODMAN_GUEST_TOKEN": token, "DSH_PODMAN_GUEST_SOCKET": filepath.Join(c.socketRoot, name, "guest.sock"), "DSH_PODMAN_PROJECTS_ROOT": c.projectRoot}
 	generator.Init = &init
+	generator.ReadOnlyFilesystem = boolPtr(true)
 	generator.Mounts = append(mounts, guestAgentMounts(hostSocketDir, c.socketRoot, name, c.hostGuestBinary, c.guestBinary)...)
 	if _, err := containers.CreateWithSpec(c.ctx, generator, nil); err != nil {
 		c.log().Error("guest container creation failed", "pod_name", pod, "container_name", name, "error", err)

@@ -364,6 +364,59 @@ export const containerGrepParameters = {
   },
   required: ["container", "pattern"],
 };
+export const daemonStartParameters = {
+  type: "object",
+  properties: {
+    container: containerParam,
+    name: { type: "string", description: "Optional daemon name." },
+    argv: {
+      type: "array",
+      items: { type: "string" },
+      description: "Command to run as a daemon.",
+    },
+    cwd: { type: "string", description: "Working directory." },
+    env: {
+      type: "object",
+      additionalProperties: { type: "string" },
+      description: "Environment variables.",
+    },
+  },
+  required: ["container", "argv"],
+};
+export const daemonListParameters = {
+  type: "object",
+  properties: { container: containerParam },
+  required: ["container"],
+};
+export const daemonStopParameters = {
+  type: "object",
+  properties: {
+    container: containerParam,
+    name: { type: "string", description: "Daemon name to stop." },
+    signal: { type: "string", description: 'Signal to send (e.g. "SIGTERM").' },
+  },
+  required: ["container", "name"],
+};
+export const daemonRestartParameters = {
+  type: "object",
+  properties: {
+    container: containerParam,
+    name: { type: "string", description: "Daemon name to restart." },
+  },
+  required: ["container", "name"],
+};
+export const daemonLogsParameters = {
+  type: "object",
+  properties: {
+    container: containerParam,
+    name: { type: "string", description: "Daemon name to read logs for." },
+    tailBytes: {
+      type: "integer",
+      description: "Maximum trailing bytes to retain per stream.",
+    },
+  },
+  required: ["container", "name"],
+};
 
 export interface ToolDefinition {
   name: string;
@@ -404,6 +457,11 @@ export const TOOLS: ToolDefinition[] = [
   { name: "container_edit", parameters: containerEditParameters },
   { name: "container_glob", parameters: containerGlobParameters },
   { name: "container_grep", parameters: containerGrepParameters },
+  { name: "daemon_start", parameters: daemonStartParameters },
+  { name: "daemon_list", parameters: daemonListParameters },
+  { name: "daemon_stop", parameters: daemonStopParameters },
+  { name: "daemon_restart", parameters: daemonRestartParameters },
+  { name: "daemon_logs", parameters: daemonLogsParameters },
 ];
 
 const TOOL_DESCRIPTIONS: Record<string, string> = {
@@ -432,6 +490,15 @@ const TOOL_DESCRIPTIONS: Record<string, string> = {
     "List files inside a container of the current workspace matching a pattern.",
   container_grep:
     "Search file contents inside a container of the current workspace.",
+  daemon_start:
+    "Start a daemon inside a container of the current workspace.",
+  daemon_list:
+    "List the daemons running inside a container of the current workspace.",
+  daemon_stop: "Stop a daemon inside a container of the current workspace.",
+  daemon_restart:
+    "Restart a daemon inside a container of the current workspace.",
+  daemon_logs:
+    "Read the captured logs of a daemon inside a container of the current workspace.",
 };
 
 const toolHandlers: Record<
@@ -600,6 +667,76 @@ const toolHandlers: Record<
     return {
       matches: outputLines(result.stdout),
       ...(result.stderr ? { stderr: result.stderr.trim() } : {}),
+    };
+  },
+  daemon_start: async (resolver, input, exec) => {
+    const binding = await resolveToolBinding(
+      resolver,
+      currentCwd(exec),
+      input.container,
+    );
+    const info = await unaryGuest(
+      { binding },
+      "startDaemon",
+      { name: input.name, argv: input.argv, cwd: input.cwd, env: input.env },
+    );
+    return formatDaemonInfo(info);
+  },
+  daemon_list: async (resolver, input, exec) => {
+    const binding = await resolveToolBinding(
+      resolver,
+      currentCwd(exec),
+      input.container,
+    );
+    const result = (await unaryGuest(
+      { binding },
+      "listDaemons",
+      {},
+    )) as { daemons?: any[] };
+    const daemons = result.daemons ?? [];
+    return daemons.length > 0
+      ? daemons.map(formatDaemonInfo).join("\n")
+      : "(no daemons)";
+  },
+  daemon_stop: async (resolver, input, exec) => {
+    const binding = await resolveToolBinding(
+      resolver,
+      currentCwd(exec),
+      input.container,
+    );
+    return unaryGuest(
+      { binding },
+      "stopDaemon",
+      { name: input.name, signal: input.signal },
+    );
+  },
+  daemon_restart: async (resolver, input, exec) => {
+    const binding = await resolveToolBinding(
+      resolver,
+      currentCwd(exec),
+      input.container,
+    );
+    const info = await unaryGuest(
+      { binding },
+      "restartDaemon",
+      { name: input.name },
+    );
+    return formatDaemonInfo(info);
+  },
+  daemon_logs: async (resolver, input, exec) => {
+    const binding = await resolveToolBinding(
+      resolver,
+      currentCwd(exec),
+      input.container,
+    );
+    const result = (await unaryGuest(
+      { binding },
+      "daemonLogs",
+      { name: input.name, tailBytes: input.tailBytes },
+    )) as { stdout?: unknown; stderr?: unknown };
+    return {
+      stdout: bytesText(result.stdout),
+      stderr: bytesText(result.stderr),
     };
   },
 };
@@ -808,6 +945,16 @@ function outputLines(text: string): string[] {
     .split("\n")
     .map((line) => line.trimEnd())
     .filter((line) => line !== "");
+}
+
+function formatDaemonInfo(info: any): string {
+  const argv = Array.isArray(info?.argv) ? info.argv.join(" ") : "";
+  return `${info.name}  running=${info.running}  exitCode=${info.exitCode ?? ""}  startedAt=${info.startedAt ?? ""}  stoppedAt=${info.stoppedAt ?? ""}  argv=${argv}`;
+}
+
+function bytesText(value: unknown): string {
+  if (value === undefined) return "";
+  return Buffer.isBuffer(value) ? value.toString("utf8") : String(value);
 }
 
 function currentCwd(exec: any): unknown {

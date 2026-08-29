@@ -148,6 +148,11 @@ const EXPECTED_TOOLS = [
   "container_edit",
   "container_glob",
   "container_grep",
+  "daemon_start",
+  "daemon_list",
+  "daemon_stop",
+  "daemon_restart",
+  "daemon_logs",
 ];
 
 test("tool set covers the image and container surface", () => {
@@ -186,4 +191,24 @@ test("the four destructive mutations require approval", () => {
     "recreate_container",
     "replace_container",
   ]);
+});
+
+const DAEMON_TOOLS = [
+  "daemon_start",
+  "daemon_list",
+  "daemon_stop",
+  "daemon_restart",
+  "daemon_logs",
+];
+
+test("daemon tools require no approval and are valid object-rooted schemas", () => {
+  for (const name of DAEMON_TOOLS) {
+    const tool = TOOLS.find((entry) => entry.name === name);
+    assert.ok(tool, `${name} registered`);
+    assert.notEqual(tool!.approval, true, `${name} must not require approval`);
+    assert.equal(tool!.parameters.type, "object", `${name} type`);
+    assert.equal(typeof tool!.parameters.properties, "object");
+    assert.ok(Array.isArray(tool!.parameters.required));
+    assert.ok(tool!.parameters.required.includes("container"));
+  }
 });

@@ -30,6 +30,14 @@ export interface ImageView {
   builtAt: string;
   packages: readonly string[];
 }
+export interface WorkspaceView {
+  workspaceSlug: string;
+  projectName: string;
+  containerName: string;
+  imageId: string;
+  status: string;
+  createdAt: string;
+}
 export interface CommandRequest {
   op: "refresh" | "remove" | "recreate";
   workspace: string;
@@ -41,6 +49,7 @@ export interface ContainerSettings {
   socketsRoot: string;
   projectsRoot: string;
   notice: string;
+  workspaces: readonly WorkspaceView[];
   containers: readonly ContainerView[];
   images: readonly ImageView[];
   command: CommandRequest | null;
@@ -53,6 +62,7 @@ export interface CardState {
   notice: string;
   defaultImage: string;
   defaultImageDraft: string;
+  workspaces: readonly WorkspaceView[];
   containers: readonly ContainerView[];
   images: readonly ImageView[];
 }
@@ -90,6 +100,7 @@ export class ContainerCardController {
       notice: value?.notice ?? "",
       defaultImage: value?.defaultImage ?? "",
       defaultImageDraft: this.draft ?? value?.defaultImage ?? "",
+      workspaces: value?.workspaces ?? [],
       containers: value?.containers ?? [],
       images: value?.images ?? [],
     };

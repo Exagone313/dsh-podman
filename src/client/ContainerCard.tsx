@@ -3,6 +3,14 @@
 // SPDX-License-Identifier: MIT
 
 import { useState, type ReactNode } from "react";
+import {
+  Button,
+  DisclosureRow,
+  Input,
+  Pill,
+  StateDot,
+  type StateDotState,
+} from "@deepseek-ai/dsh-client-ui-primitives";
 import type {
   InjectFace,
   PropsLocale,
@@ -11,6 +19,7 @@ import type {
 import type {
   ContainerCardFace,
   ContainerView,
+  WorkspaceView,
 } from "./container-card-controller.js";
 import type {} from "./container-card-controller.js";
 import { NS, type ContainerPluginKey } from "./locales.js";
@@ -19,54 +28,6 @@ export type ContainerCardProps = PropsRuntime<"settings.plugin.item"> &
   PropsLocale<typeof NS> &
   InjectFace<ContainerCardFace>;
 
-const row: React.CSSProperties = {
-  display: "flex",
-  flexDirection: "column",
-  gap: "4px",
-  padding: "8px",
-  border: "1px solid rgba(127,127,127,0.35)",
-  borderRadius: "6px",
-  marginBottom: "8px",
-};
-const meta: React.CSSProperties = {
-  display: "flex",
-  flexWrap: "wrap",
-  gap: "12px",
-  fontSize: "12px",
-  opacity: 0.8,
-};
-const actions: React.CSSProperties = {
-  display: "flex",
-  flexWrap: "wrap",
-  gap: "8px",
-  alignItems: "center",
-};
-const button: React.CSSProperties = {
-  padding: "3px 10px",
-  borderRadius: "4px",
-  border: "1px solid rgba(127,127,127,0.5)",
-  background: "transparent",
-  color: "inherit",
-  cursor: "pointer",
-};
-const select: React.CSSProperties = {
-  padding: "3px 8px",
-  borderRadius: "4px",
-  border: "1px solid rgba(127,127,127,0.5)",
-  background: "transparent",
-  color: "inherit",
-};
-const sectionTitle: React.CSSProperties = {
-  fontWeight: 600,
-  margin: "12px 0 8px",
-};
-const banner: React.CSSProperties = {
-  padding: "6px 10px",
-  borderRadius: "6px",
-  border: "1px solid rgba(210,153,34,0.6)",
-  marginBottom: "8px",
-  fontSize: "13px",
-};
 const cardStyle: React.CSSProperties = {
   listStyle: "none",
   border: "1px solid var(--dsw-alias-border-l2)",
@@ -119,6 +80,90 @@ const cardBodyStyle: React.CSSProperties = {
   margin: "0 16px",
   paddingBottom: "8px",
 };
+const sectionTitle: React.CSSProperties = {
+  fontWeight: 600,
+  margin: "16px 0 8px",
+  fontSize: "13px",
+  color: "var(--dsw-alias-label-secondary)",
+  textTransform: "uppercase",
+  letterSpacing: "0.04em",
+};
+const banner: React.CSSProperties = {
+  padding: "6px 10px",
+  borderRadius: "6px",
+  border: "1px solid rgba(210,153,34,0.6)",
+  margin: "12px 0",
+  fontSize: "13px",
+};
+const greyId: React.CSSProperties = {
+  color: "var(--dsw-alias-label-tertiary)",
+  fontSize: "12px",
+  fontFamily: "var(--dsw-alias-font-mono, ui-monospace, monospace)",
+};
+const hint: React.CSSProperties = {
+  fontSize: "13px",
+  color: "var(--dsw-alias-label-tertiary)",
+  margin: "8px 0",
+};
+const wsBody: React.CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  gap: "8px",
+  padding: "10px 0 12px",
+};
+const containerRow: React.CSSProperties = {
+  display: "flex",
+  flexWrap: "wrap",
+  alignItems: "center",
+  gap: "8px 12px",
+  padding: "10px 12px",
+  border: "1px solid var(--dsw-alias-border-l2)",
+  borderRadius: "10px",
+  background: "var(--dsw-alias-bg-layer-3)",
+};
+const meta: React.CSSProperties = {
+  display: "flex",
+  flexWrap: "wrap",
+  gap: "8px 12px",
+  alignItems: "center",
+  fontSize: "12px",
+  color: "var(--dsw-alias-label-tertiary)",
+  flex: "1 1 240px",
+  minWidth: 0,
+};
+const actions: React.CSSProperties = {
+  display: "flex",
+  flexWrap: "wrap",
+  gap: "8px",
+  alignItems: "center",
+};
+const imageRow: React.CSSProperties = {
+  display: "flex",
+  flexWrap: "wrap",
+  alignItems: "center",
+  gap: "8px 12px",
+  padding: "10px 12px",
+  border: "1px solid var(--dsw-alias-border-l2)",
+  borderRadius: "10px",
+  marginBottom: "8px",
+};
+const footerRow: React.CSSProperties = {
+  display: "flex",
+  justifyContent: "flex-end",
+  paddingTop: "12px",
+  marginTop: "12px",
+  borderTop: "1px solid var(--dsw-alias-border-l2)",
+};
+const imageSelect: React.CSSProperties = {
+  appearance: "none",
+  padding: "4px 8px",
+  borderRadius: "8px",
+  border: "1px solid var(--dsw-alias-border-l2)",
+  background: "var(--dsw-alias-bg-layer-3)",
+  color: "inherit",
+  fontSize: "12px",
+  maxWidth: "160px",
+};
 
 function CardChevron({ open }: { open: boolean }): ReactNode {
   return (
@@ -146,6 +191,17 @@ function CardChevron({ open }: { open: boolean }): ReactNode {
   );
 }
 
+function containerStateDot(status: string): StateDotState {
+  switch (status) {
+    case "running":
+      return "ongoing";
+    case "exited":
+      return "done";
+    default:
+      return "warning";
+  }
+}
+
 function ContainerRow(props: {
   t: (key: ContainerPluginKey) => string;
   container: ContainerView;
@@ -161,18 +217,14 @@ function ContainerRow(props: {
     .map((mount) => mount.projectName)
     .join(", ");
   return (
-    <div style={row}>
-      <strong>{container.containerName}</strong>
+    <div style={containerRow}>
       <div style={meta}>
-        <span>
-          {t("workspace")}:{" "}
-          {container.workspaceSlug === "" ? t("none") : container.workspaceSlug}
-        </span>
+        <strong style={{ color: "var(--dsw-alias-label-primary)" }}>
+          {container.containerName}
+        </strong>
+        <Pill>{container.status}</Pill>
         <span>
           {t("image")}: {container.imageId}
-        </span>
-        <span>
-          {t("status")}: {container.status}
         </span>
         <span>
           {t("created")}: {container.createdAt}
@@ -184,27 +236,28 @@ function ContainerRow(props: {
         ) : null}
       </div>
       <div style={actions}>
-        <button
-          type="button"
-          style={button}
+        <Button
+          variant="outline"
+          size="sm"
           disabled={!enabled}
           onClick={() => onRemove(container.workspaceSlug)}
         >
           {t("remove")}
-        </button>
-        <button
-          type="button"
-          style={button}
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
           disabled={!enabled}
           onClick={() => onRecreate(container.workspaceSlug, "")}
         >
           {t("recreate")}
-        </button>
+        </Button>
         <select
-          style={select}
+          style={imageSelect}
           value={selected}
           disabled={!enabled}
           onChange={(event) => setSelected(event.target.value)}
+          aria-label={t("recreateWithImage")}
         >
           {container.imageId === "" ? (
             <option value="">{t("none")}</option>
@@ -215,16 +268,59 @@ function ContainerRow(props: {
             </option>
           ))}
         </select>
-        <button
-          type="button"
-          style={button}
+        <Button
+          variant="ghost"
+          size="sm"
           disabled={!enabled || selected === ""}
           onClick={() => onRecreate(container.workspaceSlug, selected)}
         >
           {t("recreateWithImage")}
-        </button>
+        </Button>
       </div>
     </div>
+  );
+}
+
+function WorkspaceSection(props: {
+  t: (key: ContainerPluginKey) => string;
+  workspace: WorkspaceView;
+  containers: readonly ContainerView[];
+  images: readonly { imageId: string }[];
+  busy: boolean;
+  onRemove: (workspace: string) => void;
+  onRecreate: (workspace: string, image: string) => void;
+}): ReactNode {
+  const { t, workspace, containers, images, busy, onRemove, onRecreate } = props;
+  const [open, setOpen] = useState(false);
+  const status = containers[0]?.status ?? "exited";
+  return (
+    <DisclosureRow
+      icon={<StateDot state={containerStateDot(status)} />}
+      title={workspace.projectName}
+      open={open}
+      expandable
+      onToggle={() => setOpen(!open)}
+      collapsedContent={<code style={greyId}>{workspace.workspaceSlug}</code>}
+    >
+      <div style={wsBody}>
+        <code style={greyId}>{workspace.workspaceSlug}</code>
+        {containers.length === 0 ? (
+          <p style={hint}>{t("noContainers")}</p>
+        ) : (
+          containers.map((container) => (
+            <ContainerRow
+              key={container.containerName}
+              t={t}
+              container={container}
+              images={images}
+              busy={busy}
+              onRemove={onRemove}
+              onRecreate={onRecreate}
+            />
+          ))
+        )}
+      </div>
+    </DisclosureRow>
   );
 }
 
@@ -271,47 +367,45 @@ export function ContainerCard(props: ContainerCardProps): ReactNode {
           )}
           <div style={sectionTitle}>{t("configTitle")}</div>
           <div style={actions}>
-            <label
-              htmlFor="plugin-config-container-default-image"
-              style={{ fontSize: "13px" }}
-            >
-              {t("defaultImage")}
-            </label>
-            <input
-              id="plugin-config-container-default-image"
+            <Input
               value={state.defaultImageDraft}
               disabled={!state.writable}
               onChange={(event) => props.editDefaultImage(event.target.value)}
-              style={{ ...select, width: "180px" }}
+              style={{ width: "180px" }}
+              aria-label={t("defaultImage")}
             />
-            <button
-              type="button"
-              style={button}
+            <Button
+              variant="outline"
+              size="sm"
               disabled={
                 !state.writable || state.defaultImageDraft === state.defaultImage
               }
               onClick={props.saveDefaultImage}
             >
               {t("save")}
-            </button>
-            <button
-              type="button"
-              style={button}
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
               disabled={state.defaultImageDraft === state.defaultImage}
               onClick={props.discardDefaultImage}
             >
               {t("discard")}
-            </button>
+            </Button>
           </div>
-          <div style={sectionTitle}>{t("containersTitle")}</div>
-          {state.containers.length === 0 ? (
-            <p style={{ fontSize: "13px", opacity: 0.8 }}>{t("none")}</p>
+          <div style={sectionTitle}>{t("workspacesTitle")}</div>
+          {state.workspaces.length === 0 ? (
+            <p style={hint}>{t("none")}</p>
           ) : (
-            state.containers.map((container) => (
-              <ContainerRow
-                key={container.containerName}
+            state.workspaces.map((workspace) => (
+              <WorkspaceSection
+                key={workspace.workspaceSlug}
                 t={t}
-                container={container}
+                workspace={workspace}
+                containers={state.containers.filter(
+                  (container) =>
+                    container.workspaceSlug === workspace.workspaceSlug,
+                )}
                 images={state.images}
                 busy={state.busy}
                 onRemove={props.remove}
@@ -321,11 +415,13 @@ export function ContainerCard(props: ContainerCardProps): ReactNode {
           )}
           <div style={sectionTitle}>{t("imagesTitle")}</div>
           {state.images.length === 0 ? (
-            <p style={{ fontSize: "13px", opacity: 0.8 }}>{t("none")}</p>
+            <p style={hint}>{t("none")}</p>
           ) : (
             state.images.map((image) => (
-              <div key={image.imageId} style={row}>
-                <strong>{image.imageId}</strong>
+              <div key={image.imageId} style={imageRow}>
+                <strong style={{ color: "var(--dsw-alias-label-primary)" }}>
+                  {image.imageId}
+                </strong>
                 <div style={meta}>
                   <span>
                     {t("baseImage")}: {image.baseImage}
@@ -343,15 +439,15 @@ export function ContainerCard(props: ContainerCardProps): ReactNode {
               </div>
             ))
           )}
-          <div style={{ ...actions, paddingTop: "12px", borderTop: "1px solid var(--dsw-alias-border-l2)", marginTop: "12px" }}>
-            <button
-              type="button"
-              style={button}
+          <div style={footerRow}>
+            <Button
+              variant="outline"
+              size="sm"
               disabled={state.busy}
               onClick={props.reload}
             >
               {state.busy ? t("busy") : t("reload")}
-            </button>
+            </Button>
           </div>
         </div>
       ) : null}

@@ -19,6 +19,18 @@ export const settingsSchema = z.object({
   socketsRoot: z.string().default(""),
   projectsRoot: z.string().default(""),
   notice: z.string().default(""),
+  workspaces: z
+    .array(
+      z.object({
+        workspaceSlug: z.string().default(""),
+        projectName: z.string().default(""),
+        containerName: z.string().default(""),
+        imageId: z.string().default(""),
+        status: z.string().default(""),
+        createdAt: z.string().default(""),
+      }),
+    )
+    .default([]),
   containers: z
     .array(
       z.object({
@@ -73,11 +85,20 @@ export interface ImageView {
   builtAt: string;
   packages: readonly string[];
 }
+export interface WorkspaceView {
+  workspaceSlug: string;
+  projectName: string;
+  containerName: string;
+  imageId: string;
+  status: string;
+  createdAt: string;
+}
 export interface ContainerSettings {
   defaultImage: string;
   socketsRoot: string;
   projectsRoot: string;
   notice: string;
+  workspaces: readonly WorkspaceView[];
   containers: readonly ContainerView[];
   images: readonly ImageView[];
   command: CommandRequest | null;
@@ -113,13 +134,24 @@ export function installContainerSettings(
       if (refreshing) return;
       refreshing = true;
       try {
-        const [containers, images] = await Promise.all([
+        const [containers, images, workspaces] = await Promise.all([
           resolver.control("listContainers", {}),
           resolver.control("listImages", {}),
+          resolver.control("listWorkspaces", {}),
         ]);
         await scope.update({
           containers: (containers as any).containers ?? [],
           images: (images as any).images ?? [],
+          workspaces: (((workspaces as any).workspaces ?? []) as any[]).map(
+            (workspace) => ({
+              workspaceSlug: workspace.workspaceSlug ?? "",
+              projectName: workspace.mounts?.[0]?.projectName ?? workspace.workspaceSlug ?? "",
+              containerName: workspace.containerName ?? "",
+              imageId: workspace.imageId ?? "",
+              status: workspace.status ?? "",
+              createdAt: workspace.createdAt ?? "",
+            }),
+          ),
           notice: "",
         });
       } catch (error) {

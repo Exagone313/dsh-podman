@@ -59,13 +59,14 @@ function baseValue(): Record<string, unknown> {
     socketsRoot: "/run/dsh-podman",
     projectsRoot: "/projects",
     notice: "",
+    workspaces: [],
     containers: [],
     images: [],
     command: null,
   };
 }
 
-test("refresh on install publishes containers and images", async () => {
+test("refresh on install publishes containers, images and workspaces", async () => {
   const scope = fakeScope(baseValue());
   const calls: Array<[string, unknown]> = [];
   const resolver: any = {
@@ -83,6 +84,9 @@ test("refresh on install publishes containers and images", async () => {
       if (method === "listImages") {
         return { images: [{ imageId: "img1" }] };
       }
+      if (method === "listWorkspaces") {
+        return { workspaces: [{ workspaceSlug: "w1", mounts: [{ projectName: "team/app" }] }] };
+      }
       return {};
     },
   };
@@ -90,10 +94,14 @@ test("refresh on install publishes containers and images", async () => {
   await scope.update({}); // settle the queued async refresh
   assert.deepEqual(
     calls.map(([method]) => method),
-    ["listContainers", "listImages"],
+    ["listContainers", "listImages", "listWorkspaces"],
   );
   assert.equal((scope.value.containers as any[]).length, 1);
   assert.equal((scope.value.images as any[]).length, 1);
+  const workspaces = scope.value.workspaces as any[];
+  assert.equal(workspaces.length, 1);
+  assert.equal(workspaces[0].workspaceSlug, "w1");
+  assert.equal(workspaces[0].projectName, "team/app");
 });
 
 test("remove command drives removeContainer and clears the command", async () => {

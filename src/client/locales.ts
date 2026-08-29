@@ -17,6 +17,8 @@ export type ContainerPluginKey =
   | "defaultImageHint"
   | "save"
   | "discard"
+  | "workspacesTitle"
+  | "noContainers"
   | "containersTitle"
   | "containerName"
   | "workspace"
@@ -48,6 +50,8 @@ export const en: Record<ContainerPluginKey, string> = {
   defaultImageHint: "Image used when a workspace has no image of its own.",
   save: "Save",
   discard: "Discard",
+  workspacesTitle: "Workspaces",
+  noContainers: "This workspace has no containers yet.",
   containersTitle: "Containers",
   containerName: "Container",
   workspace: "Workspace",
@@ -80,6 +84,8 @@ export const zh: Record<ContainerPluginKey, string> = {
   defaultImageHint: "工作区没有自带镜像时使用的镜像。",
   save: "保存",
   discard: "放弃",
+  workspacesTitle: "工作区",
+  noContainers: "该工作区还没有容器。",
   containersTitle: "容器",
   containerName: "容器",
   workspace: "工作区",

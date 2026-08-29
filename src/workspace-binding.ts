@@ -8,6 +8,7 @@ import {
   grpc,
   unary,
 } from "./grpc/runtime-client.js";
+import { join } from "node:path";
 
 export interface WorkspaceBinding {
   guest: grpc.Client;
@@ -15,7 +16,7 @@ export interface WorkspaceBinding {
   socket: string;
 }
 export interface BindingConfig {
-  controlSocket: string;
+  socketsRoot: string;
   defaultImage: string;
   projectsRoot: string;
   controlToken: string;
@@ -82,7 +83,9 @@ export class WorkspaceResolver {
     slug: string,
     projectName: string,
   ): Promise<WorkspaceBinding> {
-    const control = controlClient(this.config.controlSocket);
+    const control = controlClient(
+      join(this.config.socketsRoot, "orchestrator.sock"),
+    );
     const controlMetadata = metadata(this.config.controlToken);
     let workspace: any;
     try {
@@ -106,7 +109,7 @@ export class WorkspaceResolver {
   }
   async control<T>(method: string, request: unknown): Promise<T> {
     return unary<T>(
-      controlClient(this.config.controlSocket),
+      controlClient(join(this.config.socketsRoot, "orchestrator.sock")),
       method,
       request,
       metadata(this.config.controlToken),

@@ -27,7 +27,7 @@ func main() {
 	}
 	socket := os.Getenv("DSH_PODMAN_GUEST_SOCKET")
 	if socket == "" {
-		socket = "/run/dsh-sockets/guest.sock"
+		panic("DSH_PODMAN_GUEST_SOCKET is required")
 	}
 	token := os.Getenv("DSH_PODMAN_GUEST_TOKEN")
 	root := os.Getenv("DSH_PODMAN_PROJECTS_ROOT")

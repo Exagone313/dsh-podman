@@ -56,7 +56,7 @@ function fakeContext(scope: FakeScope): any {
 function baseValue(): Record<string, unknown> {
   return {
     defaultImage: "arch-base",
-    controlSocket: "/run/dsh-sockets/control.sock",
+    socketsRoot: "/run/dsh-podman",
     projectsRoot: "/mnt/project",
     notice: "",
     containers: [],
@@ -71,7 +71,7 @@ test("refresh on install publishes containers and images", async () => {
   const resolver: any = {
     getConfig: () => ({
       defaultImage: "arch-base",
-      controlSocket: "/run/dsh-sockets/control.sock",
+      socketsRoot: "/run/dsh-podman",
       projectsRoot: "/mnt/project",
     }),
     setConfig: () => {},

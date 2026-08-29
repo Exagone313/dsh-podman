@@ -16,7 +16,7 @@ const commandSchema = z.object({
 
 export const settingsSchema = z.object({
   defaultImage: z.string().default(""),
-  controlSocket: z.string().default(""),
+  socketsRoot: z.string().default(""),
   projectsRoot: z.string().default(""),
   notice: z.string().default(""),
   containers: z
@@ -75,7 +75,7 @@ export interface ImageView {
 }
 export interface ContainerSettings {
   defaultImage: string;
-  controlSocket: string;
+  socketsRoot: string;
   projectsRoot: string;
   notice: string;
   containers: readonly ContainerView[];
@@ -103,7 +103,7 @@ export function installContainerSettings(
     const scope = sctx.settings.register(CONTAINER_NS, settingsSchema, {
       base: {
         defaultImage: resolver.getConfig().defaultImage,
-        controlSocket: resolver.getConfig().controlSocket,
+        socketsRoot: resolver.getConfig().socketsRoot,
         projectsRoot: resolver.getConfig().projectsRoot,
       },
     }) as ContainerSettingsScope;
@@ -134,7 +134,7 @@ export function installContainerSettings(
     const handle = async (next: ContainerSettings): Promise<void> => {
       resolver.setConfig({
         defaultImage: next.defaultImage,
-        controlSocket: next.controlSocket,
+        socketsRoot: next.socketsRoot,
         projectsRoot: next.projectsRoot,
       });
       const command = next.command;

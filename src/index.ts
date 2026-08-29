@@ -49,7 +49,7 @@ const imageParameters = {
 export const name = "podman";
 export const inject = ["tools", "workspaceRegistry"];
 export interface PluginConfig {
-  controlSocket?: string;
+  socketsRoot?: string;
   defaultImage?: string;
   projectsRoot?: string;
   controlToken?: string;
@@ -57,10 +57,10 @@ export interface PluginConfig {
 export function apply(ctx: any, config: PluginConfig = {}): void {
   const resolver = new WorkspaceResolver(
     {
-      controlSocket:
-        config.controlSocket ??
-        process.env.DSH_PODMAN_ORCHESTRATOR_CONTROL_SOCKET ??
-        "/run/dsh-sockets/control.sock",
+      socketsRoot:
+        config.socketsRoot ??
+        process.env.DSH_PODMAN_ORCHESTRATOR_SOCKETS_ROOT ??
+        "/run/dsh-podman",
       defaultImage:
         config.defaultImage ?? process.env.DSH_PODMAN_DEFAULT_IMAGE ?? "arch-base",
       projectsRoot: config.projectsRoot ?? "/mnt/project",

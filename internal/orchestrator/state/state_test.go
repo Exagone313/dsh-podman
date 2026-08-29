@@ -40,7 +40,7 @@ func TestWorkspacesRoundTrip(t *testing.T) {
 		ImageID:         "arch",
 		Mounts:          []Mount{{ProjectName: "proj", Mode: "read_write"}},
 		Status:          "running",
-		AgentSocketPath: "/run/dsh-sockets/dsh-workspace-proj/guest.sock",
+		AgentSocketPath: "/run/dsh-podman/dsh-workspace-proj/guest.sock",
 		AgentToken:      "secret",
 		CreatedAt:       "now",
 	}}

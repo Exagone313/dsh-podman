@@ -38,7 +38,7 @@ export interface CommandRequest {
 }
 export interface ContainerSettings {
   defaultImage: string;
-  controlSocket: string;
+  socketsRoot: string;
   projectsRoot: string;
   notice: string;
   containers: readonly ContainerView[];

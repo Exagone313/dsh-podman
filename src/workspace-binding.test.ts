@@ -9,6 +9,7 @@ import loader from "@grpc/proto-loader";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 import { tmpdir } from "node:os";
+import { mkdirSync } from "node:fs";
 import {
   workspaceSlug,
   metadata,
@@ -67,7 +68,7 @@ test("metadata omits the header when the token is empty", () => {
 });
 
 async function startControlServer(): Promise<{
-  socket: string;
+  socketsRoot: string;
   received: string[];
   stop: () => void;
 }> {
@@ -89,10 +90,12 @@ async function startControlServer(): Promise<{
       callback(null, { workspaces: [] });
     },
   });
-  const socket = resolve(
+  const socketsRoot = resolve(
     tmpdir(),
-    `dsh-control-test-${process.pid}-${Date.now()}-${Math.random()}.sock`,
+    `dsh-control-test-${process.pid}-${Date.now()}-${Math.random()}`,
   );
+  mkdirSync(socketsRoot, { recursive: true });
+  const socket = resolve(socketsRoot, "orchestrator.sock");
   await new Promise<void>((ok, fail) =>
     server.bindAsync(
       `unix:${socket}`,
@@ -100,15 +103,15 @@ async function startControlServer(): Promise<{
       (error: any) => (error ? fail(error) : ok()),
     ),
   );
-  return { socket, received, stop: () => server.forceShutdown() };
+  return { socketsRoot, received, stop: () => server.forceShutdown() };
 }
 
 test("control calls carry the bearer token", async () => {
-  const { socket, received, stop } = await startControlServer();
+  const { socketsRoot, received, stop } = await startControlServer();
   try {
     const resolver = new WorkspaceResolver(
       {
-        controlSocket: socket,
+        socketsRoot,
         defaultImage: "arch",
         projectsRoot: "/mnt/project",
         controlToken: "tok-1",
@@ -123,11 +126,11 @@ test("control calls carry the bearer token", async () => {
 });
 
 test("control calls omit the token when unset", async () => {
-  const { socket, received, stop } = await startControlServer();
+  const { socketsRoot, received, stop } = await startControlServer();
   try {
     const resolver = new WorkspaceResolver(
       {
-        controlSocket: socket,
+        socketsRoot,
         defaultImage: "arch",
         projectsRoot: "/mnt/project",
         controlToken: "",

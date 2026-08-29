@@ -30,7 +30,7 @@ func main() {
 		fmt.Println(version)
 		return
 	}
-	socketsRoot := getenv("DSH_PODMAN_ORCHESTRATOR_SOCKETS_ROOT", "/run/dsh-podman")
+	socketsRoot := getenv("DSH_PODMAN_SOCKETS_ROOT", "/run/dsh-podman")
 	socket := filepath.Join(socketsRoot, "orchestrator.sock")
 	root := getenv("DSH_PODMAN_PROJECTS_ROOT", "/projects")
 	stateDir := getenv("DSH_PODMAN_ORCHESTRATOR_STATE", "/var/lib/dsh-orchestrator")

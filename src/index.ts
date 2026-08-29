@@ -59,7 +59,7 @@ export function apply(ctx: any, config: PluginConfig = {}): void {
     {
       socketsRoot:
         config.socketsRoot ??
-        process.env.DSH_PODMAN_ORCHESTRATOR_SOCKETS_ROOT ??
+        process.env.DSH_PODMAN_SOCKETS_ROOT ??
         "/run/dsh-podman",
       defaultImage:
         config.defaultImage ?? process.env.DSH_PODMAN_DEFAULT_IMAGE ?? "arch-base",

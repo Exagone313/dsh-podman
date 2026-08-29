@@ -13,7 +13,6 @@ import (
 	osexec "os/exec"
 	"path/filepath"
 	"strconv"
-	"strings"
 	"sync"
 	"time"
 
@@ -432,44 +431,4 @@ func (s *Server) Delete(_ context.Context, request *guest.DeleteRequest) (*guest
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 	return &guest.DeleteResponse{}, nil
-}
-
-func (s *Server) InstallPackages(request *guest.InstallPackagesRequest, stream guest.WorkspaceGuestAgent_InstallPackagesServer) error {
-	slog.Info("guest agent InstallPackages requested", "package_count", len(request.GetPackages()))
-	if len(request.GetPackages()) == 0 {
-		return status.Error(codes.InvalidArgument, "at least one package is required")
-	}
-	for _, pkg := range request.GetPackages() {
-		if pkg == "" || strings.ContainsAny(pkg, " \t\r\n") {
-			return status.Error(codes.InvalidArgument, "invalid package name")
-		}
-	}
-	command := append([]string{"pacman", "-S", "--noconfirm"}, request.GetPackages()...)
-	process, err := s.Processes.Start(stream.Context(), command, "", nil)
-	if err != nil {
-		return status.Error(codes.Internal, err.Error())
-	}
-	stdout, _ := process.Command.StdoutPipe()
-	stderr, _ := process.Command.StderrPipe()
-	if err := process.Command.Start(); err != nil {
-		return status.Error(codes.Internal, err.Error())
-	}
-	go func() {
-		data, _ := io.ReadAll(stdout)
-		if len(data) > 0 {
-			_ = stream.Send(&guest.InstallPackagesOutput{Payload: &guest.InstallPackagesOutput_StdoutChunk{StdoutChunk: data}})
-		}
-	}()
-	go func() {
-		data, _ := io.ReadAll(stderr)
-		if len(data) > 0 {
-			_ = stream.Send(&guest.InstallPackagesOutput{Payload: &guest.InstallPackagesOutput_StderrChunk{StderrChunk: data}})
-		}
-	}()
-	waitErr := process.Command.Wait()
-	code := int32(0)
-	if waitErr != nil {
-		code = 1
-	}
-	return stream.Send(&guest.InstallPackagesOutput{Payload: &guest.InstallPackagesOutput_Exit{Exit: &guest.ExecExit{ExitCode: code}}})
 }

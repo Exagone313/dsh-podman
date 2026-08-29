@@ -16,7 +16,6 @@ service WorkspaceGuestAgent {
   rpc ReadDir(ReadDirRequest) returns (ReadDirResponse);
   rpc Mkdir(MkdirRequest) returns (MkdirResponse);
   rpc Delete(DeleteRequest) returns (DeleteResponse);
-  rpc InstallPackages(InstallPackagesRequest) returns (stream InstallPackagesOutput);
   rpc StartDaemon(StartDaemonRequest) returns (DaemonInfo);
   rpc ListDaemons(ListDaemonsRequest) returns (ListDaemonsResponse);
   rpc StopDaemon(StopDaemonRequest) returns (StopDaemonResponse);
@@ -46,8 +45,6 @@ message MkdirRequest { string path = 1; bool parents = 2; }
 message MkdirResponse {}
 message DeleteRequest { string path = 1; bool recursive = 2; }
 message DeleteResponse {}
-message InstallPackagesRequest { repeated string packages = 1; }
-message InstallPackagesOutput { oneof payload { bytes stdout_chunk = 1; bytes stderr_chunk = 2; ExecExit exit = 3; } }
 message StartDaemonRequest { string name = 1; repeated string argv = 2; string cwd = 3; map<string, string> env = 4; }
 message DaemonInfo { string name = 1; repeated string argv = 2; bool running = 3; int32 exit_code = 4; string started_at = 5; string stopped_at = 6; }
 message ListDaemonsRequest {}

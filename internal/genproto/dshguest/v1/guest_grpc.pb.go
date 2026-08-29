@@ -23,21 +23,20 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	WorkspaceGuestAgent_Exec_FullMethodName            = "/dshguest.v1.WorkspaceGuestAgent/Exec"
-	WorkspaceGuestAgent_Signal_FullMethodName          = "/dshguest.v1.WorkspaceGuestAgent/Signal"
-	WorkspaceGuestAgent_ListProcesses_FullMethodName   = "/dshguest.v1.WorkspaceGuestAgent/ListProcesses"
-	WorkspaceGuestAgent_ReadFile_FullMethodName        = "/dshguest.v1.WorkspaceGuestAgent/ReadFile"
-	WorkspaceGuestAgent_WriteFile_FullMethodName       = "/dshguest.v1.WorkspaceGuestAgent/WriteFile"
-	WorkspaceGuestAgent_Stat_FullMethodName            = "/dshguest.v1.WorkspaceGuestAgent/Stat"
-	WorkspaceGuestAgent_ReadDir_FullMethodName         = "/dshguest.v1.WorkspaceGuestAgent/ReadDir"
-	WorkspaceGuestAgent_Mkdir_FullMethodName           = "/dshguest.v1.WorkspaceGuestAgent/Mkdir"
-	WorkspaceGuestAgent_Delete_FullMethodName          = "/dshguest.v1.WorkspaceGuestAgent/Delete"
-	WorkspaceGuestAgent_InstallPackages_FullMethodName = "/dshguest.v1.WorkspaceGuestAgent/InstallPackages"
-	WorkspaceGuestAgent_StartDaemon_FullMethodName     = "/dshguest.v1.WorkspaceGuestAgent/StartDaemon"
-	WorkspaceGuestAgent_ListDaemons_FullMethodName     = "/dshguest.v1.WorkspaceGuestAgent/ListDaemons"
-	WorkspaceGuestAgent_StopDaemon_FullMethodName      = "/dshguest.v1.WorkspaceGuestAgent/StopDaemon"
-	WorkspaceGuestAgent_RestartDaemon_FullMethodName   = "/dshguest.v1.WorkspaceGuestAgent/RestartDaemon"
-	WorkspaceGuestAgent_DaemonLogs_FullMethodName      = "/dshguest.v1.WorkspaceGuestAgent/DaemonLogs"
+	WorkspaceGuestAgent_Exec_FullMethodName          = "/dshguest.v1.WorkspaceGuestAgent/Exec"
+	WorkspaceGuestAgent_Signal_FullMethodName        = "/dshguest.v1.WorkspaceGuestAgent/Signal"
+	WorkspaceGuestAgent_ListProcesses_FullMethodName = "/dshguest.v1.WorkspaceGuestAgent/ListProcesses"
+	WorkspaceGuestAgent_ReadFile_FullMethodName      = "/dshguest.v1.WorkspaceGuestAgent/ReadFile"
+	WorkspaceGuestAgent_WriteFile_FullMethodName     = "/dshguest.v1.WorkspaceGuestAgent/WriteFile"
+	WorkspaceGuestAgent_Stat_FullMethodName          = "/dshguest.v1.WorkspaceGuestAgent/Stat"
+	WorkspaceGuestAgent_ReadDir_FullMethodName       = "/dshguest.v1.WorkspaceGuestAgent/ReadDir"
+	WorkspaceGuestAgent_Mkdir_FullMethodName         = "/dshguest.v1.WorkspaceGuestAgent/Mkdir"
+	WorkspaceGuestAgent_Delete_FullMethodName        = "/dshguest.v1.WorkspaceGuestAgent/Delete"
+	WorkspaceGuestAgent_StartDaemon_FullMethodName   = "/dshguest.v1.WorkspaceGuestAgent/StartDaemon"
+	WorkspaceGuestAgent_ListDaemons_FullMethodName   = "/dshguest.v1.WorkspaceGuestAgent/ListDaemons"
+	WorkspaceGuestAgent_StopDaemon_FullMethodName    = "/dshguest.v1.WorkspaceGuestAgent/StopDaemon"
+	WorkspaceGuestAgent_RestartDaemon_FullMethodName = "/dshguest.v1.WorkspaceGuestAgent/RestartDaemon"
+	WorkspaceGuestAgent_DaemonLogs_FullMethodName    = "/dshguest.v1.WorkspaceGuestAgent/DaemonLogs"
 )
 
 // WorkspaceGuestAgentClient is the client API for WorkspaceGuestAgent service.
@@ -53,7 +52,6 @@ type WorkspaceGuestAgentClient interface {
 	ReadDir(ctx context.Context, in *ReadDirRequest, opts ...grpc.CallOption) (*ReadDirResponse, error)
 	Mkdir(ctx context.Context, in *MkdirRequest, opts ...grpc.CallOption) (*MkdirResponse, error)
 	Delete(ctx context.Context, in *DeleteRequest, opts ...grpc.CallOption) (*DeleteResponse, error)
-	InstallPackages(ctx context.Context, in *InstallPackagesRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[InstallPackagesOutput], error)
 	StartDaemon(ctx context.Context, in *StartDaemonRequest, opts ...grpc.CallOption) (*DaemonInfo, error)
 	ListDaemons(ctx context.Context, in *ListDaemonsRequest, opts ...grpc.CallOption) (*ListDaemonsResponse, error)
 	StopDaemon(ctx context.Context, in *StopDaemonRequest, opts ...grpc.CallOption) (*StopDaemonResponse, error)
@@ -174,25 +172,6 @@ func (c *workspaceGuestAgentClient) Delete(ctx context.Context, in *DeleteReques
 	return out, nil
 }
 
-func (c *workspaceGuestAgentClient) InstallPackages(ctx context.Context, in *InstallPackagesRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[InstallPackagesOutput], error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &WorkspaceGuestAgent_ServiceDesc.Streams[3], WorkspaceGuestAgent_InstallPackages_FullMethodName, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	x := &grpc.GenericClientStream[InstallPackagesRequest, InstallPackagesOutput]{ClientStream: stream}
-	if err := x.ClientStream.SendMsg(in); err != nil {
-		return nil, err
-	}
-	if err := x.ClientStream.CloseSend(); err != nil {
-		return nil, err
-	}
-	return x, nil
-}
-
-// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
-type WorkspaceGuestAgent_InstallPackagesClient = grpc.ServerStreamingClient[InstallPackagesOutput]
-
 func (c *workspaceGuestAgentClient) StartDaemon(ctx context.Context, in *StartDaemonRequest, opts ...grpc.CallOption) (*DaemonInfo, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(DaemonInfo)
@@ -256,7 +235,6 @@ type WorkspaceGuestAgentServer interface {
 	ReadDir(context.Context, *ReadDirRequest) (*ReadDirResponse, error)
 	Mkdir(context.Context, *MkdirRequest) (*MkdirResponse, error)
 	Delete(context.Context, *DeleteRequest) (*DeleteResponse, error)
-	InstallPackages(*InstallPackagesRequest, grpc.ServerStreamingServer[InstallPackagesOutput]) error
 	StartDaemon(context.Context, *StartDaemonRequest) (*DaemonInfo, error)
 	ListDaemons(context.Context, *ListDaemonsRequest) (*ListDaemonsResponse, error)
 	StopDaemon(context.Context, *StopDaemonRequest) (*StopDaemonResponse, error)
@@ -298,9 +276,6 @@ func (UnimplementedWorkspaceGuestAgentServer) Mkdir(context.Context, *MkdirReque
 }
 func (UnimplementedWorkspaceGuestAgentServer) Delete(context.Context, *DeleteRequest) (*DeleteResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method Delete not implemented")
-}
-func (UnimplementedWorkspaceGuestAgentServer) InstallPackages(*InstallPackagesRequest, grpc.ServerStreamingServer[InstallPackagesOutput]) error {
-	return status.Error(codes.Unimplemented, "method InstallPackages not implemented")
 }
 func (UnimplementedWorkspaceGuestAgentServer) StartDaemon(context.Context, *StartDaemonRequest) (*DaemonInfo, error) {
 	return nil, status.Error(codes.Unimplemented, "method StartDaemon not implemented")
@@ -471,17 +446,6 @@ func _WorkspaceGuestAgent_Delete_Handler(srv interface{}, ctx context.Context, d
 	return interceptor(ctx, in, info, handler)
 }
 
-func _WorkspaceGuestAgent_InstallPackages_Handler(srv interface{}, stream grpc.ServerStream) error {
-	m := new(InstallPackagesRequest)
-	if err := stream.RecvMsg(m); err != nil {
-		return err
-	}
-	return srv.(WorkspaceGuestAgentServer).InstallPackages(m, &grpc.GenericServerStream[InstallPackagesRequest, InstallPackagesOutput]{ServerStream: stream})
-}
-
-// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
-type WorkspaceGuestAgent_InstallPackagesServer = grpc.ServerStreamingServer[InstallPackagesOutput]
-
 func _WorkspaceGuestAgent_StartDaemon_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(StartDaemonRequest)
 	if err := dec(in); err != nil {
@@ -640,11 +604,6 @@ var WorkspaceGuestAgent_ServiceDesc = grpc.ServiceDesc{
 			StreamName:    "WriteFile",
 			Handler:       _WorkspaceGuestAgent_WriteFile_Handler,
 			ClientStreams: true,
-		},
-		{
-			StreamName:    "InstallPackages",
-			Handler:       _WorkspaceGuestAgent_InstallPackages_Handler,
-			ServerStreams: true,
 		},
 	},
 	Metadata: "dshguest/v1/guest.proto",

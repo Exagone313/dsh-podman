@@ -1287,148 +1287,6 @@ func (*DeleteResponse) Descriptor() ([]byte, []int) {
 	return file_dshguest_v1_guest_proto_rawDescGZIP(), []int{22}
 }
 
-type InstallPackagesRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Packages      []string               `protobuf:"bytes,1,rep,name=packages,proto3" json:"packages,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *InstallPackagesRequest) Reset() {
-	*x = InstallPackagesRequest{}
-	mi := &file_dshguest_v1_guest_proto_msgTypes[23]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *InstallPackagesRequest) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*InstallPackagesRequest) ProtoMessage() {}
-
-func (x *InstallPackagesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_dshguest_v1_guest_proto_msgTypes[23]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use InstallPackagesRequest.ProtoReflect.Descriptor instead.
-func (*InstallPackagesRequest) Descriptor() ([]byte, []int) {
-	return file_dshguest_v1_guest_proto_rawDescGZIP(), []int{23}
-}
-
-func (x *InstallPackagesRequest) GetPackages() []string {
-	if x != nil {
-		return x.Packages
-	}
-	return nil
-}
-
-type InstallPackagesOutput struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	// Types that are valid to be assigned to Payload:
-	//
-	//	*InstallPackagesOutput_StdoutChunk
-	//	*InstallPackagesOutput_StderrChunk
-	//	*InstallPackagesOutput_Exit
-	Payload       isInstallPackagesOutput_Payload `protobuf_oneof:"payload"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *InstallPackagesOutput) Reset() {
-	*x = InstallPackagesOutput{}
-	mi := &file_dshguest_v1_guest_proto_msgTypes[24]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *InstallPackagesOutput) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*InstallPackagesOutput) ProtoMessage() {}
-
-func (x *InstallPackagesOutput) ProtoReflect() protoreflect.Message {
-	mi := &file_dshguest_v1_guest_proto_msgTypes[24]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use InstallPackagesOutput.ProtoReflect.Descriptor instead.
-func (*InstallPackagesOutput) Descriptor() ([]byte, []int) {
-	return file_dshguest_v1_guest_proto_rawDescGZIP(), []int{24}
-}
-
-func (x *InstallPackagesOutput) GetPayload() isInstallPackagesOutput_Payload {
-	if x != nil {
-		return x.Payload
-	}
-	return nil
-}
-
-func (x *InstallPackagesOutput) GetStdoutChunk() []byte {
-	if x != nil {
-		if x, ok := x.Payload.(*InstallPackagesOutput_StdoutChunk); ok {
-			return x.StdoutChunk
-		}
-	}
-	return nil
-}
-
-func (x *InstallPackagesOutput) GetStderrChunk() []byte {
-	if x != nil {
-		if x, ok := x.Payload.(*InstallPackagesOutput_StderrChunk); ok {
-			return x.StderrChunk
-		}
-	}
-	return nil
-}
-
-func (x *InstallPackagesOutput) GetExit() *ExecExit {
-	if x != nil {
-		if x, ok := x.Payload.(*InstallPackagesOutput_Exit); ok {
-			return x.Exit
-		}
-	}
-	return nil
-}
-
-type isInstallPackagesOutput_Payload interface {
-	isInstallPackagesOutput_Payload()
-}
-
-type InstallPackagesOutput_StdoutChunk struct {
-	StdoutChunk []byte `protobuf:"bytes,1,opt,name=stdout_chunk,json=stdoutChunk,proto3,oneof"`
-}
-
-type InstallPackagesOutput_StderrChunk struct {
-	StderrChunk []byte `protobuf:"bytes,2,opt,name=stderr_chunk,json=stderrChunk,proto3,oneof"`
-}
-
-type InstallPackagesOutput_Exit struct {
-	Exit *ExecExit `protobuf:"bytes,3,opt,name=exit,proto3,oneof"`
-}
-
-func (*InstallPackagesOutput_StdoutChunk) isInstallPackagesOutput_Payload() {}
-
-func (*InstallPackagesOutput_StderrChunk) isInstallPackagesOutput_Payload() {}
-
-func (*InstallPackagesOutput_Exit) isInstallPackagesOutput_Payload() {}
-
 type StartDaemonRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
@@ -1441,7 +1299,7 @@ type StartDaemonRequest struct {
 
 func (x *StartDaemonRequest) Reset() {
 	*x = StartDaemonRequest{}
-	mi := &file_dshguest_v1_guest_proto_msgTypes[25]
+	mi := &file_dshguest_v1_guest_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1453,7 +1311,7 @@ func (x *StartDaemonRequest) String() string {
 func (*StartDaemonRequest) ProtoMessage() {}
 
 func (x *StartDaemonRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_dshguest_v1_guest_proto_msgTypes[25]
+	mi := &file_dshguest_v1_guest_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1466,7 +1324,7 @@ func (x *StartDaemonRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StartDaemonRequest.ProtoReflect.Descriptor instead.
 func (*StartDaemonRequest) Descriptor() ([]byte, []int) {
-	return file_dshguest_v1_guest_proto_rawDescGZIP(), []int{25}
+	return file_dshguest_v1_guest_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *StartDaemonRequest) GetName() string {
@@ -1511,7 +1369,7 @@ type DaemonInfo struct {
 
 func (x *DaemonInfo) Reset() {
 	*x = DaemonInfo{}
-	mi := &file_dshguest_v1_guest_proto_msgTypes[26]
+	mi := &file_dshguest_v1_guest_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1523,7 +1381,7 @@ func (x *DaemonInfo) String() string {
 func (*DaemonInfo) ProtoMessage() {}
 
 func (x *DaemonInfo) ProtoReflect() protoreflect.Message {
-	mi := &file_dshguest_v1_guest_proto_msgTypes[26]
+	mi := &file_dshguest_v1_guest_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1536,7 +1394,7 @@ func (x *DaemonInfo) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DaemonInfo.ProtoReflect.Descriptor instead.
 func (*DaemonInfo) Descriptor() ([]byte, []int) {
-	return file_dshguest_v1_guest_proto_rawDescGZIP(), []int{26}
+	return file_dshguest_v1_guest_proto_rawDescGZIP(), []int{24}
 }
 
 func (x *DaemonInfo) GetName() string {
@@ -1589,7 +1447,7 @@ type ListDaemonsRequest struct {
 
 func (x *ListDaemonsRequest) Reset() {
 	*x = ListDaemonsRequest{}
-	mi := &file_dshguest_v1_guest_proto_msgTypes[27]
+	mi := &file_dshguest_v1_guest_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1601,7 +1459,7 @@ func (x *ListDaemonsRequest) String() string {
 func (*ListDaemonsRequest) ProtoMessage() {}
 
 func (x *ListDaemonsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_dshguest_v1_guest_proto_msgTypes[27]
+	mi := &file_dshguest_v1_guest_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1614,7 +1472,7 @@ func (x *ListDaemonsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListDaemonsRequest.ProtoReflect.Descriptor instead.
 func (*ListDaemonsRequest) Descriptor() ([]byte, []int) {
-	return file_dshguest_v1_guest_proto_rawDescGZIP(), []int{27}
+	return file_dshguest_v1_guest_proto_rawDescGZIP(), []int{25}
 }
 
 type ListDaemonsResponse struct {
@@ -1626,7 +1484,7 @@ type ListDaemonsResponse struct {
 
 func (x *ListDaemonsResponse) Reset() {
 	*x = ListDaemonsResponse{}
-	mi := &file_dshguest_v1_guest_proto_msgTypes[28]
+	mi := &file_dshguest_v1_guest_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1638,7 +1496,7 @@ func (x *ListDaemonsResponse) String() string {
 func (*ListDaemonsResponse) ProtoMessage() {}
 
 func (x *ListDaemonsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_dshguest_v1_guest_proto_msgTypes[28]
+	mi := &file_dshguest_v1_guest_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1651,7 +1509,7 @@ func (x *ListDaemonsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListDaemonsResponse.ProtoReflect.Descriptor instead.
 func (*ListDaemonsResponse) Descriptor() ([]byte, []int) {
-	return file_dshguest_v1_guest_proto_rawDescGZIP(), []int{28}
+	return file_dshguest_v1_guest_proto_rawDescGZIP(), []int{26}
 }
 
 func (x *ListDaemonsResponse) GetDaemons() []*DaemonInfo {
@@ -1671,7 +1529,7 @@ type StopDaemonRequest struct {
 
 func (x *StopDaemonRequest) Reset() {
 	*x = StopDaemonRequest{}
-	mi := &file_dshguest_v1_guest_proto_msgTypes[29]
+	mi := &file_dshguest_v1_guest_proto_msgTypes[27]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1683,7 +1541,7 @@ func (x *StopDaemonRequest) String() string {
 func (*StopDaemonRequest) ProtoMessage() {}
 
 func (x *StopDaemonRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_dshguest_v1_guest_proto_msgTypes[29]
+	mi := &file_dshguest_v1_guest_proto_msgTypes[27]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1696,7 +1554,7 @@ func (x *StopDaemonRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StopDaemonRequest.ProtoReflect.Descriptor instead.
 func (*StopDaemonRequest) Descriptor() ([]byte, []int) {
-	return file_dshguest_v1_guest_proto_rawDescGZIP(), []int{29}
+	return file_dshguest_v1_guest_proto_rawDescGZIP(), []int{27}
 }
 
 func (x *StopDaemonRequest) GetName() string {
@@ -1721,7 +1579,7 @@ type StopDaemonResponse struct {
 
 func (x *StopDaemonResponse) Reset() {
 	*x = StopDaemonResponse{}
-	mi := &file_dshguest_v1_guest_proto_msgTypes[30]
+	mi := &file_dshguest_v1_guest_proto_msgTypes[28]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1733,7 +1591,7 @@ func (x *StopDaemonResponse) String() string {
 func (*StopDaemonResponse) ProtoMessage() {}
 
 func (x *StopDaemonResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_dshguest_v1_guest_proto_msgTypes[30]
+	mi := &file_dshguest_v1_guest_proto_msgTypes[28]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1746,7 +1604,7 @@ func (x *StopDaemonResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StopDaemonResponse.ProtoReflect.Descriptor instead.
 func (*StopDaemonResponse) Descriptor() ([]byte, []int) {
-	return file_dshguest_v1_guest_proto_rawDescGZIP(), []int{30}
+	return file_dshguest_v1_guest_proto_rawDescGZIP(), []int{28}
 }
 
 type RestartDaemonRequest struct {
@@ -1758,7 +1616,7 @@ type RestartDaemonRequest struct {
 
 func (x *RestartDaemonRequest) Reset() {
 	*x = RestartDaemonRequest{}
-	mi := &file_dshguest_v1_guest_proto_msgTypes[31]
+	mi := &file_dshguest_v1_guest_proto_msgTypes[29]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1770,7 +1628,7 @@ func (x *RestartDaemonRequest) String() string {
 func (*RestartDaemonRequest) ProtoMessage() {}
 
 func (x *RestartDaemonRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_dshguest_v1_guest_proto_msgTypes[31]
+	mi := &file_dshguest_v1_guest_proto_msgTypes[29]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1783,7 +1641,7 @@ func (x *RestartDaemonRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RestartDaemonRequest.ProtoReflect.Descriptor instead.
 func (*RestartDaemonRequest) Descriptor() ([]byte, []int) {
-	return file_dshguest_v1_guest_proto_rawDescGZIP(), []int{31}
+	return file_dshguest_v1_guest_proto_rawDescGZIP(), []int{29}
 }
 
 func (x *RestartDaemonRequest) GetName() string {
@@ -1803,7 +1661,7 @@ type DaemonLogsRequest struct {
 
 func (x *DaemonLogsRequest) Reset() {
 	*x = DaemonLogsRequest{}
-	mi := &file_dshguest_v1_guest_proto_msgTypes[32]
+	mi := &file_dshguest_v1_guest_proto_msgTypes[30]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1815,7 +1673,7 @@ func (x *DaemonLogsRequest) String() string {
 func (*DaemonLogsRequest) ProtoMessage() {}
 
 func (x *DaemonLogsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_dshguest_v1_guest_proto_msgTypes[32]
+	mi := &file_dshguest_v1_guest_proto_msgTypes[30]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1828,7 +1686,7 @@ func (x *DaemonLogsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DaemonLogsRequest.ProtoReflect.Descriptor instead.
 func (*DaemonLogsRequest) Descriptor() ([]byte, []int) {
-	return file_dshguest_v1_guest_proto_rawDescGZIP(), []int{32}
+	return file_dshguest_v1_guest_proto_rawDescGZIP(), []int{30}
 }
 
 func (x *DaemonLogsRequest) GetName() string {
@@ -1855,7 +1713,7 @@ type DaemonLogsResponse struct {
 
 func (x *DaemonLogsResponse) Reset() {
 	*x = DaemonLogsResponse{}
-	mi := &file_dshguest_v1_guest_proto_msgTypes[33]
+	mi := &file_dshguest_v1_guest_proto_msgTypes[31]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1867,7 +1725,7 @@ func (x *DaemonLogsResponse) String() string {
 func (*DaemonLogsResponse) ProtoMessage() {}
 
 func (x *DaemonLogsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_dshguest_v1_guest_proto_msgTypes[33]
+	mi := &file_dshguest_v1_guest_proto_msgTypes[31]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1880,7 +1738,7 @@ func (x *DaemonLogsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DaemonLogsResponse.ProtoReflect.Descriptor instead.
 func (*DaemonLogsResponse) Descriptor() ([]byte, []int) {
-	return file_dshguest_v1_guest_proto_rawDescGZIP(), []int{33}
+	return file_dshguest_v1_guest_proto_rawDescGZIP(), []int{31}
 }
 
 func (x *DaemonLogsResponse) GetStdout() []byte {
@@ -1979,14 +1837,7 @@ const file_dshguest_v1_guest_proto_rawDesc = "" +
 	"\rDeleteRequest\x12\x12\n" +
 	"\x04path\x18\x01 \x01(\tR\x04path\x12\x1c\n" +
 	"\trecursive\x18\x02 \x01(\bR\trecursive\"\x10\n" +
-	"\x0eDeleteResponse\"4\n" +
-	"\x16InstallPackagesRequest\x12\x1a\n" +
-	"\bpackages\x18\x01 \x03(\tR\bpackages\"\x99\x01\n" +
-	"\x15InstallPackagesOutput\x12#\n" +
-	"\fstdout_chunk\x18\x01 \x01(\fH\x00R\vstdoutChunk\x12#\n" +
-	"\fstderr_chunk\x18\x02 \x01(\fH\x00R\vstderrChunk\x12+\n" +
-	"\x04exit\x18\x03 \x01(\v2\x15.dshguest.v1.ExecExitH\x00R\x04exitB\t\n" +
-	"\apayload\"\xc2\x01\n" +
+	"\x0eDeleteResponse\"\xc2\x01\n" +
 	"\x12StartDaemonRequest\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x12\n" +
 	"\x04argv\x18\x02 \x03(\tR\x04argv\x12\x10\n" +
@@ -2020,7 +1871,7 @@ const file_dshguest_v1_guest_proto_rawDesc = "" +
 	"tail_bytes\x18\x02 \x01(\x05R\ttailBytes\"D\n" +
 	"\x12DaemonLogsResponse\x12\x16\n" +
 	"\x06stdout\x18\x01 \x01(\fR\x06stdout\x12\x16\n" +
-	"\x06stderr\x18\x02 \x01(\fR\x06stderr2\xeb\b\n" +
+	"\x06stderr\x18\x02 \x01(\fR\x06stderr2\x8d\b\n" +
 	"\x13WorkspaceGuestAgent\x12;\n" +
 	"\x04Exec\x12\x16.dshguest.v1.ExecInput\x1a\x17.dshguest.v1.ExecOutput(\x010\x01\x12A\n" +
 	"\x06Signal\x12\x1a.dshguest.v1.SignalRequest\x1a\x1b.dshguest.v1.SignalResponse\x12V\n" +
@@ -2030,8 +1881,7 @@ const file_dshguest_v1_guest_proto_rawDesc = "" +
 	"\x04Stat\x12\x18.dshguest.v1.StatRequest\x1a\x19.dshguest.v1.StatResponse\x12D\n" +
 	"\aReadDir\x12\x1b.dshguest.v1.ReadDirRequest\x1a\x1c.dshguest.v1.ReadDirResponse\x12>\n" +
 	"\x05Mkdir\x12\x19.dshguest.v1.MkdirRequest\x1a\x1a.dshguest.v1.MkdirResponse\x12A\n" +
-	"\x06Delete\x12\x1a.dshguest.v1.DeleteRequest\x1a\x1b.dshguest.v1.DeleteResponse\x12\\\n" +
-	"\x0fInstallPackages\x12#.dshguest.v1.InstallPackagesRequest\x1a\".dshguest.v1.InstallPackagesOutput0\x01\x12G\n" +
+	"\x06Delete\x12\x1a.dshguest.v1.DeleteRequest\x1a\x1b.dshguest.v1.DeleteResponse\x12G\n" +
 	"\vStartDaemon\x12\x1f.dshguest.v1.StartDaemonRequest\x1a\x17.dshguest.v1.DaemonInfo\x12P\n" +
 	"\vListDaemons\x12\x1f.dshguest.v1.ListDaemonsRequest\x1a .dshguest.v1.ListDaemonsResponse\x12M\n" +
 	"\n" +
@@ -2052,90 +1902,85 @@ func file_dshguest_v1_guest_proto_rawDescGZIP() []byte {
 	return file_dshguest_v1_guest_proto_rawDescData
 }
 
-var file_dshguest_v1_guest_proto_msgTypes = make([]protoimpl.MessageInfo, 36)
+var file_dshguest_v1_guest_proto_msgTypes = make([]protoimpl.MessageInfo, 34)
 var file_dshguest_v1_guest_proto_goTypes = []any{
-	(*ExecInput)(nil),              // 0: dshguest.v1.ExecInput
-	(*ExecStart)(nil),              // 1: dshguest.v1.ExecStart
-	(*ExecOutput)(nil),             // 2: dshguest.v1.ExecOutput
-	(*ExecExit)(nil),               // 3: dshguest.v1.ExecExit
-	(*SignalRequest)(nil),          // 4: dshguest.v1.SignalRequest
-	(*SignalResponse)(nil),         // 5: dshguest.v1.SignalResponse
-	(*ListProcessesRequest)(nil),   // 6: dshguest.v1.ListProcessesRequest
-	(*ListProcessesResponse)(nil),  // 7: dshguest.v1.ListProcessesResponse
-	(*ProcessInfo)(nil),            // 8: dshguest.v1.ProcessInfo
-	(*ReadFileRequest)(nil),        // 9: dshguest.v1.ReadFileRequest
-	(*ReadFileChunk)(nil),          // 10: dshguest.v1.ReadFileChunk
-	(*WriteFileChunk)(nil),         // 11: dshguest.v1.WriteFileChunk
-	(*WriteFileStart)(nil),         // 12: dshguest.v1.WriteFileStart
-	(*WriteFileResponse)(nil),      // 13: dshguest.v1.WriteFileResponse
-	(*StatRequest)(nil),            // 14: dshguest.v1.StatRequest
-	(*StatResponse)(nil),           // 15: dshguest.v1.StatResponse
-	(*ReadDirRequest)(nil),         // 16: dshguest.v1.ReadDirRequest
-	(*ReadDirResponse)(nil),        // 17: dshguest.v1.ReadDirResponse
-	(*DirEntry)(nil),               // 18: dshguest.v1.DirEntry
-	(*MkdirRequest)(nil),           // 19: dshguest.v1.MkdirRequest
-	(*MkdirResponse)(nil),          // 20: dshguest.v1.MkdirResponse
-	(*DeleteRequest)(nil),          // 21: dshguest.v1.DeleteRequest
-	(*DeleteResponse)(nil),         // 22: dshguest.v1.DeleteResponse
-	(*InstallPackagesRequest)(nil), // 23: dshguest.v1.InstallPackagesRequest
-	(*InstallPackagesOutput)(nil),  // 24: dshguest.v1.InstallPackagesOutput
-	(*StartDaemonRequest)(nil),     // 25: dshguest.v1.StartDaemonRequest
-	(*DaemonInfo)(nil),             // 26: dshguest.v1.DaemonInfo
-	(*ListDaemonsRequest)(nil),     // 27: dshguest.v1.ListDaemonsRequest
-	(*ListDaemonsResponse)(nil),    // 28: dshguest.v1.ListDaemonsResponse
-	(*StopDaemonRequest)(nil),      // 29: dshguest.v1.StopDaemonRequest
-	(*StopDaemonResponse)(nil),     // 30: dshguest.v1.StopDaemonResponse
-	(*RestartDaemonRequest)(nil),   // 31: dshguest.v1.RestartDaemonRequest
-	(*DaemonLogsRequest)(nil),      // 32: dshguest.v1.DaemonLogsRequest
-	(*DaemonLogsResponse)(nil),     // 33: dshguest.v1.DaemonLogsResponse
-	nil,                            // 34: dshguest.v1.ExecStart.EnvEntry
-	nil,                            // 35: dshguest.v1.StartDaemonRequest.EnvEntry
+	(*ExecInput)(nil),             // 0: dshguest.v1.ExecInput
+	(*ExecStart)(nil),             // 1: dshguest.v1.ExecStart
+	(*ExecOutput)(nil),            // 2: dshguest.v1.ExecOutput
+	(*ExecExit)(nil),              // 3: dshguest.v1.ExecExit
+	(*SignalRequest)(nil),         // 4: dshguest.v1.SignalRequest
+	(*SignalResponse)(nil),        // 5: dshguest.v1.SignalResponse
+	(*ListProcessesRequest)(nil),  // 6: dshguest.v1.ListProcessesRequest
+	(*ListProcessesResponse)(nil), // 7: dshguest.v1.ListProcessesResponse
+	(*ProcessInfo)(nil),           // 8: dshguest.v1.ProcessInfo
+	(*ReadFileRequest)(nil),       // 9: dshguest.v1.ReadFileRequest
+	(*ReadFileChunk)(nil),         // 10: dshguest.v1.ReadFileChunk
+	(*WriteFileChunk)(nil),        // 11: dshguest.v1.WriteFileChunk
+	(*WriteFileStart)(nil),        // 12: dshguest.v1.WriteFileStart
+	(*WriteFileResponse)(nil),     // 13: dshguest.v1.WriteFileResponse
+	(*StatRequest)(nil),           // 14: dshguest.v1.StatRequest
+	(*StatResponse)(nil),          // 15: dshguest.v1.StatResponse
+	(*ReadDirRequest)(nil),        // 16: dshguest.v1.ReadDirRequest
+	(*ReadDirResponse)(nil),       // 17: dshguest.v1.ReadDirResponse
+	(*DirEntry)(nil),              // 18: dshguest.v1.DirEntry
+	(*MkdirRequest)(nil),          // 19: dshguest.v1.MkdirRequest
+	(*MkdirResponse)(nil),         // 20: dshguest.v1.MkdirResponse
+	(*DeleteRequest)(nil),         // 21: dshguest.v1.DeleteRequest
+	(*DeleteResponse)(nil),        // 22: dshguest.v1.DeleteResponse
+	(*StartDaemonRequest)(nil),    // 23: dshguest.v1.StartDaemonRequest
+	(*DaemonInfo)(nil),            // 24: dshguest.v1.DaemonInfo
+	(*ListDaemonsRequest)(nil),    // 25: dshguest.v1.ListDaemonsRequest
+	(*ListDaemonsResponse)(nil),   // 26: dshguest.v1.ListDaemonsResponse
+	(*StopDaemonRequest)(nil),     // 27: dshguest.v1.StopDaemonRequest
+	(*StopDaemonResponse)(nil),    // 28: dshguest.v1.StopDaemonResponse
+	(*RestartDaemonRequest)(nil),  // 29: dshguest.v1.RestartDaemonRequest
+	(*DaemonLogsRequest)(nil),     // 30: dshguest.v1.DaemonLogsRequest
+	(*DaemonLogsResponse)(nil),    // 31: dshguest.v1.DaemonLogsResponse
+	nil,                           // 32: dshguest.v1.ExecStart.EnvEntry
+	nil,                           // 33: dshguest.v1.StartDaemonRequest.EnvEntry
 }
 var file_dshguest_v1_guest_proto_depIdxs = []int32{
 	1,  // 0: dshguest.v1.ExecInput.start:type_name -> dshguest.v1.ExecStart
-	34, // 1: dshguest.v1.ExecStart.env:type_name -> dshguest.v1.ExecStart.EnvEntry
+	32, // 1: dshguest.v1.ExecStart.env:type_name -> dshguest.v1.ExecStart.EnvEntry
 	3,  // 2: dshguest.v1.ExecOutput.exit:type_name -> dshguest.v1.ExecExit
 	8,  // 3: dshguest.v1.ListProcessesResponse.processes:type_name -> dshguest.v1.ProcessInfo
 	12, // 4: dshguest.v1.WriteFileChunk.start:type_name -> dshguest.v1.WriteFileStart
 	18, // 5: dshguest.v1.ReadDirResponse.entries:type_name -> dshguest.v1.DirEntry
-	3,  // 6: dshguest.v1.InstallPackagesOutput.exit:type_name -> dshguest.v1.ExecExit
-	35, // 7: dshguest.v1.StartDaemonRequest.env:type_name -> dshguest.v1.StartDaemonRequest.EnvEntry
-	26, // 8: dshguest.v1.ListDaemonsResponse.daemons:type_name -> dshguest.v1.DaemonInfo
-	0,  // 9: dshguest.v1.WorkspaceGuestAgent.Exec:input_type -> dshguest.v1.ExecInput
-	4,  // 10: dshguest.v1.WorkspaceGuestAgent.Signal:input_type -> dshguest.v1.SignalRequest
-	6,  // 11: dshguest.v1.WorkspaceGuestAgent.ListProcesses:input_type -> dshguest.v1.ListProcessesRequest
-	9,  // 12: dshguest.v1.WorkspaceGuestAgent.ReadFile:input_type -> dshguest.v1.ReadFileRequest
-	11, // 13: dshguest.v1.WorkspaceGuestAgent.WriteFile:input_type -> dshguest.v1.WriteFileChunk
-	14, // 14: dshguest.v1.WorkspaceGuestAgent.Stat:input_type -> dshguest.v1.StatRequest
-	16, // 15: dshguest.v1.WorkspaceGuestAgent.ReadDir:input_type -> dshguest.v1.ReadDirRequest
-	19, // 16: dshguest.v1.WorkspaceGuestAgent.Mkdir:input_type -> dshguest.v1.MkdirRequest
-	21, // 17: dshguest.v1.WorkspaceGuestAgent.Delete:input_type -> dshguest.v1.DeleteRequest
-	23, // 18: dshguest.v1.WorkspaceGuestAgent.InstallPackages:input_type -> dshguest.v1.InstallPackagesRequest
-	25, // 19: dshguest.v1.WorkspaceGuestAgent.StartDaemon:input_type -> dshguest.v1.StartDaemonRequest
-	27, // 20: dshguest.v1.WorkspaceGuestAgent.ListDaemons:input_type -> dshguest.v1.ListDaemonsRequest
-	29, // 21: dshguest.v1.WorkspaceGuestAgent.StopDaemon:input_type -> dshguest.v1.StopDaemonRequest
-	31, // 22: dshguest.v1.WorkspaceGuestAgent.RestartDaemon:input_type -> dshguest.v1.RestartDaemonRequest
-	32, // 23: dshguest.v1.WorkspaceGuestAgent.DaemonLogs:input_type -> dshguest.v1.DaemonLogsRequest
-	2,  // 24: dshguest.v1.WorkspaceGuestAgent.Exec:output_type -> dshguest.v1.ExecOutput
-	5,  // 25: dshguest.v1.WorkspaceGuestAgent.Signal:output_type -> dshguest.v1.SignalResponse
-	7,  // 26: dshguest.v1.WorkspaceGuestAgent.ListProcesses:output_type -> dshguest.v1.ListProcessesResponse
-	10, // 27: dshguest.v1.WorkspaceGuestAgent.ReadFile:output_type -> dshguest.v1.ReadFileChunk
-	13, // 28: dshguest.v1.WorkspaceGuestAgent.WriteFile:output_type -> dshguest.v1.WriteFileResponse
-	15, // 29: dshguest.v1.WorkspaceGuestAgent.Stat:output_type -> dshguest.v1.StatResponse
-	17, // 30: dshguest.v1.WorkspaceGuestAgent.ReadDir:output_type -> dshguest.v1.ReadDirResponse
-	20, // 31: dshguest.v1.WorkspaceGuestAgent.Mkdir:output_type -> dshguest.v1.MkdirResponse
-	22, // 32: dshguest.v1.WorkspaceGuestAgent.Delete:output_type -> dshguest.v1.DeleteResponse
-	24, // 33: dshguest.v1.WorkspaceGuestAgent.InstallPackages:output_type -> dshguest.v1.InstallPackagesOutput
-	26, // 34: dshguest.v1.WorkspaceGuestAgent.StartDaemon:output_type -> dshguest.v1.DaemonInfo
-	28, // 35: dshguest.v1.WorkspaceGuestAgent.ListDaemons:output_type -> dshguest.v1.ListDaemonsResponse
-	30, // 36: dshguest.v1.WorkspaceGuestAgent.StopDaemon:output_type -> dshguest.v1.StopDaemonResponse
-	26, // 37: dshguest.v1.WorkspaceGuestAgent.RestartDaemon:output_type -> dshguest.v1.DaemonInfo
-	33, // 38: dshguest.v1.WorkspaceGuestAgent.DaemonLogs:output_type -> dshguest.v1.DaemonLogsResponse
-	24, // [24:39] is the sub-list for method output_type
-	9,  // [9:24] is the sub-list for method input_type
-	9,  // [9:9] is the sub-list for extension type_name
-	9,  // [9:9] is the sub-list for extension extendee
-	0,  // [0:9] is the sub-list for field type_name
+	33, // 6: dshguest.v1.StartDaemonRequest.env:type_name -> dshguest.v1.StartDaemonRequest.EnvEntry
+	24, // 7: dshguest.v1.ListDaemonsResponse.daemons:type_name -> dshguest.v1.DaemonInfo
+	0,  // 8: dshguest.v1.WorkspaceGuestAgent.Exec:input_type -> dshguest.v1.ExecInput
+	4,  // 9: dshguest.v1.WorkspaceGuestAgent.Signal:input_type -> dshguest.v1.SignalRequest
+	6,  // 10: dshguest.v1.WorkspaceGuestAgent.ListProcesses:input_type -> dshguest.v1.ListProcessesRequest
+	9,  // 11: dshguest.v1.WorkspaceGuestAgent.ReadFile:input_type -> dshguest.v1.ReadFileRequest
+	11, // 12: dshguest.v1.WorkspaceGuestAgent.WriteFile:input_type -> dshguest.v1.WriteFileChunk
+	14, // 13: dshguest.v1.WorkspaceGuestAgent.Stat:input_type -> dshguest.v1.StatRequest
+	16, // 14: dshguest.v1.WorkspaceGuestAgent.ReadDir:input_type -> dshguest.v1.ReadDirRequest
+	19, // 15: dshguest.v1.WorkspaceGuestAgent.Mkdir:input_type -> dshguest.v1.MkdirRequest
+	21, // 16: dshguest.v1.WorkspaceGuestAgent.Delete:input_type -> dshguest.v1.DeleteRequest
+	23, // 17: dshguest.v1.WorkspaceGuestAgent.StartDaemon:input_type -> dshguest.v1.StartDaemonRequest
+	25, // 18: dshguest.v1.WorkspaceGuestAgent.ListDaemons:input_type -> dshguest.v1.ListDaemonsRequest
+	27, // 19: dshguest.v1.WorkspaceGuestAgent.StopDaemon:input_type -> dshguest.v1.StopDaemonRequest
+	29, // 20: dshguest.v1.WorkspaceGuestAgent.RestartDaemon:input_type -> dshguest.v1.RestartDaemonRequest
+	30, // 21: dshguest.v1.WorkspaceGuestAgent.DaemonLogs:input_type -> dshguest.v1.DaemonLogsRequest
+	2,  // 22: dshguest.v1.WorkspaceGuestAgent.Exec:output_type -> dshguest.v1.ExecOutput
+	5,  // 23: dshguest.v1.WorkspaceGuestAgent.Signal:output_type -> dshguest.v1.SignalResponse
+	7,  // 24: dshguest.v1.WorkspaceGuestAgent.ListProcesses:output_type -> dshguest.v1.ListProcessesResponse
+	10, // 25: dshguest.v1.WorkspaceGuestAgent.ReadFile:output_type -> dshguest.v1.ReadFileChunk
+	13, // 26: dshguest.v1.WorkspaceGuestAgent.WriteFile:output_type -> dshguest.v1.WriteFileResponse
+	15, // 27: dshguest.v1.WorkspaceGuestAgent.Stat:output_type -> dshguest.v1.StatResponse
+	17, // 28: dshguest.v1.WorkspaceGuestAgent.ReadDir:output_type -> dshguest.v1.ReadDirResponse
+	20, // 29: dshguest.v1.WorkspaceGuestAgent.Mkdir:output_type -> dshguest.v1.MkdirResponse
+	22, // 30: dshguest.v1.WorkspaceGuestAgent.Delete:output_type -> dshguest.v1.DeleteResponse
+	24, // 31: dshguest.v1.WorkspaceGuestAgent.StartDaemon:output_type -> dshguest.v1.DaemonInfo
+	26, // 32: dshguest.v1.WorkspaceGuestAgent.ListDaemons:output_type -> dshguest.v1.ListDaemonsResponse
+	28, // 33: dshguest.v1.WorkspaceGuestAgent.StopDaemon:output_type -> dshguest.v1.StopDaemonResponse
+	24, // 34: dshguest.v1.WorkspaceGuestAgent.RestartDaemon:output_type -> dshguest.v1.DaemonInfo
+	31, // 35: dshguest.v1.WorkspaceGuestAgent.DaemonLogs:output_type -> dshguest.v1.DaemonLogsResponse
+	22, // [22:36] is the sub-list for method output_type
+	8,  // [8:22] is the sub-list for method input_type
+	8,  // [8:8] is the sub-list for extension type_name
+	8,  // [8:8] is the sub-list for extension extendee
+	0,  // [0:8] is the sub-list for field type_name
 }
 
 func init() { file_dshguest_v1_guest_proto_init() }
@@ -2156,18 +2001,13 @@ func file_dshguest_v1_guest_proto_init() {
 		(*WriteFileChunk_Start)(nil),
 		(*WriteFileChunk_DataChunk)(nil),
 	}
-	file_dshguest_v1_guest_proto_msgTypes[24].OneofWrappers = []any{
-		(*InstallPackagesOutput_StdoutChunk)(nil),
-		(*InstallPackagesOutput_StderrChunk)(nil),
-		(*InstallPackagesOutput_Exit)(nil),
-	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_dshguest_v1_guest_proto_rawDesc), len(file_dshguest_v1_guest_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   36,
+			NumMessages:   34,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

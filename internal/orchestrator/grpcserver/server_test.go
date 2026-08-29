@@ -459,7 +459,7 @@ func TestBuildImageMissingBase(t *testing.T) {
 	}
 }
 
-func TestResolveBaseTag(t *testing.T) {
+func TestResolveImageTag(t *testing.T) {
 	t.Setenv("DSH_PODMAN_DEFAULT_IMAGE", "arch-base")
 	store := newTestStore(t)
 	images := []state.Image{
@@ -477,19 +477,39 @@ func TestResolveBaseTag(t *testing.T) {
 		"localhost/dsh-podman/arch-base:latest": "localhost/dsh-podman/arch-base:latest",
 		"valkey":                                "localhost/dsh-podman/valkey:latest",
 		"valkey:latest":                         "localhost/dsh-podman/valkey:latest",
+		"localhost/dsh-podman/valkey":           "localhost/dsh-podman/valkey:latest",
 		"localhost/dsh-podman/valkey:latest":    "localhost/dsh-podman/valkey:latest",
 	}
 	for in, want := range cases {
-		got, err := server.resolveBaseTag(in)
+		got, err := server.resolveImageTag(in)
 		if err != nil {
-			t.Fatalf("resolveBaseTag(%q): %v", in, err)
+			t.Fatalf("resolveImageTag(%q): %v", in, err)
 		}
 		if got != want {
-			t.Fatalf("resolveBaseTag(%q) = %q, want %q", in, got, want)
+			t.Fatalf("resolveImageTag(%q) = %q, want %q", in, got, want)
 		}
 	}
-	if _, err := server.resolveBaseTag("missing"); status.Code(err) != codes.NotFound {
+	if _, err := server.resolveImageTag("missing"); status.Code(err) != codes.NotFound {
 		t.Fatalf("expected NotFound for missing base, got %v", err)
+	}
+}
+
+func TestStartContainerAcceptsTagReference(t *testing.T) {
+	store := newTestStore(t)
+	if err := store.SaveImages([]state.Image{{ImageID: "valkey", ImageTag: "localhost/dsh-podman/valkey:latest"}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.SaveWorkspaces([]state.Workspace{{WorkspaceSlug: "proj"}}); err != nil {
+		t.Fatal(err)
+	}
+	server := &Server{Store: store, Logger: silentLogger()}
+	_, err := server.StartContainer(context.Background(), &ctl.StartContainerRequest{
+		WorkspaceSlug: "proj",
+		Container:     "valkey-ctr",
+		ImageId:       "localhost/dsh-podman/valkey:latest",
+	})
+	if status.Code(err) != codes.FailedPrecondition {
+		t.Fatalf("tag reference should resolve past image lookup, expected FailedPrecondition (podman not configured), got %v", err)
 	}
 }
 

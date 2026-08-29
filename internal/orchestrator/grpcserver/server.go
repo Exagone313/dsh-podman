@@ -710,42 +710,10 @@ func (s *Server) CreateWorkspace(ctx context.Context, request *ctl.CreateWorkspa
 	if !validWorkspaceSlug(request.GetWorkspaceSlug()) {
 		return nil, status.Error(codes.InvalidArgument, "invalid workspace slug")
 	}
-	images, err := s.Store.Images()
+	resolved, err := s.resolveImage(request.GetImageId())
 	if err != nil {
-		return nil, status.Error(codes.Internal, err.Error())
-	}
-	found := false
-	imageIndex := -1
-	for i, image := range images {
-		if image.ImageID == request.GetImageId() {
-			imageIndex = i
-		}
-		if image.ImageID == request.GetImageId() && image.ImageTag != "" {
-			found = true
-		}
-	}
-	if !found {
-		s.log().Info("CreateWorkspace image lookup", "image_id", request.GetImageId(), "found", false, "default_image", request.GetImageId() == defaultImageID())
-		if request.GetImageId() != defaultImageID() || imageIndex >= 0 {
-			return nil, status.Error(codes.NotFound, "built image not found")
-		}
-		if !s.BuildDefaultImage {
-			s.log().Error("CreateWorkspace cannot auto-provision default image", "image_id", request.GetImageId(), "reason", "DSH_PODMAN_BUILD_DEFAULT_IMAGE is disabled")
-			return nil, status.Error(codes.NotFound, "built image not found; default image auto-build is disabled")
-		}
-		if s.ImageBuilder == nil {
-			s.log().Error("CreateWorkspace cannot auto-provision default image", "image_id", request.GetImageId(), "reason", "podman image builder is not configured")
-			return nil, status.Error(codes.FailedPrecondition, "podman image builder is not configured")
-		}
-		image := state.Image{ImageID: request.GetImageId(), BaseImage: "docker.io/library/archlinux:latest", Packages: append([]string(nil), defaultPackages...)}
-		image, err = s.buildImage(request.GetImageId(), image)
-		if err != nil {
-			return nil, status.Error(codes.Internal, fmt.Sprintf("build default image: %v", err))
-		}
-		images = append(images, image)
-		imageIndex = len(images) - 1
-		s.log().Info("CreateWorkspace auto-provisioned image", "image_id", image.ImageID, "image_tag", image.ImageTag)
-		found = true
+		s.log().Info("CreateWorkspace image lookup", "image_id", request.GetImageId(), "found", false, "error", err)
+		return nil, err
 	}
 	secret, err := token.New()
 	if err != nil {
@@ -771,22 +739,21 @@ func (s *Server) CreateWorkspace(ctx context.Context, request *ctl.CreateWorkspa
 	if s.Podman == nil {
 		return nil, status.Error(codes.FailedPrecondition, "podman is not configured")
 	}
-	imageTag := images[imageIndex].ImageTag
+	imageTag := resolved.ImageTag
 	exists, imageErr := s.Podman.ImageExists(imageTag)
 	if imageErr != nil {
 		return nil, status.Error(codes.Internal, imageErr.Error())
 	}
 	if !exists {
 		s.log().Warn("CreateWorkspace image state is stale", "image_id", request.GetImageId(), "image_tag", imageTag)
-		if request.GetImageId() != defaultImageID() || !s.BuildDefaultImage || s.ImageBuilder == nil {
+		if !isDefaultImageID(request.GetImageId()) || !s.BuildDefaultImage || s.ImageBuilder == nil {
 			return nil, status.Error(codes.NotFound, "built image not found")
 		}
-		image := images[imageIndex]
+		image := resolved
 		image, err = s.buildImage(request.GetImageId(), image)
 		if err != nil {
 			return nil, status.Error(codes.Internal, fmt.Sprintf("rebuild default image: %v", err))
 		}
-		images[imageIndex] = image
 		imageTag = image.ImageTag
 		s.log().Info("CreateWorkspace rebuilt stale default image", "image_id", image.ImageID, "image_tag", image.ImageTag)
 	}
@@ -846,11 +813,17 @@ func (s *Server) BuildImage(_ context.Context, request *ctl.BuildImageRequest) (
 		return nil, status.Error(codes.FailedPrecondition, "image builder is not configured")
 	}
 	base := request.GetBaseImage()
-	tag, err := s.resolveBaseTag(base)
+	resolved, err := s.resolveImage(base)
 	if err != nil {
+		if status.Code(err) == codes.NotFound {
+			return nil, status.Error(codes.NotFound, fmt.Sprintf("base image %q not found", base))
+		}
 		return nil, err
 	}
-	base = tag
+	if resolved.ImageTag == "" {
+		return nil, status.Error(codes.NotFound, fmt.Sprintf("base image %q not found", base))
+	}
+	base = resolved.ImageTag
 	image := state.Image{ImageID: imageID, BaseImage: base, Packages: append([]string(nil), request.GetPackages()...)}
 	stored, err := s.buildImage(imageID, image)
 	if err != nil {
@@ -958,41 +931,45 @@ func (s *Server) defaultImage() (state.Image, error) {
 	return image, nil
 }
 
-// resolveBaseTag resolves a base image reference from an image build request to
-// a concrete tag. The reference may be a stored image id (with or without a tag
-// suffix), a fully-qualified id, or an already-qualified tag such as
-// "localhost/dsh-podman/arch-base:latest".
-func (s *Server) resolveBaseTag(base string) (string, error) {
+// resolveImage resolves an image reference to a stored image record. The
+// reference may be a stored image id (short or fully-qualified), with or
+// without a tag suffix, or an already-qualified tag such as
+// "localhost/dsh-podman/valkey:latest". The default (base) image is
+// auto-provisioned when absent and enabled.
+func (s *Server) resolveImage(imageID string) (state.Image, error) {
 	images, err := s.Store.Images()
 	if err != nil {
-		return "", status.Error(codes.Internal, err.Error())
-	}
-	// Already a concrete tag of a built image.
-	for _, image := range images {
-		if image.ImageTag == base {
-			return base, nil
-		}
+		return state.Image{}, status.Error(codes.Internal, err.Error())
 	}
 	// Normalize a trailing ":tag" so ids with and without a tag both resolve.
-	id := base
-	if stripped, _, hasTag := strings.Cut(base, ":"); hasTag {
+	id := imageID
+	if stripped, _, hasTag := strings.Cut(imageID, ":"); hasTag {
 		id = stripped
 	}
+	// Exact matches (a stored tag or id) win over the default image.
+	for _, image := range images {
+		if image.ImageTag != "" && image.ImageTag == imageID {
+			return image, nil
+		}
+		if image.ImageTag != "" && (image.ImageID == imageID || image.ImageID == id) {
+			return image, nil
+		}
+	}
+	// The default (base) image, auto-provisioned when absent and enabled.
 	if isDefaultImageID(id) {
 		def, err := s.defaultImage()
 		if err != nil {
-			return "", err
+			return state.Image{}, err
 		}
-		return def.ImageTag, nil
+		return def, nil
 	}
+	// Fully-qualified references to a stored image id.
 	for _, image := range images {
-		if image.ImageID == id || strings.TrimPrefix(image.ImageID, imagePrefix()) == strings.TrimPrefix(id, imagePrefix()) {
-			if image.ImageTag != "" {
-				return image.ImageTag, nil
-			}
+		if image.ImageTag != "" && strings.TrimPrefix(image.ImageID, imagePrefix()) == strings.TrimPrefix(id, imagePrefix()) {
+			return image, nil
 		}
 	}
-	return "", status.Error(codes.NotFound, fmt.Sprintf("base image %q not found", base))
+	return state.Image{}, status.Error(codes.NotFound, "built image not found")
 }
 
 // isDefaultImageID reports whether id refers to the default (base) image, in
@@ -1001,26 +978,17 @@ func isDefaultImageID(id string) bool {
 	return strings.TrimPrefix(id, imagePrefix()) == strings.TrimPrefix(defaultImageID(), imagePrefix())
 }
 
-// resolveImageTag returns the stored image tag for imageID, or a NotFound
-// status error when no built image with a non-empty tag is stored.
+// resolveImageTag returns the stored image tag for an image reference, or a
+// NotFound status error when no built image with a non-empty tag is stored.
 func (s *Server) resolveImageTag(imageID string) (string, error) {
-	if imageID == defaultImageID() {
-		def, err := s.defaultImage()
-		if err != nil {
-			return "", err
-		}
-		return def.ImageTag, nil
-	}
-	images, err := s.Store.Images()
+	image, err := s.resolveImage(imageID)
 	if err != nil {
-		return "", status.Error(codes.Internal, err.Error())
+		return "", err
 	}
-	for _, image := range images {
-		if image.ImageID == imageID && image.ImageTag != "" {
-			return image.ImageTag, nil
-		}
+	if image.ImageTag == "" {
+		return "", status.Error(codes.NotFound, "built image not found")
 	}
-	return "", status.Error(codes.NotFound, "built image not found")
+	return image.ImageTag, nil
 }
 
 // containerMounts returns the mounts that apply to a container: its own list

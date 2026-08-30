@@ -478,6 +478,41 @@ test("handle never writes projectsRoot into setConfig", async () => {
   }
 });
 
+test("settings seed projectsRoot from the resolver config", async () => {
+  let registeredBase: Record<string, unknown> | undefined;
+  const scope = fakeScope(baseValue());
+  const context: any = {
+    inject(deps: string[], callback: (sctx: any) => void): void {
+      assert.deepEqual(deps, ["settings"]);
+      callback({
+        settings: {
+          register(
+            _namespace: string,
+            _schema: unknown,
+            options: { base?: Record<string, unknown> },
+          ) {
+            registeredBase = options?.base ?? {};
+            return scope;
+          },
+        },
+      });
+    },
+  };
+  const resolver: any = {
+    getConfig: () => ({
+      defaultImage: "archlinux",
+      socketsRoot: "/run/dsh-podman",
+      projectsRoot: "/projects",
+    }),
+    setConfig: () => {},
+    async control() {
+      return {};
+    },
+  };
+  installContainerSettings(context, resolver);
+  assert.equal(registeredBase?.projectsRoot, "/projects");
+});
+
 test("image_build command drives buildImage with the imageId, parent and packages", async () => {
   const scope = fakeScope(baseValue());
   const calls: Array<[string, unknown]> = [];

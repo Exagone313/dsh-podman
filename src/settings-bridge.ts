@@ -52,6 +52,7 @@ const commandSchema = z.object({
 export const settingsSchema = z.object({
   defaultImage: z.string().default(""),
   socketsRoot: z.string().default(""),
+  projectsRoot: z.string().default(""),
   notice: z.string().default(""),
   workspaces: z
     .array(
@@ -182,6 +183,7 @@ export interface WorkspaceView {
 export interface ContainerSettings {
   defaultImage: string;
   socketsRoot: string;
+  projectsRoot: string;
   notice: string;
   workspaces: readonly WorkspaceView[];
   containers: readonly ContainerView[];
@@ -265,6 +267,7 @@ export function installContainerSettings(
       base: {
         defaultImage: resolver.getConfig().defaultImage,
         socketsRoot: resolver.getConfig().socketsRoot,
+        projectsRoot: resolver.getConfig().projectsRoot,
       },
     }) as ContainerSettingsScope;
 

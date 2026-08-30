@@ -70,6 +70,7 @@ export interface CommandRequest {
 export interface ContainerSettings {
   defaultImage: string;
   socketsRoot: string;
+  projectsRoot: string;
   notice: string;
   workspaces: readonly WorkspaceView[];
   containers: readonly ContainerView[];
@@ -88,6 +89,7 @@ export interface CardState {
   defaultImageDraft: string;
   socketsRoot: string;
   socketsRootDraft: string;
+  projectsRoot: string;
   workspaces: readonly WorkspaceView[];
   containers: readonly ContainerView[];
   images: readonly ImageView[];
@@ -154,6 +156,7 @@ export class ContainerCardController {
       defaultImageDraft: this.draft("defaultImage", value?.defaultImage ?? ""),
       socketsRoot: value?.socketsRoot ?? "",
       socketsRootDraft: this.draft("socketsRoot", value?.socketsRoot ?? ""),
+      projectsRoot: value?.projectsRoot ?? "",
       workspaces: value?.workspaces ?? [],
       containers: value?.containers ?? [],
       images: value?.images ?? [],

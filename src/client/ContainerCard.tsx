@@ -1485,6 +1485,7 @@ export function ContainerCard(props: ContainerCardProps): ReactNode {
   const [packages, setPackages] = useState<string[]>([]);
   const [defaultOpen, setDefaultOpen] = useState(false);
   const [defaultImage, setDefaultImage] = useState(state.defaultImage);
+  const projectsRootId = useId();
   const baseImages = state.images.filter((image) => image.isBase);
   const customImages = state.images.filter((image) => !image.isBase);
   const defaultCandidates = [
@@ -1707,6 +1708,32 @@ export function ContainerCard(props: ContainerCardProps): ReactNode {
             onSet={props.setSecret}
           />
           <div style={sectionTitle}>{t("configTitle")}</div>
+          <div
+            style={{
+              display: "flex",
+              flexWrap: "wrap",
+              alignItems: "center",
+              gap: "8px",
+              padding: "8px 0",
+            }}
+          >
+            <label
+              htmlFor={projectsRootId}
+              style={{
+                fontSize: "13px",
+                color: "var(--dsw-alias-label-secondary)",
+                minWidth: "110px",
+              }}
+            >
+              {t("projectsRoot")}
+            </label>
+            <Input
+              id={projectsRootId}
+              value={state.projectsRoot}
+              disabled
+              style={{ width: "200px" }}
+            />
+          </div>
           <ConfigField
             t={t}
             label={t("socketsRoot")}

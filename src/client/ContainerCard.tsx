@@ -919,8 +919,9 @@ function BaseImageRow(props: {
   onPull: (name: string) => void;
 }): ReactNode {
   const { t, image, busy, onRebuild, onPull } = props;
-  const pull = image.status === "missing" || image.status === "pulled";
-  const rebuild = image.status === "built";
+  const pull = image.basePublic && (image.status === "missing" || image.status === "pulled");
+  const build = !image.basePublic && image.status === "missing";
+  const rebuild = !image.basePublic && image.status === "built";
   return (
     <div
       style={{
@@ -942,6 +943,12 @@ function BaseImageRow(props: {
         <code style={greyId}>pm={image.packageManager}</code>
       )}
       <Pill>{image.status}</Pill>
+      {image.packages.length > 0 ? (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+          {image.packages.map((pkg) => <Chip key={pkg} t={t} label={pkg} />)}
+        </div>
+      ) : null}
+      {image.builtAt === "" ? null : <code style={greyId}>{image.builtAt}</code>}
       {pull ? (
         <Button
           variant="outline"
@@ -950,6 +957,16 @@ function BaseImageRow(props: {
           onClick={() => onPull(image.imageId)}
         >
           {t("pullImage")}
+        </Button>
+      ) : null}
+      {build ? (
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={busy}
+          onClick={() => onRebuild(image.imageId)}
+        >
+          {t("build")}
         </Button>
       ) : null}
       {rebuild ? (

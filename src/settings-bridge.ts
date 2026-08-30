@@ -106,6 +106,7 @@ export const settingsSchema = z.object({
         status: z.string().default(""),
         primitive: z.string().default(""),
         packageManager: z.string().default(""),
+        basePublic: z.boolean().default(false),
       }),
     )
     .default([]),
@@ -161,6 +162,7 @@ export interface ImageView {
   status: string;
   primitive: string;
   packageManager: string;
+  basePublic: boolean;
 }
 export interface VolumeView {
   name: string;

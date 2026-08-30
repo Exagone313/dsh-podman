@@ -752,6 +752,7 @@ type Image struct {
 	Status         string                 `protobuf:"bytes,7,opt,name=status,proto3" json:"status,omitempty"`
 	Primitive      string                 `protobuf:"bytes,8,opt,name=primitive,proto3" json:"primitive,omitempty"`
 	PackageManager string                 `protobuf:"bytes,9,opt,name=package_manager,json=packageManager,proto3" json:"package_manager,omitempty"`
+	BasePublic     bool                   `protobuf:"varint,10,opt,name=base_public,json=basePublic,proto3" json:"base_public,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -847,6 +848,13 @@ func (x *Image) GetPackageManager() string {
 		return x.PackageManager
 	}
 	return ""
+}
+
+func (x *Image) GetBasePublic() bool {
+	if x != nil {
+		return x.BasePublic
+	}
+	return false
 }
 
 type RebuildImageRequest struct {
@@ -2654,7 +2662,7 @@ const file_dshctl_v1_control_proto_rawDesc = "" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\x13\n" +
 	"\x11ListImagesRequest\">\n" +
 	"\x12ListImagesResponse\x12(\n" +
-	"\x06images\x18\x01 \x03(\v2\x10.dshctl.v1.ImageR\x06images\"\x86\x02\n" +
+	"\x06images\x18\x01 \x03(\v2\x10.dshctl.v1.ImageR\x06images\"\xa7\x02\n" +
 	"\x05Image\x12\x19\n" +
 	"\bimage_id\x18\x01 \x01(\tR\aimageId\x12\x16\n" +
 	"\x06parent\x18\x02 \x01(\tR\x06parent\x12\x1a\n" +
@@ -2664,7 +2672,10 @@ const file_dshctl_v1_control_proto_rawDesc = "" +
 	"\ais_base\x18\x06 \x01(\bR\x06isBase\x12\x16\n" +
 	"\x06status\x18\a \x01(\tR\x06status\x12\x1c\n" +
 	"\tprimitive\x18\b \x01(\tR\tprimitive\x12'\n" +
-	"\x0fpackage_manager\x18\t \x01(\tR\x0epackageManager\"0\n" +
+	"\x0fpackage_manager\x18\t \x01(\tR\x0epackageManager\x12\x1f\n" +
+	"\vbase_public\x18\n" +
+	" \x01(\bR\n" +
+	"basePublic\"0\n" +
 	"\x13RebuildImageRequest\x12\x19\n" +
 	"\bimage_id\x18\x01 \x01(\tR\aimageId\"\x19\n" +
 	"\x17RebuildAllImagesRequest\"N\n" +

@@ -53,6 +53,7 @@ export type ContainerPluginKey =
   | "rebuildImage"
   | "rebuildAllImages"
   | "buildImage"
+  | "build"
   | "buildImageTitle"
   | "pullImage"
   | "setDefaultImage"
@@ -136,6 +137,7 @@ export const en: Record<ContainerPluginKey, string> = {
   rebuildImage: "Rebuild",
   rebuildAllImages: "Rebuild all",
   buildImage: "Build image",
+  build: "Build",
   buildImageTitle: "Build an image",
   pullImage: "Pull",
   setDefaultImage: "Set default",
@@ -228,6 +230,7 @@ export const zh: Record<ContainerPluginKey, string> = {
   rebuildImage: "重建",
   rebuildAllImages: "重建全部",
   buildImage: "构建镜像",
+  build: "构建",
   buildImageTitle: "构建镜像",
   pullImage: "拉取",
   setDefaultImage: "设为默认",

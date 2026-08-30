@@ -35,6 +35,7 @@ export interface ImageView {
   status: string;
   primitive: string;
   packageManager: string;
+  basePublic: boolean;
 }
 export interface VolumeView {
   name: string;

@@ -225,6 +225,17 @@ func TestListImages(t *testing.T) {
 	if bases[2].Primitive != "docker.io/library/alpine:latest" || bases[2].PackageManager != "apk" {
 		t.Fatalf("unexpected alpine row: %#v", bases[2])
 	}
+	for _, base := range bases {
+		if len(base.Packages) == 0 {
+			t.Fatalf("base %q must expose its default packages, got %#v", base.ImageId, base)
+		}
+		if base.BasePublic {
+			t.Fatalf("base %q must default to local (not public), got %#v", base.ImageId, base)
+		}
+		if base.BuiltAt != "" {
+			t.Fatalf("missing base %q must have no built date, got %#v", base.ImageId, base)
+		}
+	}
 	custom := response.Images[3]
 	if custom.ImageId != "devimg" || custom.Parent != "archlinux" || custom.PackageManager != "pacman" || custom.Status != "built" || custom.IsBase {
 		t.Fatalf("unexpected custom row: %#v", custom)

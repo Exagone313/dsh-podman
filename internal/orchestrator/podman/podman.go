@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/containers/podman/v5/pkg/bindings"
 	"github.com/containers/podman/v5/pkg/bindings/containers"
@@ -204,6 +205,19 @@ func (c *Client) ImagePull(name string) error {
 	}
 	c.log().Info("image pulled", "image", name)
 	return nil
+}
+
+// ImageCreated returns the image's creation time as an RFC3339 string, or ""
+// when the image does not exist or its creation time cannot be read.
+func (c *Client) ImageCreated(name string) string {
+	if err := c.connReady(); err != nil {
+		return ""
+	}
+	report, err := images.GetImage(c.ctx, name, nil)
+	if err != nil {
+		return ""
+	}
+	return report.Created.UTC().Format(time.RFC3339)
 }
 
 // ImageRemove deletes the named image from local storage, tolerating an

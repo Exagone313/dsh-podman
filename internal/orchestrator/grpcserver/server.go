@@ -924,7 +924,7 @@ func (s *Server) RebuildBaseImage(_ context.Context, request *ctl.RebuildBaseIma
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 	s.log().Info("control request completed", "method", "RebuildBaseImage", "name", request.GetName(), "image_tag", tag)
-	return imageProto(resolvedImage{ImageID: base.ID, IsBase: true, PackageManager: base.PackageManager, ImageTag: tag, Primitive: base.Primitive, Status: "built"}), nil
+	return imageProto(resolvedImage{ImageID: base.ID, IsBase: true, PackageManager: base.PackageManager, ImageTag: tag, Primitive: base.Primitive, Packages: append([]string(nil), base.Packages...), Status: "built", BuiltAt: s.Podman.ImageCreated(tag), BasePublic: false}), nil
 }
 func (s *Server) PullBaseImage(_ context.Context, request *ctl.PullBaseImageRequest) (*ctl.Image, error) {
 	s.log().Info("control request", "method", "PullBaseImage", "name", request.GetName())
@@ -944,7 +944,7 @@ func (s *Server) PullBaseImage(_ context.Context, request *ctl.PullBaseImageRequ
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 	s.log().Info("control request completed", "method", "PullBaseImage", "name", request.GetName(), "image_tag", tag)
-	return imageProto(resolvedImage{ImageID: base.ID, IsBase: true, PackageManager: base.PackageManager, ImageTag: tag, Primitive: base.Primitive, Status: "pulled"}), nil
+	return imageProto(resolvedImage{ImageID: base.ID, IsBase: true, PackageManager: base.PackageManager, ImageTag: tag, Primitive: base.Primitive, Packages: append([]string(nil), base.Packages...), Status: "pulled", BuiltAt: s.Podman.ImageCreated(tag), BasePublic: true}), nil
 }
 func (s *Server) RemoveImage(_ context.Context, request *ctl.RemoveImageRequest) (*ctl.RemoveImageResponse, error) {
 	s.log().Info("control request", "method", "RemoveImage", "image_id", request.GetImageId())
@@ -1009,11 +1009,12 @@ type resolvedImage struct {
 	BuiltAt        string
 	Primitive      string
 	Status         string
+	BasePublic     bool
 }
 
 // imageProto projects a resolved image onto the control plane's Image message.
 func imageProto(image resolvedImage) *ctl.Image {
-	return &ctl.Image{ImageId: image.ImageID, Parent: image.Parent, Packages: image.Packages, ImageTag: image.ImageTag, BuiltAt: image.BuiltAt, IsBase: image.IsBase, Status: image.Status, Primitive: image.Primitive, PackageManager: image.PackageManager}
+	return &ctl.Image{ImageId: image.ImageID, Parent: image.Parent, Packages: image.Packages, ImageTag: image.ImageTag, BuiltAt: image.BuiltAt, IsBase: image.IsBase, Status: image.Status, Primitive: image.Primitive, PackageManager: image.PackageManager, BasePublic: image.BasePublic}
 }
 
 // buildCustomImage builds a custom image from its stored description,
@@ -1280,14 +1281,18 @@ func (s *Server) ensureBase(short string) (*imagebuild.BaseImage, string, error)
 func (s *Server) resolveImage(short string) (resolvedImage, error) {
 	if base, ok := imagebuild.BaseImageByID(short); ok {
 		status := "missing"
+		builtAt := ""
 		if s.Podman != nil {
 			st, err := s.baseStatus(short)
 			if err != nil {
 				return resolvedImage{}, err
 			}
 			status = st
+			if status != "missing" {
+				builtAt = s.Podman.ImageCreated(s.baseTag(short))
+			}
 		}
-		return resolvedImage{ImageID: short, IsBase: true, PackageManager: base.PackageManager, ImageTag: s.baseTag(short), Primitive: base.Primitive, Status: status}, nil
+		return resolvedImage{ImageID: short, IsBase: true, PackageManager: base.PackageManager, ImageTag: s.baseTag(short), Primitive: base.Primitive, Packages: append([]string(nil), base.Packages...), Status: status, BuiltAt: builtAt, BasePublic: s.baseImagesPublic()}, nil
 	}
 	images, err := s.Store.Images()
 	if err != nil {

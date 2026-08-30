@@ -68,7 +68,7 @@ message Workspace {
 }
 message ListImagesRequest {}
 message ListImagesResponse { repeated Image images = 1; }
-message Image { string image_id = 1; string parent = 2; repeated string packages = 3; string image_tag = 4; string built_at = 5; bool is_base = 6; string status = 7; string primitive = 8; string package_manager = 9; }
+message Image { string image_id = 1; string parent = 2; repeated string packages = 3; string image_tag = 4; string built_at = 5; bool is_base = 6; string status = 7; string primitive = 8; string package_manager = 9; bool base_public = 10; }
 message RebuildImageRequest { string image_id = 1; }
 message RebuildAllImagesRequest {}
 message RebuildAllImagesResponse { repeated string rebuilt = 1; repeated string skipped = 2; }

@@ -528,6 +528,7 @@ export interface ToolDefinition {
     required: readonly string[];
   };
   approval?: boolean;
+  approvalWhen?: (args: Record<string, unknown>) => boolean;
 }
 
 export const TOOLS: ToolDefinition[] = [
@@ -541,7 +542,12 @@ export const TOOLS: ToolDefinition[] = [
   { name: "image_rebuild", parameters: imageRebuildParameters, approval: true },
   { name: "image_remove", parameters: imageRemoveParameters, approval: true },
   { name: "container_list", parameters: containerListParameters },
-  { name: "container_start", parameters: containerStartParameters },
+  {
+    name: "container_start",
+    parameters: containerStartParameters,
+    approvalWhen: (args) =>
+      Array.isArray(args.mounts) && args.mounts.length > 0,
+  },
   {
     name: "container_recreate",
     parameters: containerRecreateParameters,
@@ -552,7 +558,7 @@ export const TOOLS: ToolDefinition[] = [
     parameters: containerReplaceParameters,
     approval: true,
   },
-  { name: "container_remove", parameters: containerRemoveParameters },
+  { name: "container_remove", parameters: containerRemoveParameters, approval: true },
   { name: "container_bash", parameters: containerBashParameters },
   { name: "container_exec", parameters: containerExecParameters },
   { name: "container_read", parameters: containerReadParameters },
@@ -576,21 +582,13 @@ export const TOOLS: ToolDefinition[] = [
   },
   { name: "volume_list", parameters: volumeListParameters },
   { name: "volume_create", parameters: volumeCreateParameters },
-  { name: "volume_remove", parameters: volumeRemoveParameters },
+  { name: "volume_remove", parameters: volumeRemoveParameters, approval: true },
   { name: "daemon_start", parameters: daemonStartParameters },
   { name: "daemon_list", parameters: daemonListParameters },
   { name: "daemon_stop", parameters: daemonStopParameters },
   { name: "daemon_restart", parameters: daemonRestartParameters },
   { name: "daemon_logs", parameters: daemonLogsParameters },
 ];
-
-// The approval-gated tools. Derived from the `approval: true` flags on the
-// TOOLS entries so the flag stays the single source of truth. DSH has no
-// per-tool approval schema field: the plugin enforces approval itself through
-// a `tools/pre-execute` policy (see approvalDecision).
-const APPROVAL_TOOLS = new Set(
-  TOOLS.filter((tool) => tool.approval === true).map((tool) => tool.name),
-);
 
 // Join top-level parts of an approval reason. List elements within a part
 // (packages, mounts) stay comma-joined instead.
@@ -693,6 +691,25 @@ export function summarizeArgs(name: string, args: Record<string, unknown>): stri
       const container = str("container");
       return container === undefined ? "" : `recreate container ${container}`;
     }
+    case "container_remove": {
+      const container = str("container");
+      return container === undefined ? "" : `remove container ${container}`;
+    }
+    case "container_start": {
+      const container = str("container");
+      const image = str("image");
+      const mountItems = mounts();
+      if (container === undefined) return "";
+      const phrase = `start container ${container}${image === undefined ? "" : ` with ${image}`}`;
+      return part(
+        phrase,
+        mountItems === undefined ? undefined : `mounts: ${mountItems}`,
+      );
+    }
+    case "volume_remove": {
+      const name = str("name");
+      return name === undefined ? "" : `remove volume ${name}`;
+    }
     case "container_replace": {
       const container = str("container");
       const image = str("image");
@@ -722,12 +739,22 @@ export function summarizeArgs(name: string, args: Record<string, unknown>): stri
 // Decide whether a tool call needs approval. DSH resolves an `ask` decision
 // through its approval service (`ctx.get("approval").request(...)`), showing
 // the standard approval prompt; without one the call fails closed.
+// Approval is per tool, optionally conditional on the call's arguments via a
+// tool's `approvalWhen` predicate (e.g. container_start only asks when project
+// mounts are supplied).
 export function approvalDecision(
   name: string,
   args?: Record<string, unknown>,
 ): { kind: "ask"; reason: string } | undefined {
-  if (!APPROVAL_TOOLS.has(name)) return undefined;
-  return { kind: "ask", reason: summarizeArgs(name, args ?? {}) };
+  const tool = TOOLS.find((entry) => entry.name === name);
+  if (tool === undefined) return undefined;
+  if (tool.approval === true) {
+    return { kind: "ask", reason: summarizeArgs(name, args ?? {}) };
+  }
+  if (tool.approvalWhen !== undefined && tool.approvalWhen(args ?? {})) {
+    return { kind: "ask", reason: summarizeArgs(name, args ?? {}) };
+  }
+  return undefined;
 }
 
 // The `tools/pre-execute` policy: asks for approval on gated tools and

@@ -201,11 +201,45 @@ test("the destructive mutations require approval", () => {
     "container_mount_add",
     "container_mount_remove",
     "container_recreate",
+    "container_remove",
     "container_replace",
     "image_build",
     "image_rebuild",
     "image_remove",
+    "volume_remove",
   ]);
+});
+
+test("container_start approval depends on mounts being passed", () => {
+  const tool = TOOLS.find((entry) => entry.name === "container_start");
+  assert.ok(tool, "container_start registered");
+  assert.notEqual(tool!.approval, true, "container_start must not always ask");
+  assert.ok(typeof tool!.approvalWhen === "function", "container_start approvalWhen");
+
+  assert.equal(
+    approvalDecision("container_start", { container: "web" }),
+    undefined,
+    "no mounts: must not ask",
+  );
+  assert.equal(
+    approvalDecision("container_start", { container: "web", mounts: [] }),
+    undefined,
+    "empty mounts: must not ask",
+  );
+  const decision = approvalDecision("container_start", {
+    container: "web",
+    image: "localhost/dsh-podman/nginx:latest",
+    mounts: [
+      { project: "team", path: "src", mode: "read_only" },
+      { project: "team", destination: "/workspace/team", mode: "read_write" },
+    ],
+  });
+  assert.ok(decision, "mounts passed: must ask");
+  assert.equal(decision!.kind, "ask");
+  assert.equal(
+    decision!.reason,
+    "start container web with localhost/dsh-podman/nginx:latest • mounts: team/src (ro), team → /workspace/team",
+  );
 });
 
 test("approvalDecision gates exactly the approval-flagged tools", () => {
@@ -218,6 +252,8 @@ test("approvalDecision gates exactly the approval-flagged tools", () => {
     image_rebuild: { imageId: "valkey" },
     image_remove: { imageId: "valkey" },
     container_recreate: { container: "valkey-ctr" },
+    container_remove: { container: "valkey-ctr" },
+    volume_remove: { name: "valkey-data" },
     container_replace: {
       container: "valkey-ctr",
       image: "localhost/dsh-podman/nginx:latest",
@@ -272,6 +308,25 @@ test("summarizeArgs renders the approval reason for each gated tool", () => {
   assert.equal(
     summarizeArgs("container_recreate", { container: "valkey-ctr" }),
     "recreate container valkey-ctr",
+  );
+  assert.equal(
+    summarizeArgs("container_remove", { container: "valkey-ctr" }),
+    "remove container valkey-ctr",
+  );
+  assert.equal(
+    summarizeArgs("volume_remove", { name: "valkey-data" }),
+    "remove volume valkey-data",
+  );
+  assert.equal(
+    summarizeArgs("container_start", {
+      container: "web",
+      image: "localhost/dsh-podman/nginx:latest",
+      mounts: [
+        { project: "team", path: "src", mode: "read_only" },
+        { project: "team", destination: "/workspace/team", mode: "read_write" },
+      ],
+    }),
+    "start container web with localhost/dsh-podman/nginx:latest • mounts: team/src (ro), team → /workspace/team",
   );
   assert.equal(
     summarizeArgs("container_replace", {
@@ -424,7 +479,11 @@ test("volume tools are registered with the expected schemas", () => {
   for (const name of VOLUME_TOOLS) {
     const tool = TOOLS.find((entry) => entry.name === name);
     assert.ok(tool, `${name} registered`);
-    assert.notEqual(tool!.approval, true, `${name} must not require approval`);
+    if (name === "volume_remove") {
+      assert.equal(tool!.approval, true, "volume_remove must require approval");
+    } else {
+      assert.notEqual(tool!.approval, true, `${name} must not require approval`);
+    }
     assert.equal(tool!.parameters.type, "object", `${name} type`);
     assert.equal(typeof tool!.parameters.properties, "object");
     assert.ok(Array.isArray(tool!.parameters.required));

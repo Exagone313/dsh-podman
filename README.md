@@ -221,13 +221,14 @@ settings namespace to exist.
 ## Tools
 
 The plugin registers the following model-facing tools. Tools marked `✱`
-require approval. Container tools operate on a **logical container name** of
+require approval (some only under certain parameters — noted in their row).
+Container tools operate on a **logical container name** of
 the current workspace (`"default"` selects the workspace's default container).
 
 Approval is enforced by the plugin itself through a `tools/pre-execute`
-policy that asks DSH's approval service before a `✱` tool runs, so the call
-shows the standard approval prompt and is denied when no approval channel is
-available. The prompt's reason summarizes the call's key parameters inline
+policy that asks DSH's approval service before an approved tool runs, so the
+call shows the standard approval prompt and is denied when no approval channel
+is available. The prompt's reason summarizes the call's key parameters inline
 (image id/base/packages, container/image, and each mount with its kind,
 destination, and `(ro)` read-only marker). The settings-card actions are
 direct control calls and are not gated.
@@ -253,10 +254,10 @@ rebuilt, or removed.
 | Tool | Params | Description |
 |---|---|---|
 | `container_list` | — | List the containers of the current workspace |
-| `container_start` | `container`, optional `image`, `mounts` | Start a container (default image when `image` is omitted) |
+| `container_start` `✱*` | `container`, optional `image`, `mounts` | Start a container (default image when `image` is omitted); approval required only when `mounts` is passed |
 | `container_recreate` ✱ | `container` | Recreate a container with the same image |
 | `container_replace` ✱ | `container`, `image`, optional `mounts` | Replace a container with a new image |
-| `container_remove` | `container` | Remove a container (stops its daemons gracefully first) |
+| `container_remove` ✱ | `container` | Remove a container (stops its daemons gracefully first) |
 | `container_bash` | `container`, `command`, optional `workdir` | Run a shell command |
 | `container_exec` | `container`, `argv`, optional `cwd`, `env` | Run a program |
 | `container_read` | `container`, `path` | Read a file |
@@ -274,7 +275,7 @@ rebuilt, or removed.
 | `container_mount_remove` ✱ | `container`, optional `kind`, `project`, `path`, `volume`, `destination` | Remove a mount |
 | `volume_list` | — | List the managed named volumes (short names) |
 | `volume_create` | `name` | Create a managed named volume |
-| `volume_remove` | `name` | Remove a managed named volume |
+| `volume_remove` ✱ | `name` | Remove a managed named volume |
 
 A `project` mount binds a directory from the project's workspace; `tmpfs`
 mounts a writable in-memory filesystem and `volume` mounts a podman named

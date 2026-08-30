@@ -54,6 +54,11 @@ export type ContainerPluginKey =
   | "rebuildAllImages"
   | "buildImage"
   | "buildImageTitle"
+  | "pullImage"
+  | "setDefaultImage"
+  | "setDefaultImageTitle"
+  | "baseImagesTitle"
+  | "parent"
   | "cancel"
   | "removeTag"
   | "env"
@@ -132,6 +137,11 @@ export const en: Record<ContainerPluginKey, string> = {
   rebuildAllImages: "Rebuild all",
   buildImage: "Build image",
   buildImageTitle: "Build an image",
+  pullImage: "Pull",
+  setDefaultImage: "Set default",
+  setDefaultImageTitle: "Set default image",
+  baseImagesTitle: "Base images",
+  parent: "Parent",
   selectImage: "Select an image",
   cancel: "Cancel",
   removeTag: "Remove",
@@ -219,6 +229,11 @@ export const zh: Record<ContainerPluginKey, string> = {
   rebuildAllImages: "重建全部",
   buildImage: "构建镜像",
   buildImageTitle: "构建镜像",
+  pullImage: "拉取",
+  setDefaultImage: "设为默认",
+  setDefaultImageTitle: "设置默认镜像",
+  baseImagesTitle: "基础镜像",
+  parent: "父镜像",
   selectImage: "选择镜像",
   cancel: "取消",
   removeTag: "移除",

@@ -43,10 +43,7 @@ export function apply(ctx: any, config: PluginConfig = {}): void {
         config.socketsRoot ??
         process.env.DSH_PODMAN_SOCKETS_ROOT ??
         "/run/dsh-podman",
-      defaultImage:
-        config.defaultImage ??
-        process.env.DSH_PODMAN_DEFAULT_IMAGE ??
-        `${imagePrefix}arch-base`,
+      defaultImage: config.defaultImage ?? "archlinux",
       projectsRoot:
         config.projectsRoot ??
         process.env.DSH_PODMAN_PROJECTS_ROOT ??
@@ -231,7 +228,7 @@ const containerParam = {
   description:
     'Logical container name; use "default" for the default workspace container.',
 };
-const imageIdParam = { type: "string", description: "Image ID." };
+const imageIdParam = { type: "string", description: "Image short name." };
 const packageListParam = {
   type: "array",
   items: { type: "string" },
@@ -287,10 +284,14 @@ export const imageBuildParameters = {
   type: "object",
   properties: {
     imageId: imageIdParam,
-    baseImage: { type: "string", description: "Base image reference." },
+    parent: {
+      type: "string",
+      description:
+        "Short name of the parent image (a base like archlinux/ubuntu/alpine, or an existing custom image).",
+    },
     packages: packageListParam,
   },
-  required: ["imageId", "baseImage", "packages"],
+  required: ["imageId", "parent", "packages"],
 };
 export const imageRebuildParameters = {
   type: "object",
@@ -316,7 +317,10 @@ export const containerStartParameters = {
   type: "object",
   properties: {
     container: containerParam,
-    image: { type: "string", description: "Optional image ID." },
+    image: {
+      type: "string",
+      description: "Image short name (base or custom).",
+    },
     mounts: mountsParam,
     env: envParam,
   },
@@ -763,10 +767,10 @@ export function summarizeArgs(name: string, args: Record<string, unknown>): stri
   switch (name) {
     case "image_build": {
       const image = str("imageId");
-      const base = str("baseImage");
+      const parent = str("parent");
       const packages = listOf("packages");
       if (image === undefined) return "";
-      const phrase = `build image ${image}${base === undefined ? "" : ` from ${base}`}`;
+      const phrase = `build image ${image}${parent === undefined ? "" : ` from ${parent}`}`;
       return part(
         phrase,
         packages === undefined ? undefined : `packages: ${packages}`,
@@ -1089,16 +1093,17 @@ export function homePresetsRoot(): string {
 }
 
 const TOOL_DESCRIPTIONS: Record<string, string> = {
-  image_list: "List the images available to the current workspace.",
-  image_get: "Get details about a specific image.",
+  image_list:
+    "List the images of the current workspace by short name, base images first, then custom images. Base images are managed from the settings.",
+  image_get: "Get details about a specific image by its short name.",
   image_build:
-    "Build a new workspace image from a base image and a set of packages. Requires approval: building installs packages system-wide into a container image.",
+    "Build a new custom image from a parent image by short name (a base like archlinux/ubuntu/alpine, or an existing custom image) and a set of packages. Base images themselves are managed from the settings. Requires approval: building installs packages system-wide into a container image.",
   image_rebuild:
-    "Rebuild an existing workspace image. Requires approval: rebuilding replaces the current image content.",
+    "Rebuild an existing custom image by short name. Base images are rebuilt from the settings. Requires approval: rebuilding replaces the current image content.",
   image_rebuild_all:
     "Rebuild every stored image in dependency order (base first), skipping any image whose rebuild fails and its dependents. Requires approval: rebuilding replaces the images' contents.",
   image_remove:
-    "Remove a built workspace image. Requires approval: removing deletes the image so containers using it must be recreated from another image.",
+    "Remove a built custom image by short name. Base images are managed from the settings. Requires approval: removing deletes the image so containers using it must be recreated from another image.",
   container_list:
     "List the containers of the current workspace, including the default container that is started on demand.",
   container_start: "Start a container in the current workspace.",
@@ -1154,10 +1159,13 @@ export const toolHandlers: Record<
   image_list: async (resolver) => {
     const result = await resolver.control<{ images?: any[] }>("listImages", {});
     const rows = (result.images ?? []).map((image: any) => {
+      if (image.isBase) {
+        return `${image.imageId}  base  pm=${image.packageManager}  primitive=${image.primitive}  status=${image.status}`;
+      }
       const packages = (image.packages ?? []).length > 0
         ? (image.packages ?? []).join(", ")
         : "(none)";
-      return `${image.imageId}  base=${image.baseImage}  tag=${image.imageTag}  built=${image.builtAt}  packages=${packages}`;
+      return `${image.imageId}  parent=${image.parent}  pm=${image.packageManager}  status=${image.status}  built=${image.builtAt}  packages=${packages}`;
     });
     return rows.length > 0 ? rows.join("\n") : "(no images)";
   },
@@ -1166,7 +1174,7 @@ export const toolHandlers: Record<
   image_build: async (resolver, input) =>
     resolver.control("buildImage", {
       imageId: input.imageId,
-      baseImage: input.baseImage,
+      parent: input.parent,
       packages: input.packages,
     }),
   image_rebuild: async (resolver, input) =>

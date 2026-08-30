@@ -55,9 +55,8 @@ function fakeContext(scope: FakeScope): any {
 
 function baseValue(): Record<string, unknown> {
   return {
-    defaultImage: "arch-base",
+    defaultImage: "archlinux",
     socketsRoot: "/run/dsh-podman",
-    projectsRoot: "/projects",
     notice: "",
     workspaces: [],
     containers: [],
@@ -73,7 +72,7 @@ test("refresh on install publishes containers, images and workspaces", async () 
   const calls: Array<[string, unknown]> = [];
   const resolver: any = {
     getConfig: () => ({
-      defaultImage: "arch-base",
+      defaultImage: "archlinux",
       socketsRoot: "/run/dsh-podman",
       projectsRoot: "/projects",
     }),
@@ -402,7 +401,84 @@ test("image_rebuild_all command drives rebuildAllImages with an empty payload", 
   assert.equal(scope.value.command, null);
 });
 
-test("image_build command drives buildImage with the imageId, baseImage and packages", async () => {
+test("image_base_rebuild command drives rebuildBaseImage with the name", async () => {
+  const scope = fakeScope(baseValue());
+  const calls: Array<[string, unknown]> = [];
+  const resolver: any = {
+    getConfig: () => ({}),
+    setConfig: () => {},
+    async control(method: string, request: unknown) {
+      calls.push([method, request]);
+      if (method === "listContainers") return { containers: [] };
+      if (method === "listImages") return { images: [] };
+      if (method === "listWorkspaces") return { workspaces: [] };
+      if (method === "listVolumes") return { volumes: [] };
+      if (method === "listSecrets") return { secrets: [] };
+      return {};
+    },
+  };
+  installContainerSettings(fakeContext(scope), resolver);
+  await scope.update({
+    command: { op: "image_base_rebuild", workspace: "archlinux", image: "", at: 21 },
+  });
+  await new Promise((resolve) => setImmediate(resolve));
+  const rebuildCall = calls.find(([method]) => method === "rebuildBaseImage");
+  assert.deepEqual(rebuildCall?.[1], { name: "archlinux" });
+  assert.equal(scope.value.command, null);
+});
+
+test("image_base_pull command drives pullBaseImage with the name", async () => {
+  const scope = fakeScope(baseValue());
+  const calls: Array<[string, unknown]> = [];
+  const resolver: any = {
+    getConfig: () => ({}),
+    setConfig: () => {},
+    async control(method: string, request: unknown) {
+      calls.push([method, request]);
+      if (method === "listContainers") return { containers: [] };
+      if (method === "listImages") return { images: [] };
+      if (method === "listWorkspaces") return { workspaces: [] };
+      if (method === "listVolumes") return { volumes: [] };
+      if (method === "listSecrets") return { secrets: [] };
+      return {};
+    },
+  };
+  installContainerSettings(fakeContext(scope), resolver);
+  await scope.update({
+    command: { op: "image_base_pull", workspace: "archlinux", image: "", at: 22 },
+  });
+  await new Promise((resolve) => setImmediate(resolve));
+  const pullCall = calls.find(([method]) => method === "pullBaseImage");
+  assert.deepEqual(pullCall?.[1], { name: "archlinux" });
+  assert.equal(scope.value.command, null);
+});
+
+test("handle never writes projectsRoot into setConfig", async () => {
+  const scope = fakeScope(baseValue());
+  const setConfigCalls: Array<Record<string, unknown>> = [];
+  const resolver: any = {
+    getConfig: () => ({}),
+    setConfig: (patch: Record<string, unknown>) => setConfigCalls.push(patch),
+    async control(method: string) {
+      if (method === "listContainers") return { containers: [] };
+      if (method === "listImages") return { images: [] };
+      if (method === "listWorkspaces") return { workspaces: [] };
+      return {};
+    },
+  };
+  installContainerSettings(fakeContext(scope), resolver);
+  await scope.update({});
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.ok(setConfigCalls.length > 0, "handle must write resolver config");
+  for (const patch of setConfigCalls) {
+    assert.ok(
+      !Object.prototype.hasOwnProperty.call(patch, "projectsRoot"),
+      "projectsRoot must not be written via setConfig",
+    );
+  }
+});
+
+test("image_build command drives buildImage with the imageId, parent and packages", async () => {
   const scope = fakeScope(baseValue());
   const calls: Array<[string, unknown]> = [];
   const resolver: any = {
@@ -423,7 +499,7 @@ test("image_build command drives buildImage with the imageId, baseImage and pack
     command: {
       op: "image_build",
       workspace: "valkey",
-      image: "localhost/dsh-podman/arch-base:latest",
+      image: "archlinux",
       packages: ["valkey", "git"],
       at: 20,
     },
@@ -432,7 +508,7 @@ test("image_build command drives buildImage with the imageId, baseImage and pack
   const buildCall = calls.find(([method]) => method === "buildImage");
   assert.deepEqual(buildCall?.[1], {
     imageId: "valkey",
-    baseImage: "localhost/dsh-podman/arch-base:latest",
+    parent: "archlinux",
     packages: ["valkey", "git"],
   });
   assert.equal(scope.value.command, null);
@@ -744,7 +820,7 @@ test("workspace list comes from the dsh registry even without orchestrator state
   };
   const resolver: any = {
     getConfig: () => ({
-      defaultImage: "arch-base",
+      defaultImage: "archlinux",
       socketsRoot: "/run/dsh-podman",
       projectsRoot: "/projects",
     }),
@@ -777,7 +853,7 @@ test("dsh workspace layers orchestrator container info", async () => {
   };
   const resolver: any = {
     getConfig: () => ({
-      defaultImage: "arch-base",
+      defaultImage: "archlinux",
       socketsRoot: "/run/dsh-podman",
       projectsRoot: "/projects",
     }),

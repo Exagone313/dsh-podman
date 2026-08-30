@@ -45,22 +45,22 @@ each of their sections.
 
 | Variable | Default | Description |
 |---|---|---|
-| `DSH_PODMAN_DEFAULT_IMAGE` | `localhost/dsh-podman/arch-base` | Default workspace image reference used when creating a workspace |
 | `DSH_PODMAN_IMAGE_PREFIX` | `localhost/dsh-podman/` | Prefix prepended to workspace image references |
 | `DSH_PODMAN_ORCHESTRATOR_TOKEN` | — | Shared secret authenticating control-plane gRPC calls; see [Variable details](#variable-details) |
 | `DSH_PODMAN_PROJECTS_ROOT` | `/projects` | Project root used to resolve session working directories into a workspace |
 | `DSH_PODMAN_SOCKETS_ROOT` | `/run/dsh-podman` | Socket root the plugin derives the orchestrator control socket (`orchestrator.sock`) from |
 
-All of the above are overridable through the plugin's `cordis.yml` config
-(`socketsRoot`, `defaultImage`, `projectsRoot`, `controlToken`, `imagePrefix`).
+`defaultImage` and `socketsRoot` are **UI settings** (the card's Configuration /
+Set-default sections); `socketsRoot` falls back to `DSH_PODMAN_SOCKETS_ROOT`.
+`projectsRoot` and `imagePrefix` are env-only so they match the orchestrator;
+`controlToken` comes from `cordis.yml` config or `DSH_PODMAN_ORCHESTRATOR_TOKEN`.
+The `defaultImage` is a **short name** (default `archlinux`).
 
 ### Orchestrator (`dsh-podman-orchestrator`)
 
 | Variable | Default | Description |
 |---|---|---|
-| `DSH_PODMAN_BUILD_DEFAULT_IMAGE` | `true` | Whether the orchestrator auto-builds the default workspace image when it is missing; see [Variable details](#variable-details) |
-| `DSH_PODMAN_BUILD_DEFAULT_IMAGE_WITH_PULL` | `true` | Whether the default-image build always pulls its upstream base image; see [Variable details](#variable-details) |
-| `DSH_PODMAN_DEFAULT_IMAGE` | `localhost/dsh-podman/arch-base` | Default workspace image reference, auto-provisioned on first use |
+| `DSH_PODMAN_BASE_IMAGE_PREFIX` | `localhost/dsh-podman/base/` | Prefix under which base images are tagged; a `localhost/` prefix builds them locally, otherwise they are pulled from a public registry |
 | `DSH_PODMAN_GUEST_AGENT_BIN` | `dsh-podman-guest-agent` | Guest agent binary path (container-internal); see [Variable details](#variable-details) |
 | `DSH_PODMAN_GUEST_AGENT_IMAGE` | — | Prebuilt guest-agent image baked into workspace images; unset disables the feature; see [Variable details](#variable-details) |
 | `DSH_PODMAN_GUEST_AGENT_IMAGE_AGENT_BIN` | `/bin/dsh-podman-guest-agent` | Path of the guest agent binary inside the guest-agent image; see [Variable details](#variable-details) |
@@ -88,23 +88,16 @@ All of the above are overridable through the plugin's `cordis.yml` config
 
 ### Variable details
 
-#### `DSH_PODMAN_BUILD_DEFAULT_IMAGE`
+#### `DSH_PODMAN_BASE_IMAGE_PREFIX`
 
-Whether the orchestrator auto-builds the default workspace image
-(`DSH_PODMAN_DEFAULT_IMAGE`, default `${DSH_PODMAN_IMAGE_PREFIX}arch-base`, i.e.
-`localhost/dsh-podman/arch-base`) the first time a workspace requests it.
-Unset or a truthy value (`1`, `true`, `yes`, `on`) builds the image; a falsy
-value (`0`, `false`, `no`, `off`) makes workspace creation fail with `NotFound`
-when the image is missing instead, letting an operator pre-build and push it
-beforehand.
-
-#### `DSH_PODMAN_BUILD_DEFAULT_IMAGE_WITH_PULL`
-
-When truthy (the default), the build of the default (base) workspace image
-passes `PullAlways` to podman, so the upstream base image
-(`docker.io/library/archlinux:latest`) is always fetched fresh instead of
-reusing a cached copy. This only ever applies to the default-image build —
-user image builds never pull.
+Prefix under which base images are tagged, as `BASE_IMAGE_PREFIX + <short> +
+":latest"`. When the prefix starts with `localhost/`, base images are **built
+locally** by the orchestrator from their upstream primitive reference; any
+other prefix marks them as **public**, in which case the orchestrator **pulls**
+the tagged base images from that registry instead of building them. The built-in
+base images are `archlinux` (pacman), `ubuntu` (apt), and `alpine` (apk); their
+short names are reserved and cannot be built over, rebuilt, or removed as custom
+images.
 
 #### `DSH_PODMAN_GUEST_AGENT_BIN` and `DSH_PODMAN_HOST_GUEST_AGENT_BIN`
 
@@ -304,27 +297,28 @@ are global and all remain available, split as:
 The permission knobs above still apply (Read Only allows only the direct
 read/list tools; Full access skips every prompt).
 
-Image references (`imageId`, `baseImage`, `image`) accept a stored image id
-(short, e.g. `valkey`, or fully qualified, e.g. `localhost/dsh-podman/valkey`)
-with or without a `:tag`, or an already-qualified tag such as
-`localhost/dsh-podman/valkey:latest`. The base image cannot be built over,
-rebuilt, or removed.
+Image references (`imageId`, `parent`, `image`) are **short names only** (no
+registry prefix, no `:tag`), e.g. `valkey`. Custom images reference their
+parent by the parent's short name; base images are the fixed built-in
+`archlinux`, `ubuntu`, and `alpine` short names and cannot be built over,
+rebuilt, or removed as custom images (they are rebuilt or pulled through the
+settings UI).
 
-`image_rebuild_all` rebuilds the stored images **in dependency order**, one at
-a time — the default (base) image first (when `DSH_PODMAN_BUILD_DEFAULT_IMAGE`
-is enabled; otherwise it is left as-is and derived images rebuild against it),
-then each derived image after its base. An image whose rebuild fails, and every
-image that depends on it, is reported in `skipped` while the rest continue.
+`image_rebuild_all` first ensures every base image (building locally or pulling
+from a public registry per `DSH_PODMAN_BASE_IMAGE_PREFIX`), then rebuilds the
+stored custom images **in dependency order** — each parent before the images
+derived from it. An image whose rebuild fails, and every image that depends on
+it, is reported in `skipped` while the rest continue.
 
 ### Images
 
 | Tool | Params | Description |
 |---|---|---|
-| `image_list` | — | List the built workspace images |
+| `image_list` | — | List the built workspace images, base images first |
 | `image_get` | `imageId` | Details for one image |
-| `image_build` ✱ | `imageId`, `baseImage`, `packages` | Build a new image from a base image and package list |
-| `image_rebuild` ✱ | `imageId` | Rebuild an existing image in place |
-| `image_rebuild_all` ✱ | — | Rebuild every image in dependency order (base first), skipping any image whose rebuild fails and its dependents |
+| `image_build` ✱ | `imageId`, `parent`, `packages` | Build a new custom image from a base or custom parent and package list |
+| `image_rebuild` ✱ | `imageId` | Rebuild an existing custom image in place |
+| `image_rebuild_all` ✱ | — | Ensure every base, then rebuild every custom image in dependency order, skipping any image whose rebuild fails and its dependents |
 | `image_remove` ✱ | `imageId` | Remove a built image; refused while a workspace or container still references it |
 
 ### Containers

@@ -25,6 +25,8 @@ const commandSchema = z.object({
     z.const("container_secret_add"),
     z.const("container_secret_remove"),
     z.const("image_build"),
+    z.const("image_base_rebuild"),
+    z.const("image_base_pull"),
   ]),
   workspace: z.string().default(""),
   image: z.string().default(""),
@@ -50,7 +52,6 @@ const commandSchema = z.object({
 export const settingsSchema = z.object({
   defaultImage: z.string().default(""),
   socketsRoot: z.string().default(""),
-  projectsRoot: z.string().default(""),
   notice: z.string().default(""),
   workspaces: z
     .array(
@@ -97,10 +98,14 @@ export const settingsSchema = z.object({
     .array(
       z.object({
         imageId: z.string().default(""),
-        baseImage: z.string().default(""),
+        parent: z.string().default(""),
+        packages: z.array(z.string()).default([]),
         imageTag: z.string().default(""),
         builtAt: z.string().default(""),
-        packages: z.array(z.string()).default([]),
+        isBase: z.boolean().default(false),
+        status: z.string().default(""),
+        primitive: z.string().default(""),
+        packageManager: z.string().default(""),
       }),
     )
     .default([]),
@@ -122,7 +127,7 @@ export const settingsSchema = z.object({
 }) as unknown as z<ContainerSettings>;
 
 export interface CommandRequest {
-  op: "refresh" | "remove" | "recreate" | "create" | "volume_create" | "volume_remove" | "image_remove" | "secret_create" | "secret_remove" | "secret_set" | "image_rebuild" | "image_rebuild_all" | "container_secret_add" | "container_secret_remove" | "image_build";
+  op: "refresh" | "remove" | "recreate" | "create" | "volume_create" | "volume_remove" | "image_remove" | "secret_create" | "secret_remove" | "secret_set" | "image_rebuild" | "image_rebuild_all" | "container_secret_add" | "container_secret_remove" | "image_build" | "image_base_rebuild" | "image_base_pull";
   workspace: string;
   image: string;
   at: number;
@@ -148,10 +153,14 @@ export interface ContainerView {
 }
 export interface ImageView {
   imageId: string;
-  baseImage: string;
+  parent: string;
+  packages: readonly string[];
   imageTag: string;
   builtAt: string;
-  packages: readonly string[];
+  isBase: boolean;
+  status: string;
+  primitive: string;
+  packageManager: string;
 }
 export interface VolumeView {
   name: string;
@@ -171,7 +180,6 @@ export interface WorkspaceView {
 export interface ContainerSettings {
   defaultImage: string;
   socketsRoot: string;
-  projectsRoot: string;
   notice: string;
   workspaces: readonly WorkspaceView[];
   containers: readonly ContainerView[];
@@ -255,7 +263,6 @@ export function installContainerSettings(
       base: {
         defaultImage: resolver.getConfig().defaultImage,
         socketsRoot: resolver.getConfig().socketsRoot,
-        projectsRoot: resolver.getConfig().projectsRoot,
       },
     }) as ContainerSettingsScope;
 
@@ -299,7 +306,6 @@ export function installContainerSettings(
       resolver.setConfig({
         defaultImage: next.defaultImage,
         socketsRoot: next.socketsRoot,
-        projectsRoot: next.projectsRoot,
       });
       const command = next.command;
       if (command === null || command === undefined) return;
@@ -380,8 +386,18 @@ export function installContainerSettings(
           case "image_build":
             await resolver.control("buildImage", {
               imageId: command.workspace,
-              baseImage: command.image,
+              parent: command.image,
               packages: command.packages,
+            });
+            break;
+          case "image_base_rebuild":
+            await resolver.control("rebuildBaseImage", {
+              name: command.workspace,
+            });
+            break;
+          case "image_base_pull":
+            await resolver.control("pullBaseImage", {
+              name: command.workspace,
             });
             break;
         }

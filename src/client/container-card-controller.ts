@@ -27,10 +27,14 @@ export interface ContainerView {
 }
 export interface ImageView {
   imageId: string;
-  baseImage: string;
+  parent: string;
+  packages: readonly string[];
   imageTag: string;
   builtAt: string;
-  packages: readonly string[];
+  isBase: boolean;
+  status: string;
+  primitive: string;
+  packageManager: string;
 }
 export interface VolumeView {
   name: string;
@@ -48,7 +52,7 @@ export interface WorkspaceView {
   mounts: readonly { projectName: string; mode: string }[];
 }
 export interface CommandRequest {
-  op: "refresh" | "remove" | "recreate" | "create" | "volume_create" | "volume_remove" | "image_remove" | "secret_create" | "secret_remove" | "secret_set" | "image_rebuild" | "image_rebuild_all" | "container_secret_add" | "container_secret_remove" | "image_build";
+  op: "refresh" | "remove" | "recreate" | "create" | "volume_create" | "volume_remove" | "image_remove" | "secret_create" | "secret_remove" | "secret_set" | "image_rebuild" | "image_rebuild_all" | "container_secret_add" | "container_secret_remove" | "image_build" | "image_base_rebuild" | "image_base_pull";
   workspace: string;
   image: string;
   at: number;
@@ -65,7 +69,6 @@ export interface CommandRequest {
 export interface ContainerSettings {
   defaultImage: string;
   socketsRoot: string;
-  projectsRoot: string;
   notice: string;
   workspaces: readonly WorkspaceView[];
   containers: readonly ContainerView[];
@@ -84,8 +87,6 @@ export interface CardState {
   defaultImageDraft: string;
   socketsRoot: string;
   socketsRootDraft: string;
-  projectsRoot: string;
-  projectsRootDraft: string;
   workspaces: readonly WorkspaceView[];
   containers: readonly ContainerView[];
   images: readonly ImageView[];
@@ -106,7 +107,10 @@ export interface ContainerCardFace {
   removeImage: (imageId: string) => void;
   rebuildImage: (imageId: string) => void;
   rebuildAllImages: () => void;
-  buildImage: (imageId: string, baseImage: string, packages: string[]) => void;
+  buildImage: (imageId: string, parent: string, packages: string[]) => void;
+  rebuildBaseImage: (name: string) => void;
+  pullBaseImage: (name: string) => void;
+  setDefaultImage: (name: string) => void;
   createSecret: (name: string, length?: number, charset?: string) => void;
   removeSecret: (name: string) => void;
   setSecret: (name: string, value: string) => void;
@@ -118,12 +122,9 @@ export interface ContainerCardFace {
   editSocketsRoot: (text: string) => void;
   saveSocketsRoot: () => void;
   discardSocketsRoot: () => void;
-  editProjectsRoot: (text: string) => void;
-  saveProjectsRoot: () => void;
-  discardProjectsRoot: () => void;
 }
 
-type DraftableField = "defaultImage" | "socketsRoot" | "projectsRoot";
+type DraftableField = "defaultImage" | "socketsRoot";
 
 export class ContainerCardController {
   private readonly store: SnapshotStore<CardState>;
@@ -152,8 +153,6 @@ export class ContainerCardController {
       defaultImageDraft: this.draft("defaultImage", value?.defaultImage ?? ""),
       socketsRoot: value?.socketsRoot ?? "",
       socketsRootDraft: this.draft("socketsRoot", value?.socketsRoot ?? ""),
-      projectsRoot: value?.projectsRoot ?? "",
-      projectsRootDraft: this.draft("projectsRoot", value?.projectsRoot ?? ""),
       workspaces: value?.workspaces ?? [],
       containers: value?.containers ?? [],
       images: value?.images ?? [],
@@ -234,8 +233,14 @@ export class ContainerCardController {
       removeImage: (imageId) => this.command("image_remove", imageId, ""),
       rebuildImage: (imageId) => this.command("image_rebuild", imageId, ""),
       rebuildAllImages: () => this.command("image_rebuild_all", "", ""),
-      buildImage: (imageId, baseImage, packages) =>
-        this.command("image_build", imageId, baseImage, { packages }),
+      buildImage: (imageId, parent, packages) =>
+        this.command("image_build", imageId, parent, { packages }),
+      rebuildBaseImage: (name) => this.command("image_base_rebuild", name, ""),
+      pullBaseImage: (name) => this.command("image_base_pull", name, ""),
+      setDefaultImage: (name) => {
+        this.edit("defaultImage", name);
+        this.save("defaultImage");
+      },
       createSecret: (name, length, charset) =>
         this.command("secret_create", name, "", {
           ...(length ? { length } : {}),
@@ -261,9 +266,6 @@ export class ContainerCardController {
       editSocketsRoot: (text) => this.edit("socketsRoot", text),
       saveSocketsRoot: () => this.save("socketsRoot"),
       discardSocketsRoot: () => this.discard("socketsRoot"),
-      editProjectsRoot: (text) => this.edit("projectsRoot", text),
-      saveProjectsRoot: () => this.save("projectsRoot"),
-      discardProjectsRoot: () => this.discard("projectsRoot"),
     };
   }
 }

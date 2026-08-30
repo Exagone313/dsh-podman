@@ -263,7 +263,7 @@ test("approvalDecision gates exactly the approval-flagged tools", () => {
   const sampleArgs: Record<string, Record<string, unknown>> = {
     image_build: {
       imageId: "valkey",
-      baseImage: "localhost/dsh-podman/arch-base:latest",
+      parent: "archlinux",
       packages: ["valkey"],
     },
     image_rebuild: { imageId: "valkey" },
@@ -316,18 +316,18 @@ test("summarizeArgs renders the approval reason for each gated tool", () => {
   assert.equal(
     summarizeArgs("image_build", {
       imageId: "valkey",
-      baseImage: "localhost/dsh-podman/arch-base:latest",
+      parent: "archlinux",
       packages: ["valkey"],
     }),
-    "build image valkey from localhost/dsh-podman/arch-base:latest • packages: valkey",
+    "build image valkey from archlinux • packages: valkey",
   );
   assert.equal(
     summarizeArgs("image_build", {
       imageId: "dev",
-      baseImage: "localhost/dsh-podman/arch-base:latest",
+      parent: "archlinux",
       packages: ["git", "curl", "tmux", "vim", "zsh", "openssh", "jq", "ripgrep", "make", "cc", "go"],
     }),
-    "build image dev from localhost/dsh-podman/arch-base:latest • packages: git, curl, tmux, vim, zsh, openssh, jq, ripgrep, +3 more",
+    "build image dev from archlinux • packages: git, curl, tmux, vim, zsh, openssh, jq, ripgrep, +3 more",
   );
   assert.equal(summarizeArgs("image_rebuild", { imageId: "valkey" }), "rebuild image valkey");
   assert.equal(summarizeArgs("image_rebuild_all", {}), "rebuild all images");
@@ -561,7 +561,7 @@ test("workspace-write keeps the ask-based approval", async () => {
       name: "image_build",
       arguments: {
         imageId: "valkey",
-        baseImage: "localhost/dsh-podman/arch-base:latest",
+        parent: "archlinux",
         packages: ["valkey"],
       },
       agent: { session: { events: workspaceWrite } },
@@ -569,7 +569,7 @@ test("workspace-write keeps the ask-based approval", async () => {
     () => Promise.resolve({ kind: "allow" }),
   )) as { kind: string; reason: string };
   assert.equal(asked.kind, "ask");
-  assert.equal(asked.reason, "build image valkey from localhost/dsh-podman/arch-base:latest • packages: valkey");
+  assert.equal(asked.reason, "build image valkey from archlinux • packages: valkey");
 });
 
 test("read-only wins over a never approval policy", async () => {
@@ -900,6 +900,20 @@ test("secret mount kinds forward the secret to the orchestrator", async () => {
     kind: "MOUNT_KIND_SECRET",
     secret: "valkey-tls",
   });
+});
+
+test("image_build requires imageId, parent and packages", () => {
+  const tool = TOOLS.find((entry) => entry.name === "image_build");
+  assert.ok(tool, "image_build registered");
+  assert.equal(tool!.approval, true, "image_build must require approval");
+  assert.deepEqual(tool!.parameters.required, ["imageId", "parent", "packages"]);
+  assert.equal(tool!.parameters.properties.imageId.description, "Image short name.");
+  assert.ok(
+    tool!.parameters.properties.parent.description.includes(
+      "Short name of the parent image",
+    ),
+    "parent must be documented as a short name",
+  );
 });
 
 test("image_remove is registered, requires approval and requires imageId", () => {

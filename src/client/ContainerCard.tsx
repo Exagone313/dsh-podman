@@ -861,8 +861,8 @@ function ImageItem(props: {
         <table style={tableStyle}>
           <tbody>
             <tr>
-              <th style={thStyle} scope="row">{t("baseImage")}</th>
-              <td style={tdStyle}>{image.baseImage}</td>
+              <th style={thStyle} scope="row">{t("parent")}</th>
+              <td style={tdStyle}>{image.parent}</td>
             </tr>
             <tr>
               <th style={thStyle} scope="row">{t("imageTag")}</th>
@@ -908,6 +908,61 @@ function ImageItem(props: {
         </div>
       </div>
     </DisclosureRow>
+  );
+}
+
+function BaseImageRow(props: {
+  t: (key: ContainerPluginKey) => string;
+  image: ImageView;
+  busy: boolean;
+  onRebuild: (name: string) => void;
+  onPull: (name: string) => void;
+}): ReactNode {
+  const { t, image, busy, onRebuild, onPull } = props;
+  const pull = image.status === "missing" || image.status === "pulled";
+  const rebuild = image.status === "built";
+  return (
+    <div
+      style={{
+        display: "flex",
+        flexWrap: "wrap",
+        alignItems: "center",
+        gap: "8px",
+        padding: "10px 12px",
+        border: "1px solid var(--dsw-alias-border-l2)",
+        borderRadius: "10px",
+        background: "var(--dsw-alias-bg-layer-3)",
+      }}
+    >
+      <strong style={{ color: "var(--dsw-alias-label-primary)" }}>
+        {image.imageId}
+      </strong>
+      {image.primitive === "" ? null : <code style={greyId}>{image.primitive}</code>}
+      {image.packageManager === "" ? null : (
+        <code style={greyId}>pm={image.packageManager}</code>
+      )}
+      <Pill>{image.status}</Pill>
+      {pull ? (
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={busy}
+          onClick={() => onPull(image.imageId)}
+        >
+          {t("pullImage")}
+        </Button>
+      ) : null}
+      {rebuild ? (
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={busy}
+          onClick={() => onRebuild(image.imageId)}
+        >
+          {t("rebuildImage")}
+        </Button>
+      ) : null}
+    </div>
   );
 }
 
@@ -1256,13 +1311,13 @@ function SecretsSection(props: {
 
 function ImageBuildModal(props: {
   t: (key: ContainerPluginKey) => string;
-  images: readonly { imageId: string }[];
+  images: readonly { imageId: string; isBase: boolean }[];
   open: boolean;
   imageId: string;
-  baseImage: string;
+  parent: string;
   packages: readonly string[];
   onImageId: (value: string) => void;
-  onBaseImage: (value: string) => void;
+  onParent: (value: string) => void;
   onPackages: (tags: string[]) => void;
   onClose: () => void;
   onBuild: () => void;
@@ -1272,18 +1327,20 @@ function ImageBuildModal(props: {
     images,
     open,
     imageId,
-    baseImage,
+    parent,
     packages,
     onImageId,
-    onBaseImage,
+    onParent,
     onPackages,
     onClose,
     onBuild,
   } = props;
-  const canBuild = imageIdPattern.test(imageId) && baseImage.trim() !== "";
+  const canBuild = imageIdPattern.test(imageId) && parent.trim() !== "";
   const imageIdLabel = useId();
-  const baseImageLabel = useId();
+  const parentLabel = useId();
   const packagesLabel = useId();
+  const baseImages = images.filter((image) => image.isBase);
+  const customImages = images.filter((image) => !image.isBase);
   return (
     <Modal
       open={open}
@@ -1327,15 +1384,20 @@ function ImageBuildModal(props: {
             <p style={{ ...hint, margin: 0 }}>{t("invalidImageId")}</p>
           ) : null}
         </Field>
-        <Field label={t("baseImage")} htmlFor={baseImageLabel}>
+        <Field label={t("parent")} htmlFor={parentLabel}>
           <select
-            id={baseImageLabel}
+            id={parentLabel}
             style={imageSelect}
-            value={baseImage}
-            onChange={(event) => onBaseImage(event.target.value)}
+            value={parent}
+            onChange={(event) => onParent(event.target.value)}
           >
             <option value="">{t("selectImage")}</option>
-            {images.map((image) => (
+            {baseImages.map((image) => (
+              <option key={image.imageId} value={image.imageId}>
+                {image.imageId}
+              </option>
+            ))}
+            {customImages.map((image) => (
               <option key={image.imageId} value={image.imageId}>
                 {image.imageId}
               </option>
@@ -1362,8 +1424,16 @@ export function ContainerCard(props: ContainerCardProps): ReactNode {
   const [hovered, setHovered] = useState(false);
   const [buildOpen, setBuildOpen] = useState(false);
   const [imageId, setImageId] = useState("");
-  const [baseImage, setBaseImage] = useState("");
+  const [parent, setParent] = useState("");
   const [packages, setPackages] = useState<string[]>([]);
+  const [defaultOpen, setDefaultOpen] = useState(false);
+  const [defaultImage, setDefaultImage] = useState(state.defaultImage);
+  const baseImages = state.images.filter((image) => image.isBase);
+  const customImages = state.images.filter((image) => !image.isBase);
+  const defaultCandidates = [
+    ...baseImages.map((image) => image.imageId),
+    ...customImages.map((image) => image.imageId),
+  ];
   if (!state.available) {
     return (
       <p style={{ padding: "8px 0", fontSize: "13px", opacity: 0.8 }}>
@@ -1438,8 +1508,19 @@ export function ContainerCard(props: ContainerCardProps): ReactNode {
               size="sm"
               disabled={state.busy}
               onClick={() => {
+                setDefaultImage(state.defaultImage);
+                setDefaultOpen(true);
+              }}
+            >
+              {t("setDefaultImage")}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={state.busy}
+              onClick={() => {
                 setImageId("");
-                setBaseImage(state.images[0]?.imageId ?? "");
+                setParent(baseImages[0]?.imageId ?? customImages[0]?.imageId ?? "");
                 setPackages([]);
                 setBuildOpen(true);
               }}
@@ -1455,10 +1536,25 @@ export function ContainerCard(props: ContainerCardProps): ReactNode {
               onConfirm={props.rebuildAllImages}
             />
           </div>
-          {state.images.length === 0 ? (
+          <div style={sectionTitle}>{t("baseImagesTitle")}</div>
+          {baseImages.length === 0 ? (
             <p style={hint}>{t("none")}</p>
           ) : (
-            state.images.map((image) => (
+            baseImages.map((image) => (
+              <BaseImageRow
+                key={image.imageId}
+                t={t}
+                image={image}
+                busy={state.busy}
+                onRebuild={props.rebuildBaseImage}
+                onPull={props.pullBaseImage}
+              />
+            ))
+          )}
+          {customImages.length === 0 ? (
+            <p style={hint}>{t("none")}</p>
+          ) : (
+            customImages.map((image) => (
               <ImageItem
                 key={image.imageId}
                 t={t}
@@ -1474,20 +1570,63 @@ export function ContainerCard(props: ContainerCardProps): ReactNode {
             images={state.images}
             open={buildOpen}
             imageId={imageId}
-            baseImage={baseImage}
+            parent={parent}
             packages={packages}
             onImageId={setImageId}
-            onBaseImage={setBaseImage}
+            onParent={setParent}
             onPackages={setPackages}
             onClose={() => setBuildOpen(false)}
             onBuild={() => {
-              props.buildImage(imageId.trim(), baseImage.trim(), packages);
+              props.buildImage(imageId.trim(), parent.trim(), packages);
               setImageId("");
-              setBaseImage("");
+              setParent("");
               setPackages([]);
               setBuildOpen(false);
             }}
           />
+          <Modal
+            open={defaultOpen}
+            onClose={() => setDefaultOpen(false)}
+            title={t("setDefaultImageTitle")}
+            closeLabel={t("cancel")}
+            footer={
+              <>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setDefaultOpen(false)}
+                >
+                  {t("cancel")}
+                </Button>
+                <Button
+                  variant="primary"
+                  size="sm"
+                  disabled={defaultImage === ""}
+                  onClick={() => {
+                    props.setDefaultImage(defaultImage);
+                    setDefaultOpen(false);
+                  }}
+                >
+                  {t("setDefaultImage")}
+                </Button>
+              </>
+            }
+          >
+            <select
+              style={imageSelect}
+              value={defaultImage}
+              onChange={(event) => setDefaultImage(event.target.value)}
+            >
+              {defaultCandidates.length === 0 ? (
+                <option value="">{t("none")}</option>
+              ) : null}
+              {defaultCandidates.map((name) => (
+                <option key={name} value={name}>
+                  {name}
+                </option>
+              ))}
+            </select>
+          </Modal>
           <VolumesSection
             t={t}
             volumes={state.volumes}
@@ -1508,16 +1647,6 @@ export function ContainerCard(props: ContainerCardProps): ReactNode {
           <div style={sectionTitle}>{t("configTitle")}</div>
           <ConfigField
             t={t}
-            label={t("defaultImage")}
-            value={state.defaultImageDraft}
-            current={state.defaultImage}
-            writable={state.writable}
-            onChange={props.editDefaultImage}
-            onSave={props.saveDefaultImage}
-            onDiscard={props.discardDefaultImage}
-          />
-          <ConfigField
-            t={t}
             label={t("socketsRoot")}
             value={state.socketsRootDraft}
             current={state.socketsRoot}
@@ -1525,16 +1654,6 @@ export function ContainerCard(props: ContainerCardProps): ReactNode {
             onChange={props.editSocketsRoot}
             onSave={props.saveSocketsRoot}
             onDiscard={props.discardSocketsRoot}
-          />
-          <ConfigField
-            t={t}
-            label={t("projectsRoot")}
-            value={state.projectsRootDraft}
-            current={state.projectsRoot}
-            writable={state.writable}
-            onChange={props.editProjectsRoot}
-            onSave={props.saveProjectsRoot}
-            onDiscard={props.discardProjectsRoot}
           />
           <div style={footerRow}>
             <Button

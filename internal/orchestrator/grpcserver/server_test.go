@@ -76,19 +76,19 @@ func TestToProto(t *testing.T) {
 func TestDefaultImageID(t *testing.T) {
 	t.Setenv("DSH_PODMAN_DEFAULT_IMAGE", "")
 	t.Setenv("DSH_PODMAN_IMAGE_PREFIX", "")
-	if got := defaultImageID(); got != "localhost/dsh-podman/arch-base" {
+	if got := DefaultImageID(); got != "localhost/dsh-podman/arch-base" {
 		t.Fatalf("unexpected default image id: %q", got)
 	}
 	t.Setenv("DSH_PODMAN_IMAGE_PREFIX", "registry.example.com/dsh/")
-	if got := defaultImageID(); got != "registry.example.com/dsh/arch-base" {
+	if got := DefaultImageID(); got != "registry.example.com/dsh/arch-base" {
 		t.Fatalf("unexpected default image id: %q", got)
 	}
 	t.Setenv("DSH_PODMAN_IMAGE_PREFIX", "registry.example.com/dsh")
-	if got := defaultImageID(); got != "registry.example.com/dsh/arch-base" {
+	if got := DefaultImageID(); got != "registry.example.com/dsh/arch-base" {
 		t.Fatalf("unexpected default image id: %q", got)
 	}
 	t.Setenv("DSH_PODMAN_DEFAULT_IMAGE", "custom")
-	if got := defaultImageID(); got != "custom" {
+	if got := DefaultImageID(); got != "custom" {
 		t.Fatalf("unexpected default image id: %q", got)
 	}
 }

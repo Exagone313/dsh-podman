@@ -59,6 +59,7 @@ All of the above are overridable through the plugin's `cordis.yml` config
 | Variable | Default | Description |
 |---|---|---|
 | `DSH_PODMAN_BUILD_DEFAULT_IMAGE` | `true` | Whether the orchestrator auto-builds the default workspace image when it is missing; see [Variable details](#variable-details) |
+| `DSH_PODMAN_BUILD_DEFAULT_IMAGE_WITH_PULL` | `true` | Whether the default-image build always pulls its upstream base image; see [Variable details](#variable-details) |
 | `DSH_PODMAN_DEFAULT_IMAGE` | `localhost/dsh-podman/arch-base` | Default workspace image reference, auto-provisioned on first use |
 | `DSH_PODMAN_GUEST_AGENT_BIN` | `dsh-podman-guest-agent` | Guest agent binary path (container-internal); see [Variable details](#variable-details) |
 | `DSH_PODMAN_GUEST_AGENT_IMAGE` | — | Prebuilt guest-agent image baked into workspace images; unset disables the feature; see [Variable details](#variable-details) |
@@ -96,6 +97,14 @@ Unset or a truthy value (`1`, `true`, `yes`, `on`) builds the image; a falsy
 value (`0`, `false`, `no`, `off`) makes workspace creation fail with `NotFound`
 when the image is missing instead, letting an operator pre-build and push it
 beforehand.
+
+#### `DSH_PODMAN_BUILD_DEFAULT_IMAGE_WITH_PULL`
+
+When truthy (the default), the build of the default (base) workspace image
+passes `PullAlways` to podman, so the upstream base image
+(`docker.io/library/archlinux:latest`) is always fetched fresh instead of
+reusing a cached copy. This only ever applies to the default-image build —
+user image builds never pull.
 
 #### `DSH_PODMAN_GUEST_AGENT_BIN` and `DSH_PODMAN_HOST_GUEST_AGENT_BIN`
 

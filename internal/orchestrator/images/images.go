@@ -126,7 +126,23 @@ type Builder struct {
 	HostPacmanCache string
 	GuestAgentImage GuestAgentImage
 	ImagePrefix     string
-	Logger          *slog.Logger
+	// PullBaseImage enables pulling the upstream base image when building the
+	// default (base) workspace image, driven by
+	// DSH_PODMAN_BUILD_DEFAULT_IMAGE_WITH_PULL.
+	PullBaseImage bool
+	// BaseImageID is the default image id whose build pulls; other builds
+	// never pull.
+	BaseImageID string
+	Logger      *slog.Logger
+}
+
+// pullPolicy returns PullAlways when this build is the default-image build and
+// pulling is enabled, and PullIfMissing (podman's default) otherwise.
+func (b Builder) pullPolicy(image state.Image) define.PullPolicy {
+	if b.PullBaseImage && b.BaseImageID != "" && image.ImageID == b.BaseImageID {
+		return define.PullAlways
+	}
+	return define.PullIfMissing
 }
 
 func (b Builder) Build(image state.Image) (string, error) {
@@ -159,11 +175,12 @@ func (b Builder) Build(image state.Image) (string, error) {
 	options.ContextDirectory = dir
 	options.AdditionalTags = []string{tag}
 	options.CommonBuildOpts.Volumes = []string{b.HostPacmanCache + ":/var/cache/pacman/pkg"}
+	options.BuildOptions.PullPolicy = b.pullPolicy(image)
 	logger := b.Logger
 	if logger == nil {
 		logger = slog.Default()
 	}
-	logger.Info("building workspace image", "image_id", image.ImageID, "base_image", image.BaseImage, "packages", image.Packages, "context_directory", dir, "container_files", options.ContainerFiles, "tags", options.AdditionalTags, "build_volumes", options.CommonBuildOpts.Volumes, "host_pacman_cache", b.HostPacmanCache)
+	logger.Info("building workspace image", "image_id", image.ImageID, "base_image", image.BaseImage, "packages", image.Packages, "context_directory", dir, "container_files", options.ContainerFiles, "tags", options.AdditionalTags, "build_volumes", options.CommonBuildOpts.Volumes, "host_pacman_cache", b.HostPacmanCache, "pull_policy", options.BuildOptions.PullPolicy)
 	_, err = images.Build(b.Context, []string{file}, options)
 	if err != nil {
 		logger.Error("workspace image build failed", "image_id", image.ImageID, "error", err)

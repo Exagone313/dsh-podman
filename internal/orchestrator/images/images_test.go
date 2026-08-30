@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/containers/buildah/define"
 	"gitlab.com/Exagone313/dsh-podman/internal/orchestrator/state"
 )
 
@@ -23,6 +24,27 @@ func TestContainerfileInstallsPackagesWithoutInlineCache(t *testing.T) {
 func TestContainerfileRejectsCommandInjection(t *testing.T) {
 	if _, err := Containerfile(state.Image{BaseImage: "arch", Packages: []string{"git;rm"}}); err == nil {
 		t.Fatal("accepted invalid package")
+	}
+}
+
+func TestPullPolicy(t *testing.T) {
+	base := state.Image{ImageID: "localhost/dsh-podman/arch-base"}
+	other := state.Image{ImageID: "localhost/dsh-podman/valkey"}
+	cases := []struct {
+		name    string
+		builder Builder
+		image   state.Image
+		want    define.PullPolicy
+	}{
+		{name: "base image with pull enabled", builder: Builder{PullBaseImage: true, BaseImageID: "localhost/dsh-podman/arch-base"}, image: base, want: define.PullAlways},
+		{name: "base image with pull disabled", builder: Builder{PullBaseImage: false, BaseImageID: "localhost/dsh-podman/arch-base"}, image: base, want: define.PullIfMissing},
+		{name: "other image with pull enabled", builder: Builder{PullBaseImage: true, BaseImageID: "localhost/dsh-podman/arch-base"}, image: other, want: define.PullIfMissing},
+		{name: "empty base id", builder: Builder{PullBaseImage: true, BaseImageID: ""}, image: base, want: define.PullIfMissing},
+	}
+	for _, tc := range cases {
+		if got := tc.builder.pullPolicy(tc.image); got != tc.want {
+			t.Errorf("%s: pullPolicy = %v, want %v", tc.name, got, tc.want)
+		}
 	}
 }
 

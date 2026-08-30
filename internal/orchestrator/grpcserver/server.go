@@ -436,7 +436,7 @@ func (s *Server) StartContainer(ctx context.Context, request *ctl.StartContainer
 	}
 	imageID := request.GetImageId()
 	if imageID == "" {
-		imageID = defaultImageID()
+		imageID = DefaultImageID()
 	}
 	recordMounts := workspace.Mounts
 	if len(request.GetMounts()) > 0 {
@@ -944,7 +944,7 @@ func (s *Server) defaultImage() (state.Image, error) {
 		return state.Image{}, status.Error(codes.Internal, err.Error())
 	}
 	for _, image := range images {
-		if image.ImageID == defaultImageID() && image.ImageTag != "" {
+		if image.ImageID == DefaultImageID() && image.ImageTag != "" {
 			return image, nil
 		}
 	}
@@ -954,8 +954,8 @@ func (s *Server) defaultImage() (state.Image, error) {
 	if s.ImageBuilder == nil {
 		return state.Image{}, status.Error(codes.FailedPrecondition, "podman image builder is not configured")
 	}
-	image := state.Image{ImageID: defaultImageID(), BaseImage: "docker.io/library/archlinux:latest", Packages: append([]string(nil), defaultPackages...)}
-	image, err = s.buildImage(defaultImageID(), image)
+	image := state.Image{ImageID: DefaultImageID(), BaseImage: "docker.io/library/archlinux:latest", Packages: append([]string(nil), defaultPackages...)}
+	image, err = s.buildImage(DefaultImageID(), image)
 	if err != nil {
 		return state.Image{}, status.Error(codes.Internal, fmt.Sprintf("build default image: %v", err))
 	}
@@ -1007,7 +1007,7 @@ func (s *Server) resolveImage(imageID string) (state.Image, error) {
 // isDefaultImageID reports whether id refers to the default (base) image, in
 // either its short or fully-qualified form.
 func isDefaultImageID(id string) bool {
-	return strings.TrimPrefix(id, imagePrefix()) == strings.TrimPrefix(defaultImageID(), imagePrefix())
+	return strings.TrimPrefix(id, imagePrefix()) == strings.TrimPrefix(DefaultImageID(), imagePrefix())
 }
 
 // imageRefsMatch reports whether two stored image references denote the same
@@ -1384,7 +1384,7 @@ func randomSecret(length int, charset string) (string, error) {
 	}
 	return string(result), nil
 }
-func defaultImageID() string {
+func DefaultImageID() string {
 	if value := os.Getenv("DSH_PODMAN_DEFAULT_IMAGE"); value != "" {
 		return value
 	}

@@ -59,6 +59,8 @@ export type ContainerPluginKey =
   | "setDefaultImage"
   | "setDefaultImageTitle"
   | "baseImagesTitle"
+  | "primitive"
+  | "packageManager"
   | "parent"
   | "cancel"
   | "removeTag"
@@ -143,6 +145,8 @@ export const en: Record<ContainerPluginKey, string> = {
   setDefaultImage: "Set default",
   setDefaultImageTitle: "Set default image",
   baseImagesTitle: "Base images",
+  primitive: "Primitive",
+  packageManager: "Package manager",
   parent: "Parent",
   selectImage: "Select an image",
   cancel: "Cancel",
@@ -236,6 +240,8 @@ export const zh: Record<ContainerPluginKey, string> = {
   setDefaultImage: "设为默认",
   setDefaultImageTitle: "设置默认镜像",
   baseImagesTitle: "基础镜像",
+  primitive: "源镜像",
+  packageManager: "包管理器",
   parent: "父镜像",
   selectImage: "选择镜像",
   cancel: "取消",

@@ -919,67 +919,87 @@ function BaseImageRow(props: {
   onPull: (name: string) => void;
 }): ReactNode {
   const { t, image, busy, onRebuild, onPull } = props;
+  const [open, setOpen] = useState(false);
   const pull = image.basePublic && (image.status === "missing" || image.status === "pulled");
   const build = !image.basePublic && image.status === "missing";
   const rebuild = !image.basePublic && image.status === "built";
   return (
-    <div
-      style={{
-        display: "flex",
-        flexWrap: "wrap",
-        alignItems: "center",
-        gap: "8px",
-        padding: "10px 12px",
-        border: "1px solid var(--dsw-alias-border-l2)",
-        borderRadius: "10px",
-        background: "var(--dsw-alias-bg-layer-3)",
-      }}
+    <DisclosureRow
+      icon={<span />}
+      title={image.imageId}
+      open={open}
+      expandable
+      onToggle={() => setOpen(!open)}
     >
-      <strong style={{ color: "var(--dsw-alias-label-primary)" }}>
-        {image.imageId}
-      </strong>
-      {image.primitive === "" ? null : <code style={greyId}>{image.primitive}</code>}
-      {image.packageManager === "" ? null : (
-        <code style={greyId}>pm={image.packageManager}</code>
-      )}
-      <Pill>{image.status}</Pill>
-      {image.packages.length > 0 ? (
-        <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
-          {image.packages.map((pkg) => <Chip key={pkg} t={t} label={pkg} />)}
+      <div style={wsBody}>
+        <table style={tableStyle}>
+          <tbody>
+            <tr>
+              <th style={thStyle} scope="row">{t("primitive")}</th>
+              <td style={tdStyle}>{image.primitive}</td>
+            </tr>
+            <tr>
+              <th style={thStyle} scope="row">{t("packageManager")}</th>
+              <td style={tdStyle}>{image.packageManager}</td>
+            </tr>
+            <tr>
+              <th style={thStyle} scope="row">{t("status")}</th>
+              <td style={tdStyle}>{image.status}</td>
+            </tr>
+            <tr>
+              <th style={thStyle} scope="row">{t("builtAt")}</th>
+              <td style={tdStyle}>{image.builtAt === "" ? t("none") : image.builtAt}</td>
+            </tr>
+            <tr>
+              <th style={thStyle} scope="row">{t("packages")}</th>
+              <td style={tdStyle}>
+                {image.packages.length === 0 ? (
+                  t("none")
+                ) : (
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+                    {image.packages.map((pkg) => (
+                      <Chip key={pkg} t={t} label={pkg} />
+                    ))}
+                  </div>
+                )}
+              </td>
+            </tr>
+          </tbody>
+        </table>
+        <div style={actions}>
+          {pull ? (
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={busy}
+              onClick={() => onPull(image.imageId)}
+            >
+              {t("pullImage")}
+            </Button>
+          ) : null}
+          {build ? (
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={busy}
+              onClick={() => onRebuild(image.imageId)}
+            >
+              {t("build")}
+            </Button>
+          ) : null}
+          {rebuild ? (
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={busy}
+              onClick={() => onRebuild(image.imageId)}
+            >
+              {t("rebuildImage")}
+            </Button>
+          ) : null}
         </div>
-      ) : null}
-      {image.builtAt === "" ? null : <code style={greyId}>{image.builtAt}</code>}
-      {pull ? (
-        <Button
-          variant="outline"
-          size="sm"
-          disabled={busy}
-          onClick={() => onPull(image.imageId)}
-        >
-          {t("pullImage")}
-        </Button>
-      ) : null}
-      {build ? (
-        <Button
-          variant="outline"
-          size="sm"
-          disabled={busy}
-          onClick={() => onRebuild(image.imageId)}
-        >
-          {t("build")}
-        </Button>
-      ) : null}
-      {rebuild ? (
-        <Button
-          variant="outline"
-          size="sm"
-          disabled={busy}
-          onClick={() => onRebuild(image.imageId)}
-        >
-          {t("rebuildImage")}
-        </Button>
-      ) : null}
-    </div>
+      </div>
+    </DisclosureRow>
   );
 }
 

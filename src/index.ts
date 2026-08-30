@@ -592,26 +592,155 @@ const APPROVAL_TOOLS = new Set(
   TOOLS.filter((tool) => tool.approval === true).map((tool) => tool.name),
 );
 
+// Join top-level parts of an approval reason. List elements within a part
+// (packages, mounts) stay comma-joined instead.
+const part = (...items: (string | undefined)[]): string =>
+  items.filter((item) => item !== undefined && item !== "").join(" • ");
+
+// Join list elements, capping at 8 with a "+N more" tail.
+const LIST_CAP = 8;
+function list(items: readonly unknown[], format: (item: unknown) => string): string {
+  if (items.length === 0) return "";
+  const shown = items.slice(0, LIST_CAP).map(format);
+  const extra = items.length - LIST_CAP;
+  return extra > 0 ? [...shown, `+${extra} more`].join(", ") : shown.join(", ");
+}
+
+// Render a project mount path "team" or "team/src" from project + optional path.
+function projectPath(project: string, path?: string): string {
+  if (path === undefined || path === "") return project;
+  return `${project}/${path.replace(/^\/+/, "")}`;
+}
+
+// Render a mount's mode suffix: "(ro)" for read_only, nothing for read_write.
+function mountMode(mode: unknown): string {
+  return mode === "read_only" ? " (ro)" : "";
+}
+
+// Summarize the mount source for container_mount_add/remove.
+function mountTarget(args: Record<string, unknown>): string {
+  const kind = args.kind === "tmpfs" ? "tmpfs" : args.kind === "volume" ? "volume" : "directory";
+  switch (kind) {
+    case "volume":
+      return typeof args.volume === "string" ? `volume ${args.volume}` : "";
+    case "tmpfs":
+      return "tmpfs";
+    default:
+      return typeof args.project === "string" ? `directory ${projectPath(args.project, typeof args.path === "string" ? args.path : undefined)}` : "";
+  }
+}
+
+// Render a single container_replace mount item, e.g. "team/src (ro)".
+function replaceMountItem(mount: Record<string, unknown>): string {
+  const project = typeof mount.project === "string" ? mount.project : "";
+  if (project === "") return "";
+  const path = typeof mount.path === "string" ? mount.path : undefined;
+  const destination = typeof mount.destination === "string" ? mount.destination : undefined;
+  const item = destination === undefined || destination === ""
+    ? projectPath(project, path)
+    : `${projectPath(project, path)} → ${destination}`;
+  return item + mountMode(mount.mode);
+}
+
+// Build the single-line approval summary shown for a gated tool call.
+export function summarizeArgs(name: string, args: Record<string, unknown>): string {
+  const str = (key: string): string | undefined =>
+    typeof args[key] === "string" && args[key] !== "" ? (args[key] as string) : undefined;
+  const count = (key: string): string | undefined => {
+    const value = args[key];
+    return Array.isArray(value) && value.length > 0 ? String(value.length) : undefined;
+  };
+  const listOf = (key: string): string | undefined => {
+    const value = args[key];
+    if (!Array.isArray(value) || value.length === 0) return undefined;
+    return list(value, (item) => String(item));
+  };
+  const mounts = (): string | undefined => {
+    const value = args.mounts;
+    if (!Array.isArray(value) || value.length === 0) return undefined;
+    const items = value.map((item) =>
+      typeof item === "object" && item !== null
+        ? replaceMountItem(item as Record<string, unknown>)
+        : "",
+    ).filter((item) => item !== "");
+    if (items.length === 0) return undefined;
+    const shown = items.slice(0, LIST_CAP);
+    const beyond = items.length - LIST_CAP;
+    return beyond > 0 ? `${shown.join(", ")}, +${beyond} more` : shown.join(", ");
+  };
+
+  switch (name) {
+    case "image_build": {
+      const image = str("imageId");
+      const base = str("baseImage");
+      const packages = listOf("packages");
+      if (image === undefined) return "";
+      const phrase = `build image ${image}${base === undefined ? "" : ` from ${base}`}`;
+      return part(
+        phrase,
+        packages === undefined ? undefined : `packages: ${packages}`,
+      );
+    }
+    case "image_rebuild": {
+      const image = str("imageId");
+      return image === undefined ? "" : `rebuild image ${image}`;
+    }
+    case "image_remove": {
+      const image = str("imageId");
+      return image === undefined ? "" : `remove image ${image}`;
+    }
+    case "container_recreate": {
+      const container = str("container");
+      return container === undefined ? "" : `recreate container ${container}`;
+    }
+    case "container_replace": {
+      const container = str("container");
+      const image = str("image");
+      const mountItems = mounts();
+      if (container === undefined) return "";
+      const phrase = `replace container ${container}${image === undefined ? "" : ` with ${image}`}`;
+      return part(
+        phrase,
+        mountItems === undefined ? undefined : `mounts: ${mountItems}`,
+      );
+    }
+    case "container_mount_add":
+    case "container_mount_remove": {
+      const container = str("container");
+      const target = mountTarget(args);
+      const destination = str("destination");
+      const verb = name === "container_mount_add" ? "mount" : "unmount";
+      if (container === undefined || target === "") return "";
+      const suffix = destination === undefined ? "" : ` at ${destination}`;
+      return `container ${container}: ${verb} ${target}${suffix}${name === "container_mount_add" ? mountMode(args.mode) : ""}`;
+    }
+    default:
+      return "";
+  }
+}
+
 // Decide whether a tool call needs approval. DSH resolves an `ask` decision
 // through its approval service (`ctx.get("approval").request(...)`), showing
 // the standard approval prompt; without one the call fails closed.
 export function approvalDecision(
   name: string,
+  args?: Record<string, unknown>,
 ): { kind: "ask"; reason: string } | undefined {
   if (!APPROVAL_TOOLS.has(name)) return undefined;
-  return {
-    kind: "ask",
-    reason: `tool "${name}" changes the workspace environment and requires your approval`,
-  };
+  return { kind: "ask", reason: summarizeArgs(name, args ?? {}) };
 }
 
 // The `tools/pre-execute` policy: asks for approval on gated tools and
 // delegates every other call to the remaining policy listeners.
 export async function preExecutePolicy(
-  exec: { name: string },
+  exec: { name: string; arguments?: unknown },
   next: () => Promise<unknown>,
 ): Promise<unknown> {
-  return approvalDecision(exec.name) ?? next();
+  const args = exec.arguments;
+  return approvalDecision(
+    exec.name,
+    typeof args === "object" && args !== null ? (args as Record<string, unknown>) : undefined,
+  ) ?? next();
 }
 
 const TOOL_DESCRIPTIONS: Record<string, string> = {

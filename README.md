@@ -227,8 +227,10 @@ the current workspace (`"default"` selects the workspace's default container).
 Approval is enforced by the plugin itself through a `tools/pre-execute`
 policy that asks DSH's approval service before a `✱` tool runs, so the call
 shows the standard approval prompt and is denied when no approval channel is
-available. The settings-card actions are direct control calls and are not
-gated.
+available. The prompt's reason summarizes the call's key parameters inline
+(image id/base/packages, container/image, and each mount with its kind,
+destination, and `(ro)` read-only marker). The settings-card actions are
+direct control calls and are not gated.
 
 Image references (`imageId`, `baseImage`, `image`) accept a stored image id
 (short, e.g. `valkey`, or fully qualified, e.g. `localhost/dsh-podman/valkey`)

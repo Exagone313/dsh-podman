@@ -14,6 +14,7 @@ import {
   imageRemoveParameters,
   approvalDecision,
   preExecutePolicy,
+  summarizeArgs,
 } from "./index.js";
 
 test("remoteArgv remaps ripgrep onto the guest path", () => {
@@ -208,8 +209,36 @@ test("the destructive mutations require approval", () => {
 });
 
 test("approvalDecision gates exactly the approval-flagged tools", () => {
+  const sampleArgs: Record<string, Record<string, unknown>> = {
+    image_build: {
+      imageId: "valkey",
+      baseImage: "localhost/dsh-podman/arch-base:latest",
+      packages: ["valkey"],
+    },
+    image_rebuild: { imageId: "valkey" },
+    image_remove: { imageId: "valkey" },
+    container_recreate: { container: "valkey-ctr" },
+    container_replace: {
+      container: "valkey-ctr",
+      image: "localhost/dsh-podman/nginx:latest",
+      mounts: [{ project: "team", mode: "read_only" }],
+    },
+    container_mount_add: {
+      container: "valkey-ctr",
+      kind: "volume",
+      volume: "valkey-data",
+      destination: "/data",
+      mode: "read_write",
+    },
+    container_mount_remove: {
+      container: "valkey-ctr",
+      kind: "volume",
+      volume: "valkey-data",
+      destination: "/data",
+    },
+  };
   for (const tool of TOOLS) {
-    const decision = approvalDecision(tool.name);
+    const decision = approvalDecision(tool.name, sampleArgs[tool.name] ?? {});
     if (tool.approval === true) {
       assert.ok(decision, `${tool.name} must ask for approval`);
       assert.equal(decision!.kind, "ask");
@@ -221,12 +250,112 @@ test("approvalDecision gates exactly the approval-flagged tools", () => {
   assert.equal(approvalDecision("no_such_tool"), undefined);
 });
 
+test("summarizeArgs renders the approval reason for each gated tool", () => {
+  assert.equal(
+    summarizeArgs("image_build", {
+      imageId: "valkey",
+      baseImage: "localhost/dsh-podman/arch-base:latest",
+      packages: ["valkey"],
+    }),
+    "build image valkey from localhost/dsh-podman/arch-base:latest • packages: valkey",
+  );
+  assert.equal(
+    summarizeArgs("image_build", {
+      imageId: "dev",
+      baseImage: "localhost/dsh-podman/arch-base:latest",
+      packages: ["git", "curl", "tmux", "vim", "zsh", "openssh", "jq", "ripgrep", "make", "cc", "go"],
+    }),
+    "build image dev from localhost/dsh-podman/arch-base:latest • packages: git, curl, tmux, vim, zsh, openssh, jq, ripgrep, +3 more",
+  );
+  assert.equal(summarizeArgs("image_rebuild", { imageId: "valkey" }), "rebuild image valkey");
+  assert.equal(summarizeArgs("image_remove", { imageId: "valkey" }), "remove image valkey");
+  assert.equal(
+    summarizeArgs("container_recreate", { container: "valkey-ctr" }),
+    "recreate container valkey-ctr",
+  );
+  assert.equal(
+    summarizeArgs("container_replace", {
+      container: "valkey-ctr",
+      image: "localhost/dsh-podman/nginx:latest",
+      mounts: [
+        { project: "team", path: "src", mode: "read_only" },
+        { project: "team", destination: "/workspace/team", mode: "read_write" },
+      ],
+    }),
+    "replace container valkey-ctr with localhost/dsh-podman/nginx:latest • mounts: team/src (ro), team → /workspace/team",
+  );
+  assert.equal(
+    summarizeArgs("container_mount_add", {
+      container: "valkey-ctr",
+      kind: "volume",
+      volume: "valkey-data",
+      destination: "/data",
+      mode: "read_write",
+    }),
+    "container valkey-ctr: mount volume valkey-data at /data",
+  );
+  assert.equal(
+    summarizeArgs("container_mount_add", {
+      container: "valkey-ctr",
+      kind: "project",
+      project: "team",
+      path: "src",
+      destination: "/workspace/team",
+      mode: "read_only",
+    }),
+    "container valkey-ctr: mount directory team/src at /workspace/team (ro)",
+  );
+  assert.equal(
+    summarizeArgs("container_mount_add", {
+      container: "valkey-ctr",
+      kind: "tmpfs",
+      destination: "/dev/shm",
+      mode: "read_write",
+    }),
+    "container valkey-ctr: mount tmpfs at /dev/shm",
+  );
+  assert.equal(
+    summarizeArgs("container_mount_remove", {
+      container: "valkey-ctr",
+      kind: "volume",
+      volume: "valkey-data",
+      destination: "/data",
+    }),
+    "container valkey-ctr: unmount volume valkey-data at /data",
+  );
+  assert.equal(
+    summarizeArgs("container_mount_remove", {
+      container: "valkey-ctr",
+      kind: "project",
+      project: "team",
+      path: "src",
+    }),
+    "container valkey-ctr: unmount directory team/src",
+  );
+});
+
+test("summarizeArgs tolerates missing or malformed arguments", () => {
+  assert.equal(summarizeArgs("image_build", {}), "");
+  assert.equal(summarizeArgs("container_mount_add", { container: "c" }), "");
+  assert.equal(summarizeArgs("image_list", { imageId: "x" }), "");
+  assert.equal(summarizeArgs("container_replace", { container: "c" }), "replace container c");
+  assert.equal(
+    summarizeArgs("container_replace", {
+      container: "c",
+      image: "img",
+      mounts: [{ mode: "read_only" }, "garbage", 42],
+    }),
+    "replace container c with img",
+  );
+});
+
 test("preExecutePolicy asks for gated tools and delegates the rest", async () => {
-  const gated = "image_remove";
-  const asked = (await preExecutePolicy({ name: gated }, () =>
-    Promise.resolve({ kind: "allow" }),
-  )) as { kind: string };
+  const asked = (await preExecutePolicy(
+    { name: "image_remove", arguments: { imageId: "valkey" } },
+    () => Promise.resolve({ kind: "allow" }),
+  )) as { kind: string; reason: string };
   assert.equal(asked.kind, "ask");
+  assert.equal(asked.reason, "remove image valkey");
 
   let delegated = false;
   const allowed = (await preExecutePolicy({ name: "image_list" }, () => {

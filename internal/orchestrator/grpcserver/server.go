@@ -6,6 +6,7 @@ package grpcserver
 
 import (
 	"context"
+	"crypto/rand"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -17,6 +18,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/containers/podman/v5/pkg/specgen"
 	"github.com/opencontainers/runtime-spec/specs-go"
 	ctl "gitlab.com/Exagone313/dsh-podman/internal/genproto/dshctl/v1"
 	guest "gitlab.com/Exagone313/dsh-podman/internal/genproto/dshguest/v1"
@@ -55,6 +57,10 @@ var containerNamePattern = containerPodmanName
 // when the orchestrator prefixes them; the full podman name is never exposed
 // to clients.
 var volumeName = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,63}$`)
+
+// secretName restricts short secret names to the same shape podman accepts
+// when the orchestrator prefixes them.
+var secretName = volumeName
 
 func validWorkspaceSlug(slug string) bool {
 	return slug != "." && slug != ".." && workspaceSlugName.MatchString(slug)
@@ -130,6 +136,7 @@ type Server struct {
 	ImageBuilder      *imagebuild.Builder
 	BuildDefaultImage bool
 	VolumePrefix      string
+	SecretPrefix      string
 	Logger            *slog.Logger
 }
 
@@ -261,13 +268,13 @@ func (s *Server) ListContainers(context.Context, *ctl.ListContainersRequest) (*c
 // Container message, including the container's effective project mounts
 // (its own list when present, else the workspace's default mounts).
 func containerProto(ws state.Workspace, c state.Container) *ctl.Container {
-	row := &ctl.Container{ContainerName: c.Name, PodmanName: c.PodmanName, WorkspaceSlug: ws.WorkspaceSlug, ImageId: c.ImageID, Status: c.Status, CreatedAt: c.CreatedAt, AgentSocketPath: c.AgentSocketPath, AgentToken: c.AgentToken, Env: cloneMap(c.Env)}
+	row := &ctl.Container{ContainerName: c.Name, PodmanName: c.PodmanName, WorkspaceSlug: ws.WorkspaceSlug, ImageId: c.ImageID, Status: c.Status, CreatedAt: c.CreatedAt, AgentSocketPath: c.AgentSocketPath, AgentToken: c.AgentToken, Env: cloneMap(c.Env), SecretEnv: cloneMap(c.SecretEnv)}
 	for _, mount := range containerMounts(ws, c) {
 		mode := ctl.MountMode_MOUNT_MODE_READ_ONLY
 		if mount.Mode == "read_write" {
 			mode = ctl.MountMode_MOUNT_MODE_READ_WRITE
 		}
-		row.Mounts = append(row.Mounts, &ctl.ProjectMount{ProjectName: mount.ProjectName, Path: mount.Path, Destination: mount.Destination, Mode: mode, Kind: mountKindToProto(mount.Kind), Volume: mount.Volume})
+		row.Mounts = append(row.Mounts, &ctl.ProjectMount{ProjectName: mount.ProjectName, Path: mount.Path, Destination: mount.Destination, Mode: mode, Kind: mountKindToProto(mount.Kind), Volume: mount.Volume, Secret: mount.Secret})
 	}
 	return row
 }
@@ -325,7 +332,12 @@ func (s *Server) recreateContainer(workspace state.Workspace, record *state.Cont
 	if err != nil {
 		return err
 	}
-	return s.Podman.RecreateWorkspace(podNameFor(workspace.WorkspaceSlug), record.PodmanName, imageTag, newToken, podmanMounts, env)
+	secrets, err := s.podmanSecrets(record.Mounts)
+	if err != nil {
+		return err
+	}
+	envSecrets := s.containerEnvSecrets(record.SecretEnv)
+	return s.Podman.RecreateWorkspace(podNameFor(workspace.WorkspaceSlug), record.PodmanName, imageTag, newToken, podmanMounts, secrets, envSecrets, env)
 }
 
 // StopAllContainerDaemons gracefully stops daemons in every container, in
@@ -436,6 +448,12 @@ func (s *Server) StartContainer(ctx context.Context, request *ctl.StartContainer
 		s.log().Error("StartContainer project validation failed", "workspace_slug", workspace.WorkspaceSlug, "error", err)
 		return nil, err
 	}
+	secrets, err := s.podmanSecrets(recordMounts)
+	if err != nil {
+		s.log().Error("StartContainer secret validation failed", "workspace_slug", workspace.WorkspaceSlug, "error", err)
+		return nil, err
+	}
+	envSecrets := s.containerEnvSecrets(record.SecretEnv)
 	if err := validateEnv(request.GetEnv()); err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
@@ -461,7 +479,7 @@ func (s *Server) StartContainer(ctx context.Context, request *ctl.StartContainer
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	if err := s.Podman.CreateWorkspace(podNameFor(workspace.WorkspaceSlug), record.PodmanName, imageTag, secret, podmanMounts, record.Env); err != nil {
+	if err := s.Podman.CreateWorkspace(podNameFor(workspace.WorkspaceSlug), record.PodmanName, imageTag, secret, podmanMounts, secrets, envSecrets, record.Env); err != nil {
 		s.log().Error("control request failed", "method", "StartContainer", "workspace_slug", request.GetWorkspaceSlug(), "container", request.GetContainer(), "error", err)
 		return nil, status.Error(codes.Internal, err.Error())
 	}
@@ -705,6 +723,12 @@ func (s *Server) CreateWorkspace(ctx context.Context, request *ctl.CreateWorkspa
 		s.log().Error("CreateWorkspace project validation failed", "root", s.ProjectsRoot, "error", mountErr)
 		return nil, mountErr
 	}
+	secrets, secretErr := s.podmanSecrets(defaultMounts)
+	if secretErr != nil {
+		s.log().Error("CreateWorkspace secret validation failed", "root", s.ProjectsRoot, "error", secretErr)
+		return nil, secretErr
+	}
+	envSecrets := s.containerEnvSecrets(nil)
 	userEnv := cloneMap(request.GetEnv())
 	if err := validateEnv(userEnv); err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
@@ -731,7 +755,7 @@ func (s *Server) CreateWorkspace(ctx context.Context, request *ctl.CreateWorkspa
 		s.log().Info("CreateWorkspace rebuilt stale default image", "image_id", image.ImageID, "image_tag", image.ImageTag)
 	}
 	name := "dsh-workspace-" + request.GetWorkspaceSlug()
-	if err := s.Podman.CreateWorkspace(podNameFor(request.GetWorkspaceSlug()), name, imageTag, secret, podmanMounts, userEnv); err != nil {
+	if err := s.Podman.CreateWorkspace(podNameFor(request.GetWorkspaceSlug()), name, imageTag, secret, podmanMounts, secrets, envSecrets, userEnv); err != nil {
 		s.log().Error("control request failed", "method", "CreateWorkspace", "workspace_slug", request.GetWorkspaceSlug(), "error", err)
 		return nil, status.Error(codes.Internal, err.Error())
 	}
@@ -1044,6 +1068,25 @@ func cloneMap(source map[string]string) map[string]string {
 	return result
 }
 
+// validateEnvKey rejects a user environment variable key that is empty,
+// contains '=' or a NUL byte, or collides with the reserved DSH_PODMAN
+// namespace.
+func validateEnvKey(key string) error {
+	if strings.HasPrefix(key, "DSH_PODMAN") {
+		return fmt.Errorf("env key %q is reserved (DSH_PODMAN prefix)", key)
+	}
+	if key == "" {
+		return fmt.Errorf("env key is empty")
+	}
+	if strings.ContainsRune(key, '=') {
+		return fmt.Errorf("env key %q contains '='", key)
+	}
+	if strings.ContainsRune(key, '\x00') {
+		return fmt.Errorf("env key %q contains a NUL byte", key)
+	}
+	return nil
+}
+
 // validateEnv rejects user environment variables whose keys are empty, contain
 // '=' or a NUL byte, or collide with the reserved DSH_PODMAN namespace. Values
 // containing a NUL byte are rejected as well. Keys are visited in sorted order
@@ -1055,17 +1098,8 @@ func validateEnv(env map[string]string) error {
 	}
 	sort.Strings(keys)
 	for _, key := range keys {
-		if strings.HasPrefix(key, "DSH_PODMAN") {
-			return fmt.Errorf("env key %q is reserved (DSH_PODMAN prefix)", key)
-		}
-		if key == "" {
-			return fmt.Errorf("env key is empty")
-		}
-		if strings.ContainsRune(key, '=') {
-			return fmt.Errorf("env key %q contains '='", key)
-		}
-		if strings.ContainsRune(key, '\x00') {
-			return fmt.Errorf("env key %q contains a NUL byte", key)
+		if err := validateEnvKey(key); err != nil {
+			return err
 		}
 		if strings.ContainsRune(env[key], '\x00') {
 			return fmt.Errorf("env value for key %q contains a NUL byte", key)
@@ -1095,6 +1129,9 @@ func mountFromProto(mount *ctl.ProjectMount) state.Mount {
 	if err != nil {
 		kind = ""
 	}
+	if kind == "secret" {
+		return state.Mount{Kind: kind, Secret: mount.GetSecret(), Destination: mount.GetDestination()}
+	}
 	return state.Mount{ProjectName: mount.GetProjectName(), Path: mount.GetPath(), Destination: mount.GetDestination(), Mode: mode, Kind: kind, Volume: mount.GetVolume()}
 }
 
@@ -1108,6 +1145,8 @@ func mountKindFromProto(kind ctl.MountKind) (string, error) {
 		return "tmpfs", nil
 	case ctl.MountKind_MOUNT_KIND_VOLUME:
 		return "volume", nil
+	case ctl.MountKind_MOUNT_KIND_SECRET:
+		return "secret", nil
 	default:
 		return "", fmt.Errorf("invalid mount kind")
 	}
@@ -1121,6 +1160,8 @@ func mountKindToProto(kind string) ctl.MountKind {
 		return ctl.MountKind_MOUNT_KIND_TMPFS
 	case "volume":
 		return ctl.MountKind_MOUNT_KIND_VOLUME
+	case "secret":
+		return ctl.MountKind_MOUNT_KIND_SECRET
 	default:
 		return ctl.MountKind_MOUNT_KIND_PROJECT
 	}
@@ -1253,11 +1294,95 @@ func (s *Server) podmanMounts(mounts []state.Mount) ([]specs.Mount, error) {
 				options = []string{"rw"}
 			}
 			podmanMounts = append(podmanMounts, specs.Mount{Type: "volume", Source: s.VolumePrefix + mount.Volume, Destination: mount.Destination, Options: options})
+		case "secret":
+			// Secret mounts are applied through podmanSecrets,
+			// not as OCI mounts.
+			continue
 		default:
 			return nil, status.Error(codes.InvalidArgument, "invalid mount kind")
 		}
 	}
 	return podmanMounts, nil
+}
+
+// podmanSecrets builds the secrets handed to podman from the stored mounts.
+// Each secret mount must carry a valid short secret name and an absolute
+// destination that never lands under ProjectsRoot.
+func (s *Server) podmanSecrets(mounts []state.Mount) ([]specgen.Secret, error) {
+	secrets := make([]specgen.Secret, 0, len(mounts))
+	for _, mount := range mounts {
+		if mount.Kind != "secret" {
+			continue
+		}
+		if !secretName.MatchString(mount.Secret) {
+			return nil, status.Error(codes.InvalidArgument, "invalid secret name")
+		}
+		if mount.Destination == "" {
+			return nil, status.Error(codes.InvalidArgument, "secret mount needs a destination")
+		}
+		if err := nonProjectDestination(s.ProjectsRoot, mount.Destination); err != nil {
+			return nil, status.Error(codes.InvalidArgument, err.Error())
+		}
+		secrets = append(secrets, specgen.Secret{Source: s.SecretPrefix + mount.Secret, Target: mount.Destination})
+	}
+	return secrets, nil
+}
+
+// containerEnvSecrets maps container secret env vars (env var name to short
+// secret name) onto the podman environment secret form (env var name to the
+// prefixed podman secret name).
+func (s *Server) containerEnvSecrets(secretEnv map[string]string) map[string]string {
+	if len(secretEnv) == 0 {
+		return nil
+	}
+	result := make(map[string]string, len(secretEnv))
+	for key, name := range secretEnv {
+		result[key] = s.SecretPrefix + name
+	}
+	return result
+}
+
+// secretAlphabets are the character sets randomSecret may draw from.
+var secretAlphabets = map[string]string{
+	"alphanumeric": "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789",
+	"hex":          "0123456789abcdef",
+	"base64url":    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_",
+}
+
+// randomSecret generates a random secret of exactly length bytes drawn from
+// the given charset. A zero length defaults to 32; the empty charset defaults
+// to "alphanumeric". Bytes are produced with rejection sampling per byte to
+// keep the distribution uniform.
+func randomSecret(length int, charset string) (string, error) {
+	if length == 0 {
+		length = 32
+	}
+	if length < 1 || length > 1024 {
+		return "", fmt.Errorf("invalid secret length")
+	}
+	if charset == "" {
+		charset = "alphanumeric"
+	}
+	alphabet, ok := secretAlphabets[charset]
+	if !ok {
+		return "", fmt.Errorf("invalid secret charset")
+	}
+	result := make([]byte, length)
+	modulus := len(alphabet)
+	limit := 256 - 256%modulus
+	buf := make([]byte, 1)
+	for i := range result {
+		for {
+			if _, err := rand.Read(buf); err != nil {
+				return "", fmt.Errorf("generate secret: %w", err)
+			}
+			if b := int(buf[0]); b < limit {
+				result[i] = alphabet[b%modulus]
+				break
+			}
+		}
+	}
+	return string(result), nil
 }
 func defaultImageID() string {
 	if value := os.Getenv("DSH_PODMAN_DEFAULT_IMAGE"); value != "" {
@@ -1410,10 +1535,260 @@ func (s *Server) RemoveVolume(_ context.Context, request *ctl.RemoveVolumeReques
 	s.log().Info("control request completed", "method", "RemoveVolume", "name", request.GetName())
 	return &ctl.RemoveVolumeResponse{}, nil
 }
+
+// ListSecrets lists the orchestrator-managed secrets, exposing only their
+// unprefixed short names. Secret values are never exposed to clients.
+func (s *Server) ListSecrets(_ context.Context, _ *ctl.ListSecretsRequest) (*ctl.ListSecretsResponse, error) {
+	s.log().Info("control request", "method", "ListSecrets")
+	if s.Podman == nil {
+		return nil, status.Error(codes.FailedPrecondition, "podman is not configured")
+	}
+	names, err := s.Podman.SecretList()
+	if err != nil {
+		s.log().Error("control request failed", "method", "ListSecrets", "error", err)
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	result := &ctl.ListSecretsResponse{}
+	for _, name := range names {
+		if !strings.HasPrefix(name, s.SecretPrefix) {
+			continue
+		}
+		result.Secrets = append(result.Secrets, &ctl.Secret{Name: name[len(s.SecretPrefix):]})
+	}
+	s.log().Info("control request completed", "method", "ListSecrets", "count", len(result.Secrets))
+	return result, nil
+}
+
+// CreateSecret generates a random secret value and stores it under the
+// orchestrator's prefix. The generated value is never logged and never
+// returned to the client.
+func (s *Server) CreateSecret(_ context.Context, request *ctl.CreateSecretRequest) (*ctl.Secret, error) {
+	s.log().Info("control request", "method", "CreateSecret", "name", request.GetName(), "length", request.GetLength(), "charset", request.GetCharset())
+	if !secretName.MatchString(request.GetName()) {
+		return nil, status.Error(codes.InvalidArgument, "invalid secret name")
+	}
+	if length := int(request.GetLength()); length != 0 && (length < 1 || length > 1024) {
+		return nil, status.Error(codes.InvalidArgument, "invalid secret length")
+	}
+	switch request.GetCharset() {
+	case "", "alphanumeric", "hex", "base64url":
+	default:
+		return nil, status.Error(codes.InvalidArgument, "invalid secret charset")
+	}
+	if s.Podman == nil {
+		return nil, status.Error(codes.FailedPrecondition, "podman is not configured")
+	}
+	full := s.SecretPrefix + request.GetName()
+	exists, err := s.Podman.SecretExists(full)
+	if err != nil {
+		s.log().Error("control request failed", "method", "CreateSecret", "name", request.GetName(), "error", err)
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	if exists {
+		return nil, status.Error(codes.AlreadyExists, "secret already exists")
+	}
+	value, err := randomSecret(int(request.GetLength()), request.GetCharset())
+	if err != nil {
+		s.log().Error("control request failed", "method", "CreateSecret", "name", request.GetName(), "error", err)
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	if err := s.Podman.SecretCreate(full, value); err != nil {
+		s.log().Error("control request failed", "method", "CreateSecret", "name", request.GetName(), "error", err)
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	s.log().Info("control request completed", "method", "CreateSecret", "name", request.GetName())
+	return &ctl.Secret{Name: request.GetName()}, nil
+}
+
+// WriteSecretValue overwrites a secret's value with a client-supplied one
+// (used by the UI to write generated values). The value is never logged.
+func (s *Server) WriteSecretValue(_ context.Context, request *ctl.WriteSecretValueRequest) (*ctl.Secret, error) {
+	s.log().Info("control request", "method", "WriteSecretValue", "name", request.GetName())
+	if !secretName.MatchString(request.GetName()) {
+		return nil, status.Error(codes.InvalidArgument, "invalid secret name")
+	}
+	if request.GetValue() == "" || strings.ContainsRune(request.GetValue(), '\x00') {
+		return nil, status.Error(codes.InvalidArgument, "invalid secret value")
+	}
+	if s.Podman == nil {
+		return nil, status.Error(codes.FailedPrecondition, "podman is not configured")
+	}
+	full := s.SecretPrefix + request.GetName()
+	exists, err := s.Podman.SecretExists(full)
+	if err != nil {
+		s.log().Error("control request failed", "method", "WriteSecretValue", "name", request.GetName(), "error", err)
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	if exists {
+		if err := s.Podman.SecretRemove(full); err != nil {
+			s.log().Error("control request failed", "method", "WriteSecretValue", "name", request.GetName(), "error", err)
+			return nil, status.Error(codes.Internal, err.Error())
+		}
+	}
+	if err := s.Podman.SecretCreate(full, request.GetValue()); err != nil {
+		s.log().Error("control request failed", "method", "WriteSecretValue", "name", request.GetName(), "error", err)
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	s.log().Info("control request completed", "method", "WriteSecretValue", "name", request.GetName())
+	return &ctl.Secret{Name: request.GetName()}, nil
+}
+
+// RemoveSecret deletes a secret under the orchestrator's prefix.
+func (s *Server) RemoveSecret(_ context.Context, request *ctl.RemoveSecretRequest) (*ctl.RemoveSecretResponse, error) {
+	s.log().Info("control request", "method", "RemoveSecret", "name", request.GetName())
+	if !secretName.MatchString(request.GetName()) {
+		return nil, status.Error(codes.InvalidArgument, "invalid secret name")
+	}
+	if s.Podman == nil {
+		return nil, status.Error(codes.FailedPrecondition, "podman is not configured")
+	}
+	full := s.SecretPrefix + request.GetName()
+	exists, err := s.Podman.SecretExists(full)
+	if err != nil {
+		s.log().Error("control request failed", "method", "RemoveSecret", "name", request.GetName(), "error", err)
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	if !exists {
+		return nil, status.Error(codes.NotFound, "secret not found")
+	}
+	if err := s.Podman.SecretRemove(full); err != nil {
+		s.log().Error("control request failed", "method", "RemoveSecret", "name", request.GetName(), "error", err)
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	s.log().Info("control request completed", "method", "RemoveSecret", "name", request.GetName())
+	return &ctl.RemoveSecretResponse{}, nil
+}
+
+// AddContainerSecret attaches an existing secret to a container as an
+// environment variable and recreates the container so the change takes
+// effect.
+func (s *Server) AddContainerSecret(ctx context.Context, request *ctl.AddContainerSecretRequest) (*ctl.Container, error) {
+	s.log().Info("control request", "method", "AddContainerSecret", "workspace_slug", request.GetWorkspaceSlug(), "container", request.GetContainer(), "env", request.GetEnv(), "secret", request.GetSecret())
+	container := request.GetContainer()
+	if container == "" {
+		container = "default"
+	}
+	if container != "default" && !validContainerName(container) {
+		return nil, status.Error(codes.InvalidArgument, "invalid container name")
+	}
+	workspace, err := workspaceBySlug(s.Store, request.GetWorkspaceSlug())
+	if err != nil {
+		return nil, status.Error(codes.NotFound, "workspace not found")
+	}
+	record, ok := containerByLogical(&workspace, container)
+	if !ok {
+		s.log().Warn("control request failed", "method", "AddContainerSecret", "workspace_slug", request.GetWorkspaceSlug(), "container", container, "reason", "container not found")
+		return nil, status.Error(codes.NotFound, "container not found")
+	}
+	if err := validateEnvKey(request.GetEnv()); err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+	if !secretName.MatchString(request.GetSecret()) {
+		return nil, status.Error(codes.InvalidArgument, "invalid secret name")
+	}
+	if record.SecretEnv == nil {
+		record.SecretEnv = map[string]string{}
+	}
+	if _, exists := record.SecretEnv[request.GetEnv()]; exists {
+		return nil, status.Error(codes.AlreadyExists, "secret already set on this env var")
+	}
+	record.SecretEnv[request.GetEnv()] = request.GetSecret()
+	if _, err := s.podmanMounts(record.Mounts); err != nil {
+		return nil, err
+	}
+	if _, err := s.podmanSecrets(record.Mounts); err != nil {
+		return nil, err
+	}
+	s.containerEnvSecrets(record.SecretEnv)
+	if s.Podman == nil {
+		return nil, status.Error(codes.FailedPrecondition, "podman is not configured")
+	}
+	imageTag, err := s.resolveImageTag(record.ImageID)
+	if err != nil {
+		return nil, err
+	}
+	secretToken, err := token.New()
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	if err := s.recreateContainer(workspace, record, imageTag, secretToken, record.Env); err != nil {
+		s.log().Error("control request failed", "method", "AddContainerSecret", "workspace_slug", request.GetWorkspaceSlug(), "container", container, "error", err)
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	record.Status = "running"
+	record.AgentToken = secretToken
+	updated, err := s.upsertContainer(workspace, *record)
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	s.log().Info("control request completed", "method", "AddContainerSecret", "workspace_slug", request.GetWorkspaceSlug(), "container", container, "env", request.GetEnv())
+	return containerProto(updated, *record), nil
+}
+
+// RemoveContainerSecret detaches a secret environment variable from a
+// container and recreates the container so the change takes effect.
+func (s *Server) RemoveContainerSecret(ctx context.Context, request *ctl.RemoveContainerSecretRequest) (*ctl.Container, error) {
+	s.log().Info("control request", "method", "RemoveContainerSecret", "workspace_slug", request.GetWorkspaceSlug(), "container", request.GetContainer(), "env", request.GetEnv())
+	container := request.GetContainer()
+	if container == "" {
+		container = "default"
+	}
+	if container != "default" && !validContainerName(container) {
+		return nil, status.Error(codes.InvalidArgument, "invalid container name")
+	}
+	workspace, err := workspaceBySlug(s.Store, request.GetWorkspaceSlug())
+	if err != nil {
+		return nil, status.Error(codes.NotFound, "workspace not found")
+	}
+	record, ok := containerByLogical(&workspace, container)
+	if !ok {
+		s.log().Warn("control request failed", "method", "RemoveContainerSecret", "workspace_slug", request.GetWorkspaceSlug(), "container", container, "reason", "container not found")
+		return nil, status.Error(codes.NotFound, "container not found")
+	}
+	if err := validateEnvKey(request.GetEnv()); err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+	if _, ok := record.SecretEnv[request.GetEnv()]; !ok {
+		return nil, status.Error(codes.NotFound, "secret not found")
+	}
+	delete(record.SecretEnv, request.GetEnv())
+	if _, err := s.podmanMounts(record.Mounts); err != nil {
+		return nil, err
+	}
+	if _, err := s.podmanSecrets(record.Mounts); err != nil {
+		return nil, err
+	}
+	s.containerEnvSecrets(record.SecretEnv)
+	if s.Podman == nil {
+		return nil, status.Error(codes.FailedPrecondition, "podman is not configured")
+	}
+	imageTag, err := s.resolveImageTag(record.ImageID)
+	if err != nil {
+		return nil, err
+	}
+	secretToken, err := token.New()
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	if err := s.recreateContainer(workspace, record, imageTag, secretToken, record.Env); err != nil {
+		s.log().Error("control request failed", "method", "RemoveContainerSecret", "workspace_slug", request.GetWorkspaceSlug(), "container", container, "error", err)
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	record.Status = "running"
+	record.AgentToken = secretToken
+	updated, err := s.upsertContainer(workspace, *record)
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	s.log().Info("control request completed", "method", "RemoveContainerSecret", "workspace_slug", request.GetWorkspaceSlug(), "container", container, "env", request.GetEnv())
+	return containerProto(updated, *record), nil
+}
+
 func toProto(workspace state.Workspace) *ctl.Workspace {
 	result := &ctl.Workspace{WorkspaceSlug: workspace.WorkspaceSlug, ContainerName: workspace.ContainerName, ImageId: workspace.ImageID, Status: workspace.Status, AgentSocketPath: workspace.AgentSocketPath, AgentToken: workspace.AgentToken, CreatedAt: workspace.CreatedAt}
 	if defaultContainer, ok := containerByLogical(&workspace, "default"); ok {
 		result.Env = cloneMap(defaultContainer.Env)
+		result.SecretEnv = cloneMap(defaultContainer.SecretEnv)
 	}
 	for _, mount := range workspace.Mounts {
 		mode := ctl.MountMode_MOUNT_MODE_READ_ONLY

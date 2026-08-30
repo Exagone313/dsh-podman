@@ -75,6 +75,7 @@ All of the above are overridable through the plugin's `cordis.yml` config
 | `DSH_PODMAN_PROJECTS_ROOT` | `/projects` | Project root inside every guest container |
 | `DSH_PODMAN_SOCKETS_ROOT` | `/run/dsh-podman` | Socket root directory (bind-mounted from the host); holds `orchestrator.sock` and per-workspace guest sockets; see [Variable details](#variable-details) |
 | `DSH_PODMAN_VOLUME_PREFIX` | `dsh-podman-` | Prefix applied to managed named volumes (see [Mounts and volumes](#mounts-and-volumes)) |
+| `DSH_PODMAN_SECRET_PREFIX` | `dsh-podman-` | Prefix applied to managed podman secrets (see [Secrets](#secrets)) |
 
 ### Guest agent (`dsh-podman-guest-agent`)
 
@@ -318,8 +319,8 @@ rebuilt, or removed.
 | Tool | Params | Description |
 |---|---|---|
 | `container_mount_list` | `container` | List the container's mounts |
-| `container_mount_add` ✱ | `container`, optional `kind`, `project`, `path`, `destination`, `mode`, `volume` | Add a mount; `kind` is `project` (default), `tmpfs`, or `volume` |
-| `container_mount_remove` ✱ | `container`, optional `kind`, `project`, `path`, `volume`, `destination` | Remove a mount |
+| `container_mount_add` ✱ | `container`, optional `kind`, `project`, `path`, `destination`, `mode`, `volume`, `secret` | Add a mount; `kind` is `project` (default), `tmpfs`, `volume`, or `secret` |
+| `container_mount_remove` ✱ | `container`, optional `kind`, `project`, `path`, `volume`, `destination`, `secret` | Remove a mount |
 | `volume_list` | — | List the managed named volumes (short names) |
 | `volume_create` | `name` | Create a managed named volume |
 | `volume_remove` ✱ | `name` | Remove a managed named volume |
@@ -328,6 +329,26 @@ A `project` mount binds a directory from the project's workspace; `tmpfs`
 mounts a writable in-memory filesystem and `volume` mounts a podman named
 volume (auto-created on first use) — both at an arbitrary absolute container
 path, never under the projects root. `mode` is `read_only` or `read_write`.
+
+### Secrets
+
+| Tool | Params | Description |
+|---|---|---|
+| `secret_list` | — | List the managed secrets (short names) |
+| `secret_create` | `name`, optional `length`, `charset` | Create a secret with an **orchestrator-generated random** value (`length` default 32; `charset` `alphanumeric` \| `hex` \| `base64url`) |
+| `secret_remove` ✱ | `name` | Remove a managed secret |
+| `container_secret_add` ✱ | `container`, `env`, `secret` | Attach a secret to a container as an environment variable |
+| `container_secret_remove` ✱ | `container`, `env` | Detach a secret environment variable from a container |
+
+Secrets are stored in podman under `DSH_PODMAN_SECRET_PREFIX` (default
+`dsh-podman-`); the tools and UI use short names. `secret_create` values are
+generated server-side with `crypto/rand` and **never exposed** — there is no
+read tool. A secret can be attached to a container either as a **mount**
+(`container_mount_add kind="secret"` + `secret` + `destination`, read-only, at
+an absolute path never under the projects root) or as an **environment
+variable** (`container_secret_add`; the env var name must not start with
+`DSH_PODMAN`). The settings card can **overwrite** a secret with user-typed
+content (write-only) but never reads it.
 
 ### Daemons
 

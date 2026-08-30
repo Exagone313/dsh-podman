@@ -23,24 +23,30 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	OrchestratorControl_ListProjects_FullMethodName         = "/dshctl.v1.OrchestratorControl/ListProjects"
-	OrchestratorControl_CreateWorkspace_FullMethodName      = "/dshctl.v1.OrchestratorControl/CreateWorkspace"
-	OrchestratorControl_DescribeWorkspace_FullMethodName    = "/dshctl.v1.OrchestratorControl/DescribeWorkspace"
-	OrchestratorControl_ListWorkspaces_FullMethodName       = "/dshctl.v1.OrchestratorControl/ListWorkspaces"
-	OrchestratorControl_ListImages_FullMethodName           = "/dshctl.v1.OrchestratorControl/ListImages"
-	OrchestratorControl_GetImage_FullMethodName             = "/dshctl.v1.OrchestratorControl/GetImage"
-	OrchestratorControl_BuildImage_FullMethodName           = "/dshctl.v1.OrchestratorControl/BuildImage"
-	OrchestratorControl_RebuildImage_FullMethodName         = "/dshctl.v1.OrchestratorControl/RebuildImage"
-	OrchestratorControl_RemoveImage_FullMethodName          = "/dshctl.v1.OrchestratorControl/RemoveImage"
-	OrchestratorControl_ListContainers_FullMethodName       = "/dshctl.v1.OrchestratorControl/ListContainers"
-	OrchestratorControl_StartContainer_FullMethodName       = "/dshctl.v1.OrchestratorControl/StartContainer"
-	OrchestratorControl_RecreateContainer_FullMethodName    = "/dshctl.v1.OrchestratorControl/RecreateContainer"
-	OrchestratorControl_RemoveContainer_FullMethodName      = "/dshctl.v1.OrchestratorControl/RemoveContainer"
-	OrchestratorControl_AddContainerMount_FullMethodName    = "/dshctl.v1.OrchestratorControl/AddContainerMount"
-	OrchestratorControl_RemoveContainerMount_FullMethodName = "/dshctl.v1.OrchestratorControl/RemoveContainerMount"
-	OrchestratorControl_ListVolumes_FullMethodName          = "/dshctl.v1.OrchestratorControl/ListVolumes"
-	OrchestratorControl_CreateVolume_FullMethodName         = "/dshctl.v1.OrchestratorControl/CreateVolume"
-	OrchestratorControl_RemoveVolume_FullMethodName         = "/dshctl.v1.OrchestratorControl/RemoveVolume"
+	OrchestratorControl_ListProjects_FullMethodName          = "/dshctl.v1.OrchestratorControl/ListProjects"
+	OrchestratorControl_CreateWorkspace_FullMethodName       = "/dshctl.v1.OrchestratorControl/CreateWorkspace"
+	OrchestratorControl_DescribeWorkspace_FullMethodName     = "/dshctl.v1.OrchestratorControl/DescribeWorkspace"
+	OrchestratorControl_ListWorkspaces_FullMethodName        = "/dshctl.v1.OrchestratorControl/ListWorkspaces"
+	OrchestratorControl_ListImages_FullMethodName            = "/dshctl.v1.OrchestratorControl/ListImages"
+	OrchestratorControl_GetImage_FullMethodName              = "/dshctl.v1.OrchestratorControl/GetImage"
+	OrchestratorControl_BuildImage_FullMethodName            = "/dshctl.v1.OrchestratorControl/BuildImage"
+	OrchestratorControl_RebuildImage_FullMethodName          = "/dshctl.v1.OrchestratorControl/RebuildImage"
+	OrchestratorControl_RemoveImage_FullMethodName           = "/dshctl.v1.OrchestratorControl/RemoveImage"
+	OrchestratorControl_ListContainers_FullMethodName        = "/dshctl.v1.OrchestratorControl/ListContainers"
+	OrchestratorControl_StartContainer_FullMethodName        = "/dshctl.v1.OrchestratorControl/StartContainer"
+	OrchestratorControl_RecreateContainer_FullMethodName     = "/dshctl.v1.OrchestratorControl/RecreateContainer"
+	OrchestratorControl_RemoveContainer_FullMethodName       = "/dshctl.v1.OrchestratorControl/RemoveContainer"
+	OrchestratorControl_AddContainerMount_FullMethodName     = "/dshctl.v1.OrchestratorControl/AddContainerMount"
+	OrchestratorControl_RemoveContainerMount_FullMethodName  = "/dshctl.v1.OrchestratorControl/RemoveContainerMount"
+	OrchestratorControl_ListVolumes_FullMethodName           = "/dshctl.v1.OrchestratorControl/ListVolumes"
+	OrchestratorControl_CreateVolume_FullMethodName          = "/dshctl.v1.OrchestratorControl/CreateVolume"
+	OrchestratorControl_RemoveVolume_FullMethodName          = "/dshctl.v1.OrchestratorControl/RemoveVolume"
+	OrchestratorControl_ListSecrets_FullMethodName           = "/dshctl.v1.OrchestratorControl/ListSecrets"
+	OrchestratorControl_CreateSecret_FullMethodName          = "/dshctl.v1.OrchestratorControl/CreateSecret"
+	OrchestratorControl_WriteSecretValue_FullMethodName      = "/dshctl.v1.OrchestratorControl/WriteSecretValue"
+	OrchestratorControl_RemoveSecret_FullMethodName          = "/dshctl.v1.OrchestratorControl/RemoveSecret"
+	OrchestratorControl_AddContainerSecret_FullMethodName    = "/dshctl.v1.OrchestratorControl/AddContainerSecret"
+	OrchestratorControl_RemoveContainerSecret_FullMethodName = "/dshctl.v1.OrchestratorControl/RemoveContainerSecret"
 )
 
 // OrchestratorControlClient is the client API for OrchestratorControl service.
@@ -65,6 +71,12 @@ type OrchestratorControlClient interface {
 	ListVolumes(ctx context.Context, in *ListVolumesRequest, opts ...grpc.CallOption) (*ListVolumesResponse, error)
 	CreateVolume(ctx context.Context, in *CreateVolumeRequest, opts ...grpc.CallOption) (*Volume, error)
 	RemoveVolume(ctx context.Context, in *RemoveVolumeRequest, opts ...grpc.CallOption) (*RemoveVolumeResponse, error)
+	ListSecrets(ctx context.Context, in *ListSecretsRequest, opts ...grpc.CallOption) (*ListSecretsResponse, error)
+	CreateSecret(ctx context.Context, in *CreateSecretRequest, opts ...grpc.CallOption) (*Secret, error)
+	WriteSecretValue(ctx context.Context, in *WriteSecretValueRequest, opts ...grpc.CallOption) (*Secret, error)
+	RemoveSecret(ctx context.Context, in *RemoveSecretRequest, opts ...grpc.CallOption) (*RemoveSecretResponse, error)
+	AddContainerSecret(ctx context.Context, in *AddContainerSecretRequest, opts ...grpc.CallOption) (*Container, error)
+	RemoveContainerSecret(ctx context.Context, in *RemoveContainerSecretRequest, opts ...grpc.CallOption) (*Container, error)
 }
 
 type orchestratorControlClient struct {
@@ -255,6 +267,66 @@ func (c *orchestratorControlClient) RemoveVolume(ctx context.Context, in *Remove
 	return out, nil
 }
 
+func (c *orchestratorControlClient) ListSecrets(ctx context.Context, in *ListSecretsRequest, opts ...grpc.CallOption) (*ListSecretsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListSecretsResponse)
+	err := c.cc.Invoke(ctx, OrchestratorControl_ListSecrets_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *orchestratorControlClient) CreateSecret(ctx context.Context, in *CreateSecretRequest, opts ...grpc.CallOption) (*Secret, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(Secret)
+	err := c.cc.Invoke(ctx, OrchestratorControl_CreateSecret_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *orchestratorControlClient) WriteSecretValue(ctx context.Context, in *WriteSecretValueRequest, opts ...grpc.CallOption) (*Secret, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(Secret)
+	err := c.cc.Invoke(ctx, OrchestratorControl_WriteSecretValue_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *orchestratorControlClient) RemoveSecret(ctx context.Context, in *RemoveSecretRequest, opts ...grpc.CallOption) (*RemoveSecretResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RemoveSecretResponse)
+	err := c.cc.Invoke(ctx, OrchestratorControl_RemoveSecret_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *orchestratorControlClient) AddContainerSecret(ctx context.Context, in *AddContainerSecretRequest, opts ...grpc.CallOption) (*Container, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(Container)
+	err := c.cc.Invoke(ctx, OrchestratorControl_AddContainerSecret_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *orchestratorControlClient) RemoveContainerSecret(ctx context.Context, in *RemoveContainerSecretRequest, opts ...grpc.CallOption) (*Container, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(Container)
+	err := c.cc.Invoke(ctx, OrchestratorControl_RemoveContainerSecret_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // OrchestratorControlServer is the server API for OrchestratorControl service.
 // All implementations must embed UnimplementedOrchestratorControlServer
 // for forward compatibility.
@@ -277,6 +349,12 @@ type OrchestratorControlServer interface {
 	ListVolumes(context.Context, *ListVolumesRequest) (*ListVolumesResponse, error)
 	CreateVolume(context.Context, *CreateVolumeRequest) (*Volume, error)
 	RemoveVolume(context.Context, *RemoveVolumeRequest) (*RemoveVolumeResponse, error)
+	ListSecrets(context.Context, *ListSecretsRequest) (*ListSecretsResponse, error)
+	CreateSecret(context.Context, *CreateSecretRequest) (*Secret, error)
+	WriteSecretValue(context.Context, *WriteSecretValueRequest) (*Secret, error)
+	RemoveSecret(context.Context, *RemoveSecretRequest) (*RemoveSecretResponse, error)
+	AddContainerSecret(context.Context, *AddContainerSecretRequest) (*Container, error)
+	RemoveContainerSecret(context.Context, *RemoveContainerSecretRequest) (*Container, error)
 	mustEmbedUnimplementedOrchestratorControlServer()
 }
 
@@ -340,6 +418,24 @@ func (UnimplementedOrchestratorControlServer) CreateVolume(context.Context, *Cre
 }
 func (UnimplementedOrchestratorControlServer) RemoveVolume(context.Context, *RemoveVolumeRequest) (*RemoveVolumeResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method RemoveVolume not implemented")
+}
+func (UnimplementedOrchestratorControlServer) ListSecrets(context.Context, *ListSecretsRequest) (*ListSecretsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListSecrets not implemented")
+}
+func (UnimplementedOrchestratorControlServer) CreateSecret(context.Context, *CreateSecretRequest) (*Secret, error) {
+	return nil, status.Error(codes.Unimplemented, "method CreateSecret not implemented")
+}
+func (UnimplementedOrchestratorControlServer) WriteSecretValue(context.Context, *WriteSecretValueRequest) (*Secret, error) {
+	return nil, status.Error(codes.Unimplemented, "method WriteSecretValue not implemented")
+}
+func (UnimplementedOrchestratorControlServer) RemoveSecret(context.Context, *RemoveSecretRequest) (*RemoveSecretResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method RemoveSecret not implemented")
+}
+func (UnimplementedOrchestratorControlServer) AddContainerSecret(context.Context, *AddContainerSecretRequest) (*Container, error) {
+	return nil, status.Error(codes.Unimplemented, "method AddContainerSecret not implemented")
+}
+func (UnimplementedOrchestratorControlServer) RemoveContainerSecret(context.Context, *RemoveContainerSecretRequest) (*Container, error) {
+	return nil, status.Error(codes.Unimplemented, "method RemoveContainerSecret not implemented")
 }
 func (UnimplementedOrchestratorControlServer) mustEmbedUnimplementedOrchestratorControlServer() {}
 func (UnimplementedOrchestratorControlServer) testEmbeddedByValue()                             {}
@@ -686,6 +782,114 @@ func _OrchestratorControl_RemoveVolume_Handler(srv interface{}, ctx context.Cont
 	return interceptor(ctx, in, info, handler)
 }
 
+func _OrchestratorControl_ListSecrets_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListSecretsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(OrchestratorControlServer).ListSecrets(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: OrchestratorControl_ListSecrets_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(OrchestratorControlServer).ListSecrets(ctx, req.(*ListSecretsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _OrchestratorControl_CreateSecret_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreateSecretRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(OrchestratorControlServer).CreateSecret(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: OrchestratorControl_CreateSecret_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(OrchestratorControlServer).CreateSecret(ctx, req.(*CreateSecretRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _OrchestratorControl_WriteSecretValue_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(WriteSecretValueRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(OrchestratorControlServer).WriteSecretValue(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: OrchestratorControl_WriteSecretValue_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(OrchestratorControlServer).WriteSecretValue(ctx, req.(*WriteSecretValueRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _OrchestratorControl_RemoveSecret_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RemoveSecretRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(OrchestratorControlServer).RemoveSecret(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: OrchestratorControl_RemoveSecret_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(OrchestratorControlServer).RemoveSecret(ctx, req.(*RemoveSecretRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _OrchestratorControl_AddContainerSecret_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(AddContainerSecretRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(OrchestratorControlServer).AddContainerSecret(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: OrchestratorControl_AddContainerSecret_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(OrchestratorControlServer).AddContainerSecret(ctx, req.(*AddContainerSecretRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _OrchestratorControl_RemoveContainerSecret_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RemoveContainerSecretRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(OrchestratorControlServer).RemoveContainerSecret(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: OrchestratorControl_RemoveContainerSecret_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(OrchestratorControlServer).RemoveContainerSecret(ctx, req.(*RemoveContainerSecretRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // OrchestratorControl_ServiceDesc is the grpc.ServiceDesc for OrchestratorControl service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -764,6 +968,30 @@ var OrchestratorControl_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "RemoveVolume",
 			Handler:    _OrchestratorControl_RemoveVolume_Handler,
+		},
+		{
+			MethodName: "ListSecrets",
+			Handler:    _OrchestratorControl_ListSecrets_Handler,
+		},
+		{
+			MethodName: "CreateSecret",
+			Handler:    _OrchestratorControl_CreateSecret_Handler,
+		},
+		{
+			MethodName: "WriteSecretValue",
+			Handler:    _OrchestratorControl_WriteSecretValue_Handler,
+		},
+		{
+			MethodName: "RemoveSecret",
+			Handler:    _OrchestratorControl_RemoveSecret_Handler,
+		},
+		{
+			MethodName: "AddContainerSecret",
+			Handler:    _OrchestratorControl_AddContainerSecret_Handler,
+		},
+		{
+			MethodName: "RemoveContainerSecret",
+			Handler:    _OrchestratorControl_RemoveContainerSecret_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

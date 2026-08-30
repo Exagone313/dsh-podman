@@ -13,6 +13,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/containers/podman/v5/pkg/specgen"
 	ctl "gitlab.com/Exagone313/dsh-podman/internal/genproto/dshctl/v1"
 	imagebuild "gitlab.com/Exagone313/dsh-podman/internal/orchestrator/images"
 	"gitlab.com/Exagone313/dsh-podman/internal/orchestrator/state"
@@ -1372,5 +1373,264 @@ func TestMountKindFromProto(t *testing.T) {
 	}
 	if _, err := mountKindFromProto(ctl.MountKind(99)); err == nil {
 		t.Fatal("expected error for unknown kind")
+	}
+}
+
+func TestPodmanSecrets(t *testing.T) {
+	root := t.TempDir()
+	server := &Server{ProjectsRoot: root, SecretPrefix: "dsh-podman-", Logger: silentLogger()}
+
+	secrets, err := server.podmanSecrets([]state.Mount{{Kind: "secret", Secret: "valkey-tls", Destination: "/run/secrets/tls"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(secrets) != 1 || secrets[0] != (specgen.Secret{Source: "dsh-podman-valkey-tls", Target: "/run/secrets/tls"}) {
+		t.Fatalf("unexpected secret: %#v", secrets)
+	}
+
+	for _, mount := range []state.Mount{
+		{Kind: "secret", Secret: "data", Destination: root},
+		{Kind: "secret", Secret: "data", Destination: filepath.Join(root, "x")},
+	} {
+		if _, err := server.podmanSecrets([]state.Mount{mount}); status.Code(err) != codes.InvalidArgument {
+			t.Errorf("mount %#v under projects root: expected InvalidArgument, got %v", mount, err)
+		}
+	}
+	for _, name := range []string{"", "-bad", "a/b", "a b", strings.Repeat("a", 65)} {
+		if _, err := server.podmanSecrets([]state.Mount{{Kind: "secret", Secret: name, Destination: "/run/secrets/x"}}); status.Code(err) != codes.InvalidArgument {
+			t.Errorf("invalid secret name %q: expected InvalidArgument, got %v", name, err)
+		}
+	}
+	if _, err := server.podmanSecrets([]state.Mount{{Kind: "secret", Secret: "data"}}); status.Code(err) != codes.InvalidArgument {
+		t.Fatalf("missing destination: expected InvalidArgument, got %v", err)
+	}
+	if _, err := server.podmanSecrets([]state.Mount{{Kind: "bogus", Secret: "data", Destination: "/x"}}); err != nil {
+		t.Fatalf("non-secret mounts should be skipped, got %v", err)
+	}
+}
+
+func TestContainerEnvSecrets(t *testing.T) {
+	server := &Server{SecretPrefix: "dsh-podman-"}
+	got := server.containerEnvSecrets(map[string]string{"VALKEY_TOKEN": "valkey-token"})
+	if len(got) != 1 || got["VALKEY_TOKEN"] != "dsh-podman-valkey-token" {
+		t.Fatalf("unexpected env secrets: %#v", got)
+	}
+	if got := server.containerEnvSecrets(nil); got != nil {
+		t.Fatalf("expected nil for empty input, got %#v", got)
+	}
+}
+
+func TestRandomSecret(t *testing.T) {
+	value, err := randomSecret(0, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(value) != 32 {
+		t.Fatalf("expected 32 chars, got %d", len(value))
+	}
+	for _, c := range value {
+		if !strings.ContainsRune(secretAlphabets["alphanumeric"], c) {
+			t.Fatalf("alphanumeric charset violated: %q", c)
+		}
+	}
+	value, err = randomSecret(16, "hex")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(value) != 16 {
+		t.Fatalf("expected 16 chars, got %d", len(value))
+	}
+	for _, c := range value {
+		if !strings.ContainsRune(secretAlphabets["hex"], c) {
+			t.Fatalf("hex charset violated: %q", c)
+		}
+	}
+	value, err = randomSecret(20, "base64url")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(value) != 20 {
+		t.Fatalf("expected 20 chars, got %d", len(value))
+	}
+	for _, c := range value {
+		if !strings.ContainsRune(secretAlphabets["base64url"], c) {
+			t.Fatalf("base64url charset violated: %q", c)
+		}
+	}
+	if value, err := randomSecret(2000, ""); err == nil {
+		t.Fatalf("expected error for length 2000, got %q", value)
+	}
+	if value, err := randomSecret(0, "bogus"); err == nil {
+		t.Fatalf("expected error for bad charset, got %q", value)
+	}
+}
+
+func TestValidateEnvKey(t *testing.T) {
+	for _, key := range []string{"DSH_PODMAN_X", "", "A=B", "a\x00b"} {
+		if err := validateEnvKey(key); err == nil {
+			t.Errorf("accepted invalid env key %q", key)
+		}
+	}
+	if err := validateEnvKey("FOO"); err != nil {
+		t.Fatalf("rejected valid env key FOO: %v", err)
+	}
+}
+
+func TestSecretRPCsRequirePodman(t *testing.T) {
+	server := &Server{Logger: silentLogger()}
+	if _, err := server.ListSecrets(context.Background(), &ctl.ListSecretsRequest{}); status.Code(err) != codes.FailedPrecondition {
+		t.Fatalf("ListSecrets: expected FailedPrecondition, got %v", err)
+	}
+	if _, err := server.CreateSecret(context.Background(), &ctl.CreateSecretRequest{Name: "data"}); status.Code(err) != codes.FailedPrecondition {
+		t.Fatalf("CreateSecret: expected FailedPrecondition, got %v", err)
+	}
+	if _, err := server.WriteSecretValue(context.Background(), &ctl.WriteSecretValueRequest{Name: "data", Value: "v"}); status.Code(err) != codes.FailedPrecondition {
+		t.Fatalf("WriteSecretValue: expected FailedPrecondition, got %v", err)
+	}
+	if _, err := server.RemoveSecret(context.Background(), &ctl.RemoveSecretRequest{Name: "data"}); status.Code(err) != codes.FailedPrecondition {
+		t.Fatalf("RemoveSecret: expected FailedPrecondition, got %v", err)
+	}
+}
+
+func TestCreateSecretRejectsInvalidName(t *testing.T) {
+	server := &Server{Logger: silentLogger()}
+	for _, name := range []string{"", "-bad", "a/b", "a b", strings.Repeat("a", 65)} {
+		if _, err := server.CreateSecret(context.Background(), &ctl.CreateSecretRequest{Name: name}); status.Code(err) != codes.InvalidArgument {
+			t.Errorf("name %q: expected InvalidArgument, got %v", name, err)
+		}
+	}
+	for _, name := range []string{"data", "a_b.c-1", "x1", "UPPER", strings.Repeat("a", 64)} {
+		if _, err := server.CreateSecret(context.Background(), &ctl.CreateSecretRequest{Name: name}); status.Code(err) != codes.FailedPrecondition {
+			t.Errorf("valid name %q: expected FailedPrecondition (nil Podman), got %v", name, err)
+		}
+	}
+	for _, charset := range []string{"bogus", "UPPER"} {
+		if _, err := server.CreateSecret(context.Background(), &ctl.CreateSecretRequest{Name: "data", Charset: charset}); status.Code(err) != codes.InvalidArgument {
+			t.Errorf("charset %q: expected InvalidArgument, got %v", charset, err)
+		}
+	}
+	if _, err := server.CreateSecret(context.Background(), &ctl.CreateSecretRequest{Name: "data", Length: 2000}); status.Code(err) != codes.InvalidArgument {
+		t.Fatalf("length 2000: expected InvalidArgument, got %v", err)
+	}
+}
+
+func TestAddContainerSecretRejectsReservedEnv(t *testing.T) {
+	root := t.TempDir()
+	store := newTestStore(t)
+	if err := store.SaveWorkspaces([]state.Workspace{{
+		WorkspaceSlug: "proj",
+		Containers: []state.Container{
+			{Name: "default", PodmanName: "dsh-workspace-proj", ImageID: "arch", Status: "running"},
+			{Name: "dev", PodmanName: "dsh-workspace-proj-dev", ImageID: "arch", Status: "running", SecretEnv: map[string]string{"FOO": "existing"}},
+		},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	server := &Server{Store: store, ProjectsRoot: root, SecretPrefix: "dsh-podman-", Logger: silentLogger()}
+
+	_, err := server.AddContainerSecret(context.Background(), &ctl.AddContainerSecretRequest{WorkspaceSlug: "proj", Container: "dev", Env: "DSH_PODMAN_X", Secret: "data"})
+	if status.Code(err) != codes.InvalidArgument {
+		t.Fatalf("reserved env: expected InvalidArgument, got %v", err)
+	}
+	_, err = server.AddContainerSecret(context.Background(), &ctl.AddContainerSecretRequest{WorkspaceSlug: "proj", Container: "nope", Env: "FOO", Secret: "data"})
+	if status.Code(err) != codes.NotFound {
+		t.Fatalf("unknown container: expected NotFound, got %v", err)
+	}
+	_, err = server.AddContainerSecret(context.Background(), &ctl.AddContainerSecretRequest{WorkspaceSlug: "nope", Container: "dev", Env: "FOO", Secret: "data"})
+	if status.Code(err) != codes.NotFound {
+		t.Fatalf("unknown workspace: expected NotFound, got %v", err)
+	}
+	_, err = server.AddContainerSecret(context.Background(), &ctl.AddContainerSecretRequest{WorkspaceSlug: "proj", Container: "dev", Env: "FOO", Secret: "data"})
+	if status.Code(err) != codes.AlreadyExists {
+		t.Fatalf("duplicate env: expected AlreadyExists, got %v", err)
+	}
+	_, err = server.AddContainerSecret(context.Background(), &ctl.AddContainerSecretRequest{WorkspaceSlug: "proj", Container: "dev", Env: "BAR", Secret: "data"})
+	if status.Code(err) != codes.FailedPrecondition {
+		t.Fatalf("valid add: expected FailedPrecondition, got %v", err)
+	}
+	_, err = server.AddContainerSecret(context.Background(), &ctl.AddContainerSecretRequest{WorkspaceSlug: "proj", Container: "dev", Env: "BAR", Secret: "-bad"})
+	if status.Code(err) != codes.InvalidArgument {
+		t.Fatalf("invalid secret name: expected InvalidArgument, got %v", err)
+	}
+}
+
+func TestRemoveContainerSecret(t *testing.T) {
+	root := t.TempDir()
+	store := newTestStore(t)
+	if err := store.SaveWorkspaces([]state.Workspace{{
+		WorkspaceSlug: "proj",
+		Containers: []state.Container{
+			{Name: "default", PodmanName: "dsh-workspace-proj", ImageID: "arch", Status: "running"},
+			{Name: "dev", PodmanName: "dsh-workspace-proj-dev", ImageID: "arch", Status: "running", SecretEnv: map[string]string{"FOO": "existing"}},
+		},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	server := &Server{Store: store, ProjectsRoot: root, SecretPrefix: "dsh-podman-", Logger: silentLogger()}
+
+	_, err := server.RemoveContainerSecret(context.Background(), &ctl.RemoveContainerSecretRequest{WorkspaceSlug: "proj", Container: "dev", Env: "DSH_PODMAN_X"})
+	if status.Code(err) != codes.InvalidArgument {
+		t.Fatalf("reserved env: expected InvalidArgument, got %v", err)
+	}
+	_, err = server.RemoveContainerSecret(context.Background(), &ctl.RemoveContainerSecretRequest{WorkspaceSlug: "proj", Container: "dev", Env: "MISSING"})
+	if status.Code(err) != codes.NotFound {
+		t.Fatalf("unknown env: expected NotFound, got %v", err)
+	}
+	_, err = server.RemoveContainerSecret(context.Background(), &ctl.RemoveContainerSecretRequest{WorkspaceSlug: "proj", Container: "nope", Env: "FOO"})
+	if status.Code(err) != codes.NotFound {
+		t.Fatalf("unknown container: expected NotFound, got %v", err)
+	}
+	_, err = server.RemoveContainerSecret(context.Background(), &ctl.RemoveContainerSecretRequest{WorkspaceSlug: "proj", Container: "dev", Env: "FOO"})
+	if status.Code(err) != codes.FailedPrecondition {
+		t.Fatalf("valid removal: expected FailedPrecondition, got %v", err)
+	}
+}
+
+func TestSecretKindMapping(t *testing.T) {
+	if kind, err := mountKindFromProto(ctl.MountKind_MOUNT_KIND_SECRET); err != nil || kind != "secret" {
+		t.Fatalf("secret kind: got %q %v", kind, err)
+	}
+	if kind := mountKindToProto("secret"); kind != ctl.MountKind_MOUNT_KIND_SECRET {
+		t.Fatalf("secret kind projection: got %v", kind)
+	}
+	m := mountFromProto(&ctl.ProjectMount{Kind: ctl.MountKind_MOUNT_KIND_SECRET, Secret: "valkey-tls", Destination: "/run/secrets/tls"})
+	if m.Kind != "secret" || m.Secret != "valkey-tls" || m.Destination != "/run/secrets/tls" {
+		t.Fatalf("secret mount not mapped: %#v", m)
+	}
+}
+
+func TestContainerProtoProjectsSecretEnvAndMount(t *testing.T) {
+	ws := state.Workspace{
+		WorkspaceSlug: "proj",
+		Containers: []state.Container{{
+			Name:      "dev",
+			SecretEnv: map[string]string{"VALKEY_TOKEN": "valkey-token"},
+			Mounts:    []state.Mount{{Kind: "secret", Secret: "valkey-tls", Destination: "/run/secrets/tls"}},
+		}},
+	}
+	row := containerProto(ws, ws.Containers[0])
+	if len(row.SecretEnv) != 1 || row.SecretEnv["VALKEY_TOKEN"] != "valkey-token" {
+		t.Fatalf("secret env not projected: %#v", row.SecretEnv)
+	}
+	if len(row.Mounts) != 1 || row.Mounts[0].Kind != ctl.MountKind_MOUNT_KIND_SECRET || row.Mounts[0].Secret != "valkey-tls" || row.Mounts[0].Destination != "/run/secrets/tls" {
+		t.Fatalf("secret mount not projected: %#v", row.Mounts)
+	}
+}
+
+func TestPodmanMountsSkipsSecretKinds(t *testing.T) {
+	root := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(root, "team"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	server := &Server{ProjectsRoot: root, SecretPrefix: "dsh-podman-", Logger: silentLogger()}
+	mounts, err := server.podmanMounts([]state.Mount{
+		{ProjectName: "team", Mode: "read_only"},
+		{Kind: "secret", Secret: "data", Destination: "/run/secrets/x"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(mounts) != 1 || mounts[0].Type != "bind" || mounts[0].Source != filepath.Join(root, "team") {
+		t.Fatalf("secret mount leaked into OCI mounts: %#v", mounts)
 	}
 }

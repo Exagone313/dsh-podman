@@ -162,6 +162,11 @@ const EXPECTED_TOOLS = [
   "volume_list",
   "volume_create",
   "volume_remove",
+  "secret_list",
+  "secret_create",
+  "secret_remove",
+  "container_secret_add",
+  "container_secret_remove",
   "daemon_start",
   "daemon_list",
   "daemon_stop",
@@ -204,9 +209,12 @@ test("the destructive mutations require approval", () => {
     "container_mount_remove",
     "container_recreate",
     "container_remove",
+    "container_secret_add",
+    "container_secret_remove",
     "image_build",
     "image_rebuild",
     "image_remove",
+    "secret_remove",
     "volume_remove",
   ]);
 });
@@ -271,6 +279,16 @@ test("approvalDecision gates exactly the approval-flagged tools", () => {
       kind: "volume",
       volume: "valkey-data",
       destination: "/data",
+    },
+    secret_remove: { name: "valkey-pass" },
+    container_secret_add: {
+      container: "valkey-ctr",
+      env: "REDIS_PASSWORD",
+      secret: "valkey-pass",
+    },
+    container_secret_remove: {
+      container: "valkey-ctr",
+      env: "REDIS_PASSWORD",
     },
   };
   for (const tool of TOOLS) {
@@ -386,6 +404,42 @@ test("summarizeArgs renders the approval reason for each gated tool", () => {
       path: "src",
     }),
     "container valkey-ctr: unmount directory team/src",
+  );
+  assert.equal(
+    summarizeArgs("secret_remove", { name: "valkey-pass" }),
+    "remove secret valkey-pass",
+  );
+  assert.equal(
+    summarizeArgs("container_secret_add", {
+      container: "valkey-ctr",
+      env: "REDIS_PASSWORD",
+      secret: "valkey-pass",
+    }),
+    "container valkey-ctr: add secret valkey-pass as REDIS_PASSWORD",
+  );
+  assert.equal(
+    summarizeArgs("container_secret_remove", {
+      container: "valkey-ctr",
+      env: "REDIS_PASSWORD",
+    }),
+    "container valkey-ctr: remove secret REDIS_PASSWORD",
+  );
+  assert.equal(
+    summarizeArgs("container_mount_add", {
+      container: "valkey-ctr",
+      kind: "secret",
+      secret: "valkey-tls",
+      destination: "/run/secrets/tls",
+    }),
+    "container valkey-ctr: mount secret valkey-tls at /run/secrets/tls",
+  );
+  assert.equal(
+    summarizeArgs("container_mount_remove", {
+      container: "valkey-ctr",
+      kind: "secret",
+      secret: "valkey-tls",
+    }),
+    "container valkey-ctr: unmount secret valkey-tls",
   );
 });
 
@@ -635,11 +689,17 @@ test("mount tools are registered with the expected schemas", () => {
     "project",
     "tmpfs",
     "volume",
+    "secret",
   ]);
   assert.equal(
     typeof addTool!.parameters.properties.volume,
     "object",
     "container_mount_add accepts a volume",
+  );
+  assert.equal(
+    typeof addTool!.parameters.properties.secret,
+    "object",
+    "container_mount_add accepts a secret",
   );
 
   const removeTool = TOOLS.find((entry) => entry.name === "container_mount_remove");
@@ -650,11 +710,17 @@ test("mount tools are registered with the expected schemas", () => {
     "project",
     "tmpfs",
     "volume",
+    "secret",
   ]);
   assert.equal(
     typeof removeTool!.parameters.properties.volume,
     "object",
     "container_mount_remove accepts a volume",
+  );
+  assert.equal(
+    typeof removeTool!.parameters.properties.secret,
+    "object",
+    "container_mount_remove accepts a secret",
   );
   assert.equal(
     typeof removeTool!.parameters.properties.destination,
@@ -689,6 +755,108 @@ test("volume tools are registered with the expected schemas", () => {
   const removeTool = TOOLS.find((entry) => entry.name === "volume_remove");
   assert.deepEqual(removeTool!.parameters.required, ["name"]);
   assert.equal(removeTool!.parameters.properties.name.type, "string");
+});
+
+const SECRET_TOOLS = [
+  "secret_list",
+  "secret_create",
+  "secret_remove",
+  "container_secret_add",
+  "container_secret_remove",
+];
+
+test("secret tools are registered with the expected schemas", () => {
+  assert.ok(READ_ONLY_TOOLS.has("secret_list"), "secret_list must be read-only");
+
+  const listTool = TOOLS.find((entry) => entry.name === "secret_list");
+  assert.ok(listTool, "secret_list registered");
+  assert.notEqual(listTool!.approval, true, "secret_list must not require approval");
+  assert.deepEqual(listTool!.parameters.required, []);
+
+  const createTool = TOOLS.find((entry) => entry.name === "secret_create");
+  assert.ok(createTool, "secret_create registered");
+  assert.notEqual(createTool!.approval, true, "secret_create must not require approval");
+  assert.deepEqual(createTool!.parameters.required, ["name"]);
+  assert.equal(createTool!.parameters.properties.length.type, "integer");
+  assert.equal(createTool!.parameters.properties.length.minimum, 1);
+  assert.deepEqual(createTool!.parameters.properties.charset.enum, [
+    "alphanumeric",
+    "hex",
+    "base64url",
+  ]);
+
+  const removeTool = TOOLS.find((entry) => entry.name === "secret_remove");
+  assert.ok(removeTool, "secret_remove registered");
+  assert.equal(removeTool!.approval, true, "secret_remove must require approval");
+  assert.deepEqual(removeTool!.parameters.required, ["name"]);
+
+  const addTool = TOOLS.find((entry) => entry.name === "container_secret_add");
+  assert.ok(addTool, "container_secret_add registered");
+  assert.equal(addTool!.approval, true, "container_secret_add must require approval");
+  assert.deepEqual(addTool!.parameters.required, ["container", "env", "secret"]);
+  assert.equal(addTool!.parameters.properties.secret.type, "string");
+  assert.equal(addTool!.parameters.properties.env.type, "string");
+
+  const removeEnvTool = TOOLS.find((entry) => entry.name === "container_secret_remove");
+  assert.ok(removeEnvTool, "container_secret_remove registered");
+  assert.equal(removeEnvTool!.approval, true, "container_secret_remove must require approval");
+  assert.deepEqual(removeEnvTool!.parameters.required, ["container", "env"]);
+
+  for (const name of SECRET_TOOLS) {
+    const tool = TOOLS.find((entry) => entry.name === name);
+    assert.ok(tool, `${name} registered`);
+    assert.equal(tool!.parameters.type, "object", `${name} type`);
+    assert.equal(typeof tool!.parameters.properties, "object");
+    assert.ok(Array.isArray(tool!.parameters.required));
+  }
+});
+
+test("secret mount kinds forward the secret to the orchestrator", async () => {
+  const requests: Record<string, unknown>[] = [];
+  const resolver = {
+    registry: {
+      resolveByPath: async () => ({ id: "team" }),
+    },
+    async control(method: string, request: unknown) {
+      if (method === "addContainerMount" || method === "removeContainerMount") {
+        requests.push(request as Record<string, unknown>);
+      }
+      return {};
+    },
+  };
+  const exec = { agent: { session: { header: { cwd: "/proj" } } } };
+  await toolHandlers.container_mount_add(
+    resolver as never,
+    {
+      container: "valkey-ctr",
+      kind: "secret",
+      secret: "valkey-tls",
+      destination: "/run/secrets/tls",
+    },
+    exec,
+  );
+  await toolHandlers.container_mount_remove(
+    resolver as never,
+    {
+      container: "valkey-ctr",
+      kind: "secret",
+      secret: "valkey-tls",
+    },
+    exec,
+  );
+  assert.deepEqual(requests[0], {
+    workspaceSlug: "team",
+    container: "valkey-ctr",
+    kind: "MOUNT_KIND_SECRET",
+    secret: "valkey-tls",
+    destination: "/run/secrets/tls",
+  });
+  assert.deepEqual(requests[1], {
+    workspaceSlug: "team",
+    container: "valkey-ctr",
+    kind: "MOUNT_KIND_SECRET",
+    secret: "valkey-tls",
+  });
 });
 
 test("image_remove is registered, requires approval and requires imageId", () => {
@@ -910,5 +1078,64 @@ test("container_list renders env keys on container rows", async () => {
     out,
   );
   assert.ok(out.includes("  db: running  env=PORT, DB, X, Y"), out);
+  assert.ok(out.includes("  worker: stopped"), out);
+});
+
+test("container_list renders secret_env pairs on container rows", async () => {
+  const resolver = {
+    registry: {
+      resolveByPath: async () => ({ id: "team" }),
+    },
+    control: async (method: string) => {
+      if (method === "listContainers") {
+        return {
+          containers: [
+            {
+              workspaceSlug: "team",
+              containerName: "default",
+              status: "running",
+              imageId: "img-1",
+              secretEnv: { REDIS_PASSWORD: "db-pass" },
+            },
+            {
+              workspaceSlug: "team",
+              containerName: "db",
+              status: "running",
+              secretEnv: {
+                A: "a",
+                B: "b",
+                C: "c",
+                D: "d",
+                E: "e",
+                F: "f",
+                G: "g",
+                H: "h",
+                I: "i",
+                J: "j",
+              },
+            },
+            {
+              workspaceSlug: "team",
+              containerName: "worker",
+              status: "stopped",
+            },
+          ],
+        };
+      }
+      return { workspaces: [] };
+    },
+  } as never;
+  const exec = { agent: { session: { header: { cwd: "/proj" } } } };
+  const out = (await toolHandlers.container_list(resolver, {}, exec)) as string;
+  assert.ok(
+    out.includes("default: running (image img-1)  secret_env=REDIS_PASSWORD=db-pass"),
+    out,
+  );
+  assert.ok(
+    out.includes(
+      "  db: running  secret_env=A=a, B=b, C=c, D=d, E=e, F=f, G=g, H=h, +2 more",
+    ),
+    out,
+  );
   assert.ok(out.includes("  worker: stopped"), out);
 });

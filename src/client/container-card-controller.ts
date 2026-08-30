@@ -33,6 +33,9 @@ export interface ImageView {
 export interface VolumeView {
   name: string;
 }
+export interface SecretView {
+  name: string;
+}
 export interface WorkspaceView {
   workspaceSlug: string;
   projectName: string;
@@ -43,11 +46,12 @@ export interface WorkspaceView {
   mounts: readonly { projectName: string; mode: string }[];
 }
 export interface CommandRequest {
-  op: "refresh" | "remove" | "recreate" | "create" | "volume_create" | "volume_remove" | "image_remove";
+  op: "refresh" | "remove" | "recreate" | "create" | "volume_create" | "volume_remove" | "image_remove" | "secret_create" | "secret_remove" | "secret_set";
   workspace: string;
   image: string;
   at: number;
   mounts: readonly { projectName: string; mode: string }[];
+  value: string;
 }
 export interface ContainerSettings {
   defaultImage: string;
@@ -58,6 +62,7 @@ export interface ContainerSettings {
   containers: readonly ContainerView[];
   images: readonly ImageView[];
   volumes: readonly VolumeView[];
+  secrets: readonly SecretView[];
   command: CommandRequest | null;
 }
 
@@ -76,6 +81,7 @@ export interface CardState {
   containers: readonly ContainerView[];
   images: readonly ImageView[];
   volumes: readonly VolumeView[];
+  secrets: readonly SecretView[];
 }
 
 export interface ContainerCardFace {
@@ -89,6 +95,9 @@ export interface ContainerCardFace {
   createVolume: (name: string) => void;
   removeVolume: (name: string) => void;
   removeImage: (imageId: string) => void;
+  createSecret: (name: string) => void;
+  removeSecret: (name: string) => void;
+  setSecret: (name: string, value: string) => void;
   editDefaultImage: (text: string) => void;
   saveDefaultImage: () => void;
   discardDefaultImage: () => void;
@@ -135,6 +144,7 @@ export class ContainerCardController {
       containers: value?.containers ?? [],
       images: value?.images ?? [],
       volumes: value?.volumes ?? [],
+      secrets: value?.secrets ?? [],
     };
   }
 
@@ -147,8 +157,16 @@ export class ContainerCardController {
     workspace: string,
     image: string,
     mounts: readonly { projectName: string; mode: string }[] = [],
+    value: string = "",
   ): void {
-    void this.scope.set("command", { op, workspace, image, at: Date.now(), mounts });
+    void this.scope.set("command", {
+      op,
+      workspace,
+      image,
+      at: Date.now(),
+      mounts,
+      value,
+    });
   }
 
   private edit(field: DraftableField, text: string): void {
@@ -184,6 +202,10 @@ export class ContainerCardController {
       createVolume: (name) => this.command("volume_create", name, ""),
       removeVolume: (name) => this.command("volume_remove", name, ""),
       removeImage: (imageId) => this.command("image_remove", imageId, ""),
+      createSecret: (name) => this.command("secret_create", name, ""),
+      removeSecret: (name) => this.command("secret_remove", name, ""),
+      setSecret: (name, value) =>
+        this.command("secret_set", name, "", undefined, value),
       editDefaultImage: (text) => this.edit("defaultImage", text),
       saveDefaultImage: () => this.save("defaultImage"),
       discardDefaultImage: () => this.discard("defaultImage"),

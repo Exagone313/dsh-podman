@@ -41,6 +41,10 @@ export type ContainerPluginKey =
   | "volumesTitle"
   | "createVolume"
   | "removeVolume"
+  | "secretsTitle"
+  | "createSecret"
+  | "setSecret"
+  | "removeSecret"
   | "removeImage"
   | "none"
   | "unavailable"
@@ -81,6 +85,10 @@ export const en: Record<ContainerPluginKey, string> = {
   volumesTitle: "Volumes",
   createVolume: "Create volume",
   removeVolume: "Remove",
+  secretsTitle: "Secrets",
+  createSecret: "Create secret",
+  setSecret: "Set value",
+  removeSecret: "Remove",
   removeImage: "Remove",
   none: "None",
   unavailable: "The container plugin is not available.",
@@ -122,6 +130,10 @@ export const zh: Record<ContainerPluginKey, string> = {
   volumesTitle: "卷",
   createVolume: "创建卷",
   removeVolume: "移除",
+  secretsTitle: "机密",
+  createSecret: "创建机密",
+  setSecret: "设置值",
+  removeSecret: "移除",
   removeImage: "移除",
   none: "无",
   unavailable: "容器插件不可用。",

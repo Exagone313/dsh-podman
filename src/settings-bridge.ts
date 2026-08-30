@@ -17,6 +17,9 @@ const commandSchema = z.object({
     z.const("volume_create"),
     z.const("volume_remove"),
     z.const("image_remove"),
+    z.const("secret_create"),
+    z.const("secret_remove"),
+    z.const("secret_set"),
   ]),
   workspace: z.string().default(""),
   image: z.string().default(""),
@@ -29,6 +32,7 @@ const commandSchema = z.object({
       }),
     )
     .default([]),
+  value: z.string().default(""),
 });
 
 export const settingsSchema = z.object({
@@ -93,15 +97,23 @@ export const settingsSchema = z.object({
       }),
     )
     .default([]),
+  secrets: z
+    .array(
+      z.object({
+        name: z.string().default(""),
+      }),
+    )
+    .default([]),
   command: z.union([commandSchema, z.const(null)]).default(null),
 }) as unknown as z<ContainerSettings>;
 
 export interface CommandRequest {
-  op: "refresh" | "remove" | "recreate" | "create" | "volume_create" | "volume_remove" | "image_remove";
+  op: "refresh" | "remove" | "recreate" | "create" | "volume_create" | "volume_remove" | "image_remove" | "secret_create" | "secret_remove" | "secret_set";
   workspace: string;
   image: string;
   at: number;
   mounts: readonly { projectName: string; mode: string }[];
+  value: string;
 }
 export interface ContainerView {
   containerName: string;
@@ -119,6 +131,9 @@ export interface ImageView {
   packages: readonly string[];
 }
 export interface VolumeView {
+  name: string;
+}
+export interface SecretView {
   name: string;
 }
 export interface WorkspaceView {
@@ -139,6 +154,7 @@ export interface ContainerSettings {
   containers: readonly ContainerView[];
   images: readonly ImageView[];
   volumes: readonly VolumeView[];
+  secrets: readonly SecretView[];
   command: CommandRequest | null;
 }
 
@@ -225,11 +241,12 @@ export function installContainerSettings(
       if (refreshing) return;
       refreshing = true;
       try {
-        const [containers, images, workspaces, volumes] = await Promise.all([
+        const [containers, images, workspaces, volumes, secrets] = await Promise.all([
           resolver.control("listContainers", {}),
           resolver.control("listImages", {}),
           resolver.control("listWorkspaces", {}),
           resolver.control("listVolumes", {}),
+          resolver.control("listSecrets", {}),
         ]);
         await scope.update({
           containers: (containers as any).containers ?? [],
@@ -240,6 +257,9 @@ export function installContainerSettings(
           ),
           volumes: ((volumes as any).volumes ?? []).map((volume: any) => ({
             name: volume.name ?? "",
+          })),
+          secrets: ((secrets as any).secrets ?? []).map((secret: any) => ({
+            name: secret.name ?? "",
           })),
           notice: "",
         });
@@ -291,6 +311,22 @@ export function installContainerSettings(
           case "image_remove":
             await resolver.control("removeImage", {
               imageId: command.workspace,
+            });
+            break;
+          case "secret_create":
+            await resolver.control("createSecret", {
+              name: command.workspace,
+            });
+            break;
+          case "secret_remove":
+            await resolver.control("removeSecret", {
+              name: command.workspace,
+            });
+            break;
+          case "secret_set":
+            await resolver.control("writeSecretValue", {
+              name: command.workspace,
+              value: command.value,
             });
             break;
         }

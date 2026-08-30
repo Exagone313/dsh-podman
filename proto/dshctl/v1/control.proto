@@ -25,13 +25,19 @@ service OrchestratorControl {
   rpc ListVolumes(ListVolumesRequest) returns (ListVolumesResponse);
   rpc CreateVolume(CreateVolumeRequest) returns (Volume);
   rpc RemoveVolume(RemoveVolumeRequest) returns (RemoveVolumeResponse);
+  rpc ListSecrets(ListSecretsRequest) returns (ListSecretsResponse);
+  rpc CreateSecret(CreateSecretRequest) returns (Secret);
+  rpc WriteSecretValue(WriteSecretValueRequest) returns (Secret);
+  rpc RemoveSecret(RemoveSecretRequest) returns (RemoveSecretResponse);
+  rpc AddContainerSecret(AddContainerSecretRequest) returns (Container);
+  rpc RemoveContainerSecret(RemoveContainerSecretRequest) returns (Container);
 }
 
 message ListProjectsRequest {}
 message ListProjectsResponse { repeated Project projects = 1; }
 message Project { string name = 1; string host_path = 2; }
 enum MountMode { MOUNT_MODE_UNSPECIFIED = 0; MOUNT_MODE_READ_ONLY = 1; MOUNT_MODE_READ_WRITE = 2; }
-enum MountKind { MOUNT_KIND_UNSPECIFIED = 0; MOUNT_KIND_PROJECT = 1; MOUNT_KIND_TMPFS = 2; MOUNT_KIND_VOLUME = 3; }
+enum MountKind { MOUNT_KIND_UNSPECIFIED = 0; MOUNT_KIND_PROJECT = 1; MOUNT_KIND_TMPFS = 2; MOUNT_KIND_VOLUME = 3; MOUNT_KIND_SECRET = 4; }
 message ProjectMount {
   string project_name = 1;
   MountMode mode = 2;
@@ -39,6 +45,7 @@ message ProjectMount {
   string destination = 4;
   MountKind kind = 5;
   string volume = 6;
+  string secret = 7;
 }
 message CreateWorkspaceRequest { string workspace_slug = 1; string image_id = 2; repeated ProjectMount mounts = 3; map<string, string> env = 4; }
 message DescribeWorkspaceRequest { string workspace_slug = 1; }
@@ -54,6 +61,7 @@ message Workspace {
   string agent_token = 7;
   string created_at = 8;
   map<string, string> env = 9;
+  map<string, string> secret_env = 10;
 }
 message ListImagesRequest {}
 message ListImagesResponse { repeated Image images = 1; }
@@ -76,16 +84,26 @@ message Container {
   string agent_socket_path = 8;
   string agent_token = 9;
   map<string, string> env = 10;
+  map<string, string> secret_env = 11;
 }
 message StartContainerRequest { string workspace_slug = 1; string container = 2; string image_id = 3; repeated ProjectMount mounts = 4; map<string, string> env = 5; }
 message RecreateContainerRequest { string workspace_slug = 1; string image_id = 2; string container = 3; repeated ProjectMount mounts = 4; map<string, string> env = 5; }
 message RemoveContainerRequest { string workspace_slug = 1; string container = 2; }
 message RemoveContainerResponse {}
-message AddContainerMountRequest { string workspace_slug = 1; string container = 2; string project = 3; string path = 4; string destination = 5; MountMode mode = 6; MountKind kind = 7; string volume = 8; }
-message RemoveContainerMountRequest { string workspace_slug = 1; string container = 2; string project = 3; string path = 4; MountKind kind = 5; string volume = 6; string destination = 7; }
+message AddContainerMountRequest { string workspace_slug = 1; string container = 2; string project = 3; string path = 4; string destination = 5; MountMode mode = 6; MountKind kind = 7; string volume = 8; string secret = 9; }
+message RemoveContainerMountRequest { string workspace_slug = 1; string container = 2; string project = 3; string path = 4; MountKind kind = 5; string volume = 6; string destination = 7; string secret = 8; }
 message ListVolumesRequest {}
 message ListVolumesResponse { repeated Volume volumes = 1; }
 message Volume { string name = 1; }
 message CreateVolumeRequest { string name = 1; }
 message RemoveVolumeRequest { string name = 1; }
 message RemoveVolumeResponse {}
+message ListSecretsRequest {}
+message ListSecretsResponse { repeated Secret secrets = 1; }
+message Secret { string name = 1; }
+message CreateSecretRequest { string name = 1; int32 length = 2; string charset = 3; }
+message WriteSecretValueRequest { string name = 1; string value = 2; }
+message RemoveSecretRequest { string name = 1; }
+message RemoveSecretResponse {}
+message AddContainerSecretRequest { string workspace_slug = 1; string container = 2; string env = 3; string secret = 4; }
+message RemoveContainerSecretRequest { string workspace_slug = 1; string container = 2; string env = 3; }

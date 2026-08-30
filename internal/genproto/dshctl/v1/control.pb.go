@@ -81,6 +81,7 @@ const (
 	MountKind_MOUNT_KIND_PROJECT     MountKind = 1
 	MountKind_MOUNT_KIND_TMPFS       MountKind = 2
 	MountKind_MOUNT_KIND_VOLUME      MountKind = 3
+	MountKind_MOUNT_KIND_SECRET      MountKind = 4
 )
 
 // Enum value maps for MountKind.
@@ -90,12 +91,14 @@ var (
 		1: "MOUNT_KIND_PROJECT",
 		2: "MOUNT_KIND_TMPFS",
 		3: "MOUNT_KIND_VOLUME",
+		4: "MOUNT_KIND_SECRET",
 	}
 	MountKind_value = map[string]int32{
 		"MOUNT_KIND_UNSPECIFIED": 0,
 		"MOUNT_KIND_PROJECT":     1,
 		"MOUNT_KIND_TMPFS":       2,
 		"MOUNT_KIND_VOLUME":      3,
+		"MOUNT_KIND_SECRET":      4,
 	}
 )
 
@@ -266,6 +269,7 @@ type ProjectMount struct {
 	Destination   string                 `protobuf:"bytes,4,opt,name=destination,proto3" json:"destination,omitempty"`
 	Kind          MountKind              `protobuf:"varint,5,opt,name=kind,proto3,enum=dshctl.v1.MountKind" json:"kind,omitempty"`
 	Volume        string                 `protobuf:"bytes,6,opt,name=volume,proto3" json:"volume,omitempty"`
+	Secret        string                 `protobuf:"bytes,7,opt,name=secret,proto3" json:"secret,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -338,6 +342,13 @@ func (x *ProjectMount) GetKind() MountKind {
 func (x *ProjectMount) GetVolume() string {
 	if x != nil {
 		return x.Volume
+	}
+	return ""
+}
+
+func (x *ProjectMount) GetSecret() string {
+	if x != nil {
+		return x.Secret
 	}
 	return ""
 }
@@ -545,6 +556,7 @@ type Workspace struct {
 	AgentToken      string                 `protobuf:"bytes,7,opt,name=agent_token,json=agentToken,proto3" json:"agent_token,omitempty"`
 	CreatedAt       string                 `protobuf:"bytes,8,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
 	Env             map[string]string      `protobuf:"bytes,9,rep,name=env,proto3" json:"env,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	SecretEnv       map[string]string      `protobuf:"bytes,10,rep,name=secret_env,json=secretEnv,proto3" json:"secret_env,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	unknownFields   protoimpl.UnknownFields
 	sizeCache       protoimpl.SizeCache
 }
@@ -638,6 +650,13 @@ func (x *Workspace) GetCreatedAt() string {
 func (x *Workspace) GetEnv() map[string]string {
 	if x != nil {
 		return x.Env
+	}
+	return nil
+}
+
+func (x *Workspace) GetSecretEnv() map[string]string {
+	if x != nil {
+		return x.SecretEnv
 	}
 	return nil
 }
@@ -1134,6 +1153,7 @@ type Container struct {
 	AgentSocketPath string                 `protobuf:"bytes,8,opt,name=agent_socket_path,json=agentSocketPath,proto3" json:"agent_socket_path,omitempty"`
 	AgentToken      string                 `protobuf:"bytes,9,opt,name=agent_token,json=agentToken,proto3" json:"agent_token,omitempty"`
 	Env             map[string]string      `protobuf:"bytes,10,rep,name=env,proto3" json:"env,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	SecretEnv       map[string]string      `protobuf:"bytes,11,rep,name=secret_env,json=secretEnv,proto3" json:"secret_env,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	unknownFields   protoimpl.UnknownFields
 	sizeCache       protoimpl.SizeCache
 }
@@ -1234,6 +1254,13 @@ func (x *Container) GetAgentToken() string {
 func (x *Container) GetEnv() map[string]string {
 	if x != nil {
 		return x.Env
+	}
+	return nil
+}
+
+func (x *Container) GetSecretEnv() map[string]string {
+	if x != nil {
+		return x.SecretEnv
 	}
 	return nil
 }
@@ -1488,6 +1515,7 @@ type AddContainerMountRequest struct {
 	Mode          MountMode              `protobuf:"varint,6,opt,name=mode,proto3,enum=dshctl.v1.MountMode" json:"mode,omitempty"`
 	Kind          MountKind              `protobuf:"varint,7,opt,name=kind,proto3,enum=dshctl.v1.MountKind" json:"kind,omitempty"`
 	Volume        string                 `protobuf:"bytes,8,opt,name=volume,proto3" json:"volume,omitempty"`
+	Secret        string                 `protobuf:"bytes,9,opt,name=secret,proto3" json:"secret,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1578,6 +1606,13 @@ func (x *AddContainerMountRequest) GetVolume() string {
 	return ""
 }
 
+func (x *AddContainerMountRequest) GetSecret() string {
+	if x != nil {
+		return x.Secret
+	}
+	return ""
+}
+
 type RemoveContainerMountRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	WorkspaceSlug string                 `protobuf:"bytes,1,opt,name=workspace_slug,json=workspaceSlug,proto3" json:"workspace_slug,omitempty"`
@@ -1587,6 +1622,7 @@ type RemoveContainerMountRequest struct {
 	Kind          MountKind              `protobuf:"varint,5,opt,name=kind,proto3,enum=dshctl.v1.MountKind" json:"kind,omitempty"`
 	Volume        string                 `protobuf:"bytes,6,opt,name=volume,proto3" json:"volume,omitempty"`
 	Destination   string                 `protobuf:"bytes,7,opt,name=destination,proto3" json:"destination,omitempty"`
+	Secret        string                 `protobuf:"bytes,8,opt,name=secret,proto3" json:"secret,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1666,6 +1702,13 @@ func (x *RemoveContainerMountRequest) GetVolume() string {
 func (x *RemoveContainerMountRequest) GetDestination() string {
 	if x != nil {
 		return x.Destination
+	}
+	return ""
+}
+
+func (x *RemoveContainerMountRequest) GetSecret() string {
+	if x != nil {
+		return x.Secret
 	}
 	return ""
 }
@@ -1918,6 +1961,450 @@ func (*RemoveVolumeResponse) Descriptor() ([]byte, []int) {
 	return file_dshctl_v1_control_proto_rawDescGZIP(), []int{31}
 }
 
+type ListSecretsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListSecretsRequest) Reset() {
+	*x = ListSecretsRequest{}
+	mi := &file_dshctl_v1_control_proto_msgTypes[32]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListSecretsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListSecretsRequest) ProtoMessage() {}
+
+func (x *ListSecretsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_dshctl_v1_control_proto_msgTypes[32]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListSecretsRequest.ProtoReflect.Descriptor instead.
+func (*ListSecretsRequest) Descriptor() ([]byte, []int) {
+	return file_dshctl_v1_control_proto_rawDescGZIP(), []int{32}
+}
+
+type ListSecretsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Secrets       []*Secret              `protobuf:"bytes,1,rep,name=secrets,proto3" json:"secrets,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListSecretsResponse) Reset() {
+	*x = ListSecretsResponse{}
+	mi := &file_dshctl_v1_control_proto_msgTypes[33]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListSecretsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListSecretsResponse) ProtoMessage() {}
+
+func (x *ListSecretsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_dshctl_v1_control_proto_msgTypes[33]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListSecretsResponse.ProtoReflect.Descriptor instead.
+func (*ListSecretsResponse) Descriptor() ([]byte, []int) {
+	return file_dshctl_v1_control_proto_rawDescGZIP(), []int{33}
+}
+
+func (x *ListSecretsResponse) GetSecrets() []*Secret {
+	if x != nil {
+		return x.Secrets
+	}
+	return nil
+}
+
+type Secret struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Secret) Reset() {
+	*x = Secret{}
+	mi := &file_dshctl_v1_control_proto_msgTypes[34]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Secret) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Secret) ProtoMessage() {}
+
+func (x *Secret) ProtoReflect() protoreflect.Message {
+	mi := &file_dshctl_v1_control_proto_msgTypes[34]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Secret.ProtoReflect.Descriptor instead.
+func (*Secret) Descriptor() ([]byte, []int) {
+	return file_dshctl_v1_control_proto_rawDescGZIP(), []int{34}
+}
+
+func (x *Secret) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+type CreateSecretRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	Length        int32                  `protobuf:"varint,2,opt,name=length,proto3" json:"length,omitempty"`
+	Charset       string                 `protobuf:"bytes,3,opt,name=charset,proto3" json:"charset,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CreateSecretRequest) Reset() {
+	*x = CreateSecretRequest{}
+	mi := &file_dshctl_v1_control_proto_msgTypes[35]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CreateSecretRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CreateSecretRequest) ProtoMessage() {}
+
+func (x *CreateSecretRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_dshctl_v1_control_proto_msgTypes[35]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CreateSecretRequest.ProtoReflect.Descriptor instead.
+func (*CreateSecretRequest) Descriptor() ([]byte, []int) {
+	return file_dshctl_v1_control_proto_rawDescGZIP(), []int{35}
+}
+
+func (x *CreateSecretRequest) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *CreateSecretRequest) GetLength() int32 {
+	if x != nil {
+		return x.Length
+	}
+	return 0
+}
+
+func (x *CreateSecretRequest) GetCharset() string {
+	if x != nil {
+		return x.Charset
+	}
+	return ""
+}
+
+type WriteSecretValueRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	Value         string                 `protobuf:"bytes,2,opt,name=value,proto3" json:"value,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *WriteSecretValueRequest) Reset() {
+	*x = WriteSecretValueRequest{}
+	mi := &file_dshctl_v1_control_proto_msgTypes[36]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *WriteSecretValueRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*WriteSecretValueRequest) ProtoMessage() {}
+
+func (x *WriteSecretValueRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_dshctl_v1_control_proto_msgTypes[36]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use WriteSecretValueRequest.ProtoReflect.Descriptor instead.
+func (*WriteSecretValueRequest) Descriptor() ([]byte, []int) {
+	return file_dshctl_v1_control_proto_rawDescGZIP(), []int{36}
+}
+
+func (x *WriteSecretValueRequest) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *WriteSecretValueRequest) GetValue() string {
+	if x != nil {
+		return x.Value
+	}
+	return ""
+}
+
+type RemoveSecretRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RemoveSecretRequest) Reset() {
+	*x = RemoveSecretRequest{}
+	mi := &file_dshctl_v1_control_proto_msgTypes[37]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RemoveSecretRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RemoveSecretRequest) ProtoMessage() {}
+
+func (x *RemoveSecretRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_dshctl_v1_control_proto_msgTypes[37]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RemoveSecretRequest.ProtoReflect.Descriptor instead.
+func (*RemoveSecretRequest) Descriptor() ([]byte, []int) {
+	return file_dshctl_v1_control_proto_rawDescGZIP(), []int{37}
+}
+
+func (x *RemoveSecretRequest) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+type RemoveSecretResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RemoveSecretResponse) Reset() {
+	*x = RemoveSecretResponse{}
+	mi := &file_dshctl_v1_control_proto_msgTypes[38]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RemoveSecretResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RemoveSecretResponse) ProtoMessage() {}
+
+func (x *RemoveSecretResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_dshctl_v1_control_proto_msgTypes[38]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RemoveSecretResponse.ProtoReflect.Descriptor instead.
+func (*RemoveSecretResponse) Descriptor() ([]byte, []int) {
+	return file_dshctl_v1_control_proto_rawDescGZIP(), []int{38}
+}
+
+type AddContainerSecretRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	WorkspaceSlug string                 `protobuf:"bytes,1,opt,name=workspace_slug,json=workspaceSlug,proto3" json:"workspace_slug,omitempty"`
+	Container     string                 `protobuf:"bytes,2,opt,name=container,proto3" json:"container,omitempty"`
+	Env           string                 `protobuf:"bytes,3,opt,name=env,proto3" json:"env,omitempty"`
+	Secret        string                 `protobuf:"bytes,4,opt,name=secret,proto3" json:"secret,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AddContainerSecretRequest) Reset() {
+	*x = AddContainerSecretRequest{}
+	mi := &file_dshctl_v1_control_proto_msgTypes[39]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AddContainerSecretRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AddContainerSecretRequest) ProtoMessage() {}
+
+func (x *AddContainerSecretRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_dshctl_v1_control_proto_msgTypes[39]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AddContainerSecretRequest.ProtoReflect.Descriptor instead.
+func (*AddContainerSecretRequest) Descriptor() ([]byte, []int) {
+	return file_dshctl_v1_control_proto_rawDescGZIP(), []int{39}
+}
+
+func (x *AddContainerSecretRequest) GetWorkspaceSlug() string {
+	if x != nil {
+		return x.WorkspaceSlug
+	}
+	return ""
+}
+
+func (x *AddContainerSecretRequest) GetContainer() string {
+	if x != nil {
+		return x.Container
+	}
+	return ""
+}
+
+func (x *AddContainerSecretRequest) GetEnv() string {
+	if x != nil {
+		return x.Env
+	}
+	return ""
+}
+
+func (x *AddContainerSecretRequest) GetSecret() string {
+	if x != nil {
+		return x.Secret
+	}
+	return ""
+}
+
+type RemoveContainerSecretRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	WorkspaceSlug string                 `protobuf:"bytes,1,opt,name=workspace_slug,json=workspaceSlug,proto3" json:"workspace_slug,omitempty"`
+	Container     string                 `protobuf:"bytes,2,opt,name=container,proto3" json:"container,omitempty"`
+	Env           string                 `protobuf:"bytes,3,opt,name=env,proto3" json:"env,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RemoveContainerSecretRequest) Reset() {
+	*x = RemoveContainerSecretRequest{}
+	mi := &file_dshctl_v1_control_proto_msgTypes[40]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RemoveContainerSecretRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RemoveContainerSecretRequest) ProtoMessage() {}
+
+func (x *RemoveContainerSecretRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_dshctl_v1_control_proto_msgTypes[40]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RemoveContainerSecretRequest.ProtoReflect.Descriptor instead.
+func (*RemoveContainerSecretRequest) Descriptor() ([]byte, []int) {
+	return file_dshctl_v1_control_proto_rawDescGZIP(), []int{40}
+}
+
+func (x *RemoveContainerSecretRequest) GetWorkspaceSlug() string {
+	if x != nil {
+		return x.WorkspaceSlug
+	}
+	return ""
+}
+
+func (x *RemoveContainerSecretRequest) GetContainer() string {
+	if x != nil {
+		return x.Container
+	}
+	return ""
+}
+
+func (x *RemoveContainerSecretRequest) GetEnv() string {
+	if x != nil {
+		return x.Env
+	}
+	return ""
+}
+
 var File_dshctl_v1_control_proto protoreflect.FileDescriptor
 
 const file_dshctl_v1_control_proto_rawDesc = "" +
@@ -1928,14 +2415,15 @@ const file_dshctl_v1_control_proto_rawDesc = "" +
 	"\bprojects\x18\x01 \x03(\v2\x12.dshctl.v1.ProjectR\bprojects\":\n" +
 	"\aProject\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x1b\n" +
-	"\thost_path\x18\x02 \x01(\tR\bhostPath\"\xd3\x01\n" +
+	"\thost_path\x18\x02 \x01(\tR\bhostPath\"\xeb\x01\n" +
 	"\fProjectMount\x12!\n" +
 	"\fproject_name\x18\x01 \x01(\tR\vprojectName\x12(\n" +
 	"\x04mode\x18\x02 \x01(\x0e2\x14.dshctl.v1.MountModeR\x04mode\x12\x12\n" +
 	"\x04path\x18\x03 \x01(\tR\x04path\x12 \n" +
 	"\vdestination\x18\x04 \x01(\tR\vdestination\x12(\n" +
 	"\x04kind\x18\x05 \x01(\x0e2\x14.dshctl.v1.MountKindR\x04kind\x12\x16\n" +
-	"\x06volume\x18\x06 \x01(\tR\x06volume\"\x81\x02\n" +
+	"\x06volume\x18\x06 \x01(\tR\x06volume\x12\x16\n" +
+	"\x06secret\x18\a \x01(\tR\x06secret\"\x81\x02\n" +
 	"\x16CreateWorkspaceRequest\x12%\n" +
 	"\x0eworkspace_slug\x18\x01 \x01(\tR\rworkspaceSlug\x12\x19\n" +
 	"\bimage_id\x18\x02 \x01(\tR\aimageId\x12/\n" +
@@ -1950,7 +2438,7 @@ const file_dshctl_v1_control_proto_rawDesc = "" +
 	"\x16ListWorkspacesResponse\x124\n" +
 	"\n" +
 	"workspaces\x18\x01 \x03(\v2\x14.dshctl.v1.WorkspaceR\n" +
-	"workspaces\"\x92\x03\n" +
+	"workspaces\"\x94\x04\n" +
 	"\tWorkspace\x12%\n" +
 	"\x0eworkspace_slug\x18\x01 \x01(\tR\rworkspaceSlug\x12%\n" +
 	"\x0econtainer_name\x18\x02 \x01(\tR\rcontainerName\x12\x19\n" +
@@ -1962,8 +2450,14 @@ const file_dshctl_v1_control_proto_rawDesc = "" +
 	"agentToken\x12\x1d\n" +
 	"\n" +
 	"created_at\x18\b \x01(\tR\tcreatedAt\x12/\n" +
-	"\x03env\x18\t \x03(\v2\x1d.dshctl.v1.Workspace.EnvEntryR\x03env\x1a6\n" +
+	"\x03env\x18\t \x03(\v2\x1d.dshctl.v1.Workspace.EnvEntryR\x03env\x12B\n" +
+	"\n" +
+	"secret_env\x18\n" +
+	" \x03(\v2#.dshctl.v1.Workspace.SecretEnvEntryR\tsecretEnv\x1a6\n" +
 	"\bEnvEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\x1a<\n" +
+	"\x0eSecretEnvEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\x13\n" +
 	"\x11ListImagesRequest\">\n" +
@@ -1995,7 +2489,7 @@ const file_dshctl_v1_control_proto_rawDesc = "" +
 	"\x16ListContainersResponse\x124\n" +
 	"\n" +
 	"containers\x18\x01 \x03(\v2\x14.dshctl.v1.ContainerR\n" +
-	"containers\"\xb3\x03\n" +
+	"containers\"\xb5\x04\n" +
 	"\tContainer\x12%\n" +
 	"\x0econtainer_name\x18\x01 \x01(\tR\rcontainerName\x12%\n" +
 	"\x0eworkspace_slug\x18\x02 \x01(\tR\rworkspaceSlug\x12\x19\n" +
@@ -2010,8 +2504,13 @@ const file_dshctl_v1_control_proto_rawDesc = "" +
 	"\vagent_token\x18\t \x01(\tR\n" +
 	"agentToken\x12/\n" +
 	"\x03env\x18\n" +
-	" \x03(\v2\x1d.dshctl.v1.Container.EnvEntryR\x03env\x1a6\n" +
+	" \x03(\v2\x1d.dshctl.v1.Container.EnvEntryR\x03env\x12B\n" +
+	"\n" +
+	"secret_env\x18\v \x03(\v2#.dshctl.v1.Container.SecretEnvEntryR\tsecretEnv\x1a6\n" +
 	"\bEnvEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\x1a<\n" +
+	"\x0eSecretEnvEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\x9d\x02\n" +
 	"\x15StartContainerRequest\x12%\n" +
@@ -2035,7 +2534,7 @@ const file_dshctl_v1_control_proto_rawDesc = "" +
 	"\x16RemoveContainerRequest\x12%\n" +
 	"\x0eworkspace_slug\x18\x01 \x01(\tR\rworkspaceSlug\x12\x1c\n" +
 	"\tcontainer\x18\x02 \x01(\tR\tcontainer\"\x19\n" +
-	"\x17RemoveContainerResponse\"\x9b\x02\n" +
+	"\x17RemoveContainerResponse\"\xb3\x02\n" +
 	"\x18AddContainerMountRequest\x12%\n" +
 	"\x0eworkspace_slug\x18\x01 \x01(\tR\rworkspaceSlug\x12\x1c\n" +
 	"\tcontainer\x18\x02 \x01(\tR\tcontainer\x12\x18\n" +
@@ -2044,7 +2543,8 @@ const file_dshctl_v1_control_proto_rawDesc = "" +
 	"\vdestination\x18\x05 \x01(\tR\vdestination\x12(\n" +
 	"\x04mode\x18\x06 \x01(\x0e2\x14.dshctl.v1.MountModeR\x04mode\x12(\n" +
 	"\x04kind\x18\a \x01(\x0e2\x14.dshctl.v1.MountKindR\x04kind\x12\x16\n" +
-	"\x06volume\x18\b \x01(\tR\x06volume\"\xf4\x01\n" +
+	"\x06volume\x18\b \x01(\tR\x06volume\x12\x16\n" +
+	"\x06secret\x18\t \x01(\tR\x06secret\"\x8c\x02\n" +
 	"\x1bRemoveContainerMountRequest\x12%\n" +
 	"\x0eworkspace_slug\x18\x01 \x01(\tR\rworkspaceSlug\x12\x1c\n" +
 	"\tcontainer\x18\x02 \x01(\tR\tcontainer\x12\x18\n" +
@@ -2052,7 +2552,8 @@ const file_dshctl_v1_control_proto_rawDesc = "" +
 	"\x04path\x18\x04 \x01(\tR\x04path\x12(\n" +
 	"\x04kind\x18\x05 \x01(\x0e2\x14.dshctl.v1.MountKindR\x04kind\x12\x16\n" +
 	"\x06volume\x18\x06 \x01(\tR\x06volume\x12 \n" +
-	"\vdestination\x18\a \x01(\tR\vdestination\"\x14\n" +
+	"\vdestination\x18\a \x01(\tR\vdestination\x12\x16\n" +
+	"\x06secret\x18\b \x01(\tR\x06secret\"\x14\n" +
 	"\x12ListVolumesRequest\"B\n" +
 	"\x13ListVolumesResponse\x12+\n" +
 	"\avolumes\x18\x01 \x03(\v2\x11.dshctl.v1.VolumeR\avolumes\"\x1c\n" +
@@ -2062,17 +2563,41 @@ const file_dshctl_v1_control_proto_rawDesc = "" +
 	"\x04name\x18\x01 \x01(\tR\x04name\")\n" +
 	"\x13RemoveVolumeRequest\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\"\x16\n" +
-	"\x14RemoveVolumeResponse*\\\n" +
+	"\x14RemoveVolumeResponse\"\x14\n" +
+	"\x12ListSecretsRequest\"B\n" +
+	"\x13ListSecretsResponse\x12+\n" +
+	"\asecrets\x18\x01 \x03(\v2\x11.dshctl.v1.SecretR\asecrets\"\x1c\n" +
+	"\x06Secret\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\"[\n" +
+	"\x13CreateSecretRequest\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\x12\x16\n" +
+	"\x06length\x18\x02 \x01(\x05R\x06length\x12\x18\n" +
+	"\acharset\x18\x03 \x01(\tR\acharset\"C\n" +
+	"\x17WriteSecretValueRequest\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value\")\n" +
+	"\x13RemoveSecretRequest\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\"\x16\n" +
+	"\x14RemoveSecretResponse\"\x8a\x01\n" +
+	"\x19AddContainerSecretRequest\x12%\n" +
+	"\x0eworkspace_slug\x18\x01 \x01(\tR\rworkspaceSlug\x12\x1c\n" +
+	"\tcontainer\x18\x02 \x01(\tR\tcontainer\x12\x10\n" +
+	"\x03env\x18\x03 \x01(\tR\x03env\x12\x16\n" +
+	"\x06secret\x18\x04 \x01(\tR\x06secret\"u\n" +
+	"\x1cRemoveContainerSecretRequest\x12%\n" +
+	"\x0eworkspace_slug\x18\x01 \x01(\tR\rworkspaceSlug\x12\x1c\n" +
+	"\tcontainer\x18\x02 \x01(\tR\tcontainer\x12\x10\n" +
+	"\x03env\x18\x03 \x01(\tR\x03env*\\\n" +
 	"\tMountMode\x12\x1a\n" +
 	"\x16MOUNT_MODE_UNSPECIFIED\x10\x00\x12\x18\n" +
 	"\x14MOUNT_MODE_READ_ONLY\x10\x01\x12\x19\n" +
-	"\x15MOUNT_MODE_READ_WRITE\x10\x02*l\n" +
+	"\x15MOUNT_MODE_READ_WRITE\x10\x02*\x83\x01\n" +
 	"\tMountKind\x12\x1a\n" +
 	"\x16MOUNT_KIND_UNSPECIFIED\x10\x00\x12\x16\n" +
 	"\x12MOUNT_KIND_PROJECT\x10\x01\x12\x14\n" +
 	"\x10MOUNT_KIND_TMPFS\x10\x02\x12\x15\n" +
-	"\x11MOUNT_KIND_VOLUME\x10\x032\xff\n" +
-	"\n" +
+	"\x11MOUNT_KIND_VOLUME\x10\x03\x12\x15\n" +
+	"\x11MOUNT_KIND_SECRET\x10\x042\xd6\x0e\n" +
 	"\x13OrchestratorControl\x12O\n" +
 	"\fListProjects\x12\x1e.dshctl.v1.ListProjectsRequest\x1a\x1f.dshctl.v1.ListProjectsResponse\x12J\n" +
 	"\x0fCreateWorkspace\x12!.dshctl.v1.CreateWorkspaceRequest\x1a\x14.dshctl.v1.Workspace\x12N\n" +
@@ -2093,7 +2618,13 @@ const file_dshctl_v1_control_proto_rawDesc = "" +
 	"\x14RemoveContainerMount\x12&.dshctl.v1.RemoveContainerMountRequest\x1a\x14.dshctl.v1.Container\x12L\n" +
 	"\vListVolumes\x12\x1d.dshctl.v1.ListVolumesRequest\x1a\x1e.dshctl.v1.ListVolumesResponse\x12A\n" +
 	"\fCreateVolume\x12\x1e.dshctl.v1.CreateVolumeRequest\x1a\x11.dshctl.v1.Volume\x12O\n" +
-	"\fRemoveVolume\x12\x1e.dshctl.v1.RemoveVolumeRequest\x1a\x1f.dshctl.v1.RemoveVolumeResponseBGZEgitlab.com/Exagone313/dsh-podman/internal/genproto/dshctl/v1;dshctlv1b\x06proto3"
+	"\fRemoveVolume\x12\x1e.dshctl.v1.RemoveVolumeRequest\x1a\x1f.dshctl.v1.RemoveVolumeResponse\x12L\n" +
+	"\vListSecrets\x12\x1d.dshctl.v1.ListSecretsRequest\x1a\x1e.dshctl.v1.ListSecretsResponse\x12A\n" +
+	"\fCreateSecret\x12\x1e.dshctl.v1.CreateSecretRequest\x1a\x11.dshctl.v1.Secret\x12I\n" +
+	"\x10WriteSecretValue\x12\".dshctl.v1.WriteSecretValueRequest\x1a\x11.dshctl.v1.Secret\x12O\n" +
+	"\fRemoveSecret\x12\x1e.dshctl.v1.RemoveSecretRequest\x1a\x1f.dshctl.v1.RemoveSecretResponse\x12P\n" +
+	"\x12AddContainerSecret\x12$.dshctl.v1.AddContainerSecretRequest\x1a\x14.dshctl.v1.Container\x12V\n" +
+	"\x15RemoveContainerSecret\x12'.dshctl.v1.RemoveContainerSecretRequest\x1a\x14.dshctl.v1.ContainerBGZEgitlab.com/Exagone313/dsh-podman/internal/genproto/dshctl/v1;dshctlv1b\x06proto3"
 
 var (
 	file_dshctl_v1_control_proto_rawDescOnce sync.Once
@@ -2108,110 +2639,136 @@ func file_dshctl_v1_control_proto_rawDescGZIP() []byte {
 }
 
 var file_dshctl_v1_control_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_dshctl_v1_control_proto_msgTypes = make([]protoimpl.MessageInfo, 37)
+var file_dshctl_v1_control_proto_msgTypes = make([]protoimpl.MessageInfo, 48)
 var file_dshctl_v1_control_proto_goTypes = []any{
-	(MountMode)(0),                      // 0: dshctl.v1.MountMode
-	(MountKind)(0),                      // 1: dshctl.v1.MountKind
-	(*ListProjectsRequest)(nil),         // 2: dshctl.v1.ListProjectsRequest
-	(*ListProjectsResponse)(nil),        // 3: dshctl.v1.ListProjectsResponse
-	(*Project)(nil),                     // 4: dshctl.v1.Project
-	(*ProjectMount)(nil),                // 5: dshctl.v1.ProjectMount
-	(*CreateWorkspaceRequest)(nil),      // 6: dshctl.v1.CreateWorkspaceRequest
-	(*DescribeWorkspaceRequest)(nil),    // 7: dshctl.v1.DescribeWorkspaceRequest
-	(*ListWorkspacesRequest)(nil),       // 8: dshctl.v1.ListWorkspacesRequest
-	(*ListWorkspacesResponse)(nil),      // 9: dshctl.v1.ListWorkspacesResponse
-	(*Workspace)(nil),                   // 10: dshctl.v1.Workspace
-	(*ListImagesRequest)(nil),           // 11: dshctl.v1.ListImagesRequest
-	(*ListImagesResponse)(nil),          // 12: dshctl.v1.ListImagesResponse
-	(*Image)(nil),                       // 13: dshctl.v1.Image
-	(*RebuildImageRequest)(nil),         // 14: dshctl.v1.RebuildImageRequest
-	(*RemoveImageRequest)(nil),          // 15: dshctl.v1.RemoveImageRequest
-	(*RemoveImageResponse)(nil),         // 16: dshctl.v1.RemoveImageResponse
-	(*GetImageRequest)(nil),             // 17: dshctl.v1.GetImageRequest
-	(*BuildImageRequest)(nil),           // 18: dshctl.v1.BuildImageRequest
-	(*ListContainersRequest)(nil),       // 19: dshctl.v1.ListContainersRequest
-	(*ListContainersResponse)(nil),      // 20: dshctl.v1.ListContainersResponse
-	(*Container)(nil),                   // 21: dshctl.v1.Container
-	(*StartContainerRequest)(nil),       // 22: dshctl.v1.StartContainerRequest
-	(*RecreateContainerRequest)(nil),    // 23: dshctl.v1.RecreateContainerRequest
-	(*RemoveContainerRequest)(nil),      // 24: dshctl.v1.RemoveContainerRequest
-	(*RemoveContainerResponse)(nil),     // 25: dshctl.v1.RemoveContainerResponse
-	(*AddContainerMountRequest)(nil),    // 26: dshctl.v1.AddContainerMountRequest
-	(*RemoveContainerMountRequest)(nil), // 27: dshctl.v1.RemoveContainerMountRequest
-	(*ListVolumesRequest)(nil),          // 28: dshctl.v1.ListVolumesRequest
-	(*ListVolumesResponse)(nil),         // 29: dshctl.v1.ListVolumesResponse
-	(*Volume)(nil),                      // 30: dshctl.v1.Volume
-	(*CreateVolumeRequest)(nil),         // 31: dshctl.v1.CreateVolumeRequest
-	(*RemoveVolumeRequest)(nil),         // 32: dshctl.v1.RemoveVolumeRequest
-	(*RemoveVolumeResponse)(nil),        // 33: dshctl.v1.RemoveVolumeResponse
-	nil,                                 // 34: dshctl.v1.CreateWorkspaceRequest.EnvEntry
-	nil,                                 // 35: dshctl.v1.Workspace.EnvEntry
-	nil,                                 // 36: dshctl.v1.Container.EnvEntry
-	nil,                                 // 37: dshctl.v1.StartContainerRequest.EnvEntry
-	nil,                                 // 38: dshctl.v1.RecreateContainerRequest.EnvEntry
+	(MountMode)(0),                       // 0: dshctl.v1.MountMode
+	(MountKind)(0),                       // 1: dshctl.v1.MountKind
+	(*ListProjectsRequest)(nil),          // 2: dshctl.v1.ListProjectsRequest
+	(*ListProjectsResponse)(nil),         // 3: dshctl.v1.ListProjectsResponse
+	(*Project)(nil),                      // 4: dshctl.v1.Project
+	(*ProjectMount)(nil),                 // 5: dshctl.v1.ProjectMount
+	(*CreateWorkspaceRequest)(nil),       // 6: dshctl.v1.CreateWorkspaceRequest
+	(*DescribeWorkspaceRequest)(nil),     // 7: dshctl.v1.DescribeWorkspaceRequest
+	(*ListWorkspacesRequest)(nil),        // 8: dshctl.v1.ListWorkspacesRequest
+	(*ListWorkspacesResponse)(nil),       // 9: dshctl.v1.ListWorkspacesResponse
+	(*Workspace)(nil),                    // 10: dshctl.v1.Workspace
+	(*ListImagesRequest)(nil),            // 11: dshctl.v1.ListImagesRequest
+	(*ListImagesResponse)(nil),           // 12: dshctl.v1.ListImagesResponse
+	(*Image)(nil),                        // 13: dshctl.v1.Image
+	(*RebuildImageRequest)(nil),          // 14: dshctl.v1.RebuildImageRequest
+	(*RemoveImageRequest)(nil),           // 15: dshctl.v1.RemoveImageRequest
+	(*RemoveImageResponse)(nil),          // 16: dshctl.v1.RemoveImageResponse
+	(*GetImageRequest)(nil),              // 17: dshctl.v1.GetImageRequest
+	(*BuildImageRequest)(nil),            // 18: dshctl.v1.BuildImageRequest
+	(*ListContainersRequest)(nil),        // 19: dshctl.v1.ListContainersRequest
+	(*ListContainersResponse)(nil),       // 20: dshctl.v1.ListContainersResponse
+	(*Container)(nil),                    // 21: dshctl.v1.Container
+	(*StartContainerRequest)(nil),        // 22: dshctl.v1.StartContainerRequest
+	(*RecreateContainerRequest)(nil),     // 23: dshctl.v1.RecreateContainerRequest
+	(*RemoveContainerRequest)(nil),       // 24: dshctl.v1.RemoveContainerRequest
+	(*RemoveContainerResponse)(nil),      // 25: dshctl.v1.RemoveContainerResponse
+	(*AddContainerMountRequest)(nil),     // 26: dshctl.v1.AddContainerMountRequest
+	(*RemoveContainerMountRequest)(nil),  // 27: dshctl.v1.RemoveContainerMountRequest
+	(*ListVolumesRequest)(nil),           // 28: dshctl.v1.ListVolumesRequest
+	(*ListVolumesResponse)(nil),          // 29: dshctl.v1.ListVolumesResponse
+	(*Volume)(nil),                       // 30: dshctl.v1.Volume
+	(*CreateVolumeRequest)(nil),          // 31: dshctl.v1.CreateVolumeRequest
+	(*RemoveVolumeRequest)(nil),          // 32: dshctl.v1.RemoveVolumeRequest
+	(*RemoveVolumeResponse)(nil),         // 33: dshctl.v1.RemoveVolumeResponse
+	(*ListSecretsRequest)(nil),           // 34: dshctl.v1.ListSecretsRequest
+	(*ListSecretsResponse)(nil),          // 35: dshctl.v1.ListSecretsResponse
+	(*Secret)(nil),                       // 36: dshctl.v1.Secret
+	(*CreateSecretRequest)(nil),          // 37: dshctl.v1.CreateSecretRequest
+	(*WriteSecretValueRequest)(nil),      // 38: dshctl.v1.WriteSecretValueRequest
+	(*RemoveSecretRequest)(nil),          // 39: dshctl.v1.RemoveSecretRequest
+	(*RemoveSecretResponse)(nil),         // 40: dshctl.v1.RemoveSecretResponse
+	(*AddContainerSecretRequest)(nil),    // 41: dshctl.v1.AddContainerSecretRequest
+	(*RemoveContainerSecretRequest)(nil), // 42: dshctl.v1.RemoveContainerSecretRequest
+	nil,                                  // 43: dshctl.v1.CreateWorkspaceRequest.EnvEntry
+	nil,                                  // 44: dshctl.v1.Workspace.EnvEntry
+	nil,                                  // 45: dshctl.v1.Workspace.SecretEnvEntry
+	nil,                                  // 46: dshctl.v1.Container.EnvEntry
+	nil,                                  // 47: dshctl.v1.Container.SecretEnvEntry
+	nil,                                  // 48: dshctl.v1.StartContainerRequest.EnvEntry
+	nil,                                  // 49: dshctl.v1.RecreateContainerRequest.EnvEntry
 }
 var file_dshctl_v1_control_proto_depIdxs = []int32{
 	4,  // 0: dshctl.v1.ListProjectsResponse.projects:type_name -> dshctl.v1.Project
 	0,  // 1: dshctl.v1.ProjectMount.mode:type_name -> dshctl.v1.MountMode
 	1,  // 2: dshctl.v1.ProjectMount.kind:type_name -> dshctl.v1.MountKind
 	5,  // 3: dshctl.v1.CreateWorkspaceRequest.mounts:type_name -> dshctl.v1.ProjectMount
-	34, // 4: dshctl.v1.CreateWorkspaceRequest.env:type_name -> dshctl.v1.CreateWorkspaceRequest.EnvEntry
+	43, // 4: dshctl.v1.CreateWorkspaceRequest.env:type_name -> dshctl.v1.CreateWorkspaceRequest.EnvEntry
 	10, // 5: dshctl.v1.ListWorkspacesResponse.workspaces:type_name -> dshctl.v1.Workspace
 	5,  // 6: dshctl.v1.Workspace.mounts:type_name -> dshctl.v1.ProjectMount
-	35, // 7: dshctl.v1.Workspace.env:type_name -> dshctl.v1.Workspace.EnvEntry
-	13, // 8: dshctl.v1.ListImagesResponse.images:type_name -> dshctl.v1.Image
-	21, // 9: dshctl.v1.ListContainersResponse.containers:type_name -> dshctl.v1.Container
-	5,  // 10: dshctl.v1.Container.mounts:type_name -> dshctl.v1.ProjectMount
-	36, // 11: dshctl.v1.Container.env:type_name -> dshctl.v1.Container.EnvEntry
-	5,  // 12: dshctl.v1.StartContainerRequest.mounts:type_name -> dshctl.v1.ProjectMount
-	37, // 13: dshctl.v1.StartContainerRequest.env:type_name -> dshctl.v1.StartContainerRequest.EnvEntry
-	5,  // 14: dshctl.v1.RecreateContainerRequest.mounts:type_name -> dshctl.v1.ProjectMount
-	38, // 15: dshctl.v1.RecreateContainerRequest.env:type_name -> dshctl.v1.RecreateContainerRequest.EnvEntry
-	0,  // 16: dshctl.v1.AddContainerMountRequest.mode:type_name -> dshctl.v1.MountMode
-	1,  // 17: dshctl.v1.AddContainerMountRequest.kind:type_name -> dshctl.v1.MountKind
-	1,  // 18: dshctl.v1.RemoveContainerMountRequest.kind:type_name -> dshctl.v1.MountKind
-	30, // 19: dshctl.v1.ListVolumesResponse.volumes:type_name -> dshctl.v1.Volume
-	2,  // 20: dshctl.v1.OrchestratorControl.ListProjects:input_type -> dshctl.v1.ListProjectsRequest
-	6,  // 21: dshctl.v1.OrchestratorControl.CreateWorkspace:input_type -> dshctl.v1.CreateWorkspaceRequest
-	7,  // 22: dshctl.v1.OrchestratorControl.DescribeWorkspace:input_type -> dshctl.v1.DescribeWorkspaceRequest
-	8,  // 23: dshctl.v1.OrchestratorControl.ListWorkspaces:input_type -> dshctl.v1.ListWorkspacesRequest
-	11, // 24: dshctl.v1.OrchestratorControl.ListImages:input_type -> dshctl.v1.ListImagesRequest
-	17, // 25: dshctl.v1.OrchestratorControl.GetImage:input_type -> dshctl.v1.GetImageRequest
-	18, // 26: dshctl.v1.OrchestratorControl.BuildImage:input_type -> dshctl.v1.BuildImageRequest
-	14, // 27: dshctl.v1.OrchestratorControl.RebuildImage:input_type -> dshctl.v1.RebuildImageRequest
-	15, // 28: dshctl.v1.OrchestratorControl.RemoveImage:input_type -> dshctl.v1.RemoveImageRequest
-	19, // 29: dshctl.v1.OrchestratorControl.ListContainers:input_type -> dshctl.v1.ListContainersRequest
-	22, // 30: dshctl.v1.OrchestratorControl.StartContainer:input_type -> dshctl.v1.StartContainerRequest
-	23, // 31: dshctl.v1.OrchestratorControl.RecreateContainer:input_type -> dshctl.v1.RecreateContainerRequest
-	24, // 32: dshctl.v1.OrchestratorControl.RemoveContainer:input_type -> dshctl.v1.RemoveContainerRequest
-	26, // 33: dshctl.v1.OrchestratorControl.AddContainerMount:input_type -> dshctl.v1.AddContainerMountRequest
-	27, // 34: dshctl.v1.OrchestratorControl.RemoveContainerMount:input_type -> dshctl.v1.RemoveContainerMountRequest
-	28, // 35: dshctl.v1.OrchestratorControl.ListVolumes:input_type -> dshctl.v1.ListVolumesRequest
-	31, // 36: dshctl.v1.OrchestratorControl.CreateVolume:input_type -> dshctl.v1.CreateVolumeRequest
-	32, // 37: dshctl.v1.OrchestratorControl.RemoveVolume:input_type -> dshctl.v1.RemoveVolumeRequest
-	3,  // 38: dshctl.v1.OrchestratorControl.ListProjects:output_type -> dshctl.v1.ListProjectsResponse
-	10, // 39: dshctl.v1.OrchestratorControl.CreateWorkspace:output_type -> dshctl.v1.Workspace
-	10, // 40: dshctl.v1.OrchestratorControl.DescribeWorkspace:output_type -> dshctl.v1.Workspace
-	9,  // 41: dshctl.v1.OrchestratorControl.ListWorkspaces:output_type -> dshctl.v1.ListWorkspacesResponse
-	12, // 42: dshctl.v1.OrchestratorControl.ListImages:output_type -> dshctl.v1.ListImagesResponse
-	13, // 43: dshctl.v1.OrchestratorControl.GetImage:output_type -> dshctl.v1.Image
-	13, // 44: dshctl.v1.OrchestratorControl.BuildImage:output_type -> dshctl.v1.Image
-	13, // 45: dshctl.v1.OrchestratorControl.RebuildImage:output_type -> dshctl.v1.Image
-	16, // 46: dshctl.v1.OrchestratorControl.RemoveImage:output_type -> dshctl.v1.RemoveImageResponse
-	20, // 47: dshctl.v1.OrchestratorControl.ListContainers:output_type -> dshctl.v1.ListContainersResponse
-	21, // 48: dshctl.v1.OrchestratorControl.StartContainer:output_type -> dshctl.v1.Container
-	10, // 49: dshctl.v1.OrchestratorControl.RecreateContainer:output_type -> dshctl.v1.Workspace
-	25, // 50: dshctl.v1.OrchestratorControl.RemoveContainer:output_type -> dshctl.v1.RemoveContainerResponse
-	21, // 51: dshctl.v1.OrchestratorControl.AddContainerMount:output_type -> dshctl.v1.Container
-	21, // 52: dshctl.v1.OrchestratorControl.RemoveContainerMount:output_type -> dshctl.v1.Container
-	29, // 53: dshctl.v1.OrchestratorControl.ListVolumes:output_type -> dshctl.v1.ListVolumesResponse
-	30, // 54: dshctl.v1.OrchestratorControl.CreateVolume:output_type -> dshctl.v1.Volume
-	33, // 55: dshctl.v1.OrchestratorControl.RemoveVolume:output_type -> dshctl.v1.RemoveVolumeResponse
-	38, // [38:56] is the sub-list for method output_type
-	20, // [20:38] is the sub-list for method input_type
-	20, // [20:20] is the sub-list for extension type_name
-	20, // [20:20] is the sub-list for extension extendee
-	0,  // [0:20] is the sub-list for field type_name
+	44, // 7: dshctl.v1.Workspace.env:type_name -> dshctl.v1.Workspace.EnvEntry
+	45, // 8: dshctl.v1.Workspace.secret_env:type_name -> dshctl.v1.Workspace.SecretEnvEntry
+	13, // 9: dshctl.v1.ListImagesResponse.images:type_name -> dshctl.v1.Image
+	21, // 10: dshctl.v1.ListContainersResponse.containers:type_name -> dshctl.v1.Container
+	5,  // 11: dshctl.v1.Container.mounts:type_name -> dshctl.v1.ProjectMount
+	46, // 12: dshctl.v1.Container.env:type_name -> dshctl.v1.Container.EnvEntry
+	47, // 13: dshctl.v1.Container.secret_env:type_name -> dshctl.v1.Container.SecretEnvEntry
+	5,  // 14: dshctl.v1.StartContainerRequest.mounts:type_name -> dshctl.v1.ProjectMount
+	48, // 15: dshctl.v1.StartContainerRequest.env:type_name -> dshctl.v1.StartContainerRequest.EnvEntry
+	5,  // 16: dshctl.v1.RecreateContainerRequest.mounts:type_name -> dshctl.v1.ProjectMount
+	49, // 17: dshctl.v1.RecreateContainerRequest.env:type_name -> dshctl.v1.RecreateContainerRequest.EnvEntry
+	0,  // 18: dshctl.v1.AddContainerMountRequest.mode:type_name -> dshctl.v1.MountMode
+	1,  // 19: dshctl.v1.AddContainerMountRequest.kind:type_name -> dshctl.v1.MountKind
+	1,  // 20: dshctl.v1.RemoveContainerMountRequest.kind:type_name -> dshctl.v1.MountKind
+	30, // 21: dshctl.v1.ListVolumesResponse.volumes:type_name -> dshctl.v1.Volume
+	36, // 22: dshctl.v1.ListSecretsResponse.secrets:type_name -> dshctl.v1.Secret
+	2,  // 23: dshctl.v1.OrchestratorControl.ListProjects:input_type -> dshctl.v1.ListProjectsRequest
+	6,  // 24: dshctl.v1.OrchestratorControl.CreateWorkspace:input_type -> dshctl.v1.CreateWorkspaceRequest
+	7,  // 25: dshctl.v1.OrchestratorControl.DescribeWorkspace:input_type -> dshctl.v1.DescribeWorkspaceRequest
+	8,  // 26: dshctl.v1.OrchestratorControl.ListWorkspaces:input_type -> dshctl.v1.ListWorkspacesRequest
+	11, // 27: dshctl.v1.OrchestratorControl.ListImages:input_type -> dshctl.v1.ListImagesRequest
+	17, // 28: dshctl.v1.OrchestratorControl.GetImage:input_type -> dshctl.v1.GetImageRequest
+	18, // 29: dshctl.v1.OrchestratorControl.BuildImage:input_type -> dshctl.v1.BuildImageRequest
+	14, // 30: dshctl.v1.OrchestratorControl.RebuildImage:input_type -> dshctl.v1.RebuildImageRequest
+	15, // 31: dshctl.v1.OrchestratorControl.RemoveImage:input_type -> dshctl.v1.RemoveImageRequest
+	19, // 32: dshctl.v1.OrchestratorControl.ListContainers:input_type -> dshctl.v1.ListContainersRequest
+	22, // 33: dshctl.v1.OrchestratorControl.StartContainer:input_type -> dshctl.v1.StartContainerRequest
+	23, // 34: dshctl.v1.OrchestratorControl.RecreateContainer:input_type -> dshctl.v1.RecreateContainerRequest
+	24, // 35: dshctl.v1.OrchestratorControl.RemoveContainer:input_type -> dshctl.v1.RemoveContainerRequest
+	26, // 36: dshctl.v1.OrchestratorControl.AddContainerMount:input_type -> dshctl.v1.AddContainerMountRequest
+	27, // 37: dshctl.v1.OrchestratorControl.RemoveContainerMount:input_type -> dshctl.v1.RemoveContainerMountRequest
+	28, // 38: dshctl.v1.OrchestratorControl.ListVolumes:input_type -> dshctl.v1.ListVolumesRequest
+	31, // 39: dshctl.v1.OrchestratorControl.CreateVolume:input_type -> dshctl.v1.CreateVolumeRequest
+	32, // 40: dshctl.v1.OrchestratorControl.RemoveVolume:input_type -> dshctl.v1.RemoveVolumeRequest
+	34, // 41: dshctl.v1.OrchestratorControl.ListSecrets:input_type -> dshctl.v1.ListSecretsRequest
+	37, // 42: dshctl.v1.OrchestratorControl.CreateSecret:input_type -> dshctl.v1.CreateSecretRequest
+	38, // 43: dshctl.v1.OrchestratorControl.WriteSecretValue:input_type -> dshctl.v1.WriteSecretValueRequest
+	39, // 44: dshctl.v1.OrchestratorControl.RemoveSecret:input_type -> dshctl.v1.RemoveSecretRequest
+	41, // 45: dshctl.v1.OrchestratorControl.AddContainerSecret:input_type -> dshctl.v1.AddContainerSecretRequest
+	42, // 46: dshctl.v1.OrchestratorControl.RemoveContainerSecret:input_type -> dshctl.v1.RemoveContainerSecretRequest
+	3,  // 47: dshctl.v1.OrchestratorControl.ListProjects:output_type -> dshctl.v1.ListProjectsResponse
+	10, // 48: dshctl.v1.OrchestratorControl.CreateWorkspace:output_type -> dshctl.v1.Workspace
+	10, // 49: dshctl.v1.OrchestratorControl.DescribeWorkspace:output_type -> dshctl.v1.Workspace
+	9,  // 50: dshctl.v1.OrchestratorControl.ListWorkspaces:output_type -> dshctl.v1.ListWorkspacesResponse
+	12, // 51: dshctl.v1.OrchestratorControl.ListImages:output_type -> dshctl.v1.ListImagesResponse
+	13, // 52: dshctl.v1.OrchestratorControl.GetImage:output_type -> dshctl.v1.Image
+	13, // 53: dshctl.v1.OrchestratorControl.BuildImage:output_type -> dshctl.v1.Image
+	13, // 54: dshctl.v1.OrchestratorControl.RebuildImage:output_type -> dshctl.v1.Image
+	16, // 55: dshctl.v1.OrchestratorControl.RemoveImage:output_type -> dshctl.v1.RemoveImageResponse
+	20, // 56: dshctl.v1.OrchestratorControl.ListContainers:output_type -> dshctl.v1.ListContainersResponse
+	21, // 57: dshctl.v1.OrchestratorControl.StartContainer:output_type -> dshctl.v1.Container
+	10, // 58: dshctl.v1.OrchestratorControl.RecreateContainer:output_type -> dshctl.v1.Workspace
+	25, // 59: dshctl.v1.OrchestratorControl.RemoveContainer:output_type -> dshctl.v1.RemoveContainerResponse
+	21, // 60: dshctl.v1.OrchestratorControl.AddContainerMount:output_type -> dshctl.v1.Container
+	21, // 61: dshctl.v1.OrchestratorControl.RemoveContainerMount:output_type -> dshctl.v1.Container
+	29, // 62: dshctl.v1.OrchestratorControl.ListVolumes:output_type -> dshctl.v1.ListVolumesResponse
+	30, // 63: dshctl.v1.OrchestratorControl.CreateVolume:output_type -> dshctl.v1.Volume
+	33, // 64: dshctl.v1.OrchestratorControl.RemoveVolume:output_type -> dshctl.v1.RemoveVolumeResponse
+	35, // 65: dshctl.v1.OrchestratorControl.ListSecrets:output_type -> dshctl.v1.ListSecretsResponse
+	36, // 66: dshctl.v1.OrchestratorControl.CreateSecret:output_type -> dshctl.v1.Secret
+	36, // 67: dshctl.v1.OrchestratorControl.WriteSecretValue:output_type -> dshctl.v1.Secret
+	40, // 68: dshctl.v1.OrchestratorControl.RemoveSecret:output_type -> dshctl.v1.RemoveSecretResponse
+	21, // 69: dshctl.v1.OrchestratorControl.AddContainerSecret:output_type -> dshctl.v1.Container
+	21, // 70: dshctl.v1.OrchestratorControl.RemoveContainerSecret:output_type -> dshctl.v1.Container
+	47, // [47:71] is the sub-list for method output_type
+	23, // [23:47] is the sub-list for method input_type
+	23, // [23:23] is the sub-list for extension type_name
+	23, // [23:23] is the sub-list for extension extendee
+	0,  // [0:23] is the sub-list for field type_name
 }
 
 func init() { file_dshctl_v1_control_proto_init() }
@@ -2225,7 +2782,7 @@ func file_dshctl_v1_control_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_dshctl_v1_control_proto_rawDesc), len(file_dshctl_v1_control_proto_rawDesc)),
 			NumEnums:      2,
-			NumMessages:   37,
+			NumMessages:   48,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

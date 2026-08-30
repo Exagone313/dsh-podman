@@ -244,8 +244,9 @@ const mountModeParam = {
 };
 const mountKindParam = {
   type: "string",
-  enum: ["project", "tmpfs", "volume"],
-  description: "Kind of mount: a project bind, a tmpfs, or a named volume.",
+  enum: ["project", "tmpfs", "volume", "secret"],
+  description:
+    "Kind of mount: a project bind, a tmpfs, a named volume, or a named secret.",
 };
 const projectMountItemParam = {
   type: "object",
@@ -348,6 +349,7 @@ export const containerMountAddParameters = {
     },
     mode: mountModeParam,
     volume: { type: "string", description: "Named volume to mount." },
+    secret: { type: "string", description: "Named secret to mount." },
   },
   required: ["container"],
 };
@@ -359,6 +361,7 @@ export const containerMountRemoveParameters = {
     project: { type: "string", description: "Project name to unmount." },
     path: { type: "string", description: "Path within the project to unmount." },
     volume: { type: "string", description: "Named volume to unmount." },
+    secret: { type: "string", description: "Named secret to unmount." },
     destination: {
       type: "string",
       description: "Destination path inside the container.",
@@ -385,6 +388,50 @@ export const volumeRemoveParameters = {
   type: "object",
   properties: { name: { type: "string", description: "Volume name to remove." } },
   required: ["name"],
+};
+export const secretListParameters = {
+  type: "object",
+  properties: {},
+  required: [] as string[],
+};
+export const secretCreateParameters = {
+  type: "object",
+  properties: {
+    name: { type: "string", description: "Secret name to create." },
+    length: {
+      type: "integer",
+      minimum: 1,
+      description: "Length of the generated random value (default 32).",
+    },
+    charset: {
+      type: "string",
+      enum: ["alphanumeric", "hex", "base64url"],
+      description: "Character set for the generated random value.",
+    },
+  },
+  required: ["name"],
+};
+export const secretRemoveParameters = {
+  type: "object",
+  properties: { name: { type: "string", description: "Secret name to remove." } },
+  required: ["name"],
+};
+export const containerSecretAddParameters = {
+  type: "object",
+  properties: {
+    container: containerParam,
+    env: { type: "string", description: "Environment variable name." },
+    secret: { type: "string", description: "Named secret to inject." },
+  },
+  required: ["container", "env", "secret"],
+};
+export const containerSecretRemoveParameters = {
+  type: "object",
+  properties: {
+    container: containerParam,
+    env: { type: "string", description: "Environment variable name." },
+  },
+  required: ["container", "env"],
 };
 export const containerBashParameters = {
   type: "object",
@@ -581,6 +628,26 @@ export const TOOLS: ToolDefinition[] = [
   { name: "volume_list", parameters: volumeListParameters },
   { name: "volume_create", parameters: volumeCreateParameters },
   { name: "volume_remove", parameters: volumeRemoveParameters, approval: true },
+  { name: "secret_list", parameters: secretListParameters },
+  {
+    name: "secret_create",
+    parameters: secretCreateParameters,
+  },
+  {
+    name: "secret_remove",
+    parameters: secretRemoveParameters,
+    approval: true,
+  },
+  {
+    name: "container_secret_add",
+    parameters: containerSecretAddParameters,
+    approval: true,
+  },
+  {
+    name: "container_secret_remove",
+    parameters: containerSecretRemoveParameters,
+    approval: true,
+  },
   { name: "daemon_start", parameters: daemonStartParameters },
   { name: "daemon_list", parameters: daemonListParameters },
   { name: "daemon_stop", parameters: daemonStopParameters },
@@ -615,12 +682,21 @@ function mountMode(mode: unknown): string {
 
 // Summarize the mount source for container_mount_add/remove.
 function mountTarget(args: Record<string, unknown>): string {
-  const kind = args.kind === "tmpfs" ? "tmpfs" : args.kind === "volume" ? "volume" : "directory";
+  const kind =
+    args.kind === "tmpfs"
+      ? "tmpfs"
+      : args.kind === "volume"
+        ? "volume"
+        : args.kind === "secret"
+          ? "secret"
+          : "directory";
   switch (kind) {
     case "volume":
       return typeof args.volume === "string" ? `volume ${args.volume}` : "";
     case "tmpfs":
       return "tmpfs";
+    case "secret":
+      return typeof args.secret === "string" ? `secret ${args.secret}` : "";
     default:
       return typeof args.project === "string" ? `directory ${projectPath(args.project, typeof args.path === "string" ? args.path : undefined)}` : "";
   }
@@ -728,6 +804,25 @@ export function summarizeArgs(name: string, args: Record<string, unknown>): stri
       const name = str("name");
       return name === undefined ? "" : `remove volume ${name}`;
     }
+    case "secret_remove": {
+      const name = str("name");
+      return name === undefined ? "" : `remove secret ${name}`;
+    }
+    case "container_secret_add": {
+      const container = str("container");
+      const env = str("env");
+      const secret = str("secret");
+      if (container === undefined || env === undefined || secret === undefined) {
+        return "";
+      }
+      return `container ${container}: add secret ${secret} as ${env}`;
+    }
+    case "container_secret_remove": {
+      const container = str("container");
+      const env = str("env");
+      if (container === undefined || env === undefined) return "";
+      return `container ${container}: remove secret ${env}`;
+    }
     case "container_mount_add":
     case "container_mount_remove": {
       const container = str("container");
@@ -816,6 +911,7 @@ export const READ_ONLY_TOOLS: ReadonlySet<string> = new Set([
   "container_grep",
   "container_mount_list",
   "volume_list",
+  "secret_list",
   "daemon_list",
   "daemon_logs",
 ]);
@@ -1010,6 +1106,16 @@ const TOOL_DESCRIPTIONS: Record<string, string> = {
     "List the named volumes available to the current workspace.",
   volume_create: "Create a named volume in the current workspace.",
   volume_remove: "Remove a named volume from the current workspace.",
+  secret_list:
+    "List the named secrets available to the current workspace (values are never exposed).",
+  secret_create:
+    "Create a secret with an orchestrator-generated random value (the value is never exposed).",
+  secret_remove:
+    "Remove a named secret from the current workspace. Requires approval: removing deletes the secret so containers using it must drop it first.",
+  container_secret_add:
+    "Inject a named secret into a container as an environment variable. Requires approval: exposing a secret to a container changes what it can read.",
+  container_secret_remove:
+    "Stop injecting a named secret into a container environment variable. Requires approval: removing a secret exposure changes what the container can read.",
   daemon_start:
     "Start a daemon inside a container of the current workspace. Optionally run it as a specific uid/gid (with optional supplementary groups).",
   daemon_list:
@@ -1066,14 +1172,28 @@ export const toolHandlers: Record<
       if (keys.length === 0) return undefined;
       return list(keys, (key) => String(key));
     };
+    const secretEnvList = (env: unknown): string | undefined => {
+      if (typeof env !== "object" || env === null || Array.isArray(env)) {
+        return undefined;
+      }
+      const entries = Object.entries(env);
+      if (entries.length === 0) return undefined;
+      return list(entries, (item) => {
+        const [key, value] = item as [string, unknown];
+        return `${key}=${String(value)}`;
+      });
+    };
     const defaultRow = rows.find((row: any) => row.containerName === "default");
     const defaultEnv = envList(defaultRow?.env);
+    const defaultSecrets = secretEnvList(defaultRow?.secretEnv);
     lines.push(
       defaultRow === undefined
         ? "default: not started (will be started on demand)"
         : `default: ${defaultRow.status}${
             defaultRow.imageId ? ` (image ${defaultRow.imageId})` : ""
-          }${defaultEnv === undefined ? "" : `  env=${defaultEnv}`}`,
+          }${defaultEnv === undefined ? "" : `  env=${defaultEnv}`}${
+            defaultSecrets === undefined ? "" : `  secret_env=${defaultSecrets}`
+          }`,
     );
     const named = rows.filter((row: any) => row.containerName !== "default");
     if (named.length === 0) {
@@ -1082,10 +1202,13 @@ export const toolHandlers: Record<
       lines.push("named containers:");
       for (const row of named) {
         const env = envList(row.env);
+        const secrets = secretEnvList(row.secretEnv);
         lines.push(
           `  ${row.containerName}: ${row.status}${
             row.imageId ? ` (image ${row.imageId})` : ""
-          }${env === undefined ? "" : `  env=${env}`}`,
+          }${env === undefined ? "" : `  env=${env}`}${
+            secrets === undefined ? "" : `  secret_env=${secrets}`
+          }`,
         );
       }
     }
@@ -1249,7 +1372,9 @@ export const toolHandlers: Record<
           ? "MOUNT_KIND_TMPFS"
           : kind === "volume"
             ? "MOUNT_KIND_VOLUME"
-            : "MOUNT_KIND_PROJECT",
+            : kind === "secret"
+              ? "MOUNT_KIND_SECRET"
+              : "MOUNT_KIND_PROJECT",
     };
     if (kind === "volume") {
       request.volume = input.volume;
@@ -1258,6 +1383,9 @@ export const toolHandlers: Record<
     } else if (kind === "tmpfs") {
       request.destination = input.destination;
       request.mode = mode;
+    } else if (kind === "secret") {
+      request.secret = input.secret;
+      request.destination = input.destination;
     } else {
       request.project = input.project;
       if (input.path !== undefined) request.path = input.path;
@@ -1276,13 +1404,17 @@ export const toolHandlers: Record<
           ? "MOUNT_KIND_TMPFS"
           : kind === "volume"
             ? "MOUNT_KIND_VOLUME"
-            : "MOUNT_KIND_PROJECT",
+            : kind === "secret"
+              ? "MOUNT_KIND_SECRET"
+              : "MOUNT_KIND_PROJECT",
     };
     if (kind === "project") {
       request.project = input.project;
       if (input.path !== undefined) request.path = input.path;
     } else if (kind === "volume") {
       if (input.volume !== undefined) request.volume = input.volume;
+    } else if (kind === "secret") {
+      if (input.secret !== undefined) request.secret = input.secret;
     }
     if (input.destination !== undefined) request.destination = input.destination;
     return resolver.control("removeContainerMount", request);
@@ -1296,6 +1428,32 @@ export const toolHandlers: Record<
     resolver.control("createVolume", { name: input.name }),
   volume_remove: async (resolver, input) =>
     resolver.control("removeVolume", { name: input.name }),
+  secret_list: async (resolver) => {
+    const result = await resolver.control<{ secrets?: any[] }>("listSecrets", {});
+    const rows = (result.secrets ?? []).map((secret: any) => secret.name);
+    return rows.length > 0 ? rows.join("\n") : "(no secrets)";
+  },
+  secret_create: async (resolver, input) =>
+    resolver.control("createSecret", {
+      name: input.name,
+      ...(input.length ? { length: input.length } : {}),
+      ...(input.charset ? { charset: input.charset } : {}),
+    }),
+  secret_remove: async (resolver, input) =>
+    resolver.control("removeSecret", { name: input.name }),
+  container_secret_add: async (resolver, input, exec) =>
+    resolver.control("addContainerSecret", {
+      workspaceSlug: await sessionWorkspaceSlug(resolver, currentCwd(exec)),
+      container: input.container,
+      env: input.env,
+      secret: input.secret,
+    }),
+  container_secret_remove: async (resolver, input, exec) =>
+    resolver.control("removeContainerSecret", {
+      workspaceSlug: await sessionWorkspaceSlug(resolver, currentCwd(exec)),
+      container: input.container,
+      env: input.env,
+    }),
   daemon_start: async (resolver, input, exec) => {
     const binding = await resolveToolBinding(
       resolver,

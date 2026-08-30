@@ -63,6 +63,7 @@ function baseValue(): Record<string, unknown> {
     containers: [],
     images: [],
     volumes: [],
+    secrets: [],
     command: null,
   };
 }
@@ -91,6 +92,9 @@ test("refresh on install publishes containers, images and workspaces", async () 
       if (method === "listVolumes") {
         return { volumes: [{ name: "data" }, { name: "cache" }] };
       }
+      if (method === "listSecrets") {
+        return { secrets: [{ name: "db-pass" }, { name: "api-key" }] };
+      }
       return {};
     },
   };
@@ -98,7 +102,7 @@ test("refresh on install publishes containers, images and workspaces", async () 
   await scope.update({}); // settle the queued async refresh
   assert.deepEqual(
     calls.map(([method]) => method),
-    ["listContainers", "listImages", "listWorkspaces", "listVolumes"],
+    ["listContainers", "listImages", "listWorkspaces", "listVolumes", "listSecrets"],
   );
   assert.equal((scope.value.containers as any[]).length, 1);
   assert.equal((scope.value.images as any[]).length, 1);
@@ -107,6 +111,7 @@ test("refresh on install publishes containers, images and workspaces", async () 
   assert.equal(workspaces[0].workspaceSlug, "w1");
   assert.equal(workspaces[0].projectName, "team/app");
   assert.deepEqual(scope.value.volumes, [{ name: "data" }, { name: "cache" }]);
+  assert.deepEqual(scope.value.secrets, [{ name: "db-pass" }, { name: "api-key" }]);
 });
 
 test("remove command drives removeContainer and clears the command", async () => {
@@ -263,6 +268,84 @@ test("image_remove command drives removeImage with the imageId", async () => {
   await new Promise((resolve) => setImmediate(resolve));
   const removeCall = calls.find(([method]) => method === "removeImage");
   assert.deepEqual(removeCall?.[1], { imageId: "valkey" });
+  assert.equal(scope.value.command, null);
+});
+
+test("secret_create command drives createSecret with the name", async () => {
+  const scope = fakeScope(baseValue());
+  const calls: Array<[string, unknown]> = [];
+  const resolver: any = {
+    getConfig: () => ({}),
+    setConfig: () => {},
+    async control(method: string, request: unknown) {
+      calls.push([method, request]);
+      if (method === "listContainers") return { containers: [] };
+      if (method === "listImages") return { images: [] };
+      if (method === "listWorkspaces") return { workspaces: [] };
+      if (method === "listVolumes") return { volumes: [] };
+      if (method === "listSecrets") return { secrets: [] };
+      return {};
+    },
+  };
+  installContainerSettings(fakeContext(scope), resolver);
+  await scope.update({
+    command: { op: "secret_create", workspace: "db-pass", image: "", at: 6, mounts: [], value: "" },
+  });
+  await new Promise((resolve) => setImmediate(resolve));
+  const createCall = calls.find(([method]) => method === "createSecret");
+  assert.deepEqual(createCall?.[1], { name: "db-pass" });
+  assert.equal(scope.value.command, null);
+});
+
+test("secret_remove command drives removeSecret with the name", async () => {
+  const scope = fakeScope(baseValue());
+  const calls: Array<[string, unknown]> = [];
+  const resolver: any = {
+    getConfig: () => ({}),
+    setConfig: () => {},
+    async control(method: string, request: unknown) {
+      calls.push([method, request]);
+      if (method === "listContainers") return { containers: [] };
+      if (method === "listImages") return { images: [] };
+      if (method === "listWorkspaces") return { workspaces: [] };
+      if (method === "listVolumes") return { volumes: [] };
+      if (method === "listSecrets") return { secrets: [] };
+      return {};
+    },
+  };
+  installContainerSettings(fakeContext(scope), resolver);
+  await scope.update({
+    command: { op: "secret_remove", workspace: "db-pass", image: "", at: 7, mounts: [], value: "" },
+  });
+  await new Promise((resolve) => setImmediate(resolve));
+  const removeCall = calls.find(([method]) => method === "removeSecret");
+  assert.deepEqual(removeCall?.[1], { name: "db-pass" });
+  assert.equal(scope.value.command, null);
+});
+
+test("secret_set command drives writeSecretValue with the name and value", async () => {
+  const scope = fakeScope(baseValue());
+  const calls: Array<[string, unknown]> = [];
+  const resolver: any = {
+    getConfig: () => ({}),
+    setConfig: () => {},
+    async control(method: string, request: unknown) {
+      calls.push([method, request]);
+      if (method === "listContainers") return { containers: [] };
+      if (method === "listImages") return { images: [] };
+      if (method === "listWorkspaces") return { workspaces: [] };
+      if (method === "listVolumes") return { volumes: [] };
+      if (method === "listSecrets") return { secrets: [] };
+      return {};
+    },
+  };
+  installContainerSettings(fakeContext(scope), resolver);
+  await scope.update({
+    command: { op: "secret_set", workspace: "db-pass", image: "", at: 8, mounts: [], value: "s3cr3t" },
+  });
+  await new Promise((resolve) => setImmediate(resolve));
+  const setCall = calls.find(([method]) => method === "writeSecretValue");
+  assert.deepEqual(setCall?.[1], { name: "db-pass", value: "s3cr3t" });
   assert.equal(scope.value.command, null);
 });
 

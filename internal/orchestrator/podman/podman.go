@@ -17,6 +17,7 @@ import (
 	"github.com/containers/podman/v5/pkg/bindings/containers"
 	"github.com/containers/podman/v5/pkg/bindings/images"
 	"github.com/containers/podman/v5/pkg/bindings/pods"
+	"github.com/containers/podman/v5/pkg/bindings/secrets"
 	"github.com/containers/podman/v5/pkg/bindings/volumes"
 	entities "github.com/containers/podman/v5/pkg/domain/entities/types"
 	"github.com/containers/podman/v5/pkg/specgen"
@@ -80,7 +81,7 @@ func (c *Client) RemovePod(name string) error {
 	return nil
 }
 
-func (c *Client) CreateWorkspace(pod, name, image, token string, mounts []specs.Mount, env map[string]string) error {
+func (c *Client) CreateWorkspace(pod, name, image, token string, mounts []specs.Mount, secrets []specgen.Secret, envSecrets map[string]string, env map[string]string) error {
 	c.log().Info("creating guest container", "pod_name", pod, "container_name", name, "image", image, "mount_count", len(mounts))
 	socketDir := filepath.Join(c.socketRoot, name)
 	hostSocketDir := filepath.Join(c.hostSocketRoot, name)
@@ -96,6 +97,8 @@ func (c *Client) CreateWorkspace(pod, name, image, token string, mounts []specs.
 	generator.Pod = pod
 	generator.Command = []string{c.guestBinary}
 	generator.Env = containerEnv(c.socketRoot, name, c.projectRoot, token, env)
+	generator.EnvSecrets = envSecrets
+	generator.Secrets = append(generator.Secrets, secrets...)
 	generator.Init = &init
 	generator.ReadOnlyFilesystem = boolPtr(true)
 	ociMounts, volumes := classifyMounts(mounts)
@@ -204,7 +207,7 @@ func (c *Client) Remove(name string) error {
 	return err
 }
 
-func (c *Client) RecreateWorkspace(pod, name, image, token string, mounts []specs.Mount, env map[string]string) error {
+func (c *Client) RecreateWorkspace(pod, name, image, token string, mounts []specs.Mount, secrets []specgen.Secret, envSecrets map[string]string, env map[string]string) error {
 	c.log().Info("recreating guest container", "pod_name", pod, "container_name", name, "image", image, "mount_count", len(mounts))
 	if err := c.Stop(name); err != nil {
 		return err
@@ -212,7 +215,7 @@ func (c *Client) RecreateWorkspace(pod, name, image, token string, mounts []spec
 	if err := c.Remove(name); err != nil {
 		return err
 	}
-	return c.CreateWorkspace(pod, name, image, token, mounts, env)
+	return c.CreateWorkspace(pod, name, image, token, mounts, secrets, envSecrets, env)
 }
 
 // containerEnv builds the guest container environment: the reserved
@@ -278,5 +281,42 @@ func (c *Client) VolumeRemove(name string) error {
 		return fmt.Errorf("remove volume: %w", err)
 	}
 	c.log().Info("volume removed", "volume_name", name)
+	return nil
+}
+
+func (c *Client) SecretExists(name string) (bool, error) {
+	return secrets.Exists(c.ctx, name)
+}
+
+// SecretCreate stores a secret value under the given name. The value is never
+// logged; only the name is.
+func (c *Client) SecretCreate(name, value string) error {
+	if _, err := secrets.Create(c.ctx, strings.NewReader(value), &secrets.CreateOptions{Name: &name}); err != nil {
+		c.log().Error("secret creation failed", "secret_name", name, "error", err)
+		return fmt.Errorf("create secret: %w", err)
+	}
+	c.log().Info("secret created", "secret_name", name)
+	return nil
+}
+
+// SecretList returns the full podman names of every secret.
+func (c *Client) SecretList() ([]string, error) {
+	reports, err := secrets.List(c.ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	names := make([]string, 0, len(reports))
+	for _, report := range reports {
+		names = append(names, report.Spec.Name)
+	}
+	return names, nil
+}
+
+func (c *Client) SecretRemove(name string) error {
+	if err := secrets.Remove(c.ctx, name); err != nil {
+		c.log().Error("secret removal failed", "secret_name", name, "error", err)
+		return fmt.Errorf("remove secret: %w", err)
+	}
+	c.log().Info("secret removed", "secret_name", name)
 	return nil
 }

@@ -112,6 +112,44 @@ func TestWorkspacesWithNamedContainersRoundTrip(t *testing.T) {
 	}
 }
 
+func TestSecretEnvAndSecretMountRoundTrip(t *testing.T) {
+	store, err := New(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	workspaces := []Workspace{{
+		WorkspaceSlug: "proj",
+		Containers: []Container{{
+			Name:       "dev",
+			PodmanName: "dsh-workspace-proj-dev",
+			ImageID:    "arch",
+			Status:     "running",
+			Mounts: []Mount{
+				{Kind: "secret", Secret: "valkey-tls", Destination: "/run/secrets/tls"},
+			},
+			SecretEnv: map[string]string{"VALKEY_TOKEN": "valkey-token"},
+		}},
+	}}
+	if err := store.SaveWorkspaces(workspaces); err != nil {
+		t.Fatal(err)
+	}
+	got, err := store.Workspaces()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 1 || len(got[0].Containers) != 1 {
+		t.Fatalf("round trip mismatch: %#v", got)
+	}
+	container := got[0].Containers[0]
+	mounts := container.Mounts
+	if len(mounts) != 1 || mounts[0].Kind != "secret" || mounts[0].Secret != "valkey-tls" || mounts[0].Destination != "/run/secrets/tls" {
+		t.Fatalf("secret mount did not survive round trip: %#v", mounts)
+	}
+	if len(container.SecretEnv) != 1 || container.SecretEnv["VALKEY_TOKEN"] != "valkey-token" {
+		t.Fatalf("secret env did not survive round trip: %#v", container.SecretEnv)
+	}
+}
+
 func TestMissingStateIsEmpty(t *testing.T) {
 	store, _ := New(t.TempDir())
 	if got, err := store.Workspaces(); err != nil || len(got) != 0 {

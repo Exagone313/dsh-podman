@@ -28,6 +28,7 @@ type Mount struct {
 	Destination string `toml:"destination,omitempty"`
 	Kind        string `toml:"kind,omitempty"`
 	Volume      string `toml:"volume,omitempty"`
+	Secret      string `toml:"secret,omitempty"`
 }
 type Container struct {
 	Name            string            `toml:"name"` // "default" or logical name
@@ -39,6 +40,7 @@ type Container struct {
 	AgentToken      string            `toml:"agent_token"`
 	Mounts          []Mount           `toml:"mounts"`
 	Env             map[string]string `toml:"env,omitempty"`
+	SecretEnv       map[string]string `toml:"secret_env,omitempty"`
 }
 type Workspace struct {
 	WorkspaceSlug   string      `toml:"workspace_slug"`

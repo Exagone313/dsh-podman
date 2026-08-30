@@ -548,6 +548,147 @@ function VolumesSection(props: {
   );
 }
 
+function SecretRow(props: {
+  t: (key: ContainerPluginKey) => string;
+  name: string;
+  busy: boolean;
+  writable: boolean;
+  onSet: (name: string, value: string) => void;
+  onRemove: (name: string) => void;
+}): ReactNode {
+  const { t, name, busy, writable, onSet, onRemove } = props;
+  const [content, setContent] = useState("");
+  const canSave = content !== "" && !busy;
+  const submit = (): void => {
+    if (content === "") return;
+    onSet(name, content);
+    setContent("");
+  };
+  return (
+    <div
+      style={{
+        display: "flex",
+        flexWrap: "wrap",
+        alignItems: "center",
+        gap: "8px",
+      }}
+    >
+      <code
+        style={{
+          ...greyId,
+          flex: 1,
+          fontSize: "13px",
+          color: "var(--dsw-alias-label-primary)",
+        }}
+      >
+        {name}
+      </code>
+      <Input
+        type="password"
+        value={content}
+        disabled={!writable || busy}
+        placeholder={t("setSecret")}
+        onChange={(event) => setContent(event.target.value)}
+        onKeyDown={(event) => {
+          if (event.key === "Enter") submit();
+        }}
+        style={{ width: "200px" }}
+      />
+      <Button
+        variant="outline"
+        size="sm"
+        disabled={!writable || !canSave}
+        onClick={submit}
+      >
+        {t("setSecret")}
+      </Button>
+      <Button
+        variant="outline"
+        size="sm"
+        disabled={busy}
+        onClick={() => onRemove(name)}
+      >
+        {t("removeSecret")}
+      </Button>
+    </div>
+  );
+}
+
+function SecretsSection(props: {
+  t: (key: ContainerPluginKey) => string;
+  secrets: readonly { name: string }[];
+  busy: boolean;
+  writable: boolean;
+  onCreate: (name: string) => void;
+  onRemove: (name: string) => void;
+  onSet: (name: string, value: string) => void;
+}): ReactNode {
+  const { t, secrets, busy, writable, onCreate, onRemove, onSet } = props;
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState("");
+  const canCreate = name.trim() !== "" && !busy;
+  const submit = (): void => {
+    if (name.trim() === "") return;
+    onCreate(name.trim());
+    setName("");
+  };
+  return (
+    <DisclosureRow
+      icon={<span />}
+      title={t("secretsTitle")}
+      open={open}
+      expandable
+      onToggle={() => setOpen(!open)}
+    >
+      <div style={wsBody}>
+        {secrets.length === 0 ? (
+          <p style={{ ...hint, margin: 0 }}>{t("none")}</p>
+        ) : (
+          secrets.map((secret) => (
+            <SecretRow
+              key={secret.name}
+              t={t}
+              name={secret.name}
+              busy={busy}
+              writable={writable}
+              onSet={onSet}
+              onRemove={onRemove}
+            />
+          ))
+        )}
+        <div
+          style={{
+            display: "flex",
+            flexWrap: "wrap",
+            alignItems: "center",
+            gap: "8px",
+            paddingTop: "8px",
+          }}
+        >
+          <Input
+            value={name}
+            disabled={!writable || busy}
+            placeholder={t("createSecret")}
+            onChange={(event) => setName(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") submit();
+            }}
+            style={{ width: "200px" }}
+          />
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={!writable || !canCreate}
+            onClick={submit}
+          >
+            {t("createSecret")}
+          </Button>
+        </div>
+      </div>
+    </DisclosureRow>
+  );
+}
+
 export function ContainerCard(props: ContainerCardProps): ReactNode {
   const { t } = props;
   const state = props.useContainerCard((snapshot) => snapshot);
@@ -632,6 +773,16 @@ export function ContainerCard(props: ContainerCardProps): ReactNode {
             writable={state.writable}
             onCreate={props.createVolume}
             onRemove={props.removeVolume}
+          />
+          <div style={sectionTitle}>{t("secretsTitle")}</div>
+          <SecretsSection
+            t={t}
+            secrets={state.secrets}
+            busy={state.busy}
+            writable={state.writable}
+            onCreate={props.createSecret}
+            onRemove={props.removeSecret}
+            onSet={props.setSecret}
           />
           <div style={sectionTitle}>{t("configTitle")}</div>
           <ConfigField

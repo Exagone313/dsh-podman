@@ -35,13 +35,14 @@ Protobuf bindings are generated with Buf (`buf generate`); the raw `.proto`
 files are copied into `dist/grpc/proto/` at build time and loaded at runtime
 by `@grpc/proto-loader`.
 
-## Configuration (environment variables)
+## Configuration
 
-All variables use the `DSH_PODMAN_` prefix. Variables are listed under the
-component that reads them; a variable read by several components appears in
-each of their sections.
+Environment variables use the `DSH_PODMAN_` prefix and are listed under the
+component that reads them (a variable read by several components appears in
+each of their sections). The plugin also exposes a few **UI settings** in the
+dsh **Settings → Plugins** card, which are listed separately from env vars.
 
-### Plugin (dsh client)
+### Plugin (dsh client) — environment variables
 
 | Variable | Default | Description |
 |---|---|---|
@@ -50,11 +51,18 @@ each of their sections.
 | `DSH_PODMAN_PROJECTS_ROOT` | `/projects` | Project root used to resolve session working directories into a workspace |
 | `DSH_PODMAN_SOCKETS_ROOT` | `/run/dsh-podman` | Socket root the plugin derives the orchestrator control socket (`orchestrator.sock`) from |
 
-`defaultImage` and `socketsRoot` are **UI settings** (the card's Configuration /
-Set-default sections); `socketsRoot` falls back to `DSH_PODMAN_SOCKETS_ROOT`.
 `projectsRoot` and `imagePrefix` are env-only so they match the orchestrator;
 `controlToken` comes from `cordis.yml` config or `DSH_PODMAN_ORCHESTRATOR_TOKEN`.
-The `defaultImage` is a **short name** (default `archlinux`).
+
+### Plugin (dsh client) — UI settings
+
+Editable in the card's **Settings → Plugins → Podman** panel (the
+Configuration section and the images' Set-default popup):
+
+| Setting | Default | Description |
+|---|---|---|
+| `defaultImage` | `archlinux` | Image **short name** used for new workspaces; chosen from base and custom images via the Set-default popup |
+| `socketsRoot` | `DSH_PODMAN_SOCKETS_ROOT` | Socket root the plugin uses to reach the orchestrator; falls back to the env var |
 
 ### Orchestrator (`dsh-podman-orchestrator`)
 

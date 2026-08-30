@@ -272,6 +272,13 @@ function Field(props: {
   );
 }
 
+const namePattern = /^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,63}$/;
+const imageIdPattern = /^[a-zA-Z0-9_][a-zA-Z0-9_.\-/:]{0,127}$/;
+const sanitizeName = (raw: string): string =>
+  raw.replace(/[^a-zA-Z0-9_.-]/g, "");
+const sanitizeImageId = (raw: string): string =>
+  raw.replace(/[^a-zA-Z0-9_.\-/:]/g, "");
+
 function ConfirmButton(props: {
   t: (key: ContainerPluginKey) => string;
   label: string;
@@ -917,9 +924,9 @@ function VolumesSection(props: {
   const [openVolume, setOpenVolume] = useState<string | null>(null);
   const [name, setName] = useState("");
   const volumeId = useId();
-  const canCreate = name.trim() !== "";
+  const canCreate = namePattern.test(name);
   const submit = (): void => {
-    if (name.trim() === "") return;
+    if (!namePattern.test(name)) return;
     onCreate(name.trim());
     setName("");
     setOpen(false);
@@ -1011,11 +1018,14 @@ function VolumesSection(props: {
             value={name}
             disabled={!writable || busy}
             autoFocus
-            onChange={(event) => setName(event.target.value)}
+            onChange={(event) => setName(sanitizeName(event.target.value))}
             onKeyDown={(event) => {
               if (event.key === "Enter") submit();
             }}
           />
+          {name !== "" && !namePattern.test(name) ? (
+            <p style={{ ...hint, margin: 0 }}>{t("invalidName")}</p>
+          ) : null}
         </Field>
       </Modal>
     </section>
@@ -1106,9 +1116,9 @@ function SecretsSection(props: {
   const secretNameId = useId();
   const secretLengthId = useId();
   const secretCharsetId = useId();
-  const canCreate = name.trim() !== "";
+  const canCreate = namePattern.test(name);
   const submit = (): void => {
-    if (name.trim() === "") return;
+    if (!namePattern.test(name)) return;
     const parsedLength = parseInt(length, 10);
     const normalized =
       length.trim() === "" || Number.isNaN(parsedLength) || parsedLength < 1
@@ -1205,11 +1215,14 @@ function SecretsSection(props: {
               value={name}
               disabled={!writable || busy}
               autoFocus
-              onChange={(event) => setName(event.target.value)}
+              onChange={(event) => setName(sanitizeName(event.target.value))}
               onKeyDown={(event) => {
                 if (event.key === "Enter") submit();
               }}
             />
+            {name !== "" && !namePattern.test(name) ? (
+              <p style={{ ...hint, margin: 0 }}>{t("invalidName")}</p>
+            ) : null}
           </Field>
           <Field label={t("secretLength")} htmlFor={secretLengthId}>
             <Input
@@ -1267,7 +1280,7 @@ function ImageBuildModal(props: {
     onClose,
     onBuild,
   } = props;
-  const canBuild = imageId.trim() !== "" && baseImage.trim() !== "";
+  const canBuild = imageIdPattern.test(imageId) && baseImage.trim() !== "";
   const imageIdLabel = useId();
   const baseImageLabel = useId();
   const packagesLabel = useId();
@@ -1308,8 +1321,11 @@ function ImageBuildModal(props: {
           <Input
             id={imageIdLabel}
             value={imageId}
-            onChange={(event) => onImageId(event.target.value)}
+            onChange={(event) => onImageId(sanitizeImageId(event.target.value))}
           />
+          {imageId !== "" && !imageIdPattern.test(imageId) ? (
+            <p style={{ ...hint, margin: 0 }}>{t("invalidImageId")}</p>
+          ) : null}
         </Field>
         <Field label={t("baseImage")} htmlFor={baseImageLabel}>
           <select

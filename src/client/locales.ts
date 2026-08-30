@@ -81,7 +81,9 @@ export type ContainerPluginKey =
   | "confirmRemoveVolume"
   | "confirmSetSecret"
   | "confirmRemoveSecret"
-  | "confirmDetachSecret";
+  | "confirmDetachSecret"
+  | "invalidName"
+  | "invalidImageId";
 
 export const en: Record<ContainerPluginKey, string> = {
   cardTitle: "Podman",
@@ -164,6 +166,10 @@ export const en: Record<ContainerPluginKey, string> = {
     "Remove this secret? Containers using it must drop it first.",
   confirmDetachSecret:
     "Detach this secret environment variable from the container?",
+  invalidName:
+    "Start with a letter or digit; only letters, digits, '.', '_', '-' (max 64).",
+  invalidImageId:
+    "Start with a letter, digit, or '_'; only letters, digits, '.', '_', '-', '/', ':' (max 128).",
 };
 
 export const zh: Record<ContainerPluginKey, string> = {
@@ -242,6 +248,8 @@ export const zh: Record<ContainerPluginKey, string> = {
   confirmSetSecret: "覆盖该机密的值？",
   confirmRemoveSecret: "移除该机密？使用它的容器需先移除注入。",
   confirmDetachSecret: "从容器上移除该机密环境变量？",
+  invalidName: "以字母或数字开头，仅可使用字母、数字、'.'、'_'、'-'（最长 64 个字符）。",
+  invalidImageId: "以字母、数字或 '_' 开头，仅可使用字母、数字、'.'、'_'、'-'、'/'、':'（最长 128 个字符）。",
 };
 
 declare module "@deepseek-ai/dsh-client-ui-slots" {

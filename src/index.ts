@@ -747,15 +747,78 @@ export function approvalDecision(
   return undefined;
 }
 
-// The `tools/pre-execute` policy: asks for approval on gated tools and
-// delegates every other call to the remaining policy listeners.
+// Tools that only read or list and remain safe under a read-only permission.
+export const READ_ONLY_TOOLS: ReadonlySet<string> = new Set([
+  "image_list",
+  "image_get",
+  "container_list",
+  "container_read",
+  "container_glob",
+  "container_grep",
+  "container_mount_list",
+  "volume_list",
+  "daemon_list",
+  "daemon_logs",
+]);
+
+// Every tool this plugin registers, so the permission policy only gates its
+// own tools and delegates DSH-native ones (bash, write, ...) to the harness.
+const OUR_TOOL_NAMES = new Set(TOOLS.map((tool) => tool.name));
+
+// Fold the session's effective sandbox mode (last `sandbox/mode` wins).
+export function foldSandboxMode(
+  events: readonly { type: string; data?: { mode?: string } }[],
+): string | undefined {
+  for (let index = events.length - 1; index >= 0; index -= 1) {
+    const event = events[index];
+    if (event.type === "sandbox/mode") return event.data?.mode;
+  }
+  return undefined;
+}
+
+// Fold the session's effective approval policy (last `approval/policy` wins).
+export function foldApprovalPolicy(
+  events: readonly { type: string; data?: { policy?: string } }[],
+): string | undefined {
+  for (let index = events.length - 1; index >= 0; index -= 1) {
+    const event = events[index];
+    if (event.type === "approval/policy") return event.data?.policy;
+  }
+  return undefined;
+}
+
+// The `tools/pre-execute` policy, driven by the session's permission knobs:
+// - read-only sandbox: only READ_ONLY_TOOLS run; every other plugin tool is
+//   denied with a reason. DSH-native tools are delegated so their own sandbox
+//   policy applies.
+// - approval policy "never" (Full access): run without asking.
+// - otherwise (Workspace Write): ask for the approval-gated tools.
 export async function preExecutePolicy(
-  exec: { name: string; arguments?: unknown },
+  exec: {
+    name: string;
+    arguments?: unknown;
+    agent?: {
+      session?: {
+        events?: readonly { type: string; data?: { mode?: string; policy?: string } }[];
+      };
+    };
+  },
   next: () => Promise<unknown>,
 ): Promise<unknown> {
+  const name = exec.name;
+  if (!OUR_TOOL_NAMES.has(name)) return next();
+  const events = exec.agent?.session?.events ?? [];
+  if (foldSandboxMode(events) === "read-only") {
+    if (READ_ONLY_TOOLS.has(name)) return next();
+    return {
+      kind: "deny",
+      reason: `tool "${name}" requires a writable permission (current: read-only)`,
+    };
+  }
+  if (foldApprovalPolicy(events) === "never") return next();
   const args = exec.arguments;
   return approvalDecision(
-    exec.name,
+    name,
     typeof args === "object" && args !== null ? (args as Record<string, unknown>) : undefined,
   ) ?? next();
 }

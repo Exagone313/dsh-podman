@@ -227,9 +227,19 @@ Container tools operate on a **logical container name** of
 the current workspace (`"default"` selects the workspace's default container).
 
 Approval is enforced by the plugin itself through a `tools/pre-execute`
-policy that asks DSH's approval service before an approved tool runs, so the
-call shows the standard approval prompt and is denied when no approval channel
-is available. The prompt's reason summarizes the call's key parameters inline
+policy that reads the session's permission knobs (sandbox mode + approval
+policy, folded from the session log):
+- **Read Only** — only the get/list tools run (`image_list`, `image_get`,
+  `container_list`, `container_read`, `container_glob`, `container_grep`,
+  `container_mount_list`, `volume_list`, `daemon_list`, `daemon_logs`); every
+  other plugin tool is denied. DSH-native tools keep their own sandbox
+  behavior.
+- **Workspace Write** — the `✱` tools ask through DSH's approval service
+  (the call shows the standard approval prompt and is denied when no approval
+  channel is available); `container_start` asks only when `mounts` is passed.
+- **Full access** — tools run without approval prompts.
+
+The prompt's reason summarizes the call's key parameters inline
 (image id/base/packages, container/image, and each mount with its kind,
 destination, and `(ro)` read-only marker). The settings-card actions are
 direct control calls and are not gated.

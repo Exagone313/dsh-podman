@@ -15,6 +15,9 @@ import {
   approvalDecision,
   preExecutePolicy,
   summarizeArgs,
+  foldSandboxMode,
+  foldApprovalPolicy,
+  READ_ONLY_TOOLS,
 } from "./index.js";
 
 test("remoteArgv remaps ripgrep onto the guest path", () => {
@@ -416,6 +419,105 @@ test("preExecutePolicy asks for gated tools and delegates the rest", async () =>
   })) as { kind: string };
   assert.equal(delegated, true, "non-gated tools must delegate to next()");
   assert.equal(allowed.kind, "allow");
+});
+
+test("foldSandboxMode and foldApprovalPolicy fold last-wins with defaults", () => {
+  assert.equal(foldSandboxMode([]), undefined);
+  assert.equal(foldApprovalPolicy([]), undefined);
+  assert.equal(
+    foldSandboxMode([
+      { type: "sandbox/mode", data: { mode: "workspace-write" } },
+      { type: "sandbox/mode", data: { mode: "read-only" } },
+    ]),
+    "read-only",
+  );
+  assert.equal(
+    foldApprovalPolicy([
+      { type: "approval/policy", data: { policy: "ask" } },
+      { type: "approval/policy", data: { policy: "never" } },
+    ]),
+    "never",
+  );
+});
+
+const readOnlyExec = (name: string, events: any[]): any => ({
+  name,
+  agent: { session: { events } },
+});
+
+test("read-only permission allows get/list tools and denies the rest", async () => {
+  const readOnly = [{ type: "sandbox/mode", data: { mode: "read-only" } }];
+
+  for (const name of READ_ONLY_TOOLS) {
+    let delegated = false;
+    const result = (await preExecutePolicy(readOnlyExec(name, readOnly), () => {
+      delegated = true;
+      return Promise.resolve({ kind: "allow" });
+    })) as { kind: string };
+    assert.equal(delegated, true, `${name} must be allowed under read-only`);
+    assert.equal(result.kind, "allow");
+  }
+
+  for (const name of ["image_build", "container_start", "container_remove", "volume_remove"]) {
+    const result = (await preExecutePolicy(readOnlyExec(name, readOnly), () =>
+      Promise.resolve({ kind: "allow" }),
+    )) as { kind: string; reason: string };
+    assert.equal(result.kind, "deny", `${name} must be denied under read-only`);
+    assert.ok(result.reason.includes("read-only"), `${name} deny reason`);
+  }
+
+  let delegated = false;
+  const foreign = (await preExecutePolicy(readOnlyExec("write", readOnly), () => {
+    delegated = true;
+    return Promise.resolve({ kind: "allow" });
+  })) as { kind: string };
+  assert.equal(delegated, true, "DSH-native tools must delegate under read-only");
+  assert.equal(foreign.kind, "allow");
+});
+
+test("full-access (approval never) runs tools without asking", async () => {
+  const never = [{ type: "approval/policy", data: { policy: "never" } }];
+  for (const name of ["image_build", "container_replace", "container_remove"]) {
+    let delegated = false;
+    const result = (await preExecutePolicy(readOnlyExec(name, never), () => {
+      delegated = true;
+      return Promise.resolve({ kind: "allow" });
+    })) as { kind: string };
+    assert.equal(delegated, true, `${name} must not ask under full access`);
+    assert.equal(result.kind, "allow");
+  }
+});
+
+test("workspace-write keeps the ask-based approval", async () => {
+  const workspaceWrite = [
+    { type: "sandbox/mode", data: { mode: "workspace-write" } },
+    { type: "approval/policy", data: { policy: "ask" } },
+  ];
+  const asked = (await preExecutePolicy(
+    {
+      name: "image_build",
+      arguments: {
+        imageId: "valkey",
+        baseImage: "localhost/dsh-podman/arch-base:latest",
+        packages: ["valkey"],
+      },
+      agent: { session: { events: workspaceWrite } },
+    },
+    () => Promise.resolve({ kind: "allow" }),
+  )) as { kind: string; reason: string };
+  assert.equal(asked.kind, "ask");
+  assert.equal(asked.reason, "build image valkey from localhost/dsh-podman/arch-base:latest • packages: valkey");
+});
+
+test("read-only wins over a never approval policy", async () => {
+  const readOnlyNever = [
+    { type: "sandbox/mode", data: { mode: "read-only" } },
+    { type: "approval/policy", data: { policy: "never" } },
+  ];
+  const result = (await preExecutePolicy(readOnlyExec("image_build", readOnlyNever), () =>
+    Promise.resolve({ kind: "allow" }),
+  )) as { kind: string };
+  assert.equal(result.kind, "deny", "read-only must deny mutating tools even under full access");
 });
 
 const MOUNT_TOOLS = [

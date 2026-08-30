@@ -256,8 +256,11 @@ const projectMountItemParam = {
       type: "string",
       description: "Destination path inside the container.",
     },
+    kind: mountKindParam,
+    volume: { type: "string", description: "Volume name to mount." },
+    secret: { type: "string", description: "Secret name to mount as a file." },
   },
-  required: ["project", "mode"],
+  required: [],
 };
 const mountsParam = {
   type: "array",
@@ -323,6 +326,7 @@ export const containerStartParameters = {
     },
     mounts: mountsParam,
     env: envParam,
+    secretEnv: { type: "object", additionalProperties: { type: "string" }, description: "Secret environment variables (env var name to secret short name)." },
   },
   required: ["container"],
 };
@@ -337,6 +341,7 @@ export const containerRecreateParameters = {
     },
     mounts: mountsParam,
     env: envParam,
+    secretEnv: { type: "object", additionalProperties: { type: "string" }, description: "Secret environment variables (env var name to secret short name)." },
   },
   required: ["container"],
 };
@@ -716,16 +721,34 @@ function mountTarget(args: Record<string, unknown>): string {
   }
 }
 
-// Render a single project-mount item, e.g. "team/src (ro)".
+// Render a single mount item, e.g. "team/src (ro)" or "volume valkey-data → /data".
 function replaceMountItem(mount: Record<string, unknown>): string {
+  const kind = typeof mount.kind === "string" ? mount.kind : "";
+  const destination =
+    typeof mount.destination === "string" && mount.destination !== ""
+      ? mount.destination
+      : undefined;
+  const mode = mountMode(mount.mode);
+  if (kind === "volume") {
+    const volume = typeof mount.volume === "string" ? mount.volume : "";
+    if (volume === "") return "";
+    return `volume ${volume}${destination === undefined ? "" : ` → ${destination}`}${mode}`;
+  }
+  if (kind === "tmpfs") {
+    return `tmpfs${destination === undefined ? "" : ` at ${destination}`}${mode}`;
+  }
+  if (kind === "secret") {
+    const secret = typeof mount.secret === "string" ? mount.secret : "";
+    if (secret === "") return "";
+    return `secret ${secret}${destination === undefined ? "" : ` → ${destination}`}${mode}`;
+  }
   const project = typeof mount.project === "string" ? mount.project : "";
   if (project === "") return "";
   const path = typeof mount.path === "string" ? mount.path : undefined;
-  const destination = typeof mount.destination === "string" ? mount.destination : undefined;
-  const item = destination === undefined || destination === ""
+  const item = destination === undefined
     ? projectPath(project, path)
     : `${projectPath(project, path)} → ${destination}`;
-  return item + mountMode(mount.mode);
+  return item + mode;
 }
 
 // Build the single-line approval summary shown for a gated tool call.
@@ -1259,6 +1282,7 @@ export const toolHandlers: Record<
       imageId: input.image,
       ...(mounts === undefined ? {} : { mounts }),
       ...(input.env !== undefined ? { env: input.env } : {}),
+      ...(input.secretEnv !== undefined ? { secretEnv: input.secretEnv } : {}),
     });
   },
   container_recreate: async (resolver, input, exec) => {
@@ -1269,6 +1293,7 @@ export const toolHandlers: Record<
       imageId: input.image ?? "",
       ...(mounts === undefined ? {} : { mounts }),
       ...(input.env !== undefined ? { env: input.env } : {}),
+      ...(input.secretEnv !== undefined ? { secretEnv: input.secretEnv } : {}),
     });
   },
   container_remove: async (resolver, input, exec) =>
@@ -1589,17 +1614,22 @@ export const toolHandlers: Record<
 
 function mountsFromInput(
   mounts: unknown,
-): { projectName: string; mode: string; path?: string; destination?: string }[] | undefined {
+): Record<string, unknown>[] | undefined {
   if (!Array.isArray(mounts) || mounts.length === 0) return undefined;
-  return mounts.map((mount: any) => ({
-    projectName: mount.project,
-    mode:
-      mount.mode === "read_write"
-        ? "MOUNT_MODE_READ_WRITE"
-        : "MOUNT_MODE_READ_ONLY",
-    ...(mount.path ? { path: mount.path } : {}),
-    ...(mount.destination ? { destination: mount.destination } : {}),
-  }));
+  return mounts.map((mount: any) => {
+    const kind =
+      mount.kind === "tmpfs" ? "MOUNT_KIND_TMPFS"
+      : mount.kind === "volume" ? "MOUNT_KIND_VOLUME"
+      : mount.kind === "secret" ? "MOUNT_KIND_SECRET"
+      : "MOUNT_KIND_PROJECT";
+    const mode = mount.mode === "read_only" ? "MOUNT_MODE_READ_ONLY" : "MOUNT_MODE_READ_WRITE";
+    const result: Record<string, unknown> = { projectName: mount.project ?? "", kind, mode };
+    if (mount.path) result.path = mount.path;
+    if (mount.destination) result.destination = mount.destination;
+    if (mount.volume) result.volume = mount.volume;
+    if (mount.secret) result.secret = mount.secret;
+    return result;
+  });
 }
 
 function registerTools(ctx: any, resolver: WorkspaceResolver): void {

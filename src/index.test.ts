@@ -949,7 +949,7 @@ test("mount schemas are object-rooted without per-property required", () => {
     assert.equal(mounts.type, "array", `${name}.mounts type`);
     assert.equal(mounts.items.type, "object", `${name}.mounts items type`);
     assert.equal(mounts.items.additionalProperties, false);
-    assert.deepEqual(mounts.items.required, ["project", "mode"]);
+    assert.deepEqual(mounts.items.required, []);
     for (const key of Object.keys(mounts.items.properties)) {
       const property = mounts.items.properties[key];
       assert.ok(

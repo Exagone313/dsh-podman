@@ -305,12 +305,32 @@ are global and all remain available, split as:
 The permission knobs above still apply (Read Only allows only the direct
 read/list tools; Full access skips every prompt).
 
+### Image model: primitive, base, and custom images
+
+dsh-podman distinguishes three image tiers:
+
+- **Primitive images** are public upstream images pulled from the internet,
+  e.g. `docker.io/library/ubuntu:latest`. The base registry pins their full
+  references; they serve only as the `FROM` when building a base image and are
+  never referenced directly.
+- **Base images** are the fixed, built-in set provided by dsh-podman:
+  `archlinux` (pacman), `ubuntu` (apt), and `alpine` (apk). Each is defined by
+  its primitive, a dsh-podman-owned default package list, and its package
+  manager. By default they are **built locally** from the primitive (installing
+  the default packages and baking in the guest agent + ENTRYPOINT); when
+  `DSH_PODMAN_BASE_IMAGE_PREFIX` points at a registry (anything not starting
+  with `localhost/`), they are **pulled** instead. Base images are listed in
+  the settings UI even when not yet built/pulled, are rebuilt or pulled from
+  the card, and their short names are reserved — they cannot be built over,
+  rebuilt, or removed as custom images.
+- **Custom images** are user-built images created with `image_build`,
+  referenced by their short name (e.g. `valkey`). A custom image is built
+  **from a parent** — a base image or another custom image — inherits the
+  parent's package manager, and only adds the extra packages on top; it
+  inherits the guest agent and ENTRYPOINT from the parent chain.
+
 Image references (`imageId`, `parent`, `image`) are **short names only** (no
-registry prefix, no `:tag`), e.g. `valkey`. Custom images reference their
-parent by the parent's short name; base images are the fixed built-in
-`archlinux`, `ubuntu`, and `alpine` short names and cannot be built over,
-rebuilt, or removed as custom images (they are rebuilt or pulled through the
-settings UI).
+registry prefix, no `:tag`).
 
 `image_rebuild_all` first ensures every base image (building locally or pulling
 from a public registry per `DSH_PODMAN_BASE_IMAGE_PREFIX`), then rebuilds the

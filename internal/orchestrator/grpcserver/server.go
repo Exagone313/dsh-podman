@@ -479,6 +479,10 @@ func (s *Server) StartContainer(ctx context.Context, request *ctl.StartContainer
 		s.log().Error("StartContainer secret validation failed", "workspace_slug", workspace.WorkspaceSlug, "error", err)
 		return nil, err
 	}
+	record.SecretEnv = cloneMap(request.GetSecretEnv())
+	if err := validateSecretEnv(record.SecretEnv); err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
 	envSecrets := s.containerEnvSecrets(record.SecretEnv)
 	if err := validateEnv(request.GetEnv()); err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
@@ -758,11 +762,15 @@ func (s *Server) CreateWorkspace(ctx context.Context, request *ctl.CreateWorkspa
 		s.log().Error("CreateWorkspace secret validation failed", "root", s.ProjectsRoot, "error", secretErr)
 		return nil, secretErr
 	}
-	envSecrets := s.containerEnvSecrets(nil)
 	userEnv := cloneMap(request.GetEnv())
 	if err := validateEnv(userEnv); err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
+	userSecretEnv := cloneMap(request.GetSecretEnv())
+	if err := validateSecretEnv(userSecretEnv); err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+	envSecrets := s.containerEnvSecrets(userSecretEnv)
 	if s.Podman == nil {
 		return nil, status.Error(codes.FailedPrecondition, "podman is not configured")
 	}
@@ -781,7 +789,7 @@ func (s *Server) CreateWorkspace(ctx context.Context, request *ctl.CreateWorkspa
 	}
 	agentSocket := filepath.Join(s.SocketsRoot, name, "guest.sock")
 	createdAt := time.Now().UTC().Format(time.RFC3339)
-	workspace := state.Workspace{WorkspaceSlug: request.GetWorkspaceSlug(), ContainerName: name, ImageID: imageID, Mounts: mounts, Status: "running", AgentSocketPath: agentSocket, AgentToken: secret, CreatedAt: createdAt, Containers: []state.Container{{Name: "default", PodmanName: name, ImageID: imageID, Mounts: defaultMounts, Status: "running", CreatedAt: createdAt, AgentSocketPath: agentSocket, AgentToken: secret, Env: userEnv}}}
+	workspace := state.Workspace{WorkspaceSlug: request.GetWorkspaceSlug(), ContainerName: name, ImageID: imageID, Mounts: mounts, Status: "running", AgentSocketPath: agentSocket, AgentToken: secret, CreatedAt: createdAt, Containers: []state.Container{{Name: "default", PodmanName: name, ImageID: imageID, Mounts: defaultMounts, Status: "running", CreatedAt: createdAt, AgentSocketPath: agentSocket, AgentToken: secret, Env: userEnv, SecretEnv: userSecretEnv}}}
 	if err := s.Store.UpdateWorkspaces(func(all []state.Workspace) ([]state.Workspace, error) {
 		replaced := false
 		for i := range all {
@@ -1438,6 +1446,27 @@ func validateEnv(env map[string]string) error {
 		}
 		if strings.ContainsRune(env[key], '\x00') {
 			return fmt.Errorf("env value for key %q contains a NUL byte", key)
+		}
+	}
+	return nil
+}
+
+// validateSecretEnv validates container secret env vars (env var name to
+// secret short name). Keys must satisfy validateEnvKey and values must be
+// well-formed secret names. Keys are visited in sorted order so the returned
+// message is deterministic.
+func validateSecretEnv(secretEnv map[string]string) error {
+	keys := make([]string, 0, len(secretEnv))
+	for key := range secretEnv {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	for _, key := range keys {
+		if err := validateEnvKey(key); err != nil {
+			return err
+		}
+		if !secretName.MatchString(secretEnv[key]) {
+			return fmt.Errorf("invalid secret name %q for env var %q", secretEnv[key], key)
 		}
 	}
 	return nil

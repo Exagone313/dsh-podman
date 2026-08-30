@@ -898,6 +898,81 @@ func TestCreateWorkspaceRejectsReservedEnv(t *testing.T) {
 	}
 }
 
+func TestValidateSecretEnv(t *testing.T) {
+	for _, secretEnv := range []map[string]string{
+		{"DSH_PODMAN_X": "sec1"},
+		{"": "v"},
+		{"a=b": "v"},
+		{"a\x00b": "v"},
+		{"FOO": "bad name"},
+		{"FOO": "sec with spaces"},
+	} {
+		if err := validateSecretEnv(secretEnv); err == nil {
+			t.Errorf("accepted invalid secret env %#v", secretEnv)
+		}
+	}
+	if err := validateSecretEnv(map[string]string{"VALKEY_PASSWORD": "valkey-tls", "TOKEN": "token"}); err != nil {
+		t.Fatalf("rejected valid secret env: %v", err)
+	}
+	if err := validateSecretEnv(nil); err != nil {
+		t.Fatalf("rejected nil secret env: %v", err)
+	}
+}
+
+func TestStartContainerRejectsReservedSecretEnv(t *testing.T) {
+	store := newTestStore(t)
+	if err := store.SaveWorkspaces([]state.Workspace{{WorkspaceSlug: "proj", ContainerName: "dsh-workspace-proj"}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.SaveImages([]state.Image{{ImageID: "arch", ImageTag: "localhost/dsh-podman/arch:latest"}}); err != nil {
+		t.Fatal(err)
+	}
+	server := &Server{Store: store, Logger: silentLogger()}
+	_, err := server.StartContainer(context.Background(), &ctl.StartContainerRequest{WorkspaceSlug: "proj", Container: "dev", ImageId: "arch", SecretEnv: map[string]string{"DSH_PODMAN_X": "sec"}})
+	if status.Code(err) != codes.InvalidArgument {
+		t.Fatalf("expected InvalidArgument, got %v", err)
+	}
+}
+
+func TestStartContainerRejectsInvalidSecretName(t *testing.T) {
+	store := newTestStore(t)
+	if err := store.SaveWorkspaces([]state.Workspace{{WorkspaceSlug: "proj", ContainerName: "dsh-workspace-proj"}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.SaveImages([]state.Image{{ImageID: "arch", ImageTag: "localhost/dsh-podman/arch:latest"}}); err != nil {
+		t.Fatal(err)
+	}
+	server := &Server{Store: store, Logger: silentLogger()}
+	_, err := server.StartContainer(context.Background(), &ctl.StartContainerRequest{WorkspaceSlug: "proj", Container: "dev", ImageId: "arch", SecretEnv: map[string]string{"TOKEN": "bad name"}})
+	if status.Code(err) != codes.InvalidArgument {
+		t.Fatalf("expected InvalidArgument, got %v", err)
+	}
+}
+
+func TestCreateWorkspaceRejectsReservedSecretEnv(t *testing.T) {
+	store := newTestStore(t)
+	if err := store.SaveImages([]state.Image{{ImageID: "devimg", ImageTag: "t1"}}); err != nil {
+		t.Fatal(err)
+	}
+	server := &Server{Store: store, Logger: silentLogger()}
+	_, err := server.CreateWorkspace(context.Background(), &ctl.CreateWorkspaceRequest{WorkspaceSlug: "proj", ImageId: "devimg", SecretEnv: map[string]string{"DSH_PODMAN_X": "sec"}})
+	if status.Code(err) != codes.InvalidArgument {
+		t.Fatalf("expected InvalidArgument, got %v", err)
+	}
+}
+
+func TestCreateWorkspaceRejectsInvalidSecretName(t *testing.T) {
+	store := newTestStore(t)
+	if err := store.SaveImages([]state.Image{{ImageID: "devimg", ImageTag: "t1"}}); err != nil {
+		t.Fatal(err)
+	}
+	server := &Server{Store: store, Logger: silentLogger()}
+	_, err := server.CreateWorkspace(context.Background(), &ctl.CreateWorkspaceRequest{WorkspaceSlug: "proj", ImageId: "devimg", SecretEnv: map[string]string{"TOKEN": "bad name"}})
+	if status.Code(err) != codes.InvalidArgument {
+		t.Fatalf("expected InvalidArgument, got %v", err)
+	}
+}
+
 func TestContainerMountsFallback(t *testing.T) {
 	ws := state.Workspace{Mounts: []state.Mount{{ProjectName: "a", Mode: "read_only"}}}
 	if got := containerMounts(ws, state.Container{}); len(got) != 1 || got[0].ProjectName != "a" {

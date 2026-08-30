@@ -187,15 +187,23 @@ The plugin ships a browser half (`./client`, built to `dist/client`) that
 registers a card in the dsh **Settings → Plugins** page. The card lists the
 orchestrator-created guest containers and the built images, and offers
 **Remove**, **Recreate** (same image), and **Recreate with image** plus a
-**Reload this view** button.
+**Reload this view** button. The container rows show their environment and
+secret-environment variables, let you edit environment variables before
+creating or recreating a container, and attach/detach named secrets to a
+container's environment variables. The images section can rebuild a single
+image or **rebuild all** in dependency order; the volumes and secrets sections
+list, create, and remove volumes/secrets, and a secret's value can be
+overwritten (never read). Card actions are direct control calls and are not
+approval-gated.
 
 Data and actions travel over the settings transport:
 
 - The host half registers the `podman` settings namespace and keeps a live
-  view (`containers`, `images`, `notice`) in it.
-- The card writes an action into `command` (`refresh` / `remove` / `recreate`);
-  the host `watch` handler executes it against the orchestrator and pushes the
-  refreshed view back.
+  view (`containers`, `images`, `volumes`, `secrets`, `notice`) in it.
+- The card writes an action into `command` (`refresh` / `remove` / `recreate`
+  / `create` / `image_rebuild` / `image_rebuild_all` / volume / secret /
+  secret-env ops); the host `watch` handler executes it against the
+  orchestrator and pushes the refreshed view back.
 
 The orchestrator service exposes gRPC methods to back the UI and the tools:
 `ListContainers` (returns only the guest containers the orchestrator created —

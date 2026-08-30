@@ -22,6 +22,8 @@ export interface ContainerView {
   status: string;
   createdAt: string;
   mounts: readonly ProjectMountView[];
+  env: Record<string, string>;
+  secretEnv: Record<string, string>;
 }
 export interface ImageView {
   imageId: string;
@@ -46,12 +48,17 @@ export interface WorkspaceView {
   mounts: readonly { projectName: string; mode: string }[];
 }
 export interface CommandRequest {
-  op: "refresh" | "remove" | "recreate" | "create" | "volume_create" | "volume_remove" | "image_remove" | "secret_create" | "secret_remove" | "secret_set";
+  op: "refresh" | "remove" | "recreate" | "create" | "volume_create" | "volume_remove" | "image_remove" | "secret_create" | "secret_remove" | "secret_set" | "image_rebuild" | "image_rebuild_all" | "container_secret_add" | "container_secret_remove";
   workspace: string;
   image: string;
   at: number;
   mounts: readonly { projectName: string; mode: string }[];
   value: string;
+  env: Record<string, string>;
+  container: string;
+  secret: string;
+  secretEnv: string;
+  length: number;
 }
 export interface ContainerSettings {
   defaultImage: string;
@@ -90,14 +97,18 @@ export interface ContainerCardFace {
   };
   reload: () => void;
   remove: (workspace: string) => void;
-  recreate: (workspace: string, image: string) => void;
-  createContainer: (workspace: WorkspaceView) => void;
+  recreate: (workspace: string, image: string, env?: Record<string, string>) => void;
+  createContainer: (workspace: WorkspaceView, env?: Record<string, string>) => void;
   createVolume: (name: string) => void;
   removeVolume: (name: string) => void;
   removeImage: (imageId: string) => void;
-  createSecret: (name: string) => void;
+  rebuildImage: (imageId: string) => void;
+  rebuildAllImages: () => void;
+  createSecret: (name: string, length?: number) => void;
   removeSecret: (name: string) => void;
   setSecret: (name: string, value: string) => void;
+  addContainerSecret: (workspace: string, envVar: string, secret: string) => void;
+  removeContainerSecret: (workspace: string, envVar: string) => void;
   editDefaultImage: (text: string) => void;
   saveDefaultImage: () => void;
   discardDefaultImage: () => void;
@@ -156,16 +167,25 @@ export class ContainerCardController {
     op: CommandRequest["op"],
     workspace: string,
     image: string,
-    mounts: readonly { projectName: string; mode: string }[] = [],
-    value: string = "",
+    extra: {
+      mounts?: readonly { projectName: string; mode: string }[];
+      value?: string;
+      env?: Record<string, string>;
+      container?: string;
+      secret?: string;
+      secretEnv?: string;
+      length?: number;
+    } = {},
   ): void {
     void this.scope.set("command", {
-      op,
-      workspace,
-      image,
-      at: Date.now(),
-      mounts,
-      value,
+      op, workspace, image, at: Date.now(),
+      mounts: extra.mounts ?? [],
+      value: extra.value ?? "",
+      env: extra.env ?? {},
+      container: extra.container ?? "",
+      secret: extra.secret ?? "",
+      secretEnv: extra.secretEnv ?? "",
+      length: extra.length ?? 0,
     });
   }
 
@@ -190,22 +210,39 @@ export class ContainerCardController {
       hooks: { containerCard: this.store },
       reload: () => this.command("refresh", "", ""),
       remove: (workspace) => this.command("remove", workspace, ""),
-      recreate: (workspace, image) =>
-        this.command("recreate", workspace, image),
-      createContainer: (workspace) =>
+      recreate: (workspace, image, env) =>
+        this.command("recreate", workspace, image, { ...(env ? { env } : {}) }),
+      createContainer: (workspace, env) =>
         this.command(
           "create",
           workspace.workspaceSlug,
           workspace.imageId || this.scope.getSnapshot().value?.defaultImage || "",
-          workspace.mounts,
+          {
+            mounts: workspace.mounts,
+            ...(env ? { env } : {}),
+          },
         ),
       createVolume: (name) => this.command("volume_create", name, ""),
       removeVolume: (name) => this.command("volume_remove", name, ""),
       removeImage: (imageId) => this.command("image_remove", imageId, ""),
-      createSecret: (name) => this.command("secret_create", name, ""),
+      rebuildImage: (imageId) => this.command("image_rebuild", imageId, ""),
+      rebuildAllImages: () => this.command("image_rebuild_all", "", ""),
+      createSecret: (name, length) =>
+        this.command("secret_create", name, "", { ...(length ? { length } : {}) }),
       removeSecret: (name) => this.command("secret_remove", name, ""),
       setSecret: (name, value) =>
-        this.command("secret_set", name, "", undefined, value),
+        this.command("secret_set", name, "", { value }),
+      addContainerSecret: (workspace, envVar, secret) =>
+        this.command("container_secret_add", workspace, "", {
+          container: "default",
+          secretEnv: envVar,
+          secret,
+        }),
+      removeContainerSecret: (workspace, envVar) =>
+        this.command("container_secret_remove", workspace, "", {
+          container: "default",
+          secretEnv: envVar,
+        }),
       editDefaultImage: (text) => this.edit("defaultImage", text),
       saveDefaultImage: () => this.save("defaultImage"),
       discardDefaultImage: () => this.discard("defaultImage"),

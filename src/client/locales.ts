@@ -46,6 +46,20 @@ export type ContainerPluginKey =
   | "setSecret"
   | "removeSecret"
   | "removeImage"
+  | "rebuildImage"
+  | "rebuildAllImages"
+  | "env"
+  | "secretEnv"
+  | "envTitle"
+  | "envKey"
+  | "envValue"
+  | "addEnv"
+  | "removeEnv"
+  | "secretLength"
+  | "containerSecretsTitle"
+  | "attachSecret"
+  | "secretEnvName"
+  | "detachSecret"
   | "none"
   | "unavailable"
   | "busy";
@@ -90,6 +104,20 @@ export const en: Record<ContainerPluginKey, string> = {
   setSecret: "Set value",
   removeSecret: "Remove",
   removeImage: "Remove",
+  rebuildImage: "Rebuild",
+  rebuildAllImages: "Rebuild all",
+  env: "Env",
+  secretEnv: "Secret env",
+  envTitle: "Environment variables",
+  envKey: "Key",
+  envValue: "Value",
+  addEnv: "Add",
+  removeEnv: "Remove",
+  secretLength: "Length",
+  containerSecretsTitle: "Secret env vars",
+  attachSecret: "Attach",
+  secretEnvName: "Env var",
+  detachSecret: "Detach",
   none: "None",
   unavailable: "The container plugin is not available.",
   busy: "Working…",
@@ -135,6 +163,20 @@ export const zh: Record<ContainerPluginKey, string> = {
   setSecret: "设置值",
   removeSecret: "移除",
   removeImage: "移除",
+  rebuildImage: "重建",
+  rebuildAllImages: "重建全部",
+  env: "环境变量",
+  secretEnv: "机密环境变量",
+  envTitle: "环境变量",
+  envKey: "键",
+  envValue: "值",
+  addEnv: "添加",
+  removeEnv: "移除",
+  secretLength: "长度",
+  containerSecretsTitle: "机密环境变量",
+  attachSecret: "注入",
+  secretEnvName: "变量名",
+  detachSecret: "移除",
   none: "无",
   unavailable: "容器插件不可用。",
   busy: "处理中…",

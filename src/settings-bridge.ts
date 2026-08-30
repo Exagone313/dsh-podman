@@ -20,6 +20,10 @@ const commandSchema = z.object({
     z.const("secret_create"),
     z.const("secret_remove"),
     z.const("secret_set"),
+    z.const("image_rebuild"),
+    z.const("image_rebuild_all"),
+    z.const("container_secret_add"),
+    z.const("container_secret_remove"),
   ]),
   workspace: z.string().default(""),
   image: z.string().default(""),
@@ -33,6 +37,11 @@ const commandSchema = z.object({
     )
     .default([]),
   value: z.string().default(""),
+  env: z.dict(z.string()).default({}),
+  container: z.string().default(""),
+  secret: z.string().default(""),
+  secretEnv: z.string().default(""),
+  length: z.number().default(0),
 });
 
 export const settingsSchema = z.object({
@@ -76,6 +85,8 @@ export const settingsSchema = z.object({
             }),
           )
           .default([]),
+        env: z.dict(z.string()).default({}),
+        secretEnv: z.dict(z.string()).default({}),
       }),
     )
     .default([]),
@@ -108,12 +119,17 @@ export const settingsSchema = z.object({
 }) as unknown as z<ContainerSettings>;
 
 export interface CommandRequest {
-  op: "refresh" | "remove" | "recreate" | "create" | "volume_create" | "volume_remove" | "image_remove" | "secret_create" | "secret_remove" | "secret_set";
+  op: "refresh" | "remove" | "recreate" | "create" | "volume_create" | "volume_remove" | "image_remove" | "secret_create" | "secret_remove" | "secret_set" | "image_rebuild" | "image_rebuild_all" | "container_secret_add" | "container_secret_remove";
   workspace: string;
   image: string;
   at: number;
   mounts: readonly { projectName: string; mode: string }[];
   value: string;
+  env: Record<string, string>;
+  container: string;
+  secret: string;
+  secretEnv: string;
+  length: number;
 }
 export interface ContainerView {
   containerName: string;
@@ -122,6 +138,8 @@ export interface ContainerView {
   status: string;
   createdAt: string;
   mounts: readonly { projectName: string; mode: string }[];
+  env: Record<string, string>;
+  secretEnv: Record<string, string>;
 }
 export interface ImageView {
   imageId: string;
@@ -289,6 +307,7 @@ export function installContainerSettings(
               workspaceSlug: command.workspace,
               imageId: command.image === "" ? undefined : command.image,
               mounts: command.mounts,
+              ...(Object.keys(command.env).length > 0 ? { env: command.env } : {}),
             });
             break;
           case "remove":
@@ -300,6 +319,7 @@ export function installContainerSettings(
             await resolver.control("recreateContainer", {
               workspaceSlug: command.workspace,
               imageId: command.image === "" ? undefined : command.image,
+              ...(Object.keys(command.env).length > 0 ? { env: command.env } : {}),
             });
             break;
           case "volume_create":
@@ -316,6 +336,7 @@ export function installContainerSettings(
           case "secret_create":
             await resolver.control("createSecret", {
               name: command.workspace,
+              ...(command.length ? { length: command.length } : {}),
             });
             break;
           case "secret_remove":
@@ -327,6 +348,27 @@ export function installContainerSettings(
             await resolver.control("writeSecretValue", {
               name: command.workspace,
               value: command.value,
+            });
+            break;
+          case "image_rebuild":
+            await resolver.control("rebuildImage", { imageId: command.workspace });
+            break;
+          case "image_rebuild_all":
+            await resolver.control("rebuildAllImages", {});
+            break;
+          case "container_secret_add":
+            await resolver.control("addContainerSecret", {
+              workspaceSlug: command.workspace,
+              container: command.container || "default",
+              env: command.secretEnv,
+              secret: command.secret,
+            });
+            break;
+          case "container_secret_remove":
+            await resolver.control("removeContainerSecret", {
+              workspaceSlug: command.workspace,
+              container: command.container || "default",
+              env: command.secretEnv,
             });
             break;
         }

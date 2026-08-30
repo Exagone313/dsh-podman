@@ -155,7 +155,7 @@ test("recreate command is not re-run by the view refresh", async () => {
   };
   installContainerSettings(fakeContext(scope), resolver);
   await scope.update({
-    command: { op: "recreate", workspace: "w1", image: "img2", at: 2 },
+    command: { op: "recreate", workspace: "w1", image: "img2", at: 2, env: {} },
   });
   await new Promise((resolve) => setImmediate(resolve));
   assert.equal(recreateCalls.length, 1);
@@ -184,6 +184,7 @@ test("create command drives createWorkspace with mounts and image", async () => 
       image: "img1",
       at: 1,
       mounts: [{ projectName: "team", mode: "MOUNT_MODE_READ_WRITE" }],
+      env: {},
     },
   });
   await new Promise((resolve) => setImmediate(resolve));
@@ -349,8 +350,331 @@ test("secret_set command drives writeSecretValue with the name and value", async
   assert.equal(scope.value.command, null);
 });
 
-test("workspace list comes from the dsh registry even without orchestrator state", async () => {
+test("image_rebuild command drives rebuildImage with the imageId", async () => {
   const scope = fakeScope(baseValue());
+  const calls: Array<[string, unknown]> = [];
+  const resolver: any = {
+    getConfig: () => ({}),
+    setConfig: () => {},
+    async control(method: string, request: unknown) {
+      calls.push([method, request]);
+      if (method === "listContainers") return { containers: [] };
+      if (method === "listImages") return { images: [] };
+      if (method === "listWorkspaces") return { workspaces: [] };
+      if (method === "listVolumes") return { volumes: [] };
+      if (method === "listSecrets") return { secrets: [] };
+      return {};
+    },
+  };
+  installContainerSettings(fakeContext(scope), resolver);
+  await scope.update({
+    command: { op: "image_rebuild", workspace: "valkey", image: "", at: 9 },
+  });
+  await new Promise((resolve) => setImmediate(resolve));
+  const rebuildCall = calls.find(([method]) => method === "rebuildImage");
+  assert.deepEqual(rebuildCall?.[1], { imageId: "valkey" });
+  assert.equal(scope.value.command, null);
+});
+
+test("image_rebuild_all command drives rebuildAllImages with an empty payload", async () => {
+  const scope = fakeScope(baseValue());
+  const calls: Array<[string, unknown]> = [];
+  const resolver: any = {
+    getConfig: () => ({}),
+    setConfig: () => {},
+    async control(method: string, request: unknown) {
+      calls.push([method, request]);
+      if (method === "listContainers") return { containers: [] };
+      if (method === "listImages") return { images: [] };
+      if (method === "listWorkspaces") return { workspaces: [] };
+      if (method === "listVolumes") return { volumes: [] };
+      if (method === "listSecrets") return { secrets: [] };
+      return {};
+    },
+  };
+  installContainerSettings(fakeContext(scope), resolver);
+  await scope.update({
+    command: { op: "image_rebuild_all", workspace: "", image: "", at: 10 },
+  });
+  await new Promise((resolve) => setImmediate(resolve));
+  const rebuildCall = calls.find(([method]) => method === "rebuildAllImages");
+  assert.deepEqual(rebuildCall?.[1], {});
+  assert.equal(scope.value.command, null);
+});
+
+test("secret_create command drives createSecret with length when provided", async () => {
+  const scope = fakeScope(baseValue());
+  const calls: Array<[string, unknown]> = [];
+  const resolver: any = {
+    getConfig: () => ({}),
+    setConfig: () => {},
+    async control(method: string, request: unknown) {
+      calls.push([method, request]);
+      if (method === "listContainers") return { containers: [] };
+      if (method === "listImages") return { images: [] };
+      if (method === "listWorkspaces") return { workspaces: [] };
+      if (method === "listVolumes") return { volumes: [] };
+      if (method === "listSecrets") return { secrets: [] };
+      return {};
+    },
+  };
+  installContainerSettings(fakeContext(scope), resolver);
+  await scope.update({
+    command: { op: "secret_create", workspace: "s", image: "", at: 11, length: 48 },
+  });
+  await new Promise((resolve) => setImmediate(resolve));
+  const createCall = calls.find(([method]) => method === "createSecret");
+  assert.deepEqual(createCall?.[1], { name: "s", length: 48 });
+  assert.equal(scope.value.command, null);
+});
+
+test("secret_create command drives createSecret without length when omitted", async () => {
+  const scope = fakeScope(baseValue());
+  const calls: Array<[string, unknown]> = [];
+  const resolver: any = {
+    getConfig: () => ({}),
+    setConfig: () => {},
+    async control(method: string, request: unknown) {
+      calls.push([method, request]);
+      if (method === "listContainers") return { containers: [] };
+      if (method === "listImages") return { images: [] };
+      if (method === "listWorkspaces") return { workspaces: [] };
+      if (method === "listVolumes") return { volumes: [] };
+      if (method === "listSecrets") return { secrets: [] };
+      return {};
+    },
+  };
+  installContainerSettings(fakeContext(scope), resolver);
+  await scope.update({
+    command: { op: "secret_create", workspace: "s", image: "", at: 12 },
+  });
+  await new Promise((resolve) => setImmediate(resolve));
+  const createCall = calls.find(([method]) => method === "createSecret");
+  assert.deepEqual(createCall?.[1], { name: "s" });
+  assert.equal(scope.value.command, null);
+});
+
+test("create command drives createWorkspace with env", async () => {
+  const scope = fakeScope(baseValue());
+  const calls: Array<[string, unknown]> = [];
+  const resolver: any = {
+    getConfig: () => ({}),
+    setConfig: () => {},
+    async control(method: string, request: unknown) {
+      calls.push([method, request]);
+      if (method === "listContainers") return { containers: [] };
+      if (method === "listImages") return { images: [] };
+      if (method === "listWorkspaces") return { workspaces: [] };
+      return {};
+    },
+  };
+  installContainerSettings(fakeContext(scope), resolver);
+  await scope.update({
+    command: {
+      op: "create",
+      workspace: "w1",
+      image: "img1",
+      at: 13,
+      mounts: [{ projectName: "team", mode: "MOUNT_MODE_READ_WRITE" }],
+      env: { A: "1", B: "2" },
+    },
+  });
+  await new Promise((resolve) => setImmediate(resolve));
+  const createCall = calls.find(([method]) => method === "createWorkspace");
+  assert.deepEqual(createCall?.[1], {
+    workspaceSlug: "w1",
+    imageId: "img1",
+    mounts: [{ projectName: "team", mode: "MOUNT_MODE_READ_WRITE" }],
+    env: { A: "1", B: "2" },
+  });
+  assert.equal(scope.value.command, null);
+});
+
+test("create command drives createWorkspace without env when empty", async () => {
+  const scope = fakeScope(baseValue());
+  const calls: Array<[string, unknown]> = [];
+  const resolver: any = {
+    getConfig: () => ({}),
+    setConfig: () => {},
+    async control(method: string, request: unknown) {
+      calls.push([method, request]);
+      if (method === "listContainers") return { containers: [] };
+      if (method === "listImages") return { images: [] };
+      if (method === "listWorkspaces") return { workspaces: [] };
+      return {};
+    },
+  };
+  installContainerSettings(fakeContext(scope), resolver);
+  await scope.update({
+    command: {
+      op: "create",
+      workspace: "w1",
+      image: "img1",
+      at: 14,
+      mounts: [{ projectName: "team", mode: "MOUNT_MODE_READ_WRITE" }],
+      env: {},
+    },
+  });
+  await new Promise((resolve) => setImmediate(resolve));
+  const createCall = calls.find(([method]) => method === "createWorkspace");
+  assert.deepEqual(createCall?.[1], {
+    workspaceSlug: "w1",
+    imageId: "img1",
+    mounts: [{ projectName: "team", mode: "MOUNT_MODE_READ_WRITE" }],
+  });
+  assert.equal(scope.value.command, null);
+});
+
+test("recreate command drives recreateContainer with env", async () => {
+  const scope = fakeScope(baseValue());
+  const calls: Array<[string, unknown]> = [];
+  const resolver: any = {
+    getConfig: () => ({}),
+    setConfig: () => {},
+    async control(method: string, request: unknown) {
+      calls.push([method, request]);
+      if (method === "listContainers") return { containers: [] };
+      if (method === "listImages") return { images: [] };
+      if (method === "listWorkspaces") return { workspaces: [] };
+      return {};
+    },
+  };
+  installContainerSettings(fakeContext(scope), resolver);
+  await scope.update({
+    command: {
+      op: "recreate",
+      workspace: "w1",
+      image: "img2",
+      at: 15,
+      env: { A: "1" },
+    },
+  });
+  await new Promise((resolve) => setImmediate(resolve));
+  const recreateCall = calls.find(([method]) => method === "recreateContainer");
+  assert.deepEqual(recreateCall?.[1], {
+    workspaceSlug: "w1",
+    imageId: "img2",
+    env: { A: "1" },
+  });
+  assert.equal(scope.value.command, null);
+});
+
+test("container_secret_add command drives addContainerSecret with env and secret", async () => {
+  const scope = fakeScope(baseValue());
+  const calls: Array<[string, unknown]> = [];
+  const resolver: any = {
+    getConfig: () => ({}),
+    setConfig: () => {},
+    async control(method: string, request: unknown) {
+      calls.push([method, request]);
+      if (method === "listContainers") return { containers: [] };
+      if (method === "listImages") return { images: [] };
+      if (method === "listWorkspaces") return { workspaces: [] };
+      if (method === "listVolumes") return { volumes: [] };
+      if (method === "listSecrets") return { secrets: [] };
+      return {};
+    },
+  };
+  installContainerSettings(fakeContext(scope), resolver);
+  await scope.update({
+    command: {
+      op: "container_secret_add",
+      workspace: "w",
+      container: "web",
+      secret: "tok",
+      secretEnv: "TOKEN",
+      image: "",
+      at: 16,
+    },
+  });
+  await new Promise((resolve) => setImmediate(resolve));
+  const addCall = calls.find(([method]) => method === "addContainerSecret");
+  assert.deepEqual(addCall?.[1], {
+    workspaceSlug: "w",
+    container: "web",
+    env: "TOKEN",
+    secret: "tok",
+  });
+  assert.equal(scope.value.command, null);
+});
+
+test("container_secret_add command uses the default container when omitted", async () => {
+  const scope = fakeScope(baseValue());
+  const calls: Array<[string, unknown]> = [];
+  const resolver: any = {
+    getConfig: () => ({}),
+    setConfig: () => {},
+    async control(method: string, request: unknown) {
+      calls.push([method, request]);
+      if (method === "listContainers") return { containers: [] };
+      if (method === "listImages") return { images: [] };
+      if (method === "listWorkspaces") return { workspaces: [] };
+      if (method === "listVolumes") return { volumes: [] };
+      if (method === "listSecrets") return { secrets: [] };
+      return {};
+    },
+  };
+  installContainerSettings(fakeContext(scope), resolver);
+  await scope.update({
+    command: {
+      op: "container_secret_add",
+      workspace: "w",
+      container: "",
+      secret: "tok",
+      secretEnv: "TOKEN",
+      image: "",
+      at: 17,
+    },
+  });
+  await new Promise((resolve) => setImmediate(resolve));
+  const addCall = calls.find(([method]) => method === "addContainerSecret");
+  assert.deepEqual(addCall?.[1], {
+    workspaceSlug: "w",
+    container: "default",
+    env: "TOKEN",
+    secret: "tok",
+  });
+  assert.equal(scope.value.command, null);
+});
+
+test("container_secret_remove command drives removeContainerSecret with the default container", async () => {
+  const scope = fakeScope(baseValue());
+  const calls: Array<[string, unknown]> = [];
+  const resolver: any = {
+    getConfig: () => ({}),
+    setConfig: () => {},
+    async control(method: string, request: unknown) {
+      calls.push([method, request]);
+      if (method === "listContainers") return { containers: [] };
+      if (method === "listImages") return { images: [] };
+      if (method === "listWorkspaces") return { workspaces: [] };
+      if (method === "listVolumes") return { volumes: [] };
+      if (method === "listSecrets") return { secrets: [] };
+      return {};
+    },
+  };
+  installContainerSettings(fakeContext(scope), resolver);
+  await scope.update({
+    command: {
+      op: "container_secret_remove",
+      workspace: "w",
+      container: "",
+      secretEnv: "TOKEN",
+      image: "",
+      at: 18,
+    },
+  });
+  await new Promise((resolve) => setImmediate(resolve));
+  const removeCall = calls.find(([method]) => method === "removeContainerSecret");
+  assert.deepEqual(removeCall?.[1], {
+    workspaceSlug: "w",
+    container: "default",
+    env: "TOKEN",
+  });
+  assert.equal(scope.value.command, null);
+});
+
+test("workspace list comes from the dsh registry even without orchestrator state", async () => {  const scope = fakeScope(baseValue());
   const registry = {
     list: () => [
       { id: "uuid-1", path: "/projects/team/app", title: "app", createdAt: "2026-01-01T00:00:00Z" },

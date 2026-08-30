@@ -256,20 +256,129 @@ function ConfigField(props: {
   );
 }
 
+function EnvEditor(props: {
+  t: (key: ContainerPluginKey) => string;
+  env: Record<string, string>;
+  busy: boolean;
+  onChange: (env: Record<string, string>) => void;
+}): ReactNode {
+  const { t, env, busy, onChange } = props;
+  const entries = Object.entries(env);
+  const updateKey = (oldKey: string, key: string, value: string): void => {
+    const next: Record<string, string> = {};
+    for (const [k, v] of entries) {
+      if (k !== oldKey) next[k] = v;
+    }
+    next[key] = value;
+    onChange(next);
+  };
+  const updateValue = (key: string, value: string): void => {
+    onChange({ ...env, [key]: value });
+  };
+  const remove = (key: string): void => {
+    const next: Record<string, string> = { ...env };
+    delete next[key];
+    onChange(next);
+  };
+  const add = (): void => {
+    onChange({ ...env, "": "" });
+  };
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+      {entries.map(([key, value]) => (
+        <div
+          key={key}
+          style={{
+            display: "flex",
+            flexWrap: "wrap",
+            alignItems: "center",
+            gap: "8px",
+          }}
+        >
+          <Input
+            value={key}
+            disabled={busy}
+            placeholder={t("envKey")}
+            aria-label={t("envKey")}
+            onChange={(event) => updateKey(key, event.target.value, value)}
+            style={{ width: "160px" }}
+          />
+          <Input
+            value={value}
+            disabled={busy}
+            placeholder={t("envValue")}
+            aria-label={t("envValue")}
+            onChange={(event) => updateValue(key, event.target.value)}
+            style={{ width: "200px" }}
+          />
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={busy}
+            onClick={() => remove(key)}
+          >
+            {t("removeEnv")}
+          </Button>
+        </div>
+      ))}
+      <div>
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={busy}
+          onClick={add}
+        >
+          {t("addEnv")}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 function ContainerRow(props: {
   t: (key: ContainerPluginKey) => string;
   container: ContainerView;
   images: readonly { imageId: string }[];
+  secrets: readonly { name: string }[];
   busy: boolean;
   onRemove: (workspace: string) => void;
-  onRecreate: (workspace: string, image: string) => void;
+  onRecreate: (
+    workspace: string,
+    image: string,
+    env?: Record<string, string>,
+  ) => void;
+  onAddContainerSecret: (workspace: string, envVar: string, secret: string) => void;
+  onRemoveContainerSecret: (workspace: string, envVar: string) => void;
 }): ReactNode {
-  const { t, container, images, busy, onRemove, onRecreate } = props;
+  const {
+    t,
+    container,
+    images,
+    secrets,
+    busy,
+    onRemove,
+    onRecreate,
+    onAddContainerSecret,
+    onRemoveContainerSecret,
+  } = props;
   const [selected, setSelected] = useState(container.imageId);
+  const [env, setEnv] = useState<Record<string, string>>(container.env);
+  const [envOpen, setEnvOpen] = useState(false);
+  const [secretOpen, setSecretOpen] = useState(false);
+  const [attachSecret, setAttachSecret] = useState("");
+  const [attachVar, setAttachVar] = useState("");
   const enabled = container.workspaceSlug !== "" && !busy;
   const projects = container.mounts
     .map((mount) => mount.projectName)
     .join(", ");
+  const envEntries = Object.entries(container.env);
+  const secretEntries = Object.entries(container.secretEnv);
+  const attach = (): void => {
+    const envVar = attachVar.trim();
+    if (envVar === "" || attachSecret === "") return;
+    onAddContainerSecret(container.workspaceSlug, envVar, attachSecret);
+    setAttachVar("");
+  };
   return (
     <div style={containerRow}>
       <div style={containerHeader}>
@@ -294,6 +403,24 @@ function ContainerRow(props: {
               <td style={tdStyle}>{projects}</td>
             </tr>
           ) : null}
+          {envEntries.length > 0 ? (
+            <tr>
+              <th style={thStyle} scope="row">{t("env")}</th>
+              <td style={tdStyle}>
+                {envEntries.map(([key]) => key).join(", ")}
+              </td>
+            </tr>
+          ) : null}
+          {secretEntries.length > 0 ? (
+            <tr>
+              <th style={thStyle} scope="row">{t("secretEnv")}</th>
+              <td style={tdStyle}>
+                {secretEntries
+                  .map(([envVar, secretName]) => `${envVar}=${secretName}`)
+                  .join(", ")}
+              </td>
+            </tr>
+          ) : null}
         </tbody>
       </table>
       <div style={actions}>
@@ -309,7 +436,7 @@ function ContainerRow(props: {
           variant="outline"
           size="sm"
           disabled={!enabled}
-          onClick={() => onRecreate(container.workspaceSlug, "")}
+          onClick={() => onRecreate(container.workspaceSlug, "", env)}
         >
           {t("recreate")}
         </Button>
@@ -333,11 +460,108 @@ function ContainerRow(props: {
           variant="outline"
           size="sm"
           disabled={!enabled || selected === ""}
-          onClick={() => onRecreate(container.workspaceSlug, selected)}
+          onClick={() => onRecreate(container.workspaceSlug, selected, env)}
         >
           {t("recreateWithImage")}
         </Button>
       </div>
+      <DisclosureRow
+        icon={<span />}
+        title={t("envTitle")}
+        open={envOpen}
+        expandable
+        onToggle={() => setEnvOpen(!envOpen)}
+      >
+        <div style={wsBody}>
+          <EnvEditor t={t} env={env} busy={busy} onChange={setEnv} />
+        </div>
+      </DisclosureRow>
+      <DisclosureRow
+        icon={<span />}
+        title={t("containerSecretsTitle")}
+        open={secretOpen}
+        expandable
+        onToggle={() => setSecretOpen(!secretOpen)}
+      >
+        <div style={wsBody}>
+          {secretEntries.map(([envVar, secretName]) => (
+            <div
+              key={envVar}
+              style={{
+                display: "flex",
+                flexWrap: "wrap",
+                alignItems: "center",
+                gap: "8px",
+              }}
+            >
+              <code
+                style={{
+                  ...greyId,
+                  flex: 1,
+                  fontSize: "13px",
+                  color: "var(--dsw-alias-label-primary)",
+                }}
+              >
+                {envVar}={secretName}
+              </code>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={busy}
+                onClick={() =>
+                  onRemoveContainerSecret(container.workspaceSlug, envVar)
+                }
+              >
+                {t("detachSecret")}
+              </Button>
+            </div>
+          ))}
+          <div
+            style={{
+              display: "flex",
+              flexWrap: "wrap",
+              alignItems: "center",
+              gap: "8px",
+              paddingTop: "8px",
+            }}
+          >
+            <select
+              style={imageSelect}
+              value={attachSecret}
+              disabled={!enabled}
+              onChange={(event) => setAttachSecret(event.target.value)}
+              aria-label={t("attachSecret")}
+            >
+              {secrets.length === 0 ? (
+                <option value="">{t("none")}</option>
+              ) : null}
+              {secrets.map((secret) => (
+                <option key={secret.name} value={secret.name}>
+                  {secret.name}
+                </option>
+              ))}
+            </select>
+            <Input
+              value={attachVar}
+              disabled={!enabled}
+              placeholder={t("secretEnvName")}
+              onChange={(event) => setAttachVar(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") attach();
+              }}
+              style={{ width: "200px" }}
+            />
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={!enabled || attachVar.trim() === "" || attachSecret === ""}
+              onClick={attach}
+            >
+              {t("attachSecret")}
+            </Button>
+          </div>
+        </div>
+      </DisclosureRow>
     </div>
   );
 }
@@ -347,13 +571,33 @@ function WorkspaceSection(props: {
   workspace: WorkspaceView;
   containers: readonly ContainerView[];
   images: readonly { imageId: string }[];
+  secrets: readonly { name: string }[];
   busy: boolean;
   onRemove: (workspace: string) => void;
-  onRecreate: (workspace: string, image: string) => void;
-  onCreate: (workspace: WorkspaceView) => void;
+  onRecreate: (
+    workspace: string,
+    image: string,
+    env?: Record<string, string>,
+  ) => void;
+  onCreate: (workspace: WorkspaceView, env?: Record<string, string>) => void;
+  onAddContainerSecret: (workspace: string, envVar: string, secret: string) => void;
+  onRemoveContainerSecret: (workspace: string, envVar: string) => void;
 }): ReactNode {
-  const { t, workspace, containers, images, busy, onRemove, onRecreate, onCreate } = props;
+  const {
+    t,
+    workspace,
+    containers,
+    images,
+    secrets,
+    busy,
+    onRemove,
+    onRecreate,
+    onCreate,
+    onAddContainerSecret,
+    onRemoveContainerSecret,
+  } = props;
   const [open, setOpen] = useState(false);
+  const [createEnv, setCreateEnv] = useState<Record<string, string>>({});
   const hasContainer = containers.length > 0;
   return (
     <DisclosureRow
@@ -372,16 +616,19 @@ function WorkspaceSection(props: {
       <div style={wsBody}>
         <code style={greyId}>{workspace.workspaceSlug}</code>
         {!hasContainer ? (
-          <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "8px" }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
             <p style={{ ...hint, margin: 0 }}>{t("noContainers")}</p>
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={busy}
-              onClick={() => onCreate(workspace)}
-            >
-              {t("createContainer")}
-            </Button>
+            <EnvEditor t={t} env={createEnv} busy={busy} onChange={setCreateEnv} />
+            <div>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={busy}
+                onClick={() => onCreate(workspace, createEnv)}
+              >
+                {t("createContainer")}
+              </Button>
+            </div>
           </div>
         ) : (
           containers.map((container) => (
@@ -390,9 +637,12 @@ function WorkspaceSection(props: {
               t={t}
               container={container}
               images={images}
+              secrets={secrets}
               busy={busy}
               onRemove={onRemove}
               onRecreate={onRecreate}
+              onAddContainerSecret={onAddContainerSecret}
+              onRemoveContainerSecret={onRemoveContainerSecret}
             />
           ))
         )}
@@ -406,8 +656,9 @@ function ImageItem(props: {
   image: ImageView;
   busy: boolean;
   onRemove: (imageId: string) => void;
+  onRebuild: (imageId: string) => void;
 }): ReactNode {
-  const { t, image, busy, onRemove } = props;
+  const { t, image, busy, onRemove, onRebuild } = props;
   const [open, setOpen] = useState(false);
   return (
     <DisclosureRow
@@ -442,14 +693,24 @@ function ImageItem(props: {
             </tr>
           </tbody>
         </table>
-        <Button
-          variant="outline"
-          size="sm"
-          disabled={busy}
-          onClick={() => onRemove(image.imageId)}
-        >
-          {t("removeImage")}
-        </Button>
+        <div style={actions}>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={busy}
+            onClick={() => onRebuild(image.imageId)}
+          >
+            {t("rebuildImage")}
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={busy}
+            onClick={() => onRemove(image.imageId)}
+          >
+            {t("removeImage")}
+          </Button>
+        </div>
       </div>
     </DisclosureRow>
   );
@@ -619,18 +880,24 @@ function SecretsSection(props: {
   secrets: readonly { name: string }[];
   busy: boolean;
   writable: boolean;
-  onCreate: (name: string) => void;
+  onCreate: (name: string, length?: number) => void;
   onRemove: (name: string) => void;
   onSet: (name: string, value: string) => void;
 }): ReactNode {
   const { t, secrets, busy, writable, onCreate, onRemove, onSet } = props;
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
+  const [length, setLength] = useState("");
   const canCreate = name.trim() !== "" && !busy;
   const submit = (): void => {
     if (name.trim() === "") return;
-    onCreate(name.trim());
+    const parsedLength = parseInt(length, 10);
+    onCreate(
+      name.trim(),
+      length.trim() === "" || Number.isNaN(parsedLength) ? undefined : parsedLength,
+    );
     setName("");
+    setLength("");
   };
   return (
     <DisclosureRow
@@ -674,6 +941,14 @@ function SecretsSection(props: {
               if (event.key === "Enter") submit();
             }}
             style={{ width: "200px" }}
+          />
+          <Input
+            type="number"
+            value={length}
+            disabled={!writable || busy}
+            aria-label={t("secretLength")}
+            onChange={(event) => setLength(event.target.value)}
+            style={{ width: "100px" }}
           />
           <Button
             variant="outline"
@@ -744,14 +1019,34 @@ export function ContainerCard(props: ContainerCardProps): ReactNode {
                     container.workspaceSlug === workspace.workspaceSlug,
                 )}
                 images={state.images}
+                secrets={state.secrets}
                 busy={state.busy}
                 onRemove={props.remove}
                 onRecreate={props.recreate}
                 onCreate={props.createContainer}
+                onAddContainerSecret={props.addContainerSecret}
+                onRemoveContainerSecret={props.removeContainerSecret}
               />
             ))
           )}
-          <div style={sectionTitle}>{t("imagesTitle")}</div>
+          <div
+            style={{
+              display: "flex",
+              flexWrap: "wrap",
+              alignItems: "center",
+              gap: "8px",
+            }}
+          >
+            <div style={{ ...sectionTitle, flex: 1 }}>{t("imagesTitle")}</div>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={state.busy}
+              onClick={props.rebuildAllImages}
+            >
+              {t("rebuildAllImages")}
+            </Button>
+          </div>
           {state.images.length === 0 ? (
             <p style={hint}>{t("none")}</p>
           ) : (
@@ -762,6 +1057,7 @@ export function ContainerCard(props: ContainerCardProps): ReactNode {
                 image={image}
                 busy={state.busy}
                 onRemove={props.removeImage}
+                onRebuild={props.rebuildImage}
               />
             ))
           )}

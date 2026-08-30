@@ -165,21 +165,76 @@ func TestBuildRejectsInvalidImageID(t *testing.T) {
 	}
 }
 
-func TestBuildRequiresPacmanCacheOnly(t *testing.T) {
-	builder := Builder{Context: context.Background(), StateDir: t.TempDir()}
-	_, err := builder.Build(BuildSpec{ImageID: "dev", From: "ubuntu", PackageManager: "apt"})
-	if err == nil {
-		t.Fatal("expected apt build to fail without a podman connection")
+func TestBuildCachesAreOptional(t *testing.T) {
+	for _, pm := range []string{"pacman", "apt", "apk"} {
+		builder := Builder{Context: context.Background(), StateDir: t.TempDir()}
+		_, err := builder.Build(BuildSpec{ImageID: "dev", From: "arch", PackageManager: pm})
+		if err == nil {
+			t.Fatalf("%s build with no cache should fail (no podman connection)", pm)
+		}
+		if strings.Contains(err.Error(), "cache path must be an absolute path") {
+			t.Fatalf("%s build without a cache must not require one: %v", pm, err)
+		}
 	}
-	if strings.Contains(err.Error(), "pacman cache path") {
-		t.Fatalf("apt build must not require the pacman cache: %v", err)
+}
+
+func TestBuildRejectsRelativeCachePath(t *testing.T) {
+	cases := []struct {
+		pm  string
+		set func(b *Builder)
+	}{
+		{"pacman", func(b *Builder) { b.HostPacmanCache = "relative/path" }},
+		{"apt", func(b *Builder) { b.HostAptCache = "relative/path" }},
+		{"apk", func(b *Builder) { b.HostApkCache = "relative/path" }},
 	}
-	_, err = builder.Build(BuildSpec{ImageID: "dev", From: "archlinux", PackageManager: "pacman"})
-	if err == nil {
-		t.Fatal("expected pacman build to fail")
+	for _, tc := range cases {
+		builder := Builder{Context: context.Background(), StateDir: t.TempDir()}
+		tc.set(&builder)
+		_, err := builder.Build(BuildSpec{ImageID: "dev", From: "arch", PackageManager: tc.pm})
+		if err == nil {
+			t.Fatalf("%s build with a relative cache should fail", tc.pm)
+		}
+		if !strings.Contains(err.Error(), tc.pm+" cache path must be an absolute path") {
+			t.Fatalf("%s build should reject a relative cache path: %v", tc.pm, err)
+		}
 	}
-	if !strings.Contains(err.Error(), "pacman cache path must be an absolute path") {
-		t.Fatalf("pacman build should require an absolute cache path: %v", err)
+}
+
+func TestContainerfileApkCachingVariant(t *testing.T) {
+	file, err := Containerfile(BuildSpec{From: "alpine", PackageManager: "apk", Packages: []string{"git"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(file, "RUN apk add --no-cache git") {
+		t.Fatalf("default apk build should use --no-cache: %s", file)
+	}
+	if strings.Contains(file, "--cache-packages") || strings.Contains(file, "--update-cache") {
+		t.Fatalf("default apk build must not enable caching: %s", file)
+	}
+	file, err = Containerfile(BuildSpec{From: "alpine", PackageManager: "apk", Packages: []string{"git"}, CachePackages: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(file, "RUN apk add --cache-packages --update-cache git") {
+		t.Fatalf("caching apk build should use --cache-packages --update-cache: %s", file)
+	}
+	if strings.Contains(file, "--no-cache") {
+		t.Fatalf("caching apk build must not use --no-cache: %s", file)
+	}
+}
+
+func TestContainerfileAptUnchangedByCaching(t *testing.T) {
+	for _, cache := range []bool{false, true} {
+		file, err := Containerfile(BuildSpec{From: "ubuntu", PackageManager: "apt", Packages: []string{"git"}, CachePackages: cache})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !strings.Contains(file, "apt-get install") {
+			t.Fatalf("unexpected apt Containerfile: %s", file)
+		}
+		if strings.Contains(file, "--cache-packages") || strings.Contains(file, "--update-cache") {
+			t.Fatalf("apt Containerfile must not contain apk cache flags: %s", file)
+		}
 	}
 }
 
@@ -335,10 +390,10 @@ func TestBaseImagesRegistry(t *testing.T) {
 	if BaseImages[0].ID != "archlinux" || BaseImages[0].Primitive != "docker.io/library/archlinux:latest" || BaseImages[0].PackageManager != "pacman" || BaseImages[0].CachePath != "/var/cache/pacman/pkg" {
 		t.Fatalf("unexpected archlinux base: %#v", BaseImages[0])
 	}
-	if BaseImages[1].ID != "ubuntu" || BaseImages[1].Primitive != "docker.io/library/ubuntu:latest" || BaseImages[1].PackageManager != "apt" || len(BaseImages[1].PostInstall) != 1 || BaseImages[1].PostInstall[0] != "ln -s /usr/bin/fd-find /usr/local/bin/fd" {
+	if BaseImages[1].ID != "ubuntu" || BaseImages[1].Primitive != "docker.io/library/ubuntu:latest" || BaseImages[1].PackageManager != "apt" || BaseImages[1].CachePath != "/var/cache/apt/archives" || len(BaseImages[1].PostInstall) != 1 || BaseImages[1].PostInstall[0] != "ln -s /usr/bin/fd-find /usr/local/bin/fd" {
 		t.Fatalf("unexpected ubuntu base: %#v", BaseImages[1])
 	}
-	if BaseImages[2].ID != "alpine" || BaseImages[2].Primitive != "docker.io/library/alpine:latest" || BaseImages[2].PackageManager != "apk" || BaseImages[2].CachePath != "" {
+	if BaseImages[2].ID != "alpine" || BaseImages[2].Primitive != "docker.io/library/alpine:latest" || BaseImages[2].PackageManager != "apk" || BaseImages[2].CachePath != "/etc/apk/cache" {
 		t.Fatalf("unexpected alpine base: %#v", BaseImages[2])
 	}
 }

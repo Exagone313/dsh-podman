@@ -42,6 +42,8 @@ func main() {
 	guestBinary := getenv("DSH_PODMAN_GUEST_AGENT_BIN", "dsh-podman-guest-agent")
 	hostGuestBinary := getenv("DSH_PODMAN_HOST_GUEST_AGENT_BIN", "")
 	hostPacmanCache := getenv("DSH_PODMAN_HOST_PACMAN_CACHE", "")
+	hostAptCache := getenv("DSH_PODMAN_HOST_APT_CACHE", "")
+	hostApkCache := getenv("DSH_PODMAN_HOST_APK_CACHE", "")
 	controlToken := getenv("DSH_PODMAN_ORCHESTRATOR_TOKEN", "")
 	if err := requireDirectory(filepath.Dir(socket)); err != nil {
 		panic(err)
@@ -84,7 +86,7 @@ func main() {
 		if err != nil {
 			panic(fmt.Errorf("initialize Podman client: %w", err))
 		}
-		imageBuilder = &images.Builder{Context: podmanContext, StateDir: stateDir, HostPacmanCache: hostPacmanCache, GuestAgentImage: images.GuestAgentImage{
+		imageBuilder = &images.Builder{Context: podmanContext, StateDir: stateDir, HostPacmanCache: hostPacmanCache, HostAptCache: hostAptCache, HostApkCache: hostApkCache, GuestAgentImage: images.GuestAgentImage{
 			Image:        getenv("DSH_PODMAN_GUEST_AGENT_IMAGE", ""),
 			AgentBin:     getenv("DSH_PODMAN_GUEST_AGENT_IMAGE_AGENT_BIN", "/bin/dsh-podman-guest-agent"),
 			DestAgentBin: getenv("DSH_PODMAN_GUEST_AGENT_IMAGE_DEST_AGENT_BIN", "/usr/local/bin/dsh-podman-guest-agent"),

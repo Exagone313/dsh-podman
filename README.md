@@ -74,7 +74,9 @@ Configuration section and the images' Set-default popup):
 | `DSH_PODMAN_GUEST_AGENT_IMAGE_AGENT_BIN` | `/bin/dsh-podman-guest-agent` | Path of the guest agent binary inside the guest-agent image; see [Variable details](#variable-details) |
 | `DSH_PODMAN_GUEST_AGENT_IMAGE_DEST_AGENT_BIN` | `/usr/local/bin/dsh-podman-guest-agent` | Destination path for the copied binary inside built workspace images; see [Variable details](#variable-details) |
 | `DSH_PODMAN_HOST_GUEST_AGENT_BIN` | — | Host-side guest agent binary path; bind-mounted when set; see [Variable details](#variable-details) |
-| `DSH_PODMAN_HOST_PACMAN_CACHE` | — | Host-absolute Buildah cache directory used by workspace-image builds |
+| `DSH_PODMAN_HOST_PACMAN_CACHE` | — | Host-absolute directory mounted at `/var/cache/pacman/pkg` to persist downloaded packages across pacman builds; unset disables caching |
+| `DSH_PODMAN_HOST_APT_CACHE` | — | Host-absolute directory mounted at `/var/cache/apt/archives` to persist downloaded packages across apt builds; unset disables caching |
+| `DSH_PODMAN_HOST_APK_CACHE` | — | Host-absolute directory mounted at `/etc/apk/cache` to persist downloaded packages across apk builds; unset disables caching |
 | `DSH_PODMAN_HOST_PROJECTS_ROOT` | `DSH_PODMAN_PROJECTS_ROOT` | Host-side projects root used as the source of bind mounts |
 | `DSH_PODMAN_HOST_SOCKETS_ROOT` | `DSH_PODMAN_SOCKETS_ROOT` | Host-side sockets root for guest socket bind mounts |
 | `DSH_PODMAN_IMAGE_PREFIX` | `localhost/dsh-podman/` | Prefix prepended to built workspace image references |

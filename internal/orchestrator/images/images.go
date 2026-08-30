@@ -93,7 +93,7 @@ var BaseImages = []BaseImage{
 		PostInstall: []string{"ln -s /usr/bin/fd-find /usr/local/bin/fd"},
 	},
 	{
-		ID: "alpine", Primitive: "docker.io/library/alpine:latest", PackageManager: "apk", CachePath: "",
+		ID: "alpine", Primitive: "docker.io/library/alpine:latest", PackageManager: "apk", CachePath: "/etc/apk/cache",
 		Packages: []string{"bash", "build-base", "ca-certificates", "curl", "diffutils", "fd", "git", "jq", "less", "openssh-client", "patch", "procps", "python3", "ripgrep", "tree", "unzip", "wget", "zstd"},
 	},
 }
@@ -118,6 +118,7 @@ type BuildSpec struct {
 	Packages       []string
 	IsBase         bool
 	PostInstall    []string
+	CachePackages  bool
 	GuestAgent     GuestAgentImage
 }
 
@@ -174,6 +175,9 @@ func Containerfile(spec BuildSpec) (string, error) {
 		lines = append(lines, line)
 	case "apk":
 		line := "RUN apk add --no-cache"
+		if spec.CachePackages {
+			line = "RUN apk add --cache-packages --update-cache"
+		}
 		if len(spec.Packages) > 0 {
 			line += " " + strings.Join(spec.Packages, " ")
 		}
@@ -195,10 +199,38 @@ type Builder struct {
 	Context         context.Context
 	StateDir        string
 	HostPacmanCache string
+	HostAptCache    string
+	HostApkCache    string
 	GuestAgentImage GuestAgentImage
 	ImagePrefix     string
 	BaseImagePrefix string
 	Logger          *slog.Logger
+}
+
+// cacheMount returns the host cache directory and its container mount target
+// for the given package manager, along with whether a host cache is
+// configured. Caches are opt-in: an unset host cache disables caching for that
+// package manager entirely.
+func (b Builder) cacheMount(packageManager string) (host, container string, configured bool) {
+	switch packageManager {
+	case "pacman":
+		if b.HostPacmanCache == "" {
+			return "", "", false
+		}
+		return b.HostPacmanCache, "/var/cache/pacman/pkg", true
+	case "apt":
+		if b.HostAptCache == "" {
+			return "", "", false
+		}
+		return b.HostAptCache, "/var/cache/apt/archives", true
+	case "apk":
+		if b.HostApkCache == "" {
+			return "", "", false
+		}
+		return b.HostApkCache, "/etc/apk/cache", true
+	default:
+		return "", "", false
+	}
 }
 
 func (b Builder) Build(spec BuildSpec) (string, error) {
@@ -208,6 +240,11 @@ func (b Builder) Build(spec BuildSpec) (string, error) {
 	if !validImageID(spec.ImageID) {
 		return "", fmt.Errorf("invalid image id %q", spec.ImageID)
 	}
+	hostCache, cacheTarget, cacheConfigured := b.cacheMount(spec.PackageManager)
+	if cacheConfigured && !filepath.IsAbs(hostCache) {
+		return "", fmt.Errorf("%s cache path must be an absolute path", spec.PackageManager)
+	}
+	spec.CachePackages = cacheConfigured
 	contents, err := Containerfile(spec)
 	if err != nil {
 		return "", err
@@ -223,23 +260,18 @@ func (b Builder) Build(spec BuildSpec) (string, error) {
 	if err := os.WriteFile(file, []byte(contents), 0600); err != nil {
 		return "", err
 	}
-	if spec.PackageManager == "pacman" {
-		if b.HostPacmanCache == "" || !filepath.IsAbs(b.HostPacmanCache) {
-			return "", fmt.Errorf("pacman cache path must be an absolute path")
-		}
-	}
 	tag := b.tagFor(spec.ImageID, spec.IsBase)
 	options := entities.BuildOptions{ContainerFiles: []string{file}, BuildOptions: define.BuildOptions{CommonBuildOpts: &define.CommonBuildOptions{}}}
 	options.ContextDirectory = dir
 	options.AdditionalTags = []string{tag}
-	if spec.PackageManager == "pacman" {
-		options.CommonBuildOpts.Volumes = []string{b.HostPacmanCache + ":/var/cache/pacman/pkg"}
+	if cacheConfigured {
+		options.CommonBuildOpts.Volumes = []string{hostCache + ":" + cacheTarget}
 	}
 	logger := b.Logger
 	if logger == nil {
 		logger = slog.Default()
 	}
-	logger.Info("building workspace image", "image_id", spec.ImageID, "from", spec.From, "package_manager", spec.PackageManager, "is_base", spec.IsBase, "packages", spec.Packages, "context_directory", dir, "container_files", options.ContainerFiles, "tags", options.AdditionalTags, "build_volumes", options.CommonBuildOpts.Volumes, "host_pacman_cache", b.HostPacmanCache)
+	logger.Info("building workspace image", "image_id", spec.ImageID, "from", spec.From, "package_manager", spec.PackageManager, "is_base", spec.IsBase, "packages", spec.Packages, "context_directory", dir, "container_files", options.ContainerFiles, "tags", options.AdditionalTags, "build_volumes", options.CommonBuildOpts.Volumes, "host_package_cache", hostCache)
 	_, err = images.Build(b.Context, []string{file}, options)
 	if err != nil {
 		logger.Error("workspace image build failed", "image_id", spec.ImageID, "error", err)

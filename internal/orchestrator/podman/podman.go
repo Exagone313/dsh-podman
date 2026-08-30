@@ -45,6 +45,16 @@ func (c *Client) log() *slog.Logger {
 	return slog.Default()
 }
 
+// connReady guards against a client whose podman connection context is
+// missing (e.g. a zero-value Client constructed without New), turning what
+// would otherwise be a panic into a regular error.
+func (c *Client) connReady() error {
+	if c.ctx == nil {
+		return errors.New("podman connection is not configured")
+	}
+	return nil
+}
+
 // EnsurePod lazily creates the pod when it does not already exist. Containers
 // created afterwards are placed inside it, sharing its network namespace.
 func (c *Client) EnsurePod(name string) error {
@@ -167,7 +177,11 @@ func boolPtr(value bool) *bool {
 	return &value
 }
 
+// ImageExists reports whether the named image is present in local storage.
 func (c *Client) ImageExists(name string) (bool, error) {
+	if err := c.connReady(); err != nil {
+		return false, err
+	}
 	exists, err := images.Exists(c.ctx, name, nil)
 	if err != nil {
 		c.log().Error("workspace image lookup failed", "image", name, "error", err)
@@ -177,10 +191,28 @@ func (c *Client) ImageExists(name string) (bool, error) {
 	return exists, err
 }
 
+// ImagePull pulls the named image into local storage. The name is the only
+// detail logged; pulled layers are never echoed.
+func (c *Client) ImagePull(name string) error {
+	if err := c.connReady(); err != nil {
+		return err
+	}
+	c.log().Info("pulling image", "image", name)
+	if _, err := images.Pull(c.ctx, name, nil); err != nil {
+		c.log().Error("image pull failed", "image", name, "error", err)
+		return err
+	}
+	c.log().Info("image pulled", "image", name)
+	return nil
+}
+
 // ImageRemove deletes the named image from local storage, tolerating an
 // already-absent image via the force option. Any non-nil errors reported by
 // images.Remove are joined into a single error.
 func (c *Client) ImageRemove(name string) error {
+	if err := c.connReady(); err != nil {
+		return err
+	}
 	c.log().Info("removing image", "image", name)
 	_, errs := images.Remove(c.ctx, []string{name}, &images.RemoveOptions{Force: boolPtr(true)})
 	var joined error

@@ -62,6 +62,16 @@ var volumeName = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,63}$`)
 // when the orchestrator prefixes them.
 var secretName = volumeName
 
+// shortImageNamePattern restricts short image ids to letters, digits, '_',
+// '.', and '-', starting with an alphanumeric or '_', and at most 64
+// characters. Slashes and colons are excluded: every image reference is a
+// bare short name.
+var shortImageNamePattern = regexp.MustCompile(`^[a-zA-Z0-9_][a-zA-Z0-9_.\-]{0,63}$`)
+
+func shortImageName(s string) bool {
+	return s != "." && s != ".." && shortImageNamePattern.MatchString(s)
+}
+
 func validWorkspaceSlug(slug string) bool {
 	return slug != "." && slug != ".." && workspaceSlugName.MatchString(slug)
 }
@@ -128,19 +138,17 @@ func workspaceBySlug(store *state.Store, slug string) (state.Workspace, error) {
 
 type Server struct {
 	ctl.UnimplementedOrchestratorControlServer
-	ProjectsRoot      string
-	HostProjectsRoot  string
-	SocketsRoot       string
-	Store             *state.Store
-	Podman            *podman.Client
-	ImageBuilder      *imagebuild.Builder
-	BuildDefaultImage bool
-	VolumePrefix      string
-	SecretPrefix      string
-	Logger            *slog.Logger
+	ProjectsRoot     string
+	HostProjectsRoot string
+	SocketsRoot      string
+	Store            *state.Store
+	Podman           *podman.Client
+	ImageBuilder     *imagebuild.Builder
+	BaseImagePrefix  string
+	VolumePrefix     string
+	SecretPrefix     string
+	Logger           *slog.Logger
 }
-
-var defaultPackages = []string{"base-devel", "git", "python", "curl", "wget", "openssh", "ca-certificates", "ripgrep", "fd", "jq", "unzip", "zstd", "less", "procps-ng", "diffutils", "patch", "tree"}
 
 func (s *Server) log() *slog.Logger {
 	if s.Logger != nil {
@@ -223,13 +231,27 @@ func (s *Server) ListWorkspaces(context.Context, *ctl.ListWorkspacesRequest) (*c
 }
 func (s *Server) ListImages(context.Context, *ctl.ListImagesRequest) (*ctl.ListImagesResponse, error) {
 	s.log().Info("control request", "method", "ListImages")
+	result := &ctl.ListImagesResponse{}
+	for _, base := range imagebuild.BaseImages {
+		resolved, err := s.resolveImage(base.ID)
+		if err != nil {
+			s.log().Error("control request failed", "method", "ListImages", "base_image", base.ID, "error", err)
+			return nil, err
+		}
+		result.Images = append(result.Images, imageProto(resolved))
+	}
 	images, err := s.Store.Images()
 	if err != nil {
+		s.log().Error("control request failed", "method", "ListImages", "error", err)
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	result := &ctl.ListImagesResponse{}
 	for _, image := range images {
-		result.Images = append(result.Images, &ctl.Image{ImageId: image.ImageID, BaseImage: image.BaseImage, Packages: image.Packages, ImageTag: image.ImageTag, BuiltAt: image.BuiltAt})
+		resolved, err := s.resolveImage(image.ImageID)
+		if err != nil {
+			s.log().Error("control request failed", "method", "ListImages", "image_id", image.ImageID, "error", err)
+			return nil, err
+		}
+		result.Images = append(result.Images, imageProto(resolved))
 	}
 	s.log().Info("control request completed", "method", "ListImages", "count", len(result.Images))
 	return result, nil
@@ -436,7 +458,7 @@ func (s *Server) StartContainer(ctx context.Context, request *ctl.StartContainer
 	}
 	imageID := request.GetImageId()
 	if imageID == "" {
-		imageID = DefaultImageID()
+		imageID = defaultImageShort()
 	}
 	recordMounts := workspace.Mounts
 	if len(request.GetMounts()) > 0 {
@@ -697,9 +719,13 @@ func (s *Server) CreateWorkspace(ctx context.Context, request *ctl.CreateWorkspa
 	if !validWorkspaceSlug(request.GetWorkspaceSlug()) {
 		return nil, status.Error(codes.InvalidArgument, "invalid workspace slug")
 	}
-	resolved, err := s.resolveImage(request.GetImageId())
+	imageID := request.GetImageId()
+	if imageID == "" {
+		imageID = defaultImageShort()
+	}
+	imageTag, err := s.resolveImageTag(imageID)
 	if err != nil {
-		s.log().Info("CreateWorkspace image lookup", "image_id", request.GetImageId(), "found", false, "error", err)
+		s.log().Info("CreateWorkspace image lookup", "image_id", imageID, "found", false, "error", err)
 		return nil, err
 	}
 	secret, err := token.New()
@@ -736,23 +762,13 @@ func (s *Server) CreateWorkspace(ctx context.Context, request *ctl.CreateWorkspa
 	if s.Podman == nil {
 		return nil, status.Error(codes.FailedPrecondition, "podman is not configured")
 	}
-	imageTag := resolved.ImageTag
 	exists, imageErr := s.Podman.ImageExists(imageTag)
 	if imageErr != nil {
 		return nil, status.Error(codes.Internal, imageErr.Error())
 	}
 	if !exists {
-		s.log().Warn("CreateWorkspace image state is stale", "image_id", request.GetImageId(), "image_tag", imageTag)
-		if !isDefaultImageID(request.GetImageId()) || !s.BuildDefaultImage || s.ImageBuilder == nil {
-			return nil, status.Error(codes.NotFound, "built image not found")
-		}
-		image := resolved
-		image, err = s.buildImage(request.GetImageId(), image)
-		if err != nil {
-			return nil, status.Error(codes.Internal, fmt.Sprintf("rebuild default image: %v", err))
-		}
-		imageTag = image.ImageTag
-		s.log().Info("CreateWorkspace rebuilt stale default image", "image_id", image.ImageID, "image_tag", image.ImageTag)
+		s.log().Warn("CreateWorkspace image state is stale", "image_id", imageID, "image_tag", imageTag)
+		return nil, status.Error(codes.NotFound, "built image not found")
 	}
 	name := "dsh-workspace-" + request.GetWorkspaceSlug()
 	if err := s.Podman.CreateWorkspace(podNameFor(request.GetWorkspaceSlug()), name, imageTag, secret, podmanMounts, secrets, envSecrets, userEnv); err != nil {
@@ -761,7 +777,7 @@ func (s *Server) CreateWorkspace(ctx context.Context, request *ctl.CreateWorkspa
 	}
 	agentSocket := filepath.Join(s.SocketsRoot, name, "guest.sock")
 	createdAt := time.Now().UTC().Format(time.RFC3339)
-	workspace := state.Workspace{WorkspaceSlug: request.GetWorkspaceSlug(), ContainerName: name, ImageID: request.GetImageId(), Mounts: mounts, Status: "running", AgentSocketPath: agentSocket, AgentToken: secret, CreatedAt: createdAt, Containers: []state.Container{{Name: "default", PodmanName: name, ImageID: request.GetImageId(), Mounts: defaultMounts, Status: "running", CreatedAt: createdAt, AgentSocketPath: agentSocket, AgentToken: secret, Env: userEnv}}}
+	workspace := state.Workspace{WorkspaceSlug: request.GetWorkspaceSlug(), ContainerName: name, ImageID: imageID, Mounts: mounts, Status: "running", AgentSocketPath: agentSocket, AgentToken: secret, CreatedAt: createdAt, Containers: []state.Container{{Name: "default", PodmanName: name, ImageID: imageID, Mounts: defaultMounts, Status: "running", CreatedAt: createdAt, AgentSocketPath: agentSocket, AgentToken: secret, Env: userEnv}}}
 	if err := s.Store.UpdateWorkspaces(func(all []state.Workspace) ([]state.Workspace, error) {
 		replaced := false
 		for i := range all {
@@ -792,37 +808,25 @@ func (s *Server) GetImage(_ context.Context, request *ctl.GetImageRequest) (*ctl
 	return imageProto(resolved), nil
 }
 func (s *Server) BuildImage(_ context.Context, request *ctl.BuildImageRequest) (*ctl.Image, error) {
-	s.log().Info("control request", "method", "BuildImage", "image_id", request.GetImageId(), "base_image", request.GetBaseImage(), "package_count", len(request.GetPackages()))
+	s.log().Info("control request", "method", "BuildImage", "image_id", request.GetImageId(), "parent", request.GetParent(), "package_count", len(request.GetPackages()))
 	imageID := request.GetImageId()
-	if imageID == "" {
-		return nil, status.Error(codes.InvalidArgument, "image id is required")
+	if !shortImageName(imageID) {
+		return nil, status.Error(codes.InvalidArgument, "invalid image id")
 	}
-	if imageIDOverridesBase(imageID) {
-		return nil, status.Error(codes.InvalidArgument, "cannot build over the base image")
+	if _, ok := imagebuild.BaseImageByID(imageID); ok {
+		return nil, status.Error(codes.InvalidArgument, "image id is a reserved base image name")
 	}
 	if s.ImageBuilder == nil {
 		return nil, status.Error(codes.FailedPrecondition, "image builder is not configured")
 	}
-	base := request.GetBaseImage()
-	resolved, err := s.resolveImage(base)
-	if err != nil {
-		if status.Code(err) == codes.NotFound {
-			return nil, status.Error(codes.NotFound, fmt.Sprintf("base image %q not found", base))
-		}
-		return nil, err
-	}
-	if resolved.ImageTag == "" {
-		return nil, status.Error(codes.NotFound, fmt.Sprintf("base image %q not found", base))
-	}
-	base = resolved.ImageTag
-	image := state.Image{ImageID: imageID, BaseImage: base, Packages: append([]string(nil), request.GetPackages()...)}
-	stored, err := s.buildImage(imageID, image)
+	image := state.Image{ImageID: imageID, Parent: request.GetParent(), Packages: append([]string(nil), request.GetPackages()...)}
+	stored, err := s.buildCustomImage(image)
 	if err != nil {
 		s.log().Error("control request failed", "method", "BuildImage", "image_id", imageID, "error", err)
-		return nil, status.Error(codes.Internal, err.Error())
+		return nil, grpcError(err)
 	}
 	s.log().Info("control request completed", "method", "BuildImage", "image_id", stored.ImageID, "image_tag", stored.ImageTag)
-	return imageProto(stored), nil
+	return imageProto(resolvedImage{ImageID: stored.ImageID, IsBase: false, PackageManager: stored.PackageManager, ImageTag: stored.ImageTag, Parent: stored.Parent, Packages: stored.Packages, BuiltAt: stored.BuiltAt, Status: "built"}), nil
 }
 func (s *Server) RebuildImage(_ context.Context, request *ctl.RebuildImageRequest) (*ctl.Image, error) {
 	s.log().Info("control request", "method", "RebuildImage", "image_id", request.GetImageId())
@@ -830,8 +834,8 @@ func (s *Server) RebuildImage(_ context.Context, request *ctl.RebuildImageReques
 	if imageID == "" {
 		return nil, status.Error(codes.InvalidArgument, "image id is required")
 	}
-	if imageIDOverridesBase(imageID) {
-		return nil, status.Error(codes.InvalidArgument, "cannot rebuild the base image")
+	if _, ok := imagebuild.BaseImageByID(imageID); ok {
+		return nil, status.Error(codes.InvalidArgument, "base images are rebuilt from the settings")
 	}
 	if s.ImageBuilder == nil {
 		return nil, status.Error(codes.FailedPrecondition, "image builder is not configured")
@@ -839,15 +843,18 @@ func (s *Server) RebuildImage(_ context.Context, request *ctl.RebuildImageReques
 	resolved, err := s.resolveImage(imageID)
 	if err != nil {
 		s.log().Warn("control request failed", "method", "RebuildImage", "image_id", imageID, "reason", "not found")
-		return nil, status.Error(codes.NotFound, "built image not found")
+		return nil, err
 	}
-	stored, err := s.buildImage(resolved.ImageID, resolved)
+	if resolved.IsBase {
+		return nil, status.Error(codes.InvalidArgument, "base images are rebuilt from the settings")
+	}
+	stored, err := s.buildCustomImage(state.Image{ImageID: imageID, Parent: resolved.Parent, PackageManager: resolved.PackageManager, Packages: resolved.Packages})
 	if err != nil {
 		s.log().Error("control request failed", "method", "RebuildImage", "image_id", imageID, "error", err)
-		return nil, status.Error(codes.Internal, err.Error())
+		return nil, grpcError(err)
 	}
 	s.log().Info("control request completed", "method", "RebuildImage", "image_id", stored.ImageID, "image_tag", stored.ImageTag)
-	return imageProto(stored), nil
+	return imageProto(resolvedImage{ImageID: stored.ImageID, IsBase: false, PackageManager: stored.PackageManager, ImageTag: stored.ImageTag, Parent: stored.Parent, Packages: stored.Packages, BuiltAt: stored.BuiltAt, Status: "built"}), nil
 }
 func (s *Server) RebuildAllImages(_ context.Context, _ *ctl.RebuildAllImagesRequest) (*ctl.RebuildAllImagesResponse, error) {
 	s.log().Info("control request", "method", "RebuildAllImages")
@@ -862,30 +869,23 @@ func (s *Server) RebuildAllImages(_ context.Context, _ *ctl.RebuildAllImagesRequ
 		s.log().Error("control request failed", "method", "RebuildAllImages", "error", err)
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	if len(images) == 0 {
-		return nil, status.Error(codes.NotFound, "no images to rebuild")
+	for _, base := range imagebuild.BaseImages {
+		if _, _, err := s.ensureBase(base.ID); err != nil {
+			s.log().Error("control request failed", "method", "RebuildAllImages", "base_image", base.ID, "error", err)
+		}
 	}
-
-	// Compute a deterministic, dependency-ordered rebuild plan up front; build
-	// failures discovered during execution propagate to the failed image and
-	// its transitive dependents while every unrelated image still rebuilds.
-	_, _, dependents := rebuildGraph(images)
-	ordered, skipped := rebuildPlan(images, s.BuildDefaultImage)
-
+	_, dependents := rebuildGraph(images)
+	ordered, skipped := rebuildPlan(images)
 	settled := make(map[string]bool, len(images))
 	for _, id := range skipped {
 		settled[id] = true
 	}
-	if !s.BuildDefaultImage {
-		settled[DefaultImageID()] = true
-	}
-
 	rebuilt := make([]string, 0, len(ordered))
 	for _, image := range ordered {
 		if settled[image.ImageID] {
 			continue
 		}
-		if _, err := s.buildImage(image.ImageID, image); err != nil {
+		if _, err := s.buildCustomImage(image); err != nil {
 			s.log().Error("control request failed", "method", "RebuildAllImages", "image_id", image.ImageID, "error", err)
 			for _, id := range skipDependents(dependents, image.ImageID) {
 				if settled[id] {
@@ -902,14 +902,58 @@ func (s *Server) RebuildAllImages(_ context.Context, _ *ctl.RebuildAllImagesRequ
 	s.log().Info("control request completed", "method", "RebuildAllImages", "rebuilt", len(rebuilt), "skipped", len(skipped))
 	return &ctl.RebuildAllImagesResponse{Rebuilt: rebuilt, Skipped: skipped}, nil
 }
+func (s *Server) RebuildBaseImage(_ context.Context, request *ctl.RebuildBaseImageRequest) (*ctl.Image, error) {
+	s.log().Info("control request", "method", "RebuildBaseImage", "name", request.GetName())
+	base, ok := imagebuild.BaseImageByID(request.GetName())
+	if !ok {
+		return nil, status.Error(codes.NotFound, "base image not found")
+	}
+	if s.baseImagesPublic() {
+		return nil, status.Error(codes.InvalidArgument, "base images are pulled, not built, in this mode")
+	}
+	if s.Podman == nil {
+		return nil, status.Error(codes.FailedPrecondition, "podman is not configured")
+	}
+	if s.ImageBuilder == nil {
+		return nil, status.Error(codes.FailedPrecondition, "image builder is not configured")
+	}
+	spec := imagebuild.BuildSpec{ImageID: base.ID, From: base.Primitive, PackageManager: base.PackageManager, Packages: base.Packages, IsBase: true, PostInstall: base.PostInstall, GuestAgent: s.ImageBuilder.GuestAgentImage}
+	tag, err := s.ImageBuilder.Build(spec)
+	if err != nil {
+		s.log().Error("control request failed", "method", "RebuildBaseImage", "name", request.GetName(), "error", err)
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	s.log().Info("control request completed", "method", "RebuildBaseImage", "name", request.GetName(), "image_tag", tag)
+	return imageProto(resolvedImage{ImageID: base.ID, IsBase: true, PackageManager: base.PackageManager, ImageTag: tag, Primitive: base.Primitive, Status: "built"}), nil
+}
+func (s *Server) PullBaseImage(_ context.Context, request *ctl.PullBaseImageRequest) (*ctl.Image, error) {
+	s.log().Info("control request", "method", "PullBaseImage", "name", request.GetName())
+	base, ok := imagebuild.BaseImageByID(request.GetName())
+	if !ok {
+		return nil, status.Error(codes.NotFound, "base image not found")
+	}
+	if !s.baseImagesPublic() {
+		return nil, status.Error(codes.InvalidArgument, "base images are built, not pulled, in this mode")
+	}
+	if s.Podman == nil {
+		return nil, status.Error(codes.FailedPrecondition, "podman is not configured")
+	}
+	tag := s.baseTag(base.ID)
+	if err := s.Podman.ImagePull(tag); err != nil {
+		s.log().Error("control request failed", "method", "PullBaseImage", "name", request.GetName(), "error", err)
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	s.log().Info("control request completed", "method", "PullBaseImage", "name", request.GetName(), "image_tag", tag)
+	return imageProto(resolvedImage{ImageID: base.ID, IsBase: true, PackageManager: base.PackageManager, ImageTag: tag, Primitive: base.Primitive, Status: "pulled"}), nil
+}
 func (s *Server) RemoveImage(_ context.Context, request *ctl.RemoveImageRequest) (*ctl.RemoveImageResponse, error) {
 	s.log().Info("control request", "method", "RemoveImage", "image_id", request.GetImageId())
 	imageID := request.GetImageId()
 	if imageID == "" {
 		return nil, status.Error(codes.InvalidArgument, "image id is required")
 	}
-	if imageIDOverridesBase(imageID) {
-		return nil, status.Error(codes.InvalidArgument, "cannot remove the base image")
+	if _, ok := imagebuild.BaseImageByID(imageID); ok {
+		return nil, status.Error(codes.InvalidArgument, "base images are rebuilt from the settings")
 	}
 	resolved, err := s.resolveImage(imageID)
 	if err != nil {
@@ -921,11 +965,11 @@ func (s *Server) RemoveImage(_ context.Context, request *ctl.RemoveImageRequest)
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 	for _, workspace := range workspaces {
-		if imageRefsMatch(workspace.ImageID, resolved.ImageID) {
+		if imageRefsMatch(workspace.ImageID, imageID) {
 			return nil, status.Error(codes.FailedPrecondition, fmt.Sprintf("image %q is in use by workspace %q container %q", imageID, workspace.WorkspaceSlug, "default"))
 		}
 		for _, container := range workspace.Containers {
-			if imageRefsMatch(container.ImageID, resolved.ImageID) {
+			if imageRefsMatch(container.ImageID, imageID) {
 				return nil, status.Error(codes.FailedPrecondition, fmt.Sprintf("image %q is in use by workspace %q container %q", imageID, workspace.WorkspaceSlug, container.Name))
 			}
 		}
@@ -940,7 +984,7 @@ func (s *Server) RemoveImage(_ context.Context, request *ctl.RemoveImageRequest)
 	if err := s.Store.UpdateImages(func(current []state.Image) ([]state.Image, error) {
 		next := make([]state.Image, 0, len(current))
 		for _, image := range current {
-			if image.ImageID != resolved.ImageID {
+			if image.ImageID != imageID {
 				next = append(next, image)
 			}
 		}
@@ -953,26 +997,42 @@ func (s *Server) RemoveImage(_ context.Context, request *ctl.RemoveImageRequest)
 	return &ctl.RemoveImageResponse{}, nil
 }
 
-// imageProto projects a stored image onto the control plane's Image message.
-func imageProto(image state.Image) *ctl.Image {
-	return &ctl.Image{ImageId: image.ImageID, BaseImage: image.BaseImage, Packages: image.Packages, ImageTag: image.ImageTag, BuiltAt: image.BuiltAt}
+// resolvedImage is the control-plane-ready projection of an image reference:
+// either a synthesized base image or a stored custom image.
+type resolvedImage struct {
+	ImageID        string
+	IsBase         bool
+	PackageManager string
+	ImageTag       string
+	Parent         string
+	Packages       []string
+	BuiltAt        string
+	Primitive      string
+	Status         string
 }
 
-// buildImage builds the given image, stamps BuiltAt, upserts it in the store
-// (replacing the record with the same id, else appending), and returns the
-// stored image. The caller is responsible for builder availability checks.
-func (s *Server) buildImage(id string, image state.Image) (state.Image, error) {
-	if id != "" {
-		image.ImageID = id
+// imageProto projects a resolved image onto the control plane's Image message.
+func imageProto(image resolvedImage) *ctl.Image {
+	return &ctl.Image{ImageId: image.ImageID, Parent: image.Parent, Packages: image.Packages, ImageTag: image.ImageTag, BuiltAt: image.BuiltAt, IsBase: image.IsBase, Status: image.Status, Primitive: image.Primitive, PackageManager: image.PackageManager}
+}
+
+// buildCustomImage builds a custom image from its stored description,
+// resolving its short-name parent to a tag, stamps BuiltAt, upserts the
+// record in the store (replacing the record with the same id, else appending),
+// and returns the stored image. The caller is responsible for builder
+// availability checks.
+func (s *Server) buildCustomImage(image state.Image) (state.Image, error) {
+	parentTag, parentPM, err := s.resolveParent(image.Parent)
+	if err != nil {
+		return state.Image{}, err
 	}
-	if s.ImageBuilder == nil {
-		return state.Image{}, fmt.Errorf("podman image builder is not configured")
-	}
-	tag, err := s.ImageBuilder.Build(image)
+	spec := imagebuild.BuildSpec{ImageID: image.ImageID, From: parentTag, PackageManager: parentPM, Packages: image.Packages, IsBase: false}
+	tag, err := s.ImageBuilder.Build(spec)
 	if err != nil {
 		return state.Image{}, err
 	}
 	image.ImageTag = tag
+	image.PackageManager = parentPM
 	image.BuiltAt = time.Now().UTC().Format(time.RFC3339)
 	if err := s.Store.UpdateImages(func(current []state.Image) ([]state.Image, error) {
 		for i := range current {
@@ -988,47 +1048,38 @@ func (s *Server) buildImage(id string, image state.Image) (state.Image, error) {
 	return image, nil
 }
 
-// rebuildGraph indexes stored images for rebuild planning: byID maps image ids
-// to their records (last occurrence wins), byTag maps non-empty image tags to
-// the owning image id, and dependents maps each image id to the sorted list of
-// image ids whose base is one of its tags.
-func rebuildGraph(images []state.Image) (byID map[string]state.Image, byTag map[string]string, dependents map[string][]string) {
+// rebuildGraph indexes stored images for rebuild planning: byID maps short
+// image ids to their records (last occurrence wins) and dependents maps each
+// short image id to the sorted list of image ids whose parent is that id.
+func rebuildGraph(images []state.Image) (byID map[string]state.Image, dependents map[string][]string) {
 	byID = make(map[string]state.Image, len(images))
-	byTag = make(map[string]string, len(images))
 	for _, image := range images {
 		byID[image.ImageID] = image
-		if image.ImageTag != "" {
-			byTag[image.ImageTag] = image.ImageID
-		}
 	}
 	dependents = make(map[string][]string)
 	for _, image := range images {
-		if owner, ok := byTag[image.BaseImage]; ok {
-			dependents[owner] = append(dependents[owner], image.ImageID)
+		if owner, ok := byID[image.Parent]; ok {
+			dependents[owner.ImageID] = append(dependents[owner.ImageID], image.ImageID)
 		}
 	}
 	for owner := range dependents {
 		sort.Strings(dependents[owner])
 	}
-	return byID, byTag, dependents
+	return byID, dependents
 }
 
-// rebuildPlan computes the deterministic rebuild plan for the stored images.
-// It returns the ordered list of images to rebuild, with every base preceding
-// its dependents, and the list of image ids to skip.
+// rebuildPlan computes the deterministic rebuild plan for the stored custom
+// images. It returns the ordered list of images to rebuild, with every parent
+// preceding its dependents, and the list of image ids to skip.
 //
-// The default image, when stored and buildDefault is true, is rebuilt first
-// because its base is external. When buildDefault is false it is treated as an
-// externally-provided base: it is settled without being rebuilt, so derived
-// images may still rebuild against its existing tag. Images whose base cannot
-// be resolved to a stored tag are skipped, as are any images left over by a
-// dependency cycle.
-func rebuildPlan(images []state.Image, buildDefault bool) (ordered []state.Image, skipped []string) {
-	byID, byTag, dependents := rebuildGraph(images)
+// A parent that names a base image is always usable: bases are ensured before
+// custom images are rebuilt. A parent that cannot be resolved to a stored
+// custom image is skipped, as are any images left over by a dependency cycle.
+func rebuildPlan(images []state.Image) (ordered []state.Image, skipped []string) {
+	byID, dependents := rebuildGraph(images)
 
 	settled := make(map[string]bool, len(images))
 	rebuilt := make(map[string]bool, len(images))
-	baseUsable := make(map[string]bool)
 
 	var markSkipped func(id string)
 	markSkipped = func(id string) {
@@ -1042,23 +1093,9 @@ func rebuildPlan(images []state.Image, buildDefault bool) (ordered []state.Image
 		}
 	}
 
-	defaultID := DefaultImageID()
-	if _, ok := byID[defaultID]; ok {
-		if buildDefault {
-			settled[defaultID] = true
-			rebuilt[defaultID] = true
-			ordered = append(ordered, byID[defaultID])
-		} else {
-			settled[defaultID] = true
-			baseUsable[defaultID] = true
-		}
-	}
-
 	candidates := make([]string, 0, len(images))
 	for _, image := range images {
-		if image.ImageID != defaultID {
-			candidates = append(candidates, image.ImageID)
-		}
+		candidates = append(candidates, image.ImageID)
 	}
 	sort.Strings(candidates)
 	remaining := make(map[string]bool, len(candidates))
@@ -1077,17 +1114,31 @@ func rebuildPlan(images []state.Image, buildDefault bool) (ordered []state.Image
 				continue
 			}
 			image := byID[id]
-			ownerID := byTag[image.BaseImage]
-			if ownerID == "" {
+			if image.Parent == "" {
 				markSkipped(id)
 				delete(remaining, id)
 				progress = true
 				continue
 			}
-			if !settled[ownerID] {
+			if _, isBase := imagebuild.BaseImageByID(image.Parent); isBase {
+				settled[id] = true
+				rebuilt[id] = true
+				ordered = append(ordered, image)
+				delete(remaining, id)
+				progress = true
 				continue
 			}
-			if !rebuilt[ownerID] && !baseUsable[ownerID] {
+			owner, ok := byID[image.Parent]
+			if !ok {
+				markSkipped(id)
+				delete(remaining, id)
+				progress = true
+				continue
+			}
+			if !settled[owner.ImageID] {
+				continue
+			}
+			if !rebuilt[owner.ImageID] {
 				markSkipped(id)
 				delete(remaining, id)
 				progress = true
@@ -1134,79 +1185,169 @@ func skipDependents(dependents map[string][]string, failedID string) []string {
 	return skipped
 }
 
-// defaultImage returns the stored default (base) image, auto-provisioning it
-// when absent and enabled. The returned record's tag may be used as the base
-// for derived image builds.
-func (s *Server) defaultImage() (state.Image, error) {
-	images, err := s.Store.Images()
+// defaultImageShort is the short name of the built-in default workspace image.
+func defaultImageShort() string {
+	return "archlinux"
+}
+
+// baseTag computes the fully-qualified tag for a base image short name under
+// the server's base image prefix.
+func (s *Server) baseTag(short string) string {
+	prefix := s.BaseImagePrefix
+	if prefix == "" {
+		prefix = "localhost/dsh-podman/base/"
+	}
+	if !strings.HasSuffix(prefix, "/") {
+		prefix += "/"
+	}
+	return prefix + short + ":latest"
+}
+
+// baseImagesPublic reports whether base images are pulled from a public
+// registry rather than built locally. A prefix starting with "localhost/"
+// designates a local build prefix; an empty prefix defaults to the local
+// prefix.
+func (s *Server) baseImagesPublic() bool {
+	prefix := s.BaseImagePrefix
+	if prefix == "" {
+		prefix = "localhost/dsh-podman/base/"
+	}
+	return !strings.HasPrefix(prefix, "localhost/")
+}
+
+// baseStatus reports the current status of a base image: "built" (local mode)
+// or "pulled" (public mode) when the image is present, else "missing".
+func (s *Server) baseStatus(short string) (string, error) {
+	if _, ok := imagebuild.BaseImageByID(short); !ok {
+		return "", status.Error(codes.NotFound, "base image not found")
+	}
+	if s.Podman == nil {
+		return "", status.Error(codes.FailedPrecondition, "podman is not configured")
+	}
+	exists, err := s.Podman.ImageExists(s.baseTag(short))
 	if err != nil {
-		return state.Image{}, status.Error(codes.Internal, err.Error())
+		return "", status.Error(codes.Internal, err.Error())
 	}
-	for _, image := range images {
-		if image.ImageID == DefaultImageID() && image.ImageTag != "" {
-			return image, nil
+	if !exists {
+		return "missing", nil
+	}
+	if s.baseImagesPublic() {
+		return "pulled", nil
+	}
+	return "built", nil
+}
+
+// ensureBase makes sure the named base image exists, building it locally or
+// pulling it from a public registry as appropriate, and returns the base
+// definition and its fully-qualified tag.
+func (s *Server) ensureBase(short string) (*imagebuild.BaseImage, string, error) {
+	base, ok := imagebuild.BaseImageByID(short)
+	if !ok {
+		return nil, "", status.Error(codes.NotFound, "base image not found")
+	}
+	if s.Podman == nil {
+		return nil, "", status.Error(codes.FailedPrecondition, "podman is not configured")
+	}
+	tag := s.baseTag(short)
+	exists, err := s.Podman.ImageExists(tag)
+	if err != nil {
+		return nil, "", status.Error(codes.Internal, err.Error())
+	}
+	if exists {
+		return base, tag, nil
+	}
+	if s.baseImagesPublic() {
+		if err := s.Podman.ImagePull(tag); err != nil {
+			return nil, "", status.Error(codes.Internal, err.Error())
 		}
-	}
-	if !s.BuildDefaultImage {
-		return state.Image{}, status.Error(codes.NotFound, "built image not found; default image auto-build is disabled")
+		return base, tag, nil
 	}
 	if s.ImageBuilder == nil {
-		return state.Image{}, status.Error(codes.FailedPrecondition, "podman image builder is not configured")
+		return nil, "", status.Error(codes.FailedPrecondition, "image builder is not configured")
 	}
-	image := state.Image{ImageID: DefaultImageID(), BaseImage: "docker.io/library/archlinux:latest", Packages: append([]string(nil), defaultPackages...)}
-	image, err = s.buildImage(DefaultImageID(), image)
-	if err != nil {
-		return state.Image{}, status.Error(codes.Internal, fmt.Sprintf("build default image: %v", err))
+	spec := imagebuild.BuildSpec{ImageID: short, From: base.Primitive, PackageManager: base.PackageManager, Packages: base.Packages, IsBase: true, PostInstall: base.PostInstall, GuestAgent: s.ImageBuilder.GuestAgentImage}
+	if _, err := s.ImageBuilder.Build(spec); err != nil {
+		return nil, "", status.Error(codes.Internal, err.Error())
 	}
-	s.log().Info("auto-provisioned default image", "image_id", image.ImageID, "image_tag", image.ImageTag)
-	return image, nil
+	s.log().Info("auto-provisioned base image", "base_image", short, "image_tag", tag)
+	return base, tag, nil
 }
 
-// resolveImage resolves an image reference to a stored image record. The
-// reference may be a stored image id (short or fully-qualified), with or
-// without a tag suffix, or an already-qualified tag such as
-// "localhost/dsh-podman/valkey:latest". The default (base) image is
-// auto-provisioned when absent and enabled.
-func (s *Server) resolveImage(imageID string) (state.Image, error) {
+// resolveImage resolves a short image reference to control-plane-ready
+// information. Base short names synthesize a base row (with its registry
+// package manager and primitive reference); any other short name must match a
+// stored custom image.
+func (s *Server) resolveImage(short string) (resolvedImage, error) {
+	if base, ok := imagebuild.BaseImageByID(short); ok {
+		status := "missing"
+		if s.Podman != nil {
+			st, err := s.baseStatus(short)
+			if err != nil {
+				return resolvedImage{}, err
+			}
+			status = st
+		}
+		return resolvedImage{ImageID: short, IsBase: true, PackageManager: base.PackageManager, ImageTag: s.baseTag(short), Primitive: base.Primitive, Status: status}, nil
+	}
 	images, err := s.Store.Images()
 	if err != nil {
-		return state.Image{}, status.Error(codes.Internal, err.Error())
+		return resolvedImage{}, status.Error(codes.Internal, err.Error())
 	}
-	// Normalize a trailing ":tag" so ids with and without a tag both resolve.
-	id := imageID
-	if stripped, _, hasTag := strings.Cut(imageID, ":"); hasTag {
-		id = stripped
-	}
-	// Exact matches (a stored tag or id) win over the default image.
 	for _, image := range images {
-		if image.ImageTag != "" && image.ImageTag == imageID {
-			return image, nil
-		}
-		if image.ImageTag != "" && (image.ImageID == imageID || image.ImageID == id) {
-			return image, nil
+		if image.ImageID == short {
+			return resolvedImage{ImageID: image.ImageID, IsBase: false, PackageManager: image.PackageManager, ImageTag: image.ImageTag, Parent: image.Parent, Packages: image.Packages, BuiltAt: image.BuiltAt, Status: "built"}, nil
 		}
 	}
-	// The default (base) image, auto-provisioned when absent and enabled.
-	if isDefaultImageID(id) {
-		def, err := s.defaultImage()
-		if err != nil {
-			return state.Image{}, err
-		}
-		return def, nil
-	}
-	// Fully-qualified references to a stored image id.
-	for _, image := range images {
-		if image.ImageTag != "" && strings.TrimPrefix(image.ImageID, imagePrefix()) == strings.TrimPrefix(id, imagePrefix()) {
-			return image, nil
-		}
-	}
-	return state.Image{}, status.Error(codes.NotFound, "built image not found")
+	return resolvedImage{}, status.Error(codes.NotFound, "image not found")
 }
 
-// isDefaultImageID reports whether id refers to the default (base) image, in
-// either its short or fully-qualified form.
-func isDefaultImageID(id string) bool {
-	return strings.TrimPrefix(id, imagePrefix()) == strings.TrimPrefix(DefaultImageID(), imagePrefix())
+// resolveImageTag returns the fully-qualified tag for a short image
+// reference, auto-provisioning base images. Custom images must be stored with
+// a non-empty tag.
+func (s *Server) resolveImageTag(short string) (string, error) {
+	if _, ok := imagebuild.BaseImageByID(short); ok {
+		_, tag, err := s.ensureBase(short)
+		if err != nil {
+			return "", err
+		}
+		return tag, nil
+	}
+	images, err := s.Store.Images()
+	if err != nil {
+		return "", status.Error(codes.Internal, err.Error())
+	}
+	for _, image := range images {
+		if image.ImageID == short && image.ImageTag != "" {
+			return image.ImageTag, nil
+		}
+	}
+	return "", status.Error(codes.NotFound, "built image not found")
+}
+
+// resolveParent resolves a short parent reference to its fully-qualified tag
+// and package manager: a base short name is ensured (built or pulled), a
+// stored custom image contributes its tag and recorded package manager.
+func (s *Server) resolveParent(parent string) (tag, packageManager string, err error) {
+	if base, ok := imagebuild.BaseImageByID(parent); ok {
+		_, tag, err := s.ensureBase(parent)
+		if err != nil {
+			return "", "", err
+		}
+		return tag, base.PackageManager, nil
+	}
+	images, err := s.Store.Images()
+	if err != nil {
+		return "", "", status.Error(codes.Internal, err.Error())
+	}
+	for _, image := range images {
+		if image.ImageID == parent {
+			if image.ImageTag == "" {
+				return "", "", status.Error(codes.NotFound, fmt.Sprintf("parent image %q not found", parent))
+			}
+			return image.ImageTag, image.PackageManager, nil
+		}
+	}
+	return "", "", status.Error(codes.NotFound, fmt.Sprintf("parent image %q not found", parent))
 }
 
 // imageRefsMatch reports whether two stored image references denote the same
@@ -1221,27 +1362,13 @@ func imageRefsMatch(a, b string) bool {
 	return strings.TrimPrefix(a, imagePrefix()) == strings.TrimPrefix(b, imagePrefix())
 }
 
-// imageIDOverridesBase reports whether an image id used as a build/rebuild
-// target refers to the default (base) image, allowing for a tag suffix and the
-// fully-qualified form.
-func imageIDOverridesBase(imageID string) bool {
-	if stripped, _, hasTag := strings.Cut(imageID, ":"); hasTag {
-		imageID = stripped
+// grpcError maps a plain error to an Internal status error, passing through
+// status errors produced by the resolution helpers unchanged.
+func grpcError(err error) error {
+	if code := status.Code(err); code != codes.Unknown {
+		return err
 	}
-	return isDefaultImageID(imageID)
-}
-
-// resolveImageTag returns the stored image tag for an image reference, or a
-// NotFound status error when no built image with a non-empty tag is stored.
-func (s *Server) resolveImageTag(imageID string) (string, error) {
-	image, err := s.resolveImage(imageID)
-	if err != nil {
-		return "", err
-	}
-	if image.ImageTag == "" {
-		return "", status.Error(codes.NotFound, "built image not found")
-	}
-	return image.ImageTag, nil
+	return status.Error(codes.Internal, err.Error())
 }
 
 // containerMounts returns the mounts that apply to a container: its own list
@@ -1582,12 +1709,6 @@ func randomSecret(length int, charset string) (string, error) {
 		}
 	}
 	return string(result), nil
-}
-func DefaultImageID() string {
-	if value := os.Getenv("DSH_PODMAN_DEFAULT_IMAGE"); value != "" {
-		return value
-	}
-	return imagePrefix() + "arch-base"
 }
 func imagePrefix() string {
 	prefix := os.Getenv("DSH_PODMAN_IMAGE_PREFIX")

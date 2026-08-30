@@ -12,7 +12,6 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
-	"strings"
 	"syscall"
 	"time"
 
@@ -89,13 +88,13 @@ func main() {
 			Image:        getenv("DSH_PODMAN_GUEST_AGENT_IMAGE", ""),
 			AgentBin:     getenv("DSH_PODMAN_GUEST_AGENT_IMAGE_AGENT_BIN", "/bin/dsh-podman-guest-agent"),
 			DestAgentBin: getenv("DSH_PODMAN_GUEST_AGENT_IMAGE_DEST_AGENT_BIN", "/usr/local/bin/dsh-podman-guest-agent"),
-		}, ImagePrefix: getenv("DSH_PODMAN_IMAGE_PREFIX", "localhost/dsh-podman/"), PullBaseImage: getenvBool("DSH_PODMAN_BUILD_DEFAULT_IMAGE_WITH_PULL", true), BaseImageID: grpcserver.DefaultImageID(), Logger: logger}
+		}, ImagePrefix: getenv("DSH_PODMAN_IMAGE_PREFIX", "localhost/dsh-podman/"), BaseImagePrefix: getenv("DSH_PODMAN_BASE_IMAGE_PREFIX", "localhost/dsh-podman/base/"), Logger: logger}
 	} else {
 		_, orchSocketSet := os.LookupEnv("DSH_PODMAN_ORCHESTRATOR_PODMAN_SOCKET")
 		logger.Error("Podman API configuration is missing", "DSH_PODMAN_ORCHESTRATOR_PODMAN_SOCKET_present", orchSocketSet, "expected", "DSH_PODMAN_ORCHESTRATOR_PODMAN_SOCKET=unix:///run/podman/podman.sock")
 		panic("Podman API is not configured: DSH_PODMAN_ORCHESTRATOR_PODMAN_SOCKET is absent or empty")
 	}
-	controlServer := &grpcserver.Server{ProjectsRoot: root, HostProjectsRoot: hostProjectsRoot, SocketsRoot: socketsRoot, Store: store, Podman: podmanClient, ImageBuilder: imageBuilder, BuildDefaultImage: getenvBool("DSH_PODMAN_BUILD_DEFAULT_IMAGE", true), VolumePrefix: getenv("DSH_PODMAN_VOLUME_PREFIX", "dsh-podman-"), SecretPrefix: getenv("DSH_PODMAN_SECRET_PREFIX", "dsh-podman-"), Logger: logger}
+	controlServer := &grpcserver.Server{ProjectsRoot: root, HostProjectsRoot: hostProjectsRoot, SocketsRoot: socketsRoot, Store: store, Podman: podmanClient, ImageBuilder: imageBuilder, BaseImagePrefix: getenv("DSH_PODMAN_BASE_IMAGE_PREFIX", "localhost/dsh-podman/base/"), VolumePrefix: getenv("DSH_PODMAN_VOLUME_PREFIX", "dsh-podman-"), SecretPrefix: getenv("DSH_PODMAN_SECRET_PREFIX", "dsh-podman-"), Logger: logger}
 	ctl.RegisterOrchestratorControlServer(server, controlServer)
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGTERM, os.Interrupt)
@@ -116,16 +115,6 @@ func main() {
 func getenv(name, fallback string) string {
 	if value := os.Getenv(name); value != "" {
 		return value
-	}
-	return fallback
-}
-
-func getenvBool(name string, fallback bool) bool {
-	switch strings.ToLower(strings.TrimSpace(os.Getenv(name))) {
-	case "1", "true", "yes", "on":
-		return true
-	case "0", "false", "no", "off":
-		return false
 	}
 	return fallback
 }

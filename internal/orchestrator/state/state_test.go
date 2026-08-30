@@ -16,7 +16,7 @@ func TestStateRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	images := []Image{{ImageID: "arch", BaseImage: "archlinux", Packages: []string{"git"}, ImageTag: "tag", BuiltAt: "now"}}
+	images := []Image{{ImageID: "arch", Parent: "archlinux", PackageManager: "pacman", Packages: []string{"git"}, ImageTag: "tag", BuiltAt: "now"}}
 	if err := store.SaveImages(images); err != nil {
 		t.Fatal(err)
 	}
@@ -26,6 +26,9 @@ func TestStateRoundTrip(t *testing.T) {
 	}
 	if len(got) != 1 || got[0].ImageID != "arch" || got[0].Packages[0] != "git" {
 		t.Fatalf("round trip mismatch: %#v", got)
+	}
+	if got[0].Parent != "archlinux" || got[0].PackageManager != "pacman" {
+		t.Fatalf("parent/package_manager did not survive round trip: %#v", got[0])
 	}
 }
 

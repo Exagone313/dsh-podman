@@ -17,6 +17,8 @@ service OrchestratorControl {
   rpc RebuildImage(RebuildImageRequest) returns (Image);
   rpc RebuildAllImages(RebuildAllImagesRequest) returns (RebuildAllImagesResponse);
   rpc RemoveImage(RemoveImageRequest) returns (RemoveImageResponse);
+  rpc RebuildBaseImage(RebuildBaseImageRequest) returns (Image);
+  rpc PullBaseImage(PullBaseImageRequest) returns (Image);
   rpc ListContainers(ListContainersRequest) returns (ListContainersResponse);
   rpc StartContainer(StartContainerRequest) returns (Container);
   rpc RecreateContainer(RecreateContainerRequest) returns (Workspace);
@@ -66,14 +68,16 @@ message Workspace {
 }
 message ListImagesRequest {}
 message ListImagesResponse { repeated Image images = 1; }
-message Image { string image_id = 1; string base_image = 2; repeated string packages = 3; string image_tag = 4; string built_at = 5; }
-message RebuildImageRequest { string image_id = 1; string base_image = 2; repeated string packages = 3; }
+message Image { string image_id = 1; string parent = 2; repeated string packages = 3; string image_tag = 4; string built_at = 5; bool is_base = 6; string status = 7; string primitive = 8; string package_manager = 9; }
+message RebuildImageRequest { string image_id = 1; }
 message RebuildAllImagesRequest {}
 message RebuildAllImagesResponse { repeated string rebuilt = 1; repeated string skipped = 2; }
 message RemoveImageRequest { string image_id = 1; }
 message RemoveImageResponse {}
+message RebuildBaseImageRequest { string name = 1; }
+message PullBaseImageRequest { string name = 1; }
 message GetImageRequest { string image_id = 1; }
-message BuildImageRequest { string image_id = 1; string base_image = 2; repeated string packages = 3; }
+message BuildImageRequest { string image_id = 1; string parent = 2; repeated string packages = 3; }
 message ListContainersRequest {}
 message ListContainersResponse { repeated Container containers = 1; }
 message Container {

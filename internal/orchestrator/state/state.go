@@ -15,11 +15,12 @@ import (
 )
 
 type Image struct {
-	ImageID   string   `toml:"image_id"`
-	BaseImage string   `toml:"base_image"`
-	Packages  []string `toml:"packages"`
-	ImageTag  string   `toml:"image_tag"`
-	BuiltAt   string   `toml:"built_at"`
+	ImageID        string   `toml:"image_id"`
+	Parent         string   `toml:"parent,omitempty"`
+	PackageManager string   `toml:"package_manager,omitempty"`
+	Packages       []string `toml:"packages"`
+	ImageTag       string   `toml:"image_tag"`
+	BuiltAt        string   `toml:"built_at"`
 }
 type Mount struct {
 	ProjectName string `toml:"project_name"`

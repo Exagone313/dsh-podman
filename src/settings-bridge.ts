@@ -43,6 +43,7 @@ const commandSchema = z.object({
   secret: z.string().default(""),
   secretEnv: z.string().default(""),
   length: z.number().default(0),
+  charset: z.string().default(""),
   packages: z.array(z.string()).default([]),
 });
 
@@ -132,6 +133,7 @@ export interface CommandRequest {
   secret: string;
   secretEnv: string;
   length: number;
+  charset: string;
   packages: string[];
 }
 export interface ContainerView {
@@ -340,6 +342,7 @@ export function installContainerSettings(
             await resolver.control("createSecret", {
               name: command.workspace,
               ...(command.length ? { length: command.length } : {}),
+              ...(command.charset ? { charset: command.charset } : {}),
             });
             break;
           case "secret_remove":

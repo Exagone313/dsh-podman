@@ -257,6 +257,21 @@ function ConfigField(props: {
   );
 }
 
+function Field(props: {
+  label: string;
+  htmlFor: string;
+  children: ReactNode;
+}): ReactNode {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+      <label htmlFor={props.htmlFor} style={{ fontSize: "13px", color: "var(--dsw-alias-label-secondary)" }}>
+        {props.label}
+      </label>
+      {props.children}
+    </div>
+  );
+}
+
 function ConfirmButton(props: {
   t: (key: ContainerPluginKey) => string;
   label: string;
@@ -901,6 +916,7 @@ function VolumesSection(props: {
   const [open, setOpen] = useState(false);
   const [openVolume, setOpenVolume] = useState<string | null>(null);
   const [name, setName] = useState("");
+  const volumeId = useId();
   const canCreate = name.trim() !== "";
   const submit = (): void => {
     if (name.trim() === "") return;
@@ -989,16 +1005,18 @@ function VolumesSection(props: {
           </>
         }
       >
-        <Input
-          value={name}
-          disabled={!writable || busy}
-          placeholder={t("createVolume")}
-          autoFocus
-          onChange={(event) => setName(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key === "Enter") submit();
-          }}
-        />
+        <Field label={t("volumeName")} htmlFor={volumeId}>
+          <Input
+            id={volumeId}
+            value={name}
+            disabled={!writable || busy}
+            autoFocus
+            onChange={(event) => setName(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") submit();
+            }}
+          />
+        </Field>
       </Modal>
     </section>
   );
@@ -1075,7 +1093,7 @@ function SecretsSection(props: {
   secrets: readonly { name: string }[];
   busy: boolean;
   writable: boolean;
-  onCreate: (name: string, length?: number) => void;
+  onCreate: (name: string, length?: number, charset?: string) => void;
   onRemove: (name: string) => void;
   onSet: (name: string, value: string) => void;
 }): ReactNode {
@@ -1083,7 +1101,11 @@ function SecretsSection(props: {
   const [open, setOpen] = useState(false);
   const [openSecret, setOpenSecret] = useState<string | null>(null);
   const [name, setName] = useState("");
-  const [length, setLength] = useState("");
+  const [length, setLength] = useState("32");
+  const [charset, setCharset] = useState("alphanumeric");
+  const secretNameId = useId();
+  const secretLengthId = useId();
+  const secretCharsetId = useId();
   const canCreate = name.trim() !== "";
   const submit = (): void => {
     if (name.trim() === "") return;
@@ -1091,9 +1113,11 @@ function SecretsSection(props: {
     onCreate(
       name.trim(),
       length.trim() === "" || Number.isNaN(parsedLength) ? undefined : parsedLength,
+      charset,
     );
     setName("");
-    setLength("");
+    setLength("32");
+    setCharset("alphanumeric");
     setOpen(false);
   };
   return (
@@ -1175,23 +1199,40 @@ function SecretsSection(props: {
             gap: "12px",
           }}
         >
-          <Input
-            value={name}
-            disabled={!writable || busy}
-            placeholder={t("createSecret")}
-            autoFocus
-            onChange={(event) => setName(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === "Enter") submit();
-            }}
-          />
-          <Input
-            type="number"
-            value={length}
-            disabled={!writable || busy}
-            aria-label={t("secretLength")}
-            onChange={(event) => setLength(event.target.value)}
-          />
+          <Field label={t("secretName")} htmlFor={secretNameId}>
+            <Input
+              id={secretNameId}
+              value={name}
+              disabled={!writable || busy}
+              autoFocus
+              onChange={(event) => setName(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") submit();
+              }}
+            />
+          </Field>
+          <Field label={t("secretLength")} htmlFor={secretLengthId}>
+            <Input
+              id={secretLengthId}
+              type="number"
+              value={length}
+              disabled={!writable || busy}
+              onChange={(event) => setLength(event.target.value)}
+            />
+          </Field>
+          <Field label={t("secretCharset")} htmlFor={secretCharsetId}>
+            <select
+              id={secretCharsetId}
+              style={imageSelect}
+              value={charset}
+              disabled={!writable || busy}
+              onChange={(event) => setCharset(event.target.value)}
+            >
+              <option value="alphanumeric">alphanumeric</option>
+              <option value="hex">hex</option>
+              <option value="base64url">base64url</option>
+            </select>
+          </Field>
         </div>
       </Modal>
     </section>
@@ -1200,6 +1241,7 @@ function SecretsSection(props: {
 
 function ImageBuildModal(props: {
   t: (key: ContainerPluginKey) => string;
+  images: readonly { imageId: string }[];
   open: boolean;
   imageId: string;
   baseImage: string;
@@ -1212,6 +1254,7 @@ function ImageBuildModal(props: {
 }): ReactNode {
   const {
     t,
+    images,
     open,
     imageId,
     baseImage,
@@ -1259,76 +1302,36 @@ function ImageBuildModal(props: {
           gap: "12px",
         }}
       >
-        <div
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            gap: "4px",
-          }}
-        >
-          <label
-            htmlFor={imageIdLabel}
-            style={{
-              fontSize: "13px",
-              color: "var(--dsw-alias-label-secondary)",
-            }}
-          >
-            {t("imageId")}
-          </label>
+        <Field label={t("imageId")} htmlFor={imageIdLabel}>
           <Input
             id={imageIdLabel}
             value={imageId}
-            placeholder={t("imageId")}
             onChange={(event) => onImageId(event.target.value)}
           />
-        </div>
-        <div
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            gap: "4px",
-          }}
-        >
-          <label
-            htmlFor={baseImageLabel}
-            style={{
-              fontSize: "13px",
-              color: "var(--dsw-alias-label-secondary)",
-            }}
-          >
-            {t("baseImage")}
-          </label>
-          <Input
+        </Field>
+        <Field label={t("baseImage")} htmlFor={baseImageLabel}>
+          <select
             id={baseImageLabel}
+            style={imageSelect}
             value={baseImage}
-            placeholder={t("baseImage")}
             onChange={(event) => onBaseImage(event.target.value)}
-          />
-        </div>
-        <div
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            gap: "4px",
-          }}
-        >
-          <label
-            htmlFor={packagesLabel}
-            style={{
-              fontSize: "13px",
-              color: "var(--dsw-alias-label-secondary)",
-            }}
           >
-            {t("packages")}
-          </label>
+            <option value="">{t("selectImage")}</option>
+            {images.map((image) => (
+              <option key={image.imageId} value={image.imageId}>
+                {image.imageId}
+              </option>
+            ))}
+          </select>
+        </Field>
+        <Field label={t("packages")} htmlFor={packagesLabel}>
           <TagInput
             id={packagesLabel}
             t={t}
             value={packages}
             onChange={onPackages}
-            placeholder={t("packages")}
           />
-        </div>
+        </Field>
       </div>
     </Modal>
   );
@@ -1416,7 +1419,12 @@ export function ContainerCard(props: ContainerCardProps): ReactNode {
               variant="outline"
               size="sm"
               disabled={state.busy}
-              onClick={() => setBuildOpen(true)}
+              onClick={() => {
+                setImageId("");
+                setBaseImage(state.images[0]?.imageId ?? "");
+                setPackages([]);
+                setBuildOpen(true);
+              }}
             >
               {t("buildImage")}
             </Button>
@@ -1445,6 +1453,7 @@ export function ContainerCard(props: ContainerCardProps): ReactNode {
           )}
           <ImageBuildModal
             t={t}
+            images={state.images}
             open={buildOpen}
             imageId={imageId}
             baseImage={baseImage}

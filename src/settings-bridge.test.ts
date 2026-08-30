@@ -490,6 +490,32 @@ test("secret_create command drives createSecret without length when omitted", as
   assert.equal(scope.value.command, null);
 });
 
+test("secret_create command drives createSecret with charset when provided", async () => {
+  const scope = fakeScope(baseValue());
+  const calls: Array<[string, unknown]> = [];
+  const resolver: any = {
+    getConfig: () => ({}),
+    setConfig: () => {},
+    async control(method: string, request: unknown) {
+      calls.push([method, request]);
+      if (method === "listContainers") return { containers: [] };
+      if (method === "listImages") return { images: [] };
+      if (method === "listWorkspaces") return { workspaces: [] };
+      if (method === "listVolumes") return { volumes: [] };
+      if (method === "listSecrets") return { secrets: [] };
+      return {};
+    },
+  };
+  installContainerSettings(fakeContext(scope), resolver);
+  await scope.update({
+    command: { op: "secret_create", workspace: "tok", length: 48, charset: "hex" },
+  });
+  await new Promise((resolve) => setImmediate(resolve));
+  const createCall = calls.find(([method]) => method === "createSecret");
+  assert.deepEqual(createCall?.[1], { name: "tok", length: 48, charset: "hex" });
+  assert.equal(scope.value.command, null);
+});
+
 test("create command drives createWorkspace with env", async () => {
   const scope = fakeScope(baseValue());
   const calls: Array<[string, unknown]> = [];

@@ -59,6 +59,7 @@ export interface CommandRequest {
   secret: string;
   secretEnv: string;
   length: number;
+  charset: string;
   packages: string[];
 }
 export interface ContainerSettings {
@@ -106,7 +107,7 @@ export interface ContainerCardFace {
   rebuildImage: (imageId: string) => void;
   rebuildAllImages: () => void;
   buildImage: (imageId: string, baseImage: string, packages: string[]) => void;
-  createSecret: (name: string, length?: number) => void;
+  createSecret: (name: string, length?: number, charset?: string) => void;
   removeSecret: (name: string) => void;
   setSecret: (name: string, value: string) => void;
   addContainerSecret: (workspace: string, envVar: string, secret: string) => void;
@@ -177,6 +178,7 @@ export class ContainerCardController {
       secret?: string;
       secretEnv?: string;
       length?: number;
+      charset?: string;
       packages?: string[];
     } = {},
   ): void {
@@ -189,6 +191,7 @@ export class ContainerCardController {
       secret: extra.secret ?? "",
       secretEnv: extra.secretEnv ?? "",
       length: extra.length ?? 0,
+      charset: extra.charset ?? "",
       packages: extra.packages ?? [],
     });
   }
@@ -233,8 +236,11 @@ export class ContainerCardController {
       rebuildAllImages: () => this.command("image_rebuild_all", "", ""),
       buildImage: (imageId, baseImage, packages) =>
         this.command("image_build", imageId, baseImage, { packages }),
-      createSecret: (name, length) =>
-        this.command("secret_create", name, "", { ...(length ? { length } : {}) }),
+      createSecret: (name, length, charset) =>
+        this.command("secret_create", name, "", {
+          ...(length ? { length } : {}),
+          ...(charset ? { charset } : {}),
+        }),
       removeSecret: (name) => this.command("secret_remove", name, ""),
       setSecret: (name, value) =>
         this.command("secret_set", name, "", { value }),

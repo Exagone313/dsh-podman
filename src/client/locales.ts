@@ -41,8 +41,12 @@ export type ContainerPluginKey =
   | "volumesTitle"
   | "createVolume"
   | "removeVolume"
+  | "volumeName"
   | "secretsTitle"
   | "createSecret"
+  | "secretName"
+  | "secretCharset"
+  | "selectImage"
   | "setSecret"
   | "removeSecret"
   | "removeImage"
@@ -114,8 +118,11 @@ export const en: Record<ContainerPluginKey, string> = {
   volumesTitle: "Volumes",
   createVolume: "Create volume",
   removeVolume: "Remove",
+  volumeName: "Volume name",
   secretsTitle: "Secrets",
   createSecret: "Create secret",
+  secretName: "Secret name",
+  secretCharset: "Charset",
   setSecret: "Set value",
   removeSecret: "Remove",
   removeImage: "Remove",
@@ -123,6 +130,7 @@ export const en: Record<ContainerPluginKey, string> = {
   rebuildAllImages: "Rebuild all",
   buildImage: "Build image",
   buildImageTitle: "Build an image",
+  selectImage: "Select an image",
   cancel: "Cancel",
   removeTag: "Remove",
   env: "Env",
@@ -193,8 +201,11 @@ export const zh: Record<ContainerPluginKey, string> = {
   volumesTitle: "卷",
   createVolume: "创建卷",
   removeVolume: "移除",
+  volumeName: "卷名称",
   secretsTitle: "机密",
   createSecret: "创建机密",
+  secretName: "机密名称",
+  secretCharset: "字符集",
   setSecret: "设置值",
   removeSecret: "移除",
   removeImage: "移除",
@@ -202,6 +213,7 @@ export const zh: Record<ContainerPluginKey, string> = {
   rebuildAllImages: "重建全部",
   buildImage: "构建镜像",
   buildImageTitle: "构建镜像",
+  selectImage: "选择镜像",
   cancel: "取消",
   removeTag: "移除",
   env: "环境变量",

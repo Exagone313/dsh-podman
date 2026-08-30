@@ -449,7 +449,11 @@ func (s *Server) RecreateContainer(ctx context.Context, request *ctl.RecreateCon
 
 func (s *Server) StartContainer(ctx context.Context, request *ctl.StartContainerRequest) (*ctl.Container, error) {
 	s.log().Info("control request", "method", "StartContainer", "workspace_slug", request.GetWorkspaceSlug(), "container", request.GetContainer(), "image_id", request.GetImageId(), "mount_count", len(request.GetMounts()))
-	if !validContainerName(request.GetContainer()) {
+	container := request.GetContainer()
+	if container == "" {
+		container = "default"
+	}
+	if container != "default" && !validContainerName(container) {
 		return nil, status.Error(codes.InvalidArgument, "invalid container name")
 	}
 	workspace, err := workspaceBySlug(s.Store, request.GetWorkspaceSlug())
@@ -464,7 +468,7 @@ func (s *Server) StartContainer(ctx context.Context, request *ctl.StartContainer
 	if len(request.GetMounts()) > 0 {
 		recordMounts = stateMounts(request.GetMounts())
 	}
-	record := state.Container{Name: request.GetContainer(), PodmanName: podmanContainerName(workspace.WorkspaceSlug, request.GetContainer()), ImageID: imageID, Mounts: recordMounts}
+	record := state.Container{Name: container, PodmanName: podmanContainerName(workspace.WorkspaceSlug, container), ImageID: imageID, Mounts: recordMounts}
 	podmanMounts, err := s.podmanMounts(containerMounts(workspace, record))
 	if err != nil {
 		s.log().Error("StartContainer project validation failed", "workspace_slug", workspace.WorkspaceSlug, "error", err)
@@ -1727,36 +1731,47 @@ func imagePrefix() string {
 }
 func (s *Server) RemoveContainer(_ context.Context, request *ctl.RemoveContainerRequest) (*ctl.RemoveContainerResponse, error) {
 	s.log().Info("control request", "method", "RemoveContainer", "workspace_slug", request.GetWorkspaceSlug(), "container", request.GetContainer())
-	if !validContainerName(request.GetContainer()) {
+	container := request.GetContainer()
+	if container == "" {
+		container = "default"
+	}
+	if container != "default" && !validContainerName(container) {
 		return nil, status.Error(codes.InvalidArgument, "invalid container name")
 	}
 	workspace, err := workspaceBySlug(s.Store, request.GetWorkspaceSlug())
 	if err != nil {
 		return nil, status.Error(codes.NotFound, "workspace not found")
 	}
-	record, ok := containerByLogical(&workspace, request.GetContainer())
+	record, ok := containerByLogical(&workspace, container)
 	if !ok {
-		s.log().Warn("control request failed", "method", "RemoveContainer", "workspace_slug", request.GetWorkspaceSlug(), "container", request.GetContainer(), "reason", "container not found")
+		s.log().Warn("control request failed", "method", "RemoveContainer", "workspace_slug", request.GetWorkspaceSlug(), "container", container, "reason", "container not found")
 		return nil, status.Error(codes.NotFound, "container not found")
 	}
 	if s.Podman == nil {
 		return nil, status.Error(codes.FailedPrecondition, "podman is not configured")
 	}
 	s.stopContainerDaemons(context.Background(), *record)
-	if err := s.Podman.Stop(record.PodmanName); err != nil {
-		s.log().Warn("RemoveContainer stop failed", "workspace_slug", request.GetWorkspaceSlug(), "container", request.GetContainer(), "error", err)
-	}
-	if err := s.Podman.Remove(record.PodmanName); err != nil {
-		s.log().Error("control request failed", "method", "RemoveContainer", "workspace_slug", request.GetWorkspaceSlug(), "container", request.GetContainer(), "error", err)
+	exists, err := s.Podman.ContainerExists(record.PodmanName)
+	if err != nil {
+		s.log().Error("control request failed", "method", "RemoveContainer", "workspace_slug", request.GetWorkspaceSlug(), "container", container, "error", err)
 		return nil, status.Error(codes.Internal, err.Error())
+	}
+	if exists {
+		if err := s.Podman.Stop(record.PodmanName); err != nil {
+			s.log().Warn("RemoveContainer stop failed", "workspace_slug", request.GetWorkspaceSlug(), "container", container, "error", err)
+		}
+		if err := s.Podman.Remove(record.PodmanName); err != nil {
+			s.log().Error("control request failed", "method", "RemoveContainer", "workspace_slug", request.GetWorkspaceSlug(), "container", container, "error", err)
+			return nil, status.Error(codes.Internal, err.Error())
+		}
 	}
 	if err := s.Store.UpdateWorkspaces(func(all []state.Workspace) ([]state.Workspace, error) {
 		for i := range all {
 			if all[i].WorkspaceSlug == workspace.WorkspaceSlug {
 				remaining := make([]state.Container, 0, len(all[i].Containers))
-				for _, container := range all[i].Containers {
-					if container.Name != request.GetContainer() {
-						remaining = append(remaining, container)
+				for _, c := range all[i].Containers {
+					if c.Name != container {
+						remaining = append(remaining, c)
 					}
 				}
 				all[i].Containers = remaining
@@ -1782,7 +1797,7 @@ func (s *Server) RemoveContainer(_ context.Context, request *ctl.RemoveContainer
 			break
 		}
 	}
-	s.log().Info("control request completed", "method", "RemoveContainer", "workspace_slug", request.GetWorkspaceSlug(), "container", request.GetContainer())
+	s.log().Info("control request completed", "method", "RemoveContainer", "workspace_slug", request.GetWorkspaceSlug(), "container", container)
 	return &ctl.RemoveContainerResponse{}, nil
 }
 

@@ -435,13 +435,25 @@ func TestContainerByLogical(t *testing.T) {
 	}
 }
 
-func TestStartContainerRejectsDefault(t *testing.T) {
+func TestStartContainerRejectsInvalidName(t *testing.T) {
 	server := &Server{Logger: silentLogger()}
-	for _, name := range []string{"", "default", "Dev", "dev_1", "-dev"} {
+	for _, name := range []string{"Dev", "dev_1", "-dev", "bad name"} {
 		_, err := server.StartContainer(context.Background(), &ctl.StartContainerRequest{WorkspaceSlug: "proj", Container: name})
 		if status.Code(err) != codes.InvalidArgument {
 			t.Errorf("container %q: expected InvalidArgument, got %v", name, err)
 		}
+	}
+}
+
+func TestStartContainerAcceptsDefault(t *testing.T) {
+	store := newTestStore(t)
+	if err := store.SaveWorkspaces([]state.Workspace{{WorkspaceSlug: "proj"}}); err != nil {
+		t.Fatal(err)
+	}
+	server := &Server{Store: store, Logger: silentLogger()}
+	_, err := server.StartContainer(context.Background(), &ctl.StartContainerRequest{WorkspaceSlug: "proj", Container: "default"})
+	if status.Code(err) != codes.FailedPrecondition {
+		t.Fatalf("default container must pass validation, expected FailedPrecondition (podman not configured), got %v", err)
 	}
 }
 
@@ -478,13 +490,25 @@ func TestStartContainerRejectsUnknownImage(t *testing.T) {
 	}
 }
 
-func TestRemoveContainerRejectsDefault(t *testing.T) {
+func TestRemoveContainerRejectsInvalidName(t *testing.T) {
 	server := &Server{Logger: silentLogger()}
-	for _, name := range []string{"", "default"} {
+	for _, name := range []string{"Dev", "dev_1", "-dev", "bad name"} {
 		_, err := server.RemoveContainer(context.Background(), &ctl.RemoveContainerRequest{WorkspaceSlug: "proj", Container: name})
 		if status.Code(err) != codes.InvalidArgument {
 			t.Errorf("container %q: expected InvalidArgument, got %v", name, err)
 		}
+	}
+}
+
+func TestRemoveContainerAcceptsDefault(t *testing.T) {
+	store := newTestStore(t)
+	if err := store.SaveWorkspaces([]state.Workspace{{WorkspaceSlug: "proj", ContainerName: "dsh-workspace-proj", Containers: []state.Container{{Name: "default", PodmanName: "dsh-workspace-proj"}}}}); err != nil {
+		t.Fatal(err)
+	}
+	server := &Server{Store: store, Logger: silentLogger()}
+	_, err := server.RemoveContainer(context.Background(), &ctl.RemoveContainerRequest{WorkspaceSlug: "proj", Container: "default"})
+	if status.Code(err) != codes.FailedPrecondition {
+		t.Fatalf("default container must pass validation, expected FailedPrecondition (podman not configured), got %v", err)
 	}
 }
 

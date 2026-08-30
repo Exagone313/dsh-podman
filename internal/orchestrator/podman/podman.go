@@ -255,11 +255,17 @@ func (c *Client) Remove(name string) error {
 
 func (c *Client) RecreateWorkspace(pod, name, image, token string, mounts []specs.Mount, secrets []specgen.Secret, envSecrets map[string]string, env map[string]string) error {
 	c.log().Info("recreating guest container", "pod_name", pod, "container_name", name, "image", image, "mount_count", len(mounts))
-	if err := c.Stop(name); err != nil {
+	exists, err := c.ContainerExists(name)
+	if err != nil {
 		return err
 	}
-	if err := c.Remove(name); err != nil {
-		return err
+	if exists {
+		if err := c.Stop(name); err != nil {
+			return err
+		}
+		if err := c.Remove(name); err != nil {
+			return err
+		}
 	}
 	return c.CreateWorkspace(pod, name, image, token, mounts, secrets, envSecrets, env)
 }

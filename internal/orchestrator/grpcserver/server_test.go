@@ -399,16 +399,6 @@ func TestStartContainerRejectsUnknownImage(t *testing.T) {
 	}
 }
 
-func TestReplaceContainerRejectsDefault(t *testing.T) {
-	server := &Server{Logger: silentLogger()}
-	for _, name := range []string{"", "default"} {
-		_, err := server.ReplaceContainer(context.Background(), &ctl.ReplaceContainerRequest{WorkspaceSlug: "proj", Container: name, ImageId: "arch"})
-		if status.Code(err) != codes.InvalidArgument {
-			t.Errorf("container %q: expected InvalidArgument, got %v", name, err)
-		}
-	}
-}
-
 func TestRemoveContainerRejectsDefault(t *testing.T) {
 	server := &Server{Logger: silentLogger()}
 	for _, name := range []string{"", "default"} {
@@ -966,7 +956,7 @@ func TestStartContainerMountsValidation(t *testing.T) {
 	}
 }
 
-func TestReplaceContainerMountsValidation(t *testing.T) {
+func TestRecreateContainerMountsValidation(t *testing.T) {
 	root := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(root, "team", "src"), 0755); err != nil {
 		t.Fatal(err)
@@ -975,12 +965,15 @@ func TestReplaceContainerMountsValidation(t *testing.T) {
 	if err := store.SaveWorkspaces([]state.Workspace{{WorkspaceSlug: "proj", Mounts: []state.Mount{{ProjectName: "team", Mode: "read_only"}}, Containers: []state.Container{{Name: "dev", PodmanName: "dsh-workspace-proj-dev", ImageID: "arch"}}}}); err != nil {
 		t.Fatal(err)
 	}
+	if err := store.SaveImages([]state.Image{{ImageID: "arch", ImageTag: "localhost/dsh-podman/arch:latest"}}); err != nil {
+		t.Fatal(err)
+	}
 	server := &Server{Store: store, ProjectsRoot: root, Logger: silentLogger()}
-	_, err := server.ReplaceContainer(context.Background(), &ctl.ReplaceContainerRequest{WorkspaceSlug: "proj", Container: "dev", ImageId: "arch", Mounts: []*ctl.ProjectMount{{ProjectName: "team", Destination: "/outside"}}})
+	_, err := server.RecreateContainer(context.Background(), &ctl.RecreateContainerRequest{WorkspaceSlug: "proj", Container: "dev", Mounts: []*ctl.ProjectMount{{ProjectName: "team", Destination: "/outside"}}})
 	if status.Code(err) != codes.InvalidArgument {
 		t.Fatalf("invalid destination: expected InvalidArgument, got %v", err)
 	}
-	_, err = server.ReplaceContainer(context.Background(), &ctl.ReplaceContainerRequest{WorkspaceSlug: "proj", Container: "dev", ImageId: "arch", Mounts: []*ctl.ProjectMount{{ProjectName: "team", Path: "src", Mode: ctl.MountMode_MOUNT_MODE_READ_ONLY}}})
+	_, err = server.RecreateContainer(context.Background(), &ctl.RecreateContainerRequest{WorkspaceSlug: "proj", Container: "dev", ImageId: "arch", Mounts: []*ctl.ProjectMount{{ProjectName: "team", Path: "src", Mode: ctl.MountMode_MOUNT_MODE_READ_ONLY}}})
 	if status.Code(err) != codes.FailedPrecondition {
 		t.Fatalf("valid mounts: expected FailedPrecondition, got %v", err)
 	}

@@ -308,17 +308,16 @@ export const containerStartParameters = {
 };
 export const containerRecreateParameters = {
   type: "object",
-  properties: { container: containerParam },
-  required: ["container"],
-};
-export const containerReplaceParameters = {
-  type: "object",
   properties: {
     container: containerParam,
-    image: { type: "string", description: "Image ID to replace with." },
+    image: {
+      type: "string",
+      description:
+        "Image ID to recreate the container with; defaults to the container's current image.",
+    },
     mounts: mountsParam,
   },
-  required: ["container", "image"],
+  required: ["container"],
 };
 export const containerMountListParameters = {
   type: "object",
@@ -553,11 +552,6 @@ export const TOOLS: ToolDefinition[] = [
     parameters: containerRecreateParameters,
     approval: true,
   },
-  {
-    name: "container_replace",
-    parameters: containerReplaceParameters,
-    approval: true,
-  },
   { name: "container_remove", parameters: containerRemoveParameters, approval: true },
   { name: "container_bash", parameters: containerBashParameters },
   { name: "container_exec", parameters: containerExecParameters },
@@ -628,7 +622,7 @@ function mountTarget(args: Record<string, unknown>): string {
   }
 }
 
-// Render a single container_replace mount item, e.g. "team/src (ro)".
+// Render a single project-mount item, e.g. "team/src (ro)".
 function replaceMountItem(mount: Record<string, unknown>): string {
   const project = typeof mount.project === "string" ? mount.project : "";
   if (project === "") return "";
@@ -689,7 +683,14 @@ export function summarizeArgs(name: string, args: Record<string, unknown>): stri
     }
     case "container_recreate": {
       const container = str("container");
-      return container === undefined ? "" : `recreate container ${container}`;
+      const image = str("image");
+      const mountItems = mounts();
+      if (container === undefined) return "";
+      const phrase = `recreate container ${container}${image === undefined ? "" : ` with ${image}`}`;
+      return part(
+        phrase,
+        mountItems === undefined ? undefined : `mounts: ${mountItems}`,
+      );
     }
     case "container_remove": {
       const container = str("container");
@@ -709,17 +710,6 @@ export function summarizeArgs(name: string, args: Record<string, unknown>): stri
     case "volume_remove": {
       const name = str("name");
       return name === undefined ? "" : `remove volume ${name}`;
-    }
-    case "container_replace": {
-      const container = str("container");
-      const image = str("image");
-      const mountItems = mounts();
-      if (container === undefined) return "";
-      const phrase = `replace container ${container}${image === undefined ? "" : ` with ${image}`}`;
-      return part(
-        phrase,
-        mountItems === undefined ? undefined : `mounts: ${mountItems}`,
-      );
     }
     case "container_mount_add":
     case "container_mount_remove": {
@@ -783,9 +773,7 @@ const TOOL_DESCRIPTIONS: Record<string, string> = {
     "List the containers of the current workspace, including the default container that is started on demand.",
   container_start: "Start a container in the current workspace.",
   container_recreate:
-    "Recreate a container in the current workspace. Requires approval: recreating replaces the running container.",
-  container_replace:
-    "Replace a container in the current workspace with a new image. Requires approval: replacing destroys the existing container.",
+    "Recreate a container in the current workspace, keeping its current image when no image is given, optionally with new project mounts. Requires approval: recreating replaces the running container.",
   container_remove: "Remove a container from the current workspace.",
   container_bash:
     "Run a shell command inside a container of the current workspace.",
@@ -888,18 +876,12 @@ export const toolHandlers: Record<
       ...(mounts === undefined ? {} : { mounts }),
     });
   },
-  container_recreate: async (resolver, input, exec) =>
-    resolver.control("recreateContainer", {
-      workspaceSlug: await sessionWorkspaceSlug(resolver, currentCwd(exec)),
-      container: input.container,
-      imageId: "",
-    }),
-  container_replace: async (resolver, input, exec) => {
+  container_recreate: async (resolver, input, exec) => {
     const mounts = mountsFromInput(input.mounts);
-    return resolver.control("replaceContainer", {
+    return resolver.control("recreateContainer", {
       workspaceSlug: await sessionWorkspaceSlug(resolver, currentCwd(exec)),
       container: input.container,
-      imageId: input.image,
+      imageId: input.image ?? "",
       ...(mounts === undefined ? {} : { mounts }),
     });
   },

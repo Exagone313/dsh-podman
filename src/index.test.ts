@@ -145,7 +145,6 @@ const EXPECTED_TOOLS = [
   "container_list",
   "container_start",
   "container_recreate",
-  "container_replace",
   "container_remove",
   "container_bash",
   "container_exec",
@@ -202,7 +201,6 @@ test("the destructive mutations require approval", () => {
     "container_mount_remove",
     "container_recreate",
     "container_remove",
-    "container_replace",
     "image_build",
     "image_rebuild",
     "image_remove",
@@ -251,14 +249,13 @@ test("approvalDecision gates exactly the approval-flagged tools", () => {
     },
     image_rebuild: { imageId: "valkey" },
     image_remove: { imageId: "valkey" },
-    container_recreate: { container: "valkey-ctr" },
-    container_remove: { container: "valkey-ctr" },
-    volume_remove: { name: "valkey-data" },
-    container_replace: {
+    container_recreate: {
       container: "valkey-ctr",
       image: "localhost/dsh-podman/nginx:latest",
       mounts: [{ project: "team", mode: "read_only" }],
     },
+    container_remove: { container: "valkey-ctr" },
+    volume_remove: { name: "valkey-data" },
     container_mount_add: {
       container: "valkey-ctr",
       kind: "volume",
@@ -329,7 +326,7 @@ test("summarizeArgs renders the approval reason for each gated tool", () => {
     "start container web with localhost/dsh-podman/nginx:latest • mounts: team/src (ro), team → /workspace/team",
   );
   assert.equal(
-    summarizeArgs("container_replace", {
+    summarizeArgs("container_recreate", {
       container: "valkey-ctr",
       image: "localhost/dsh-podman/nginx:latest",
       mounts: [
@@ -337,7 +334,7 @@ test("summarizeArgs renders the approval reason for each gated tool", () => {
         { project: "team", destination: "/workspace/team", mode: "read_write" },
       ],
     }),
-    "replace container valkey-ctr with localhost/dsh-podman/nginx:latest • mounts: team/src (ro), team → /workspace/team",
+    "recreate container valkey-ctr with localhost/dsh-podman/nginx:latest • mounts: team/src (ro), team → /workspace/team",
   );
   assert.equal(
     summarizeArgs("container_mount_add", {
@@ -393,14 +390,14 @@ test("summarizeArgs tolerates missing or malformed arguments", () => {
   assert.equal(summarizeArgs("image_build", {}), "");
   assert.equal(summarizeArgs("container_mount_add", { container: "c" }), "");
   assert.equal(summarizeArgs("image_list", { imageId: "x" }), "");
-  assert.equal(summarizeArgs("container_replace", { container: "c" }), "replace container c");
+  assert.equal(summarizeArgs("container_recreate", { container: "c" }), "recreate container c");
   assert.equal(
-    summarizeArgs("container_replace", {
+    summarizeArgs("container_recreate", {
       container: "c",
       image: "img",
       mounts: [{ mode: "read_only" }, "garbage", 42],
     }),
-    "replace container c with img",
+    "recreate container c with img",
   );
 });
 
@@ -527,7 +524,7 @@ test("mount schemas are object-rooted without per-property required", () => {
       );
     }
   }
-  for (const name of ["container_start", "container_replace"]) {
+  for (const name of ["container_start", "container_recreate"]) {
     const tool = TOOLS.find((entry) => entry.name === name);
     assert.ok(tool, `${name} registered`);
     const mounts = tool!.parameters.properties.mounts;

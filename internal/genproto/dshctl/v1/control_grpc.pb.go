@@ -35,7 +35,6 @@ const (
 	OrchestratorControl_ListContainers_FullMethodName       = "/dshctl.v1.OrchestratorControl/ListContainers"
 	OrchestratorControl_StartContainer_FullMethodName       = "/dshctl.v1.OrchestratorControl/StartContainer"
 	OrchestratorControl_RecreateContainer_FullMethodName    = "/dshctl.v1.OrchestratorControl/RecreateContainer"
-	OrchestratorControl_ReplaceContainer_FullMethodName     = "/dshctl.v1.OrchestratorControl/ReplaceContainer"
 	OrchestratorControl_RemoveContainer_FullMethodName      = "/dshctl.v1.OrchestratorControl/RemoveContainer"
 	OrchestratorControl_AddContainerMount_FullMethodName    = "/dshctl.v1.OrchestratorControl/AddContainerMount"
 	OrchestratorControl_RemoveContainerMount_FullMethodName = "/dshctl.v1.OrchestratorControl/RemoveContainerMount"
@@ -60,7 +59,6 @@ type OrchestratorControlClient interface {
 	ListContainers(ctx context.Context, in *ListContainersRequest, opts ...grpc.CallOption) (*ListContainersResponse, error)
 	StartContainer(ctx context.Context, in *StartContainerRequest, opts ...grpc.CallOption) (*Container, error)
 	RecreateContainer(ctx context.Context, in *RecreateContainerRequest, opts ...grpc.CallOption) (*Workspace, error)
-	ReplaceContainer(ctx context.Context, in *ReplaceContainerRequest, opts ...grpc.CallOption) (*Container, error)
 	RemoveContainer(ctx context.Context, in *RemoveContainerRequest, opts ...grpc.CallOption) (*RemoveContainerResponse, error)
 	AddContainerMount(ctx context.Context, in *AddContainerMountRequest, opts ...grpc.CallOption) (*Container, error)
 	RemoveContainerMount(ctx context.Context, in *RemoveContainerMountRequest, opts ...grpc.CallOption) (*Container, error)
@@ -197,16 +195,6 @@ func (c *orchestratorControlClient) RecreateContainer(ctx context.Context, in *R
 	return out, nil
 }
 
-func (c *orchestratorControlClient) ReplaceContainer(ctx context.Context, in *ReplaceContainerRequest, opts ...grpc.CallOption) (*Container, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(Container)
-	err := c.cc.Invoke(ctx, OrchestratorControl_ReplaceContainer_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
 func (c *orchestratorControlClient) RemoveContainer(ctx context.Context, in *RemoveContainerRequest, opts ...grpc.CallOption) (*RemoveContainerResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(RemoveContainerResponse)
@@ -283,7 +271,6 @@ type OrchestratorControlServer interface {
 	ListContainers(context.Context, *ListContainersRequest) (*ListContainersResponse, error)
 	StartContainer(context.Context, *StartContainerRequest) (*Container, error)
 	RecreateContainer(context.Context, *RecreateContainerRequest) (*Workspace, error)
-	ReplaceContainer(context.Context, *ReplaceContainerRequest) (*Container, error)
 	RemoveContainer(context.Context, *RemoveContainerRequest) (*RemoveContainerResponse, error)
 	AddContainerMount(context.Context, *AddContainerMountRequest) (*Container, error)
 	RemoveContainerMount(context.Context, *RemoveContainerMountRequest) (*Container, error)
@@ -335,9 +322,6 @@ func (UnimplementedOrchestratorControlServer) StartContainer(context.Context, *S
 }
 func (UnimplementedOrchestratorControlServer) RecreateContainer(context.Context, *RecreateContainerRequest) (*Workspace, error) {
 	return nil, status.Error(codes.Unimplemented, "method RecreateContainer not implemented")
-}
-func (UnimplementedOrchestratorControlServer) ReplaceContainer(context.Context, *ReplaceContainerRequest) (*Container, error) {
-	return nil, status.Error(codes.Unimplemented, "method ReplaceContainer not implemented")
 }
 func (UnimplementedOrchestratorControlServer) RemoveContainer(context.Context, *RemoveContainerRequest) (*RemoveContainerResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method RemoveContainer not implemented")
@@ -594,24 +578,6 @@ func _OrchestratorControl_RecreateContainer_Handler(srv interface{}, ctx context
 	return interceptor(ctx, in, info, handler)
 }
 
-func _OrchestratorControl_ReplaceContainer_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(ReplaceContainerRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(OrchestratorControlServer).ReplaceContainer(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: OrchestratorControl_ReplaceContainer_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(OrchestratorControlServer).ReplaceContainer(ctx, req.(*ReplaceContainerRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
 func _OrchestratorControl_RemoveContainer_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(RemoveContainerRequest)
 	if err := dec(in); err != nil {
@@ -774,10 +740,6 @@ var OrchestratorControl_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "RecreateContainer",
 			Handler:    _OrchestratorControl_RecreateContainer_Handler,
-		},
-		{
-			MethodName: "ReplaceContainer",
-			Handler:    _OrchestratorControl_ReplaceContainer_Handler,
 		},
 		{
 			MethodName: "RemoveContainer",

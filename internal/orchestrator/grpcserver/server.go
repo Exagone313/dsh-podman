@@ -367,8 +367,14 @@ func (s *Server) RecreateContainer(ctx context.Context, request *ctl.RecreateCon
 		s.log().Warn("control request failed", "method", "RecreateContainer", "workspace_slug", request.GetWorkspaceSlug(), "container", container, "reason", "container not found")
 		return nil, status.Error(codes.NotFound, "container not found")
 	}
-	if s.Podman == nil {
-		return nil, status.Error(codes.FailedPrecondition, "podman is not configured")
+	if len(request.GetMounts()) > 0 {
+		record.Mounts = stateMounts(request.GetMounts())
+	} else {
+		record.Mounts = containerMounts(workspace, *record)
+	}
+	if _, err := s.podmanMounts(record.Mounts); err != nil {
+		s.log().Error("RecreateContainer project validation failed", "workspace_slug", workspace.WorkspaceSlug, "error", err)
+		return nil, err
 	}
 	imageID := request.GetImageId()
 	if imageID == "" {
@@ -378,9 +384,8 @@ func (s *Server) RecreateContainer(ctx context.Context, request *ctl.RecreateCon
 	if err != nil {
 		return nil, err
 	}
-	if _, err := s.podmanMounts(containerMounts(workspace, *record)); err != nil {
-		s.log().Error("RecreateContainer project validation failed", "workspace_slug", workspace.WorkspaceSlug, "error", err)
-		return nil, err
+	if s.Podman == nil {
+		return nil, status.Error(codes.FailedPrecondition, "podman is not configured")
 	}
 	secret, err := token.New()
 	if err != nil {
@@ -460,56 +465,6 @@ func (s *Server) StartContainer(ctx context.Context, request *ctl.StartContainer
 	}
 	s.log().Info("control request completed", "method", "StartContainer", "workspace_slug", request.GetWorkspaceSlug(), "container", request.GetContainer(), "podman_name", record.PodmanName)
 	return containerProto(updated, record), nil
-}
-
-func (s *Server) ReplaceContainer(ctx context.Context, request *ctl.ReplaceContainerRequest) (*ctl.Container, error) {
-	s.log().Info("control request", "method", "ReplaceContainer", "workspace_slug", request.GetWorkspaceSlug(), "container", request.GetContainer(), "image_id", request.GetImageId(), "mount_count", len(request.GetMounts()))
-	if !validContainerName(request.GetContainer()) {
-		return nil, status.Error(codes.InvalidArgument, "invalid container name")
-	}
-	workspace, err := workspaceBySlug(s.Store, request.GetWorkspaceSlug())
-	if err != nil {
-		return nil, status.Error(codes.NotFound, "workspace not found")
-	}
-	record, ok := containerByLogical(&workspace, request.GetContainer())
-	if !ok {
-		s.log().Warn("control request failed", "method", "ReplaceContainer", "workspace_slug", request.GetWorkspaceSlug(), "container", request.GetContainer(), "reason", "container not found")
-		return nil, status.Error(codes.NotFound, "container not found")
-	}
-	if len(request.GetMounts()) > 0 {
-		record.Mounts = stateMounts(request.GetMounts())
-	} else {
-		record.Mounts = containerMounts(workspace, *record)
-	}
-	if _, err := s.podmanMounts(record.Mounts); err != nil {
-		s.log().Error("ReplaceContainer project validation failed", "workspace_slug", workspace.WorkspaceSlug, "error", err)
-		return nil, err
-	}
-	if s.Podman == nil {
-		return nil, status.Error(codes.FailedPrecondition, "podman is not configured")
-	}
-	imageTag, err := s.resolveImageTag(request.GetImageId())
-	if err != nil {
-		return nil, err
-	}
-	secret, err := token.New()
-	if err != nil {
-		return nil, status.Error(codes.Internal, err.Error())
-	}
-	if err := s.recreateContainer(workspace, record, imageTag, secret); err != nil {
-		s.log().Error("control request failed", "method", "ReplaceContainer", "workspace_slug", request.GetWorkspaceSlug(), "container", request.GetContainer(), "error", err)
-		return nil, status.Error(codes.Internal, err.Error())
-	}
-	record.ImageID = request.GetImageId()
-	record.Status = "running"
-	record.CreatedAt = time.Now().UTC().Format(time.RFC3339)
-	record.AgentToken = secret
-	updated, err := s.upsertContainer(workspace, *record)
-	if err != nil {
-		return nil, status.Error(codes.Internal, err.Error())
-	}
-	s.log().Info("control request completed", "method", "ReplaceContainer", "workspace_slug", request.GetWorkspaceSlug(), "container", request.GetContainer(), "image_id", request.GetImageId())
-	return containerProto(updated, *record), nil
 }
 
 // AddContainerMount adds a project, tmpfs, or named-volume mount to a

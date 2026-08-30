@@ -192,10 +192,11 @@ The orchestrator service exposes gRPC methods to back the UI and the tools:
 containers it does not own are never exposed, and a client cannot name a
 container directly; workspace slugs are validated so the container name is
 always derived server-side from `dsh-workspace-<slug>`), `StartContainer`,
-`RecreateContainer{workspace_slug, container, image_id}` (stops, removes, and
-recreates the container, optionally with a new image; an empty `image_id`
-keeps the workspace's current image), `ReplaceContainer`, `RemoveContainer`,
-`AddContainerMount`, and `RemoveContainerMount`. Containers of a workspace run
+`RecreateContainer{workspace_slug, container, image_id, mounts}` (stops,
+removes, and recreates the container, optionally with a new image or project
+mounts; an empty `image_id` keeps the workspace's current image),
+`RemoveContainer`, `AddContainerMount`, and `RemoveContainerMount`. Containers
+of a workspace run
 inside a shared podman pod (`dsh-pod-<slug>`) so they share a network
 namespace, and their root filesystems are mounted read-only. Recreating a
 container or shutting down the orchestrator first asks the container's guest
@@ -255,8 +256,7 @@ rebuilt, or removed.
 |---|---|---|
 | `container_list` | — | List the containers of the current workspace |
 | `container_start` `✱*` | `container`, optional `image`, `mounts` | Start a container (default image when `image` is omitted); approval required only when `mounts` is passed |
-| `container_recreate` ✱ | `container` | Recreate a container with the same image |
-| `container_replace` ✱ | `container`, `image`, optional `mounts` | Replace a container with a new image |
+| `container_recreate` ✱ | `container`, optional `image`, `mounts` | Recreate a container, keeping its current image when `image` is omitted, optionally with new project mounts |
 | `container_remove` ✱ | `container` | Remove a container (stops its daemons gracefully first) |
 | `container_bash` | `container`, `command`, optional `workdir` | Run a shell command |
 | `container_exec` | `container`, `argv`, optional `cwd`, `env` | Run a program |

@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: MIT
 
-import { useId, useState, type ReactNode } from "react";
+import { useEffect, useId, useState, type ReactNode } from "react";
 import {
   Button,
   DisclosureRow,
@@ -19,11 +19,13 @@ import type {
 } from "@deepseek-ai/dsh-client-ui-slots";
 import type {
   ContainerCardFace,
+  ContainerCreateConfig,
   ContainerView,
   ImageView,
+  MountInput,
+  ProjectMountView,
   WorkspaceView,
 } from "./container-card-controller.js";
-import type {} from "./container-card-controller.js";
 import { NS, type ContainerPluginKey } from "./locales.js";
 
 export type ContainerCardProps = PropsRuntime<"settings.plugin.item"> &
@@ -279,6 +281,48 @@ const sanitizeName = (raw: string): string =>
 const sanitizeImageId = (raw: string): string =>
   raw.replace(/[^a-zA-Z0-9_.\-/:]/g, "");
 
+const mountKindShort = (kind: string): string => {
+  if (kind === "MOUNT_KIND_TMPFS") return "tmpfs";
+  if (kind === "MOUNT_KIND_VOLUME") return "volume";
+  if (kind === "MOUNT_KIND_SECRET") return "secret";
+  return "project";
+};
+const mountModeShort = (mode: string): string =>
+  mode === "MOUNT_MODE_READ_ONLY" ? "read_only" : "read_write";
+const mountViewToInput = (mount: ProjectMountView): MountInput => ({
+  kind: mountKindShort(mount.kind),
+  project: mount.projectName,
+  path: mount.path,
+  destination: mount.destination,
+  mode: mountModeShort(mount.mode),
+  volume: mount.volume,
+  secret: mount.secret,
+});
+const mountLabel = (
+  t: (key: ContainerPluginKey) => string,
+  mount: MountInput,
+): string => {
+  if (mount.kind === "tmpfs") {
+    return `tmpfs${mount.destination !== "" ? ` at ${mount.destination}` : ""}`;
+  }
+  if (mount.kind === "volume") {
+    return `volume ${mount.volume}${mount.destination !== "" ? ` → ${mount.destination}` : ""}`;
+  }
+  if (mount.kind === "secret") {
+    return `secret ${mount.secret}${mount.destination !== "" ? ` → ${mount.destination}` : ""}`;
+  }
+  return `${mount.project}${mount.path !== "" ? `/${mount.path}` : ""}${mount.destination !== "" ? ` → ${mount.destination}` : ""}${mount.mode === "read_only" ? " (ro)" : " (rw)"}`;
+};
+const emptyMount = (): MountInput => ({
+  kind: "project",
+  project: "",
+  path: "",
+  destination: "",
+  mode: "read_write",
+  volume: "",
+  secret: "",
+});
+
 function ConfirmButton(props: {
   t: (key: ContainerPluginKey) => string;
   label: string;
@@ -524,10 +568,290 @@ function EnvEditor(props: {
   );
 }
 
+function MountsEditor(props: {
+  t: (key: ContainerPluginKey) => string;
+  mounts: readonly MountInput[];
+  volumes: readonly { name: string }[];
+  secrets: readonly { name: string }[];
+  busy: boolean;
+  enabled: boolean;
+  confirmRemove?: boolean;
+  onAdd: (mount: MountInput) => void;
+  onRemove: (mount: MountInput) => void;
+}): ReactNode {
+  const {
+    t,
+    mounts,
+    volumes,
+    secrets,
+    busy,
+    enabled,
+    confirmRemove,
+    onAdd,
+    onRemove,
+  } = props;
+  const [adding, setAdding] = useState(false);
+  const [draft, setDraft] = useState<MountInput>(emptyMount());
+  const mountKindId = useId();
+  const mountProjectId = useId();
+  const mountPathId = useId();
+  const mountDestinationId = useId();
+  const mountModeId = useId();
+  const mountVolumeId = useId();
+  const mountSecretId = useId();
+  const updateDraft = (patch: Partial<MountInput>): void => {
+    setDraft((prev) => ({ ...prev, ...patch }));
+  };
+  const canAdd =
+    draft.kind === "project"
+      ? draft.project.trim() !== ""
+      : draft.kind === "volume"
+        ? draft.volume !== ""
+        : draft.kind === "secret"
+          ? draft.secret !== ""
+          : true;
+  const openAdd = (): void => {
+    setDraft(emptyMount());
+    setAdding(true);
+  };
+  const submit = (): void => {
+    if (!canAdd) return;
+    onAdd(draft);
+    setAdding(false);
+  };
+  const kindField =
+    draft.kind === "tmpfs" ? (
+      <Field label={t("mountDestination")} htmlFor={mountDestinationId}>
+        <Input
+          id={mountDestinationId}
+          value={draft.destination}
+          disabled={busy}
+          onChange={(event) => updateDraft({ destination: event.target.value })}
+        />
+      </Field>
+    ) : draft.kind === "volume" ? (
+      <>
+        <Field label={t("mountVolume")} htmlFor={mountVolumeId}>
+          <select
+            id={mountVolumeId}
+            style={imageSelect}
+            value={draft.volume}
+            disabled={busy}
+            onChange={(event) => updateDraft({ volume: event.target.value })}
+          >
+            {volumes.length === 0 ? (
+              <option value="">{t("none")}</option>
+            ) : null}
+            {volumes.map((volume) => (
+              <option key={volume.name} value={volume.name}>
+                {volume.name}
+              </option>
+            ))}
+          </select>
+        </Field>
+        <Field label={t("mountDestination")} htmlFor={mountDestinationId}>
+          <Input
+            id={mountDestinationId}
+            value={draft.destination}
+            disabled={busy}
+            onChange={(event) => updateDraft({ destination: event.target.value })}
+          />
+        </Field>
+        <Field label={t("mountMode")} htmlFor={mountModeId}>
+          <select
+            id={mountModeId}
+            style={imageSelect}
+            value={draft.mode}
+            disabled={busy}
+            onChange={(event) => updateDraft({ mode: event.target.value })}
+          >
+            <option value="read_only">{t("readOnly")}</option>
+            <option value="read_write">{t("readWrite")}</option>
+          </select>
+        </Field>
+      </>
+    ) : draft.kind === "secret" ? (
+      <>
+        <Field label={t("mountSecret")} htmlFor={mountSecretId}>
+          <select
+            id={mountSecretId}
+            style={imageSelect}
+            value={draft.secret}
+            disabled={busy}
+            onChange={(event) => updateDraft({ secret: event.target.value })}
+          >
+            {secrets.length === 0 ? (
+              <option value="">{t("none")}</option>
+            ) : null}
+            {secrets.map((secret) => (
+              <option key={secret.name} value={secret.name}>
+                {secret.name}
+              </option>
+            ))}
+          </select>
+        </Field>
+        <Field label={t("mountDestination")} htmlFor={mountDestinationId}>
+          <Input
+            id={mountDestinationId}
+            value={draft.destination}
+            disabled={busy}
+            onChange={(event) => updateDraft({ destination: event.target.value })}
+          />
+        </Field>
+      </>
+    ) : (
+      <>
+        <Field label={t("mountProject")} htmlFor={mountProjectId}>
+          <Input
+            id={mountProjectId}
+            value={draft.project}
+            disabled={busy}
+            onChange={(event) => updateDraft({ project: event.target.value })}
+          />
+        </Field>
+        <Field label={t("mountPath")} htmlFor={mountPathId}>
+          <Input
+            id={mountPathId}
+            value={draft.path}
+            disabled={busy}
+            onChange={(event) => updateDraft({ path: event.target.value })}
+          />
+        </Field>
+        <Field label={t("mountDestination")} htmlFor={mountDestinationId}>
+          <Input
+            id={mountDestinationId}
+            value={draft.destination}
+            disabled={busy}
+            onChange={(event) => updateDraft({ destination: event.target.value })}
+          />
+        </Field>
+        <Field label={t("mountMode")} htmlFor={mountModeId}>
+          <select
+            id={mountModeId}
+            style={imageSelect}
+            value={draft.mode}
+            disabled={busy}
+            onChange={(event) => updateDraft({ mode: event.target.value })}
+          >
+            <option value="read_only">{t("readOnly")}</option>
+            <option value="read_write">{t("readWrite")}</option>
+          </select>
+        </Field>
+      </>
+    );
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+      {mounts.map((mount) => (
+        <div
+          key={mountLabel(t, mount)}
+          style={{
+            display: "flex",
+            flexWrap: "wrap",
+            alignItems: "center",
+            gap: "8px",
+          }}
+        >
+          <code
+            style={{
+              ...greyId,
+              flex: 1,
+              fontSize: "13px",
+              color: "var(--dsw-alias-label-primary)",
+            }}
+          >
+            {mountLabel(t, mount)}
+          </code>
+          {confirmRemove ? (
+            <ConfirmButton
+              t={t}
+              label={t("remove")}
+              title={t("confirmTitle")}
+              description={t("confirmRemoveMount")}
+              disabled={!enabled}
+              onConfirm={() => onRemove(mount)}
+            />
+          ) : (
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={!enabled}
+              onClick={() => onRemove(mount)}
+            >
+              {t("remove")}
+            </Button>
+          )}
+        </div>
+      ))}
+      <div>
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={!enabled}
+          onClick={openAdd}
+        >
+          {t("addMount")}
+        </Button>
+      </div>
+      <Modal
+        open={adding}
+        onClose={() => setAdding(false)}
+        title={t("addMount")}
+        closeLabel={t("cancel")}
+        footer={
+          <>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setAdding(false)}
+            >
+              {t("cancel")}
+            </Button>
+            <Button
+              variant="primary"
+              size="sm"
+              disabled={busy || !canAdd}
+              onClick={submit}
+            >
+              {t("addMount")}
+            </Button>
+          </>
+        }
+      >
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: "12px",
+          }}
+        >
+          <Field label={t("mountKind")} htmlFor={mountKindId}>
+            <select
+              id={mountKindId}
+              style={imageSelect}
+              value={draft.kind}
+              disabled={busy}
+              onChange={(event) =>
+                setDraft({ ...emptyMount(), kind: event.target.value })
+              }
+            >
+              <option value="project">{t("mountProject")}</option>
+              <option value="tmpfs">tmpfs</option>
+              <option value="volume">{t("mountVolume")}</option>
+              <option value="secret">{t("mountSecret")}</option>
+            </select>
+          </Field>
+          {kindField}
+        </div>
+      </Modal>
+    </div>
+  );
+}
+
 function ContainerRow(props: {
   t: (key: ContainerPluginKey) => string;
   container: ContainerView;
   images: readonly { imageId: string }[];
+  volumes: readonly { name: string }[];
   secrets: readonly { name: string }[];
   busy: boolean;
   onRemove: (workspace: string) => void;
@@ -536,6 +860,8 @@ function ContainerRow(props: {
     image: string,
     env?: Record<string, string>,
   ) => void;
+  onAddContainerMount: (workspace: string, container: string, mount: MountInput) => void;
+  onRemoveContainerMount: (workspace: string, container: string, mount: MountInput) => void;
   onAddContainerSecret: (workspace: string, envVar: string, secret: string) => void;
   onRemoveContainerSecret: (workspace: string, envVar: string) => void;
 }): ReactNode {
@@ -543,16 +869,20 @@ function ContainerRow(props: {
     t,
     container,
     images,
+    volumes,
     secrets,
     busy,
     onRemove,
     onRecreate,
+    onAddContainerMount,
+    onRemoveContainerMount,
     onAddContainerSecret,
     onRemoveContainerSecret,
   } = props;
   const [selected, setSelected] = useState(container.imageId);
   const [env, setEnv] = useState<Record<string, string>>(container.env);
   const [envOpen, setEnvOpen] = useState(false);
+  const [mountOpen, setMountOpen] = useState(false);
   const [secretOpen, setSecretOpen] = useState(false);
   const [attachSecret, setAttachSecret] = useState("");
   const [attachVar, setAttachVar] = useState("");
@@ -667,6 +997,39 @@ function ContainerRow(props: {
       </DisclosureRow>
       <DisclosureRow
         icon={<span />}
+        title={t("mountsTitle")}
+        open={mountOpen}
+        expandable
+        onToggle={() => setMountOpen(!mountOpen)}
+      >
+        <div style={wsBody}>
+          <MountsEditor
+            t={t}
+            mounts={container.mounts.map(mountViewToInput)}
+            volumes={volumes}
+            secrets={secrets}
+            busy={busy}
+            enabled={enabled}
+            confirmRemove
+            onRemove={(mount) =>
+              onRemoveContainerMount(
+                container.workspaceSlug,
+                container.containerName,
+                mount,
+              )
+            }
+            onAdd={(mount) =>
+              onAddContainerMount(
+                container.workspaceSlug,
+                container.containerName,
+                mount,
+              )
+            }
+          />
+        </div>
+      </DisclosureRow>
+      <DisclosureRow
+        icon={<span />}
         title={t("containerSecretsTitle")}
         open={secretOpen}
         expandable
@@ -755,20 +1118,296 @@ function ContainerRow(props: {
   );
 }
 
+function CreateContainerModal(props: {
+  t: (key: ContainerPluginKey) => string;
+  workspace: WorkspaceView;
+  images: readonly ImageView[];
+  volumes: readonly { name: string }[];
+  secrets: readonly { name: string }[];
+  busy: boolean;
+  defaultImage: string;
+  named: boolean;
+  existing: readonly string[];
+  open: boolean;
+  onClose: () => void;
+  onCreate: (container: string, config: ContainerCreateConfig) => void;
+}): ReactNode {
+  const {
+    t,
+    workspace,
+    images,
+    volumes,
+    secrets,
+    busy,
+    defaultImage,
+    named,
+    existing,
+    open,
+    onClose,
+    onCreate,
+  } = props;
+  const [image, setImage] = useState(workspace.imageId || defaultImage);
+  const [name, setName] = useState("");
+  const [env, setEnv] = useState<Record<string, string>>({});
+  const [mounts, setMounts] = useState<MountInput[]>(() => [
+    {
+      kind: "project",
+      project: workspace.projectName,
+      path: "",
+      destination: "",
+      mode: "read_write",
+      volume: "",
+      secret: "",
+    },
+  ]);
+  const [secretEnv, setSecretEnv] = useState<Record<string, string>>({});
+  const [attachSecret, setAttachSecret] = useState("");
+  const [attachVar, setAttachVar] = useState("");
+  const imageLabel = useId();
+  const nameLabel = useId();
+  useEffect(() => {
+    if (!open) return;
+    setImage(workspace.imageId || defaultImage);
+    setName("");
+    setEnv({});
+    setMounts([
+      {
+        kind: "project",
+        project: workspace.projectName,
+        path: "",
+        destination: "",
+        mode: "read_write",
+        volume: "",
+        secret: "",
+      },
+    ]);
+    setSecretEnv({});
+    setAttachSecret("");
+    setAttachVar("");
+  }, [open, workspace, defaultImage]);
+  const baseImages = images.filter((image) => image.isBase);
+  const customImages = images.filter((image) => !image.isBase);
+  const candidates = [
+    ...baseImages.map((image) => image.imageId),
+    ...customImages.map((image) => image.imageId),
+  ];
+  const nameTaken = existing.includes(name);
+  const validName = namePattern.test(name) && name !== "default" && !nameTaken;
+  const canCreate = !named || validName;
+  const submit = (): void => {
+    if (!canCreate) return;
+    onCreate(named ? name : "", {
+      image,
+      env,
+      mounts,
+      secretEnv,
+    });
+  };
+  const attach = (): void => {
+    const envVar = attachVar.trim();
+    if (envVar === "" || attachSecret === "") return;
+    setSecretEnv({ ...secretEnv, [envVar]: attachSecret });
+    setAttachVar("");
+  };
+  return (
+    <Modal
+      open={open}
+      onClose={onClose}
+      title={t("createContainerTitle")}
+      closeLabel={t("cancel")}
+      footer={
+        <>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onClose}
+          >
+            {t("cancel")}
+          </Button>
+          <Button
+            variant="primary"
+            size="sm"
+            disabled={!canCreate}
+            onClick={submit}
+          >
+            {t("createContainer")}
+          </Button>
+        </>
+      }
+    >
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          gap: "12px",
+        }}
+      >
+        <Field label={t("image")} htmlFor={imageLabel}>
+          <select
+            id={imageLabel}
+            style={imageSelect}
+            value={image}
+            disabled={busy}
+            onChange={(event) => setImage(event.target.value)}
+          >
+            {candidates.length === 0 ? (
+              <option value="">{t("none")}</option>
+            ) : null}
+            {candidates.map((imageId) => (
+              <option key={imageId} value={imageId}>
+                {imageId}
+              </option>
+            ))}
+          </select>
+        </Field>
+        {named ? (
+          <Field label={t("containerName")} htmlFor={nameLabel}>
+            <Input
+              id={nameLabel}
+              value={name}
+              disabled={busy}
+              onChange={(event) => setName(sanitizeName(event.target.value))}
+            />
+            {name !== "" && !validName ? (
+              <p style={{ ...hint, margin: 0 }}>
+                {nameTaken
+                  ? t("containerNameTaken")
+                  : t("invalidContainerName")}
+              </p>
+            ) : null}
+          </Field>
+        ) : null}
+        <div style={sectionTitle}>{t("envTitle")}</div>
+        <EnvEditor t={t} env={env} busy={busy} onChange={setEnv} />
+        <div style={sectionTitle}>{t("mountsTitle")}</div>
+        <MountsEditor
+          t={t}
+          mounts={mounts}
+          volumes={volumes}
+          secrets={secrets}
+          busy={busy}
+          enabled={!busy}
+          onAdd={(mount) => setMounts([...mounts, mount])}
+          onRemove={(mount) =>
+            setMounts(mounts.filter((item) => item !== mount))
+          }
+        />
+        <div style={sectionTitle}>{t("containerSecretsTitle")}</div>
+        {Object.entries(secretEnv).map(([envVar, secretName]) => (
+          <div
+            key={envVar}
+            style={{
+              display: "flex",
+              flexWrap: "wrap",
+              alignItems: "center",
+              gap: "8px",
+            }}
+          >
+            <code
+              style={{
+                ...greyId,
+                flex: 1,
+                fontSize: "13px",
+                color: "var(--dsw-alias-label-primary)",
+              }}
+            >
+              {envVar}={secretName}
+            </code>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={busy}
+              onClick={() => {
+                const next = { ...secretEnv };
+                delete next[envVar];
+                setSecretEnv(next);
+              }}
+            >
+              {t("remove")}
+            </Button>
+          </div>
+        ))}
+        <div
+          style={{
+            display: "flex",
+            flexWrap: "wrap",
+            alignItems: "center",
+            gap: "8px",
+          }}
+        >
+          <select
+            style={imageSelect}
+            value={attachSecret}
+            disabled={busy}
+            onChange={(event) => setAttachSecret(event.target.value)}
+            aria-label={t("attachSecret")}
+          >
+            {secrets.length === 0 ? (
+              <option value="">{t("none")}</option>
+            ) : null}
+            {secrets.map((secret) => (
+              <option key={secret.name} value={secret.name}>
+                {secret.name}
+              </option>
+            ))}
+          </select>
+          <Input
+            value={attachVar}
+            disabled={busy}
+            placeholder={t("secretEnvName")}
+            onChange={(event) => setAttachVar(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") attach();
+            }}
+            style={{ width: "200px" }}
+          />
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={
+              busy || attachVar.trim() === "" || attachSecret === ""
+            }
+            onClick={attach}
+          >
+            {t("attachSecret")}
+          </Button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
 function WorkspaceSection(props: {
   t: (key: ContainerPluginKey) => string;
   workspace: WorkspaceView;
   containers: readonly ContainerView[];
-  images: readonly { imageId: string }[];
+  images: readonly ImageView[];
+  volumes: readonly { name: string }[];
   secrets: readonly { name: string }[];
   busy: boolean;
+  defaultImage: string;
   onRemove: (workspace: string) => void;
   onRecreate: (
     workspace: string,
     image: string,
     env?: Record<string, string>,
   ) => void;
-  onCreate: (workspace: WorkspaceView, env?: Record<string, string>) => void;
+  onCreate: (workspace: WorkspaceView, config?: ContainerCreateConfig) => void;
+  onStartContainer: (
+    workspace: WorkspaceView,
+    container: string,
+    config?: ContainerCreateConfig,
+  ) => void;
+  onAddContainerMount: (
+    workspace: string,
+    container: string,
+    mount: MountInput,
+  ) => void;
+  onRemoveContainerMount: (
+    workspace: string,
+    container: string,
+    mount: MountInput,
+  ) => void;
   onAddContainerSecret: (workspace: string, envVar: string, secret: string) => void;
   onRemoveContainerSecret: (workspace: string, envVar: string) => void;
 }): ReactNode {
@@ -777,16 +1416,21 @@ function WorkspaceSection(props: {
     workspace,
     containers,
     images,
+    volumes,
     secrets,
     busy,
+    defaultImage,
     onRemove,
     onRecreate,
     onCreate,
+    onStartContainer,
+    onAddContainerMount,
+    onRemoveContainerMount,
     onAddContainerSecret,
     onRemoveContainerSecret,
   } = props;
   const [open, setOpen] = useState(false);
-  const [createEnv, setCreateEnv] = useState<Record<string, string>>({});
+  const [createOpen, setCreateOpen] = useState<"default" | "named" | null>(null);
   const hasContainer = containers.length > 0;
   return (
     <DisclosureRow
@@ -807,35 +1451,70 @@ function WorkspaceSection(props: {
         {!hasContainer ? (
           <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
             <p style={{ ...hint, margin: 0 }}>{t("noContainers")}</p>
-            <EnvEditor t={t} env={createEnv} busy={busy} onChange={setCreateEnv} />
             <div>
               <Button
                 variant="outline"
                 size="sm"
                 disabled={busy}
-                onClick={() => onCreate(workspace, createEnv)}
+                onClick={() => setCreateOpen("default")}
               >
                 {t("createContainer")}
               </Button>
             </div>
           </div>
         ) : (
-          containers.map((container) => (
-            <ContainerRow
-              key={container.containerName}
-              t={t}
-              container={container}
-              images={images}
-              secrets={secrets}
-              busy={busy}
-              onRemove={onRemove}
-              onRecreate={onRecreate}
-              onAddContainerSecret={onAddContainerSecret}
-              onRemoveContainerSecret={onRemoveContainerSecret}
-            />
-          ))
+          <>
+            {containers.map((container) => (
+              <ContainerRow
+                key={container.containerName}
+                t={t}
+                container={container}
+                images={images}
+                volumes={volumes}
+                secrets={secrets}
+                busy={busy}
+                onRemove={onRemove}
+                onRecreate={onRecreate}
+                onAddContainerMount={onAddContainerMount}
+                onRemoveContainerMount={onRemoveContainerMount}
+                onAddContainerSecret={onAddContainerSecret}
+                onRemoveContainerSecret={onRemoveContainerSecret}
+              />
+            ))}
+            <div>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={busy}
+                onClick={() => setCreateOpen("named")}
+              >
+                {t("addContainer")}
+              </Button>
+            </div>
+          </>
         )}
       </div>
+      <CreateContainerModal
+        t={t}
+        workspace={workspace}
+        images={images}
+        volumes={volumes}
+        secrets={secrets}
+        busy={busy}
+        defaultImage={defaultImage}
+        named={createOpen === "named"}
+        existing={containers.map((container) => container.containerName)}
+        open={createOpen !== null}
+        onClose={() => setCreateOpen(null)}
+        onCreate={(container, config) => {
+          if (createOpen === "named") {
+            onStartContainer(workspace, container, config);
+          } else {
+            onCreate(workspace, config);
+          }
+          setCreateOpen(null);
+        }}
+      />
     </DisclosureRow>
   );
 }
@@ -1542,11 +2221,16 @@ export function ContainerCard(props: ContainerCardProps): ReactNode {
                     container.workspaceSlug === workspace.workspaceSlug,
                 )}
                 images={state.images}
+                volumes={state.volumes}
                 secrets={state.secrets}
                 busy={state.busy}
+                defaultImage={state.defaultImage}
                 onRemove={props.remove}
                 onRecreate={props.recreate}
                 onCreate={props.createContainer}
+                onStartContainer={props.startContainer}
+                onAddContainerMount={props.addContainerMount}
+                onRemoveContainerMount={props.removeContainerMount}
                 onAddContainerSecret={props.addContainerSecret}
                 onRemoveContainerSecret={props.removeContainerSecret}
               />

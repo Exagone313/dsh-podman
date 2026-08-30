@@ -182,8 +182,11 @@ test("create command drives createWorkspace with mounts and image", async () => 
       workspace: "w1",
       image: "img1",
       at: 1,
-      mounts: [{ projectName: "team", mode: "MOUNT_MODE_READ_WRITE" }],
+      mounts: [{ kind: "project", project: "team", mode: "read_write", path: "", destination: "", volume: "", secret: "" }],
       env: {},
+      container: "",
+      secretEnvMap: {},
+      mount: null,
     },
   });
   await new Promise((resolve) => setImmediate(resolve));
@@ -191,7 +194,7 @@ test("create command drives createWorkspace with mounts and image", async () => 
   assert.deepEqual(createCall?.[1], {
     workspaceSlug: "w1",
     imageId: "img1",
-    mounts: [{ projectName: "team", mode: "MOUNT_MODE_READ_WRITE" }],
+    mounts: [{ projectName: "team", kind: "MOUNT_KIND_PROJECT", mode: "MOUNT_MODE_READ_WRITE" }],
   });
   assert.equal(scope.value.command, null);
 });
@@ -648,8 +651,11 @@ test("create command drives createWorkspace with env", async () => {
       workspace: "w1",
       image: "img1",
       at: 13,
-      mounts: [{ projectName: "team", mode: "MOUNT_MODE_READ_WRITE" }],
+      mounts: [],
       env: { A: "1", B: "2" },
+      container: "",
+      secretEnvMap: {},
+      mount: null,
     },
   });
   await new Promise((resolve) => setImmediate(resolve));
@@ -657,7 +663,6 @@ test("create command drives createWorkspace with env", async () => {
   assert.deepEqual(createCall?.[1], {
     workspaceSlug: "w1",
     imageId: "img1",
-    mounts: [{ projectName: "team", mode: "MOUNT_MODE_READ_WRITE" }],
     env: { A: "1", B: "2" },
   });
   assert.equal(scope.value.command, null);
@@ -684,8 +689,11 @@ test("create command drives createWorkspace without env when empty", async () =>
       workspace: "w1",
       image: "img1",
       at: 14,
-      mounts: [{ projectName: "team", mode: "MOUNT_MODE_READ_WRITE" }],
+      mounts: [],
       env: {},
+      container: "",
+      secretEnvMap: {},
+      mount: null,
     },
   });
   await new Promise((resolve) => setImmediate(resolve));
@@ -693,7 +701,6 @@ test("create command drives createWorkspace without env when empty", async () =>
   assert.deepEqual(createCall?.[1], {
     workspaceSlug: "w1",
     imageId: "img1",
-    mounts: [{ projectName: "team", mode: "MOUNT_MODE_READ_WRITE" }],
   });
   assert.equal(scope.value.command, null);
 });
@@ -918,4 +925,413 @@ test("dsh workspace layers orchestrator container info", async () => {
   assert.equal(workspaces[0].containerName, "dsh-workspace-uuid-1");
   assert.equal(workspaces[0].status, "running");
   assert.equal(workspaces[0].imageId, "arch");
+});
+
+test("create command with a container name routes to startContainer", async () => {
+  const scope = fakeScope(baseValue());
+  const calls: Array<[string, unknown]> = [];
+  const resolver: any = {
+    getConfig: () => ({}),
+    setConfig: () => {},
+    async control(method: string, request: unknown) {
+      calls.push([method, request]);
+      if (method === "listContainers") return { containers: [] };
+      if (method === "listImages") return { images: [] };
+      if (method === "listWorkspaces") return { workspaces: [] };
+      return {};
+    },
+  };
+  installContainerSettings(fakeContext(scope), resolver);
+  await scope.update({
+    command: {
+      op: "create",
+      workspace: "w1",
+      container: "dev",
+      image: "img1",
+      at: 1,
+      mounts: [],
+      env: {},
+      secretEnvMap: {},
+      mount: null,
+    },
+  });
+  await new Promise((resolve) => setImmediate(resolve));
+  const startCall = calls.find(([method]) => method === "startContainer");
+  assert.deepEqual(startCall?.[1], {
+    workspaceSlug: "w1",
+    imageId: "img1",
+    container: "dev",
+  });
+  assert.equal(
+    calls.some(([method]) => method === "createWorkspace"),
+    false,
+    "a create command with a container name must not create a workspace",
+  );
+  assert.equal(scope.value.command, null);
+});
+
+test("create command sends secret env", async () => {
+  const scope = fakeScope(baseValue());
+  const calls: Array<[string, unknown]> = [];
+  const resolver: any = {
+    getConfig: () => ({}),
+    setConfig: () => {},
+    async control(method: string, request: unknown) {
+      calls.push([method, request]);
+      if (method === "listContainers") return { containers: [] };
+      if (method === "listImages") return { images: [] };
+      if (method === "listWorkspaces") return { workspaces: [] };
+      return {};
+    },
+  };
+  installContainerSettings(fakeContext(scope), resolver);
+  await scope.update({
+    command: {
+      op: "create",
+      workspace: "w1",
+      image: "img1",
+      at: 1,
+      mounts: [],
+      env: {},
+      container: "",
+      secretEnvMap: { VALKEY_PASSWORD: "valkey-tls" },
+      mount: null,
+    },
+  });
+  await new Promise((resolve) => setImmediate(resolve));
+  const createCall = calls.find(([method]) => method === "createWorkspace");
+  assert.deepEqual(createCall?.[1], {
+    workspaceSlug: "w1",
+    imageId: "img1",
+    secretEnv: { VALKEY_PASSWORD: "valkey-tls" },
+  });
+  assert.equal(scope.value.command, null);
+
+  const calls2: Array<[string, unknown]> = [];
+  const resolver2: any = {
+    getConfig: () => ({}),
+    setConfig: () => {},
+    async control(method: string, request: unknown) {
+      calls2.push([method, request]);
+      if (method === "listContainers") return { containers: [] };
+      if (method === "listImages") return { images: [] };
+      if (method === "listWorkspaces") return { workspaces: [] };
+      return {};
+    },
+  };
+  const scope2 = fakeScope(baseValue());
+  installContainerSettings(fakeContext(scope2), resolver2);
+  await scope2.update({
+    command: {
+      op: "create",
+      workspace: "w1",
+      image: "img1",
+      at: 2,
+      mounts: [],
+      env: {},
+      container: "",
+      secretEnvMap: {},
+      mount: null,
+    },
+  });
+  await new Promise((resolve) => setImmediate(resolve));
+  const createCall2 = calls2.find(([method]) => method === "createWorkspace");
+  assert.deepEqual(createCall2?.[1], {
+    workspaceSlug: "w1",
+    imageId: "img1",
+  });
+  assert.equal(scope2.value.command, null);
+});
+
+test("container_mount_add command drives addContainerMount for each kind", async () => {
+  const scope = fakeScope(baseValue());
+  const calls: Array<[string, unknown]> = [];
+  const resolver: any = {
+    getConfig: () => ({}),
+    setConfig: () => {},
+    async control(method: string, request: unknown) {
+      calls.push([method, request]);
+      if (method === "listContainers") return { containers: [] };
+      if (method === "listImages") return { images: [] };
+      if (method === "listWorkspaces") return { workspaces: [] };
+      return {};
+    },
+  };
+  installContainerSettings(fakeContext(scope), resolver);
+  await scope.update({
+    command: {
+      op: "container_mount_add",
+      workspace: "w1",
+      container: "web",
+      image: "",
+      at: 1,
+      mount: {
+        kind: "project",
+        project: "team",
+        path: "src",
+        destination: "/workspace/team",
+        mode: "read_only",
+        volume: "",
+        secret: "",
+      },
+    },
+  });
+  await new Promise((resolve) => setImmediate(resolve));
+  await scope.update({
+    command: {
+      op: "container_mount_add",
+      workspace: "w1",
+      container: "web",
+      image: "",
+      at: 2,
+      mount: {
+        kind: "volume",
+        project: "",
+        path: "",
+        destination: "/data",
+        mode: "read_write",
+        volume: "valkey-data",
+        secret: "",
+      },
+    },
+  });
+  await new Promise((resolve) => setImmediate(resolve));
+  await scope.update({
+    command: {
+      op: "container_mount_add",
+      workspace: "w1",
+      container: "web",
+      image: "",
+      at: 3,
+      mount: {
+        kind: "tmpfs",
+        project: "",
+        path: "",
+        destination: "/dev/shm",
+        mode: "read_write",
+        volume: "",
+        secret: "",
+      },
+    },
+  });
+  await new Promise((resolve) => setImmediate(resolve));
+  await scope.update({
+    command: {
+      op: "container_mount_add",
+      workspace: "w1",
+      container: "",
+      image: "",
+      at: 4,
+      mount: {
+        kind: "secret",
+        project: "",
+        path: "",
+        destination: "/run/secrets/tls",
+        mode: "read_write",
+        volume: "",
+        secret: "valkey-tls",
+      },
+    },
+  });
+  await new Promise((resolve) => setImmediate(resolve));
+  const addCalls = calls.filter(([method]) => method === "addContainerMount");
+  assert.deepEqual(addCalls.map(([, request]) => request), [
+    {
+      workspaceSlug: "w1",
+      container: "web",
+      kind: "MOUNT_KIND_PROJECT",
+      project: "team",
+      path: "src",
+      destination: "/workspace/team",
+      mode: "MOUNT_MODE_READ_ONLY",
+    },
+    {
+      workspaceSlug: "w1",
+      container: "web",
+      kind: "MOUNT_KIND_VOLUME",
+      volume: "valkey-data",
+      destination: "/data",
+      mode: "MOUNT_MODE_READ_WRITE",
+    },
+    {
+      workspaceSlug: "w1",
+      container: "web",
+      kind: "MOUNT_KIND_TMPFS",
+      destination: "/dev/shm",
+      mode: "MOUNT_MODE_READ_WRITE",
+    },
+    {
+      workspaceSlug: "w1",
+      container: "default",
+      kind: "MOUNT_KIND_SECRET",
+      secret: "valkey-tls",
+      destination: "/run/secrets/tls",
+    },
+  ]);
+  assert.equal(scope.value.command, null);
+});
+
+test("container_mount_remove command drives removeContainerMount for each kind", async () => {
+  const scope = fakeScope(baseValue());
+  const calls: Array<[string, unknown]> = [];
+  const resolver: any = {
+    getConfig: () => ({}),
+    setConfig: () => {},
+    async control(method: string, request: unknown) {
+      calls.push([method, request]);
+      if (method === "listContainers") return { containers: [] };
+      if (method === "listImages") return { images: [] };
+      if (method === "listWorkspaces") return { workspaces: [] };
+      return {};
+    },
+  };
+  installContainerSettings(fakeContext(scope), resolver);
+  await scope.update({
+    command: {
+      op: "container_mount_remove",
+      workspace: "w1",
+      container: "web",
+      image: "",
+      at: 1,
+      mount: {
+        kind: "project",
+        project: "team",
+        path: "src",
+        destination: "/workspace/team",
+        mode: "read_write",
+        volume: "",
+        secret: "",
+      },
+    },
+  });
+  await new Promise((resolve) => setImmediate(resolve));
+  await scope.update({
+    command: {
+      op: "container_mount_remove",
+      workspace: "w1",
+      container: "web",
+      image: "",
+      at: 2,
+      mount: {
+        kind: "volume",
+        project: "",
+        path: "",
+        destination: "",
+        mode: "read_write",
+        volume: "valkey-data",
+        secret: "",
+      },
+    },
+  });
+  await new Promise((resolve) => setImmediate(resolve));
+  await scope.update({
+    command: {
+      op: "container_mount_remove",
+      workspace: "w1",
+      container: "",
+      image: "",
+      at: 3,
+      mount: {
+        kind: "tmpfs",
+        project: "",
+        path: "",
+        destination: "/dev/shm",
+        mode: "read_write",
+        volume: "",
+        secret: "",
+      },
+    },
+  });
+  await new Promise((resolve) => setImmediate(resolve));
+  await scope.update({
+    command: {
+      op: "container_mount_remove",
+      workspace: "w1",
+      container: "web",
+      image: "",
+      at: 4,
+      mount: {
+        kind: "secret",
+        project: "",
+        path: "",
+        destination: "/run/secrets/tls",
+        mode: "read_write",
+        volume: "",
+        secret: "valkey-tls",
+      },
+    },
+  });
+  await new Promise((resolve) => setImmediate(resolve));
+  const removeCalls = calls.filter(([method]) => method === "removeContainerMount");
+  assert.deepEqual(removeCalls.map(([, request]) => request), [
+    {
+      workspaceSlug: "w1",
+      container: "web",
+      kind: "MOUNT_KIND_PROJECT",
+      project: "team",
+      path: "src",
+      destination: "/workspace/team",
+    },
+    {
+      workspaceSlug: "w1",
+      container: "web",
+      kind: "MOUNT_KIND_VOLUME",
+      volume: "valkey-data",
+    },
+    {
+      workspaceSlug: "w1",
+      container: "default",
+      kind: "MOUNT_KIND_TMPFS",
+      destination: "/dev/shm",
+    },
+    {
+      workspaceSlug: "w1",
+      container: "web",
+      kind: "MOUNT_KIND_SECRET",
+      secret: "valkey-tls",
+      destination: "/run/secrets/tls",
+    },
+  ]);
+  assert.equal(scope.value.command, null);
+});
+
+test("listContainers container mounts carry the raw proto fields", async () => {
+  const scope = fakeScope(baseValue());
+  const resolver: any = {
+    getConfig: () => ({}),
+    setConfig: () => {},
+    async control(method: string) {
+      if (method === "listContainers") {
+        return {
+          containers: [{
+            containerName: "c1",
+            workspaceSlug: "w1",
+            mounts: [{
+              projectName: "team",
+              path: "src",
+              destination: "/x",
+              kind: "MOUNT_KIND_PROJECT",
+              mode: "MOUNT_MODE_READ_WRITE",
+              volume: "",
+              secret: "",
+            }],
+          }],
+        };
+      }
+      if (method === "listImages") return { images: [] };
+      if (method === "listWorkspaces") return { workspaces: [] };
+      return {};
+    },
+  };
+  installContainerSettings(fakeContext(scope), resolver);
+  await scope.update({});
+  assert.deepEqual((scope.value.containers as any[])[0].mounts[0], {
+    projectName: "team",
+    path: "src",
+    destination: "/x",
+    kind: "MOUNT_KIND_PROJECT",
+    mode: "MOUNT_MODE_READ_WRITE",
+    volume: "",
+    secret: "",
+  });
 });

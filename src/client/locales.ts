@@ -91,6 +91,22 @@ export type ContainerPluginKey =
   | "confirmSetSecret"
   | "confirmRemoveSecret"
   | "confirmDetachSecret"
+  | "mountsTitle"
+  | "addMount"
+  | "mountKind"
+  | "mountProject"
+  | "mountPath"
+  | "mountDestination"
+  | "mountVolume"
+  | "mountSecret"
+  | "mountMode"
+  | "readOnly"
+  | "readWrite"
+  | "confirmRemoveMount"
+  | "createContainerTitle"
+  | "addContainer"
+  | "invalidContainerName"
+  | "containerNameTaken"
   | "invalidName"
   | "invalidImageId";
 
@@ -184,6 +200,22 @@ export const en: Record<ContainerPluginKey, string> = {
     "Remove this secret? Containers using it must drop it first.",
   confirmDetachSecret:
     "Detach this secret environment variable from the container?",
+  mountsTitle: "Mounts",
+  addMount: "Add mount",
+  mountKind: "Kind",
+  mountProject: "Project",
+  mountPath: "Path",
+  mountDestination: "Destination",
+  mountVolume: "Volume",
+  mountSecret: "Secret",
+  mountMode: "Mode",
+  readOnly: "Read-only",
+  readWrite: "Read-write",
+  confirmRemoveMount: "Remove this mount from the container and recreate it?",
+  createContainerTitle: "Create container",
+  addContainer: "Add container",
+  invalidContainerName: "Invalid container name",
+  containerNameTaken: "Container name already exists",
   invalidName:
     "Start with a letter or digit; only letters, digits, '.', '_', '-' (max 64).",
   invalidImageId:
@@ -275,6 +307,22 @@ export const zh: Record<ContainerPluginKey, string> = {
   confirmSetSecret: "覆盖该机密的值？",
   confirmRemoveSecret: "移除该机密？使用它的容器需先移除注入。",
   confirmDetachSecret: "从容器上移除该机密环境变量？",
+  mountsTitle: "挂载",
+  addMount: "添加挂载",
+  mountKind: "类型",
+  mountProject: "项目",
+  mountPath: "路径",
+  mountDestination: "目标路径",
+  mountVolume: "卷",
+  mountSecret: "机密",
+  mountMode: "模式",
+  readOnly: "只读",
+  readWrite: "读写",
+  confirmRemoveMount: "从容器中移除该挂载并重建容器？",
+  createContainerTitle: "创建容器",
+  addContainer: "添加容器",
+  invalidContainerName: "容器名称无效",
+  containerNameTaken: "容器名称已存在",
   invalidName: "以字母或数字开头，仅可使用字母、数字、'.'、'_'、'-'（最长 64 个字符）。",
   invalidImageId: "以字母、数字或 '_' 开头，仅可使用字母、数字、'.'、'_'、'-'、'/'、':'（最长 128 个字符）。",
 };

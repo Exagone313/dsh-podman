@@ -27,18 +27,21 @@ const commandSchema = z.object({
     z.const("image_build"),
     z.const("image_base_rebuild"),
     z.const("image_base_pull"),
+    z.const("container_mount_add"),
+    z.const("container_mount_remove"),
   ]),
   workspace: z.string().default(""),
   image: z.string().default(""),
   at: z.number().default(0),
-  mounts: z
-    .array(
-      z.object({
-        projectName: z.string().default(""),
-        mode: z.string().default(""),
-      }),
-    )
-    .default([]),
+  mounts: z.array(z.object({
+    kind: z.string().default(""),
+    project: z.string().default(""),
+    path: z.string().default(""),
+    destination: z.string().default(""),
+    mode: z.string().default(""),
+    volume: z.string().default(""),
+    secret: z.string().default(""),
+  })).default([]),
   value: z.string().default(""),
   env: z.dict(z.string()).default({}),
   container: z.string().default(""),
@@ -47,6 +50,19 @@ const commandSchema = z.object({
   length: z.number().default(0),
   charset: z.string().default(""),
   packages: z.array(z.string()).default([]),
+  secretEnvMap: z.dict(z.string()).default({}),
+  mount: z.union([
+    z.object({
+      kind: z.string().default(""),
+      project: z.string().default(""),
+      path: z.string().default(""),
+      destination: z.string().default(""),
+      mode: z.string().default(""),
+      volume: z.string().default(""),
+      secret: z.string().default(""),
+    }),
+    z.const(null),
+  ]).default(null),
 });
 
 export const settingsSchema = z.object({
@@ -82,14 +98,15 @@ export const settingsSchema = z.object({
         imageId: z.string().default(""),
         status: z.string().default(""),
         createdAt: z.string().default(""),
-        mounts: z
-          .array(
-            z.object({
-              projectName: z.string().default(""),
-              mode: z.string().default(""),
-            }),
-          )
-          .default([]),
+        mounts: z.array(z.object({
+          projectName: z.string().default(""),
+          path: z.string().default(""),
+          destination: z.string().default(""),
+          kind: z.string().default(""),
+          mode: z.string().default(""),
+          volume: z.string().default(""),
+          secret: z.string().default(""),
+        })).default([]),
         env: z.dict(z.string()).default({}),
         secretEnv: z.dict(z.string()).default({}),
       }),
@@ -128,12 +145,21 @@ export const settingsSchema = z.object({
   command: z.union([commandSchema, z.const(null)]).default(null),
 }) as unknown as z<ContainerSettings>;
 
+export interface MountInput {
+  kind: string;
+  project: string;
+  path: string;
+  destination: string;
+  mode: string;
+  volume: string;
+  secret: string;
+}
 export interface CommandRequest {
-  op: "refresh" | "remove" | "recreate" | "create" | "volume_create" | "volume_remove" | "image_remove" | "secret_create" | "secret_remove" | "secret_set" | "image_rebuild" | "image_rebuild_all" | "container_secret_add" | "container_secret_remove" | "image_build" | "image_base_rebuild" | "image_base_pull";
+  op: "refresh" | "remove" | "recreate" | "create" | "volume_create" | "volume_remove" | "image_remove" | "secret_create" | "secret_remove" | "secret_set" | "image_rebuild" | "image_rebuild_all" | "container_secret_add" | "container_secret_remove" | "image_build" | "image_base_rebuild" | "image_base_pull" | "container_mount_add" | "container_mount_remove";
   workspace: string;
   image: string;
   at: number;
-  mounts: readonly { projectName: string; mode: string }[];
+  mounts: readonly MountInput[];
   value: string;
   env: Record<string, string>;
   container: string;
@@ -142,6 +168,8 @@ export interface CommandRequest {
   length: number;
   charset: string;
   packages: string[];
+  secretEnvMap: Record<string, string>;
+  mount: MountInput | null;
 }
 export interface ContainerView {
   containerName: string;
@@ -149,7 +177,7 @@ export interface ContainerView {
   imageId: string;
   status: string;
   createdAt: string;
-  mounts: readonly { projectName: string; mode: string }[];
+  mounts: readonly { projectName: string; path: string; destination: string; kind: string; mode: string; volume: string; secret: string }[];
   env: Record<string, string>;
   secretEnv: Record<string, string>;
 }
@@ -203,6 +231,21 @@ export interface ContainerSettingsScope {
   ): () => void;
   update(patch: object): Promise<void>;
   replace(section: object): Promise<void>;
+}
+
+function mountInputToProto(mount: { kind: string; project: string; path: string; destination: string; mode: string; volume: string; secret: string }): Record<string, unknown> {
+  const kind =
+    mount.kind === "tmpfs" ? "MOUNT_KIND_TMPFS"
+    : mount.kind === "volume" ? "MOUNT_KIND_VOLUME"
+    : mount.kind === "secret" ? "MOUNT_KIND_SECRET"
+    : "MOUNT_KIND_PROJECT";
+  const mode = mount.mode === "read_only" ? "MOUNT_MODE_READ_ONLY" : "MOUNT_MODE_READ_WRITE";
+  const result: Record<string, unknown> = { projectName: mount.project ?? "", kind, mode };
+  if (mount.path) result.path = mount.path;
+  if (mount.destination) result.destination = mount.destination;
+  if (mount.volume) result.volume = mount.volume;
+  if (mount.secret) result.secret = mount.secret;
+  return result;
 }
 
 function orchestratorWorkspaceViews(raw: unknown): WorkspaceView[] {
@@ -318,14 +361,47 @@ export function installContainerSettings(
         switch (command.op) {
           case "refresh":
             break;
-          case "create":
-            await resolver.control("createWorkspace", {
+          case "create": {
+            const payload: Record<string, unknown> = {
               workspaceSlug: command.workspace,
               imageId: command.image === "" ? undefined : command.image,
-              mounts: command.mounts,
-              ...(Object.keys(command.env).length > 0 ? { env: command.env } : {}),
-            });
+            };
+            const mounts = command.mounts.map(mountInputToProto);
+            if (mounts.length > 0) payload.mounts = mounts;
+            if (Object.keys(command.env).length > 0) payload.env = command.env;
+            if (Object.keys(command.secretEnvMap).length > 0) payload.secretEnv = command.secretEnvMap;
+            if (command.container !== "") {
+              await resolver.control("startContainer", { ...payload, container: command.container });
+            } else {
+              await resolver.control("createWorkspace", payload);
+            }
             break;
+          }
+          case "container_mount_add": {
+            const m = command.mount;
+            if (m === null) break;
+            const kind = m.kind === "tmpfs" ? "MOUNT_KIND_TMPFS" : m.kind === "volume" ? "MOUNT_KIND_VOLUME" : m.kind === "secret" ? "MOUNT_KIND_SECRET" : "MOUNT_KIND_PROJECT";
+            const mode = m.mode === "read_only" ? "MOUNT_MODE_READ_ONLY" : "MOUNT_MODE_READ_WRITE";
+            const request: Record<string, unknown> = { workspaceSlug: command.workspace, container: command.container || "default", kind };
+            if (kind === "MOUNT_KIND_VOLUME") { request.volume = m.volume; request.destination = m.destination; request.mode = mode; }
+            else if (kind === "MOUNT_KIND_TMPFS") { request.destination = m.destination; request.mode = mode; }
+            else if (kind === "MOUNT_KIND_SECRET") { request.secret = m.secret; request.destination = m.destination; }
+            else { request.project = m.project; if (m.path) request.path = m.path; if (m.destination) request.destination = m.destination; request.mode = mode; }
+            await resolver.control("addContainerMount", request);
+            break;
+          }
+          case "container_mount_remove": {
+            const m = command.mount;
+            if (m === null) break;
+            const kind = m.kind === "tmpfs" ? "MOUNT_KIND_TMPFS" : m.kind === "volume" ? "MOUNT_KIND_VOLUME" : m.kind === "secret" ? "MOUNT_KIND_SECRET" : "MOUNT_KIND_PROJECT";
+            const request: Record<string, unknown> = { workspaceSlug: command.workspace, container: command.container || "default", kind };
+            if (kind === "MOUNT_KIND_PROJECT") { request.project = m.project; if (m.path) request.path = m.path; }
+            else if (kind === "MOUNT_KIND_VOLUME") { if (m.volume) request.volume = m.volume; }
+            else if (kind === "MOUNT_KIND_SECRET") { if (m.secret) request.secret = m.secret; }
+            if (m.destination) request.destination = m.destination;
+            await resolver.control("removeContainerMount", request);
+            break;
+          }
           case "remove":
             await resolver.control("removeContainer", {
               workspaceSlug: command.workspace,

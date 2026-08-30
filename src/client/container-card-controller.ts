@@ -13,7 +13,27 @@ export const CONTAINER_NS = "podman";
 
 export interface ProjectMountView {
   projectName: string;
-  mode: string;
+  path: string;
+  destination: string;
+  kind: string; // "MOUNT_KIND_PROJECT" | "MOUNT_KIND_TMPFS" | "MOUNT_KIND_VOLUME" | "MOUNT_KIND_SECRET"
+  mode: string; // "MOUNT_MODE_READ_ONLY" | "MOUNT_MODE_READ_WRITE"
+  volume: string;
+  secret: string;
+}
+export interface MountInput {
+  kind: string;      // "project" | "tmpfs" | "volume" | "secret"
+  project: string;   // project short name (kind=project)
+  path: string;      // path within the project (kind=project)
+  destination: string; // destination path inside the container
+  mode: string;      // "read_only" | "read_write"
+  volume: string;    // volume short name (kind=volume)
+  secret: string;    // secret short name (kind=secret)
+}
+export interface ContainerCreateConfig {
+  image?: string;
+  env?: Record<string, string>;
+  mounts?: readonly MountInput[];
+  secretEnv?: Record<string, string>;
 }
 export interface ContainerView {
   containerName: string;
@@ -53,11 +73,11 @@ export interface WorkspaceView {
   mounts: readonly { projectName: string; mode: string }[];
 }
 export interface CommandRequest {
-  op: "refresh" | "remove" | "recreate" | "create" | "volume_create" | "volume_remove" | "image_remove" | "secret_create" | "secret_remove" | "secret_set" | "image_rebuild" | "image_rebuild_all" | "container_secret_add" | "container_secret_remove" | "image_build" | "image_base_rebuild" | "image_base_pull";
+  op: "refresh" | "remove" | "recreate" | "create" | "volume_create" | "volume_remove" | "image_remove" | "secret_create" | "secret_remove" | "secret_set" | "image_rebuild" | "image_rebuild_all" | "container_secret_add" | "container_secret_remove" | "image_build" | "image_base_rebuild" | "image_base_pull" | "container_mount_add" | "container_mount_remove";
   workspace: string;
   image: string;
   at: number;
-  mounts: readonly { projectName: string; mode: string }[];
+  mounts: readonly MountInput[];
   value: string;
   env: Record<string, string>;
   container: string;
@@ -66,6 +86,8 @@ export interface CommandRequest {
   length: number;
   charset: string;
   packages: string[];
+  secretEnvMap: Record<string, string>;
+  mount: MountInput | null;
 }
 export interface ContainerSettings {
   defaultImage: string;
@@ -104,7 +126,10 @@ export interface ContainerCardFace {
   reload: () => void;
   remove: (workspace: string) => void;
   recreate: (workspace: string, image: string, env?: Record<string, string>) => void;
-  createContainer: (workspace: WorkspaceView, env?: Record<string, string>) => void;
+  createContainer: (workspace: WorkspaceView, config?: ContainerCreateConfig) => void;
+  startContainer: (workspace: WorkspaceView, container: string, config?: ContainerCreateConfig) => void;
+  addContainerMount: (workspace: string, container: string, mount: MountInput) => void;
+  removeContainerMount: (workspace: string, container: string, mount: MountInput) => void;
   createVolume: (name: string) => void;
   removeVolume: (name: string) => void;
   removeImage: (imageId: string) => void;
@@ -174,7 +199,7 @@ export class ContainerCardController {
     workspace: string,
     image: string,
     extra: {
-      mounts?: readonly { projectName: string; mode: string }[];
+      mounts?: readonly MountInput[];
       value?: string;
       env?: Record<string, string>;
       container?: string;
@@ -183,6 +208,8 @@ export class ContainerCardController {
       length?: number;
       charset?: string;
       packages?: string[];
+      secretEnvMap?: Record<string, string>;
+      mount?: MountInput | null;
     } = {},
   ): void {
     void this.scope.set("command", {
@@ -196,6 +223,8 @@ export class ContainerCardController {
       length: extra.length ?? 0,
       charset: extra.charset ?? "",
       packages: extra.packages ?? [],
+      secretEnvMap: extra.secretEnvMap ?? {},
+      mount: extra.mount ?? null,
     });
   }
 
@@ -222,16 +251,33 @@ export class ContainerCardController {
       remove: (workspace) => this.command("remove", workspace, ""),
       recreate: (workspace, image, env) =>
         this.command("recreate", workspace, image, { ...(env ? { env } : {}) }),
-      createContainer: (workspace, env) =>
+      createContainer: (workspace, config) =>
         this.command(
           "create",
           workspace.workspaceSlug,
-          workspace.imageId || this.scope.getSnapshot().value?.defaultImage || "",
+          config?.image ?? (workspace.imageId || this.scope.getSnapshot().value?.defaultImage || ""),
           {
-            mounts: workspace.mounts,
-            ...(env ? { env } : {}),
+            ...(config?.mounts && config.mounts.length > 0 ? { mounts: config.mounts } : {}),
+            ...(config?.env && Object.keys(config.env).length > 0 ? { env: config.env } : {}),
+            ...(config?.secretEnv && Object.keys(config.secretEnv).length > 0 ? { secretEnvMap: config.secretEnv } : {}),
           },
         ),
+      startContainer: (workspace, container, config) =>
+        this.command(
+          "create",
+          workspace.workspaceSlug,
+          config?.image ?? (workspace.imageId || this.scope.getSnapshot().value?.defaultImage || ""),
+          {
+            container,
+            ...(config?.mounts && config.mounts.length > 0 ? { mounts: config.mounts } : {}),
+            ...(config?.env && Object.keys(config.env).length > 0 ? { env: config.env } : {}),
+            ...(config?.secretEnv && Object.keys(config.secretEnv).length > 0 ? { secretEnvMap: config.secretEnv } : {}),
+          },
+        ),
+      addContainerMount: (workspace, container, mount) =>
+        this.command("container_mount_add", workspace, "", { container, mount }),
+      removeContainerMount: (workspace, container, mount) =>
+        this.command("container_mount_remove", workspace, "", { container, mount }),
       createVolume: (name) => this.command("volume_create", name, ""),
       removeVolume: (name) => this.command("volume_remove", name, ""),
       removeImage: (imageId) => this.command("image_remove", imageId, ""),

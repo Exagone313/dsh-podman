@@ -144,6 +144,7 @@ const EXPECTED_TOOLS = [
   "image_get",
   "image_build",
   "image_rebuild",
+  "image_rebuild_all",
   "image_remove",
   "container_list",
   "container_start",
@@ -213,6 +214,7 @@ test("the destructive mutations require approval", () => {
     "container_secret_remove",
     "image_build",
     "image_rebuild",
+    "image_rebuild_all",
     "image_remove",
     "secret_remove",
     "volume_remove",
@@ -322,6 +324,7 @@ test("summarizeArgs renders the approval reason for each gated tool", () => {
     "build image dev from localhost/dsh-podman/arch-base:latest • packages: git, curl, tmux, vim, zsh, openssh, jq, ripgrep, +3 more",
   );
   assert.equal(summarizeArgs("image_rebuild", { imageId: "valkey" }), "rebuild image valkey");
+  assert.equal(summarizeArgs("image_rebuild_all", {}), "rebuild all images");
   assert.equal(summarizeArgs("image_remove", { imageId: "valkey" }), "remove image valkey");
   assert.equal(
     summarizeArgs("container_recreate", { container: "valkey-ctr" }),

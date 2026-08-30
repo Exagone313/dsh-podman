@@ -297,6 +297,11 @@ export const imageRebuildParameters = {
   properties: { imageId: imageIdParam },
   required: ["imageId"],
 };
+export const imageRebuildAllParameters = {
+  type: "object",
+  properties: {},
+  required: [] as string[],
+};
 export const imageRemoveParameters = {
   type: "object",
   properties: { imageId: imageIdParam },
@@ -590,6 +595,11 @@ export const TOOLS: ToolDefinition[] = [
     approval: true,
   },
   { name: "image_rebuild", parameters: imageRebuildParameters, approval: true },
+  {
+    name: "image_rebuild_all",
+    parameters: imageRebuildAllParameters,
+    approval: true,
+  },
   { name: "image_remove", parameters: imageRemoveParameters, approval: true },
   { name: "container_list", parameters: containerListParameters },
   {
@@ -766,6 +776,8 @@ export function summarizeArgs(name: string, args: Record<string, unknown>): stri
       const image = str("imageId");
       return image === undefined ? "" : `rebuild image ${image}`;
     }
+    case "image_rebuild_all":
+      return "rebuild all images";
     case "image_remove": {
       const image = str("imageId");
       return image === undefined ? "" : `remove image ${image}`;
@@ -1077,6 +1089,8 @@ const TOOL_DESCRIPTIONS: Record<string, string> = {
     "Build a new workspace image from a base image and a set of packages. Requires approval: building installs packages system-wide into a container image.",
   image_rebuild:
     "Rebuild an existing workspace image. Requires approval: rebuilding replaces the current image content.",
+  image_rebuild_all:
+    "Rebuild every stored image in dependency order (base first), skipping any image whose rebuild fails and its dependents. Requires approval: rebuilding replaces the images' contents.",
   image_remove:
     "Remove a built workspace image. Requires approval: removing deletes the image so containers using it must be recreated from another image.",
   container_list:
@@ -1151,6 +1165,15 @@ export const toolHandlers: Record<
     }),
   image_rebuild: async (resolver, input) =>
     resolver.control("rebuildImage", { imageId: input.imageId }),
+  image_rebuild_all: async (resolver) => {
+    const result = await resolver.control<{ rebuilt?: string[]; skipped?: string[] }>(
+      "rebuildAllImages",
+      {},
+    );
+    const rebuilt = (result.rebuilt ?? []).join(", ");
+    const skipped = (result.skipped ?? []).join(", ");
+    return `rebuilt: ${rebuilt || "(none)"}${skipped ? `\nskipped: ${skipped}` : ""}`;
+  },
   image_remove: async (resolver, input) =>
     resolver.control("removeImage", { imageId: input.imageId }),
   container_list: async (resolver, _input, exec) => {

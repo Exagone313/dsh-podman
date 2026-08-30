@@ -849,6 +849,59 @@ func (s *Server) RebuildImage(_ context.Context, request *ctl.RebuildImageReques
 	s.log().Info("control request completed", "method", "RebuildImage", "image_id", stored.ImageID, "image_tag", stored.ImageTag)
 	return imageProto(stored), nil
 }
+func (s *Server) RebuildAllImages(_ context.Context, _ *ctl.RebuildAllImagesRequest) (*ctl.RebuildAllImagesResponse, error) {
+	s.log().Info("control request", "method", "RebuildAllImages")
+	if s.Podman == nil {
+		return nil, status.Error(codes.FailedPrecondition, "podman is not configured")
+	}
+	if s.ImageBuilder == nil {
+		return nil, status.Error(codes.FailedPrecondition, "image builder is not configured")
+	}
+	images, err := s.Store.Images()
+	if err != nil {
+		s.log().Error("control request failed", "method", "RebuildAllImages", "error", err)
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	if len(images) == 0 {
+		return nil, status.Error(codes.NotFound, "no images to rebuild")
+	}
+
+	// Compute a deterministic, dependency-ordered rebuild plan up front; build
+	// failures discovered during execution propagate to the failed image and
+	// its transitive dependents while every unrelated image still rebuilds.
+	_, _, dependents := rebuildGraph(images)
+	ordered, skipped := rebuildPlan(images, s.BuildDefaultImage)
+
+	settled := make(map[string]bool, len(images))
+	for _, id := range skipped {
+		settled[id] = true
+	}
+	if !s.BuildDefaultImage {
+		settled[DefaultImageID()] = true
+	}
+
+	rebuilt := make([]string, 0, len(ordered))
+	for _, image := range ordered {
+		if settled[image.ImageID] {
+			continue
+		}
+		if _, err := s.buildImage(image.ImageID, image); err != nil {
+			s.log().Error("control request failed", "method", "RebuildAllImages", "image_id", image.ImageID, "error", err)
+			for _, id := range skipDependents(dependents, image.ImageID) {
+				if settled[id] {
+					continue
+				}
+				settled[id] = true
+				skipped = append(skipped, id)
+			}
+			continue
+		}
+		settled[image.ImageID] = true
+		rebuilt = append(rebuilt, image.ImageID)
+	}
+	s.log().Info("control request completed", "method", "RebuildAllImages", "rebuilt", len(rebuilt), "skipped", len(skipped))
+	return &ctl.RebuildAllImagesResponse{Rebuilt: rebuilt, Skipped: skipped}, nil
+}
 func (s *Server) RemoveImage(_ context.Context, request *ctl.RemoveImageRequest) (*ctl.RemoveImageResponse, error) {
 	s.log().Info("control request", "method", "RemoveImage", "image_id", request.GetImageId())
 	imageID := request.GetImageId()
@@ -933,6 +986,152 @@ func (s *Server) buildImage(id string, image state.Image) (state.Image, error) {
 		return state.Image{}, err
 	}
 	return image, nil
+}
+
+// rebuildGraph indexes stored images for rebuild planning: byID maps image ids
+// to their records (last occurrence wins), byTag maps non-empty image tags to
+// the owning image id, and dependents maps each image id to the sorted list of
+// image ids whose base is one of its tags.
+func rebuildGraph(images []state.Image) (byID map[string]state.Image, byTag map[string]string, dependents map[string][]string) {
+	byID = make(map[string]state.Image, len(images))
+	byTag = make(map[string]string, len(images))
+	for _, image := range images {
+		byID[image.ImageID] = image
+		if image.ImageTag != "" {
+			byTag[image.ImageTag] = image.ImageID
+		}
+	}
+	dependents = make(map[string][]string)
+	for _, image := range images {
+		if owner, ok := byTag[image.BaseImage]; ok {
+			dependents[owner] = append(dependents[owner], image.ImageID)
+		}
+	}
+	for owner := range dependents {
+		sort.Strings(dependents[owner])
+	}
+	return byID, byTag, dependents
+}
+
+// rebuildPlan computes the deterministic rebuild plan for the stored images.
+// It returns the ordered list of images to rebuild, with every base preceding
+// its dependents, and the list of image ids to skip.
+//
+// The default image, when stored and buildDefault is true, is rebuilt first
+// because its base is external. When buildDefault is false it is treated as an
+// externally-provided base: it is settled without being rebuilt, so derived
+// images may still rebuild against its existing tag. Images whose base cannot
+// be resolved to a stored tag are skipped, as are any images left over by a
+// dependency cycle.
+func rebuildPlan(images []state.Image, buildDefault bool) (ordered []state.Image, skipped []string) {
+	byID, byTag, dependents := rebuildGraph(images)
+
+	settled := make(map[string]bool, len(images))
+	rebuilt := make(map[string]bool, len(images))
+	baseUsable := make(map[string]bool)
+
+	var markSkipped func(id string)
+	markSkipped = func(id string) {
+		if settled[id] {
+			return
+		}
+		settled[id] = true
+		skipped = append(skipped, id)
+		for _, dependent := range dependents[id] {
+			markSkipped(dependent)
+		}
+	}
+
+	defaultID := DefaultImageID()
+	if _, ok := byID[defaultID]; ok {
+		if buildDefault {
+			settled[defaultID] = true
+			rebuilt[defaultID] = true
+			ordered = append(ordered, byID[defaultID])
+		} else {
+			settled[defaultID] = true
+			baseUsable[defaultID] = true
+		}
+	}
+
+	candidates := make([]string, 0, len(images))
+	for _, image := range images {
+		if image.ImageID != defaultID {
+			candidates = append(candidates, image.ImageID)
+		}
+	}
+	sort.Strings(candidates)
+	remaining := make(map[string]bool, len(candidates))
+	for _, id := range candidates {
+		remaining[id] = true
+	}
+
+	for len(remaining) > 0 {
+		progress := false
+		for _, id := range candidates {
+			if !remaining[id] {
+				continue
+			}
+			if settled[id] {
+				delete(remaining, id)
+				continue
+			}
+			image := byID[id]
+			ownerID := byTag[image.BaseImage]
+			if ownerID == "" {
+				markSkipped(id)
+				delete(remaining, id)
+				progress = true
+				continue
+			}
+			if !settled[ownerID] {
+				continue
+			}
+			if !rebuilt[ownerID] && !baseUsable[ownerID] {
+				markSkipped(id)
+				delete(remaining, id)
+				progress = true
+				continue
+			}
+			settled[id] = true
+			rebuilt[id] = true
+			ordered = append(ordered, image)
+			delete(remaining, id)
+			progress = true
+		}
+		if !progress {
+			leftover := make([]string, 0, len(remaining))
+			for id := range remaining {
+				leftover = append(leftover, id)
+			}
+			sort.Strings(leftover)
+			for _, id := range leftover {
+				markSkipped(id)
+			}
+			break
+		}
+	}
+	return ordered, skipped
+}
+
+// skipDependents returns failedID and all of its transitive dependents: the
+// image ids that must be skipped when failedID's rebuild fails.
+func skipDependents(dependents map[string][]string, failedID string) []string {
+	skipped := make([]string, 0)
+	seen := make(map[string]bool)
+	var walk func(id string)
+	walk = func(id string) {
+		if seen[id] {
+			return
+		}
+		seen[id] = true
+		skipped = append(skipped, id)
+		for _, dependent := range dependents[id] {
+			walk(dependent)
+		}
+	}
+	walk(failedID)
+	return skipped
 }
 
 // defaultImage returns the stored default (base) image, auto-provisioning it

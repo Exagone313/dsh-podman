@@ -297,6 +297,12 @@ with or without a `:tag`, or an already-qualified tag such as
 `localhost/dsh-podman/valkey:latest`. The base image cannot be built over,
 rebuilt, or removed.
 
+`image_rebuild_all` rebuilds the stored images **in dependency order**, one at
+a time — the default (base) image first (when `DSH_PODMAN_BUILD_DEFAULT_IMAGE`
+is enabled; otherwise it is left as-is and derived images rebuild against it),
+then each derived image after its base. An image whose rebuild fails, and every
+image that depends on it, is reported in `skipped` while the rest continue.
+
 ### Images
 
 | Tool | Params | Description |
@@ -305,6 +311,7 @@ rebuilt, or removed.
 | `image_get` | `imageId` | Details for one image |
 | `image_build` ✱ | `imageId`, `baseImage`, `packages` | Build a new image from a base image and package list |
 | `image_rebuild` ✱ | `imageId` | Rebuild an existing image in place |
+| `image_rebuild_all` ✱ | — | Rebuild every image in dependency order (base first), skipping any image whose rebuild fails and its dependents |
 | `image_remove` ✱ | `imageId` | Remove a built image; refused while a workspace or container still references it |
 
 ### Containers

@@ -31,6 +31,7 @@ const (
 	OrchestratorControl_GetImage_FullMethodName              = "/dshctl.v1.OrchestratorControl/GetImage"
 	OrchestratorControl_BuildImage_FullMethodName            = "/dshctl.v1.OrchestratorControl/BuildImage"
 	OrchestratorControl_RebuildImage_FullMethodName          = "/dshctl.v1.OrchestratorControl/RebuildImage"
+	OrchestratorControl_RebuildAllImages_FullMethodName      = "/dshctl.v1.OrchestratorControl/RebuildAllImages"
 	OrchestratorControl_RemoveImage_FullMethodName           = "/dshctl.v1.OrchestratorControl/RemoveImage"
 	OrchestratorControl_ListContainers_FullMethodName        = "/dshctl.v1.OrchestratorControl/ListContainers"
 	OrchestratorControl_StartContainer_FullMethodName        = "/dshctl.v1.OrchestratorControl/StartContainer"
@@ -61,6 +62,7 @@ type OrchestratorControlClient interface {
 	GetImage(ctx context.Context, in *GetImageRequest, opts ...grpc.CallOption) (*Image, error)
 	BuildImage(ctx context.Context, in *BuildImageRequest, opts ...grpc.CallOption) (*Image, error)
 	RebuildImage(ctx context.Context, in *RebuildImageRequest, opts ...grpc.CallOption) (*Image, error)
+	RebuildAllImages(ctx context.Context, in *RebuildAllImagesRequest, opts ...grpc.CallOption) (*RebuildAllImagesResponse, error)
 	RemoveImage(ctx context.Context, in *RemoveImageRequest, opts ...grpc.CallOption) (*RemoveImageResponse, error)
 	ListContainers(ctx context.Context, in *ListContainersRequest, opts ...grpc.CallOption) (*ListContainersResponse, error)
 	StartContainer(ctx context.Context, in *StartContainerRequest, opts ...grpc.CallOption) (*Container, error)
@@ -161,6 +163,16 @@ func (c *orchestratorControlClient) RebuildImage(ctx context.Context, in *Rebuil
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(Image)
 	err := c.cc.Invoke(ctx, OrchestratorControl_RebuildImage_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *orchestratorControlClient) RebuildAllImages(ctx context.Context, in *RebuildAllImagesRequest, opts ...grpc.CallOption) (*RebuildAllImagesResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RebuildAllImagesResponse)
+	err := c.cc.Invoke(ctx, OrchestratorControl_RebuildAllImages_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -339,6 +351,7 @@ type OrchestratorControlServer interface {
 	GetImage(context.Context, *GetImageRequest) (*Image, error)
 	BuildImage(context.Context, *BuildImageRequest) (*Image, error)
 	RebuildImage(context.Context, *RebuildImageRequest) (*Image, error)
+	RebuildAllImages(context.Context, *RebuildAllImagesRequest) (*RebuildAllImagesResponse, error)
 	RemoveImage(context.Context, *RemoveImageRequest) (*RemoveImageResponse, error)
 	ListContainers(context.Context, *ListContainersRequest) (*ListContainersResponse, error)
 	StartContainer(context.Context, *StartContainerRequest) (*Container, error)
@@ -388,6 +401,9 @@ func (UnimplementedOrchestratorControlServer) BuildImage(context.Context, *Build
 }
 func (UnimplementedOrchestratorControlServer) RebuildImage(context.Context, *RebuildImageRequest) (*Image, error) {
 	return nil, status.Error(codes.Unimplemented, "method RebuildImage not implemented")
+}
+func (UnimplementedOrchestratorControlServer) RebuildAllImages(context.Context, *RebuildAllImagesRequest) (*RebuildAllImagesResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method RebuildAllImages not implemented")
 }
 func (UnimplementedOrchestratorControlServer) RemoveImage(context.Context, *RemoveImageRequest) (*RemoveImageResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method RemoveImage not implemented")
@@ -598,6 +614,24 @@ func _OrchestratorControl_RebuildImage_Handler(srv interface{}, ctx context.Cont
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(OrchestratorControlServer).RebuildImage(ctx, req.(*RebuildImageRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _OrchestratorControl_RebuildAllImages_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RebuildAllImagesRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(OrchestratorControlServer).RebuildAllImages(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: OrchestratorControl_RebuildAllImages_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(OrchestratorControlServer).RebuildAllImages(ctx, req.(*RebuildAllImagesRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -928,6 +962,10 @@ var OrchestratorControl_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "RebuildImage",
 			Handler:    _OrchestratorControl_RebuildImage_Handler,
+		},
+		{
+			MethodName: "RebuildAllImages",
+			Handler:    _OrchestratorControl_RebuildAllImages_Handler,
 		},
 		{
 			MethodName: "RemoveImage",

@@ -16,6 +16,7 @@ import (
 	"github.com/containers/podman/v5/pkg/specgen"
 	ctl "gitlab.com/Exagone313/dsh-podman/internal/genproto/dshctl/v1"
 	imagebuild "gitlab.com/Exagone313/dsh-podman/internal/orchestrator/images"
+	"gitlab.com/Exagone313/dsh-podman/internal/orchestrator/podman"
 	"gitlab.com/Exagone313/dsh-podman/internal/orchestrator/state"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -1632,5 +1633,215 @@ func TestPodmanMountsSkipsSecretKinds(t *testing.T) {
 	}
 	if len(mounts) != 1 || mounts[0].Type != "bind" || mounts[0].Source != filepath.Join(root, "team") {
 		t.Fatalf("secret mount leaked into OCI mounts: %#v", mounts)
+	}
+}
+
+const (
+	rebuildAllBaseTag = "localhost/dsh-podman/arch-base:latest"
+	rebuildAllMidTag  = "localhost/dsh-podman/mid:latest"
+	rebuildAllTopTag  = "localhost/dsh-podman/top:latest"
+)
+
+func sameStrings(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
+}
+
+func sameImageIDs(images []state.Image, ids []string) bool {
+	if len(images) != len(ids) {
+		return false
+	}
+	for i := range images {
+		if images[i].ImageID != ids[i] {
+			return false
+		}
+	}
+	return true
+}
+
+func rebuildAllImagesFixtures() []state.Image {
+	return []state.Image{
+		{ImageID: DefaultImageID(), BaseImage: "docker.io/library/archlinux:latest", ImageTag: rebuildAllBaseTag, BuiltAt: "old"},
+		{ImageID: "localhost/dsh-podman/mid", BaseImage: rebuildAllBaseTag, ImageTag: rebuildAllMidTag, BuiltAt: "old"},
+		{ImageID: "localhost/dsh-podman/top", BaseImage: rebuildAllMidTag, ImageTag: rebuildAllTopTag, BuiltAt: "old"},
+	}
+}
+
+func TestRebuildAllImagesRequiresBuilder(t *testing.T) {
+	server := &Server{Store: newTestStore(t), Logger: silentLogger()}
+	_, err := server.RebuildAllImages(context.Background(), &ctl.RebuildAllImagesRequest{})
+	if status.Code(err) != codes.FailedPrecondition {
+		t.Fatalf("expected FailedPrecondition, got %v", err)
+	}
+}
+
+func TestRebuildAllImagesRequiresPodman(t *testing.T) {
+	server := &Server{Store: newTestStore(t), ImageBuilder: &imagebuild.Builder{}, Logger: silentLogger()}
+	_, err := server.RebuildAllImages(context.Background(), &ctl.RebuildAllImagesRequest{})
+	if status.Code(err) != codes.FailedPrecondition {
+		t.Fatalf("expected FailedPrecondition, got %v", err)
+	}
+}
+
+func TestRebuildAllImagesNoImages(t *testing.T) {
+	server := &Server{Store: newTestStore(t), ImageBuilder: &imagebuild.Builder{}, Podman: &podman.Client{}, Logger: silentLogger()}
+	_, err := server.RebuildAllImages(context.Background(), &ctl.RebuildAllImagesRequest{})
+	if status.Code(err) != codes.NotFound {
+		t.Fatalf("expected NotFound, got %v", err)
+	}
+}
+
+func TestRebuildAllImagesFailingBuilderSkipsAll(t *testing.T) {
+	store := newTestStore(t)
+	if err := store.SaveImages(rebuildAllImagesFixtures()); err != nil {
+		t.Fatal(err)
+	}
+	server := &Server{Store: store, ImageBuilder: &imagebuild.Builder{}, Podman: &podman.Client{}, Logger: silentLogger(), BuildDefaultImage: true}
+	response, err := server.RebuildAllImages(context.Background(), &ctl.RebuildAllImagesRequest{})
+	if err != nil {
+		t.Fatalf("build failures must not surface as a gRPC error, got %v", err)
+	}
+	if len(response.Rebuilt) != 0 {
+		t.Fatalf("expected no rebuilt images, got %#v", response.Rebuilt)
+	}
+	want := []string{DefaultImageID(), "localhost/dsh-podman/mid", "localhost/dsh-podman/top"}
+	if !sameStrings(response.Skipped, want) {
+		t.Fatalf("expected skipped %#v, got %#v", want, response.Skipped)
+	}
+}
+
+func TestRebuildAllImagesBaseDisabled(t *testing.T) {
+	store := newTestStore(t)
+	if err := store.SaveImages(rebuildAllImagesFixtures()); err != nil {
+		t.Fatal(err)
+	}
+	server := &Server{Store: store, ImageBuilder: &imagebuild.Builder{}, Podman: &podman.Client{}, Logger: silentLogger(), BuildDefaultImage: false}
+	response, err := server.RebuildAllImages(context.Background(), &ctl.RebuildAllImagesRequest{})
+	if err != nil {
+		t.Fatalf("build failures must not surface as a gRPC error, got %v", err)
+	}
+	if len(response.Rebuilt) != 0 {
+		t.Fatalf("expected no rebuilt images, got %#v", response.Rebuilt)
+	}
+	if !sameStrings(response.Skipped, []string{"localhost/dsh-podman/mid", "localhost/dsh-podman/top"}) {
+		t.Fatalf("expected derived images skipped, got %#v", response.Skipped)
+	}
+	after, err := store.Images()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, image := range after {
+		if image.ImageID == DefaultImageID() && image.BuiltAt != "old" {
+			t.Fatalf("default image was rebuilt despite BuildDefaultImage=false: %#v", image)
+		}
+	}
+}
+
+func TestRebuildGraph(t *testing.T) {
+	images := []state.Image{
+		{ImageID: "a", ImageTag: "tag-a"},
+		{ImageID: "b", ImageTag: "tag-b"},
+		{ImageID: "c", BaseImage: "tag-a"},
+		{ImageID: "d", BaseImage: "tag-b"},
+		{ImageID: "e", BaseImage: "tag-a"},
+		{ImageID: "f", BaseImage: "missing"},
+		{ImageID: "g"},
+	}
+	byID, byTag, dependents := rebuildGraph(images)
+	if len(byID) != 7 {
+		t.Fatalf("unexpected byID size: %#v", byID)
+	}
+	if byTag["tag-a"] != "a" || byTag["tag-b"] != "b" {
+		t.Fatalf("unexpected byTag: %#v", byTag)
+	}
+	if _, ok := byTag[""]; ok {
+		t.Fatalf("empty tag must not be indexed: %#v", byTag)
+	}
+	want := map[string][]string{"a": {"c", "e"}, "b": {"d"}}
+	if len(dependents) != len(want) {
+		t.Fatalf("unexpected dependents: %#v", dependents)
+	}
+	for owner, deps := range want {
+		if !sameStrings(dependents[owner], deps) {
+			t.Fatalf("dependents[%q] = %#v, want %#v", owner, dependents[owner], deps)
+		}
+	}
+	if _, ok := dependents["f"]; ok {
+		t.Fatalf("unresolvable base must not create a dependent edge: %#v", dependents)
+	}
+}
+
+func TestRebuildGraphByIDLastWins(t *testing.T) {
+	images := []state.Image{
+		{ImageID: "a", ImageTag: "tag-a", Packages: []string{"x"}},
+		{ImageID: "a", ImageTag: "tag-a", Packages: []string{"y"}},
+	}
+	byID, _, _ := rebuildGraph(images)
+	if len(byID["a"].Packages) != 1 || byID["a"].Packages[0] != "y" {
+		t.Fatalf("expected last image to win, got %#v", byID["a"])
+	}
+}
+
+func TestRebuildPlanOrder(t *testing.T) {
+	images := append(rebuildAllImagesFixtures(),
+		state.Image{ImageID: "localhost/dsh-podman/unresolvable", BaseImage: "docker.io/library/does-not-exist:latest", ImageTag: "unresolvable:latest"},
+	)
+	ordered, skipped := rebuildPlan(images, true)
+	wantOrder := []string{DefaultImageID(), "localhost/dsh-podman/mid", "localhost/dsh-podman/top"}
+	if !sameImageIDs(ordered, wantOrder) {
+		t.Fatalf("expected order %#v, got %#v", wantOrder, ordered)
+	}
+	if !sameStrings(skipped, []string{"localhost/dsh-podman/unresolvable"}) {
+		t.Fatalf("expected unresolvable skipped, got %#v", skipped)
+	}
+}
+
+func TestRebuildPlanBaseDisabled(t *testing.T) {
+	ordered, skipped := rebuildPlan(rebuildAllImagesFixtures(), false)
+	wantOrder := []string{"localhost/dsh-podman/mid", "localhost/dsh-podman/top"}
+	if !sameImageIDs(ordered, wantOrder) {
+		t.Fatalf("expected default excluded from order %#v, got %#v", wantOrder, ordered)
+	}
+	if len(skipped) != 0 {
+		t.Fatalf("expected nothing skipped, got %#v", skipped)
+	}
+}
+
+func TestRebuildPlanCycleSkipped(t *testing.T) {
+	images := []state.Image{
+		{ImageID: "cyc-a", BaseImage: "tag-b", ImageTag: "tag-a"},
+		{ImageID: "cyc-b", BaseImage: "tag-a", ImageTag: "tag-b"},
+	}
+	ordered, skipped := rebuildPlan(images, true)
+	if len(ordered) != 0 {
+		t.Fatalf("expected no rebuild candidates for a cycle, got %#v", ordered)
+	}
+	if !sameStrings(skipped, []string{"cyc-a", "cyc-b"}) {
+		t.Fatalf("expected cycle members skipped, got %#v", skipped)
+	}
+}
+
+func TestSkipDependents(t *testing.T) {
+	_, _, dependents := rebuildGraph(rebuildAllImagesFixtures())
+	cases := []struct {
+		failed string
+		want   []string
+	}{
+		{failed: DefaultImageID(), want: []string{DefaultImageID(), "localhost/dsh-podman/mid", "localhost/dsh-podman/top"}},
+		{failed: "localhost/dsh-podman/mid", want: []string{"localhost/dsh-podman/mid", "localhost/dsh-podman/top"}},
+		{failed: "localhost/dsh-podman/top", want: []string{"localhost/dsh-podman/top"}},
+		{failed: "independent", want: []string{"independent"}},
+	}
+	for _, tc := range cases {
+		if got := skipDependents(dependents, tc.failed); !sameStrings(got, tc.want) {
+			t.Fatalf("skipDependents(%q) = %#v, want %#v", tc.failed, got, tc.want)
+		}
 	}
 }

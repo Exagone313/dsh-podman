@@ -844,10 +844,12 @@ function ImageItem(props: {
   t: (key: ContainerPluginKey) => string;
   image: ImageView;
   busy: boolean;
+  defaultImage: string;
   onRemove: (imageId: string) => void;
   onRebuild: (imageId: string) => void;
+  onSetDefault: (imageId: string) => void;
 }): ReactNode {
-  const { t, image, busy, onRemove, onRebuild } = props;
+  const { t, image, busy, defaultImage, onRemove, onRebuild, onSetDefault } = props;
   const [open, setOpen] = useState(false);
   return (
     <DisclosureRow
@@ -905,6 +907,14 @@ function ImageItem(props: {
             disabled={busy}
             onConfirm={() => onRemove(image.imageId)}
           />
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={busy || image.imageId === defaultImage}
+            onClick={() => onSetDefault(image.imageId)}
+          >
+            {t("setDefaultImage")}
+          </Button>
         </div>
       </div>
     </DisclosureRow>
@@ -915,10 +925,12 @@ function BaseImageRow(props: {
   t: (key: ContainerPluginKey) => string;
   image: ImageView;
   busy: boolean;
+  defaultImage: string;
   onRebuild: (name: string) => void;
   onPull: (name: string) => void;
+  onSetDefault: (imageId: string) => void;
 }): ReactNode {
-  const { t, image, busy, onRebuild, onPull } = props;
+  const { t, image, busy, defaultImage, onRebuild, onPull, onSetDefault } = props;
   const [open, setOpen] = useState(false);
   const pull = image.basePublic && (image.status === "missing" || image.status === "pulled");
   const build = !image.basePublic && image.status === "missing";
@@ -997,6 +1009,14 @@ function BaseImageRow(props: {
               {t("rebuildImage")}
             </Button>
           ) : null}
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={busy || image.imageId === defaultImage}
+            onClick={() => onSetDefault(image.imageId)}
+          >
+            {t("setDefaultImage")}
+          </Button>
         </div>
       </div>
     </DisclosureRow>
@@ -1583,8 +1603,10 @@ export function ContainerCard(props: ContainerCardProps): ReactNode {
                 t={t}
                 image={image}
                 busy={state.busy}
+                defaultImage={state.defaultImage}
                 onRebuild={props.rebuildBaseImage}
                 onPull={props.pullBaseImage}
+                onSetDefault={props.setDefaultImage}
               />
             ))
           )}
@@ -1598,8 +1620,10 @@ export function ContainerCard(props: ContainerCardProps): ReactNode {
                 t={t}
                 image={image}
                 busy={state.busy}
+                defaultImage={state.defaultImage}
                 onRemove={props.removeImage}
                 onRebuild={props.rebuildImage}
+                onSetDefault={props.setDefaultImage}
               />
             ))
           )}

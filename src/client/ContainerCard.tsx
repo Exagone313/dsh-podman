@@ -1110,11 +1110,11 @@ function SecretsSection(props: {
   const submit = (): void => {
     if (name.trim() === "") return;
     const parsedLength = parseInt(length, 10);
-    onCreate(
-      name.trim(),
-      length.trim() === "" || Number.isNaN(parsedLength) ? undefined : parsedLength,
-      charset,
-    );
+    const normalized =
+      length.trim() === "" || Number.isNaN(parsedLength) || parsedLength < 1
+        ? undefined
+        : parsedLength;
+    onCreate(name.trim(), normalized, charset);
     setName("");
     setLength("32");
     setCharset("alphanumeric");
@@ -1215,6 +1215,8 @@ function SecretsSection(props: {
             <Input
               id={secretLengthId}
               type="number"
+              min={1}
+              max={1024}
               value={length}
               disabled={!writable || busy}
               onChange={(event) => setLength(event.target.value)}

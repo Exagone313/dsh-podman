@@ -154,6 +154,9 @@ func Containerfile(spec BuildSpec) (string, error) {
 		}
 	}
 	lines := make([]string, 0, 7)
+	if spec.IsBase {
+		lines = append(lines, "FROM "+guest.Image+" AS guestagent")
+	}
 	lines = append(lines, "FROM "+spec.From)
 	switch spec.PackageManager {
 	case "pacman":
@@ -182,7 +185,6 @@ func Containerfile(spec BuildSpec) (string, error) {
 		lines = append(lines, "RUN "+cmd)
 	}
 	if spec.IsBase {
-		lines = append(lines, "FROM "+guest.Image+" AS guestagent")
 		lines = append(lines, "COPY --from=guestagent "+guest.AgentBin+" "+guest.DestAgentBin)
 		lines = append(lines, "ENTRYPOINT [\""+guest.DestAgentBin+"\"]")
 	}

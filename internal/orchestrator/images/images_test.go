@@ -290,8 +290,8 @@ func TestContainerfileBaseDistros(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if !strings.HasPrefix(file, tc.wantFrom) {
-				t.Fatalf("unexpected FROM: want prefix %q, got:\n%s", tc.wantFrom, file)
+			if !strings.HasPrefix(file, "FROM localhost/dsh-podman-guest-agent:latest AS guestagent\n"+tc.wantFrom) {
+				t.Fatalf("unexpected stage order: want guest-agent stage first then %q, got:\n%s", tc.wantFrom, file)
 			}
 			if !strings.Contains(file, tc.wantInstall) {
 				t.Fatalf("missing install line %q, got:\n%s", tc.wantInstall, file)

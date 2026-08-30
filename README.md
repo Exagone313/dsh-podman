@@ -191,10 +191,13 @@ orchestrator-created guest containers and the built images, and offers
 secret-environment variables, let you edit environment variables before
 creating or recreating a container, and attach/detach named secrets to a
 container's environment variables. The images section can rebuild a single
-image or **rebuild all** in dependency order; the volumes and secrets sections
-list, create, and remove volumes/secrets, and a secret's value can be
-overwritten (never read). Card actions are direct control calls and are not
-approval-gated.
+image or **rebuild all** in dependency order; **Build image** opens a popup
+with an image-id/base-image form and a chip input for the package list (type a
+name and press space/comma, or paste a list, to add removable chips). Volumes
+and secrets are listed as individual expandable rows, each with its own
+actions, and **Create volume** / **Create secret** open popup forms (the secret
+form takes an optional length; a secret's value can be overwritten, never
+read). Card actions are direct control calls and are not approval-gated.
 
 Data and actions travel over the settings transport:
 

@@ -7,6 +7,7 @@ import {
   Button,
   DisclosureRow,
   Input,
+  Modal,
   Pill,
   StateDot,
   type StateDotState,
@@ -252,6 +253,101 @@ function ConfigField(props: {
       >
         {t("discard")}
       </Button>
+    </div>
+  );
+}
+
+function TagInput(props: {
+  t: (key: ContainerPluginKey) => string;
+  value: readonly string[];
+  onChange: (tags: string[]) => void;
+  placeholder?: string;
+  disabled?: boolean;
+  id?: string;
+}): ReactNode {
+  const { t, value, onChange, placeholder, disabled, id } = props;
+  const [draft, setDraft] = useState("");
+  const commit = (raw: string): void => {
+    const tag = raw.trim();
+    if (tag === "" || value.includes(tag)) return;
+    onChange([...value, tag]);
+  };
+  return (
+    <div
+      style={{
+        display: "flex",
+        flexWrap: "wrap",
+        alignItems: "center",
+        gap: "6px",
+      }}
+    >
+      {value.map((tag) => (
+        <span
+          key={tag}
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: "2px",
+            height: "24px",
+            padding: "0 4px 0 8px",
+            borderRadius: "999px",
+            border: "1px solid var(--dsw-alias-border-l2)",
+            background: "var(--dsw-alias-bg-layer-3)",
+            fontSize: "12px",
+            fontFamily: "var(--dsw-alias-font-mono, ui-monospace, monospace)",
+            color: "var(--dsw-alias-label-primary)",
+          }}
+        >
+          {tag}
+          <Button
+            variant="ghost"
+            size="sm"
+            aria-label={t("removeTag")}
+            disabled={disabled}
+            onClick={() => onChange(value.filter((item) => item !== tag))}
+            style={{
+              padding: 0,
+              minWidth: "18px",
+              height: "18px",
+              lineHeight: 1,
+              fontSize: "13px",
+              color: "var(--dsw-alias-label-tertiary)",
+            }}
+          >
+            ×
+          </Button>
+        </span>
+      ))}
+      <Input
+        id={id}
+        value={draft}
+        disabled={disabled}
+        placeholder={placeholder}
+        onChange={(event) => setDraft(event.target.value)}
+        onKeyDown={(event) => {
+          if (event.key === " " || event.key === "," || event.key === "Enter") {
+            if (event.key === " " || event.key === ",") event.preventDefault();
+            commit(draft);
+            setDraft("");
+          } else if (event.key === "Backspace" && draft === "") {
+            const last = value[value.length - 1];
+            if (last !== undefined) onChange(value.slice(0, -1));
+          }
+        }}
+        onPaste={(event) => {
+          const text = event.clipboardData.getData("text");
+          if (text === "") return;
+          event.preventDefault();
+          const tokens = text.split(/[\s,]+/);
+          const next = [...value];
+          for (const token of tokens) {
+            const tag = token.trim();
+            if (tag !== "" && !next.includes(tag)) next.push(tag);
+          }
+          if (next.length !== value.length) onChange(next);
+        }}
+        style={{ flex: 1, minWidth: "160px" }}
+      />
     </div>
   );
 }
@@ -726,86 +822,108 @@ function VolumesSection(props: {
 }): ReactNode {
   const { t, volumes, busy, writable, onCreate, onRemove } = props;
   const [open, setOpen] = useState(false);
+  const [openVolume, setOpenVolume] = useState<string | null>(null);
   const [name, setName] = useState("");
-  const canCreate = name.trim() !== "" && !busy;
+  const canCreate = name.trim() !== "";
   const submit = (): void => {
     if (name.trim() === "") return;
     onCreate(name.trim());
     setName("");
+    setOpen(false);
   };
   return (
-    <DisclosureRow
-      icon={<span />}
-      title={t("volumesTitle")}
-      open={open}
-      expandable
-      onToggle={() => setOpen(!open)}
-    >
-      <div style={wsBody}>
-        {volumes.length === 0 ? (
-          <p style={{ ...hint, margin: 0 }}>{t("none")}</p>
-        ) : (
-          volumes.map((volume) => (
-            <div
-              key={volume.name}
-              style={{
-                display: "flex",
-                flexWrap: "wrap",
-                alignItems: "center",
-                gap: "8px",
-              }}
-            >
-              <code
+    <section>
+      <div
+        style={{
+          display: "flex",
+          flexWrap: "wrap",
+          alignItems: "center",
+          gap: "8px",
+        }}
+      >
+        <div style={{ ...sectionTitle, flex: 1 }}>{t("volumesTitle")}</div>
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={!writable || busy}
+          onClick={() => setOpen(true)}
+        >
+          {t("createVolume")}
+        </Button>
+      </div>
+      {volumes.length === 0 ? (
+        <p style={hint}>{t("none")}</p>
+      ) : (
+        volumes.map((volume) => (
+          <DisclosureRow
+            key={volume.name}
+            icon={<span />}
+            title={volume.name}
+            open={openVolume === volume.name}
+            expandable
+            onToggle={() =>
+              setOpenVolume(openVolume === volume.name ? null : volume.name)
+            }
+          >
+            <div style={wsBody}>
+              <div
                 style={{
-                  ...greyId,
-                  flex: 1,
-                  fontSize: "13px",
-                  color: "var(--dsw-alias-label-primary)",
+                  display: "flex",
+                  flexWrap: "wrap",
+                  alignItems: "center",
+                  gap: "8px",
                 }}
               >
-                {volume.name}
-              </code>
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={busy}
-                onClick={() => onRemove(volume.name)}
-              >
-                {t("removeVolume")}
-              </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={busy}
+                  onClick={() => onRemove(volume.name)}
+                >
+                  {t("removeVolume")}
+                </Button>
+              </div>
             </div>
-          ))
-        )}
-        <div
-          style={{
-            display: "flex",
-            flexWrap: "wrap",
-            alignItems: "center",
-            gap: "8px",
-            paddingTop: "8px",
+          </DisclosureRow>
+        ))
+      )}
+      <Modal
+        open={open}
+        onClose={() => setOpen(false)}
+        title={t("volumesTitle")}
+        closeLabel={t("cancel")}
+        footer={
+          <>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setOpen(false)}
+            >
+              {t("cancel")}
+            </Button>
+            <Button
+              variant="primary"
+              size="sm"
+              disabled={!canCreate}
+              onClick={submit}
+            >
+              {t("createVolume")}
+            </Button>
+          </>
+        }
+      >
+        <Input
+          value={name}
+          disabled={!writable || busy}
+          placeholder={t("createVolume")}
+          autoFocus
+          onChange={(event) => setName(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") submit();
           }}
-        >
-          <Input
-            value={name}
-            disabled={!writable || busy}
-            placeholder={t("createVolume")}
-            onChange={(event) => setName(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === "Enter") submit();
-            }}
-            style={{ width: "200px" }}
-          />
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={!writable || !canCreate}
-            onClick={submit}
-          >
-            {t("createVolume")}
-          </Button>
-        </div>
-      </div>
-    </DisclosureRow>
+        />
+      </Modal>
+    </section>
   );
 }
 
@@ -886,9 +1004,10 @@ function SecretsSection(props: {
 }): ReactNode {
   const { t, secrets, busy, writable, onCreate, onRemove, onSet } = props;
   const [open, setOpen] = useState(false);
+  const [openSecret, setOpenSecret] = useState<string | null>(null);
   const [name, setName] = useState("");
   const [length, setLength] = useState("");
-  const canCreate = name.trim() !== "" && !busy;
+  const canCreate = name.trim() !== "";
   const submit = (): void => {
     if (name.trim() === "") return;
     const parsedLength = parseInt(length, 10);
@@ -898,49 +1017,96 @@ function SecretsSection(props: {
     );
     setName("");
     setLength("");
+    setOpen(false);
   };
   return (
-    <DisclosureRow
-      icon={<span />}
-      title={t("secretsTitle")}
-      open={open}
-      expandable
-      onToggle={() => setOpen(!open)}
-    >
-      <div style={wsBody}>
-        {secrets.length === 0 ? (
-          <p style={{ ...hint, margin: 0 }}>{t("none")}</p>
-        ) : (
-          secrets.map((secret) => (
-            <SecretRow
-              key={secret.name}
-              t={t}
-              name={secret.name}
-              busy={busy}
-              writable={writable}
-              onSet={onSet}
-              onRemove={onRemove}
-            />
-          ))
-        )}
+    <section>
+      <div
+        style={{
+          display: "flex",
+          flexWrap: "wrap",
+          alignItems: "center",
+          gap: "8px",
+        }}
+      >
+        <div style={{ ...sectionTitle, flex: 1 }}>{t("secretsTitle")}</div>
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={!writable || busy}
+          onClick={() => setOpen(true)}
+        >
+          {t("createSecret")}
+        </Button>
+      </div>
+      {secrets.length === 0 ? (
+        <p style={hint}>{t("none")}</p>
+      ) : (
+        secrets.map((secret) => (
+          <DisclosureRow
+            key={secret.name}
+            icon={<span />}
+            title={secret.name}
+            open={openSecret === secret.name}
+            expandable
+            onToggle={() =>
+              setOpenSecret(openSecret === secret.name ? null : secret.name)
+            }
+          >
+            <div style={wsBody}>
+              <SecretRow
+                t={t}
+                name={secret.name}
+                busy={busy}
+                writable={writable}
+                onSet={onSet}
+                onRemove={onRemove}
+              />
+            </div>
+          </DisclosureRow>
+        ))
+      )}
+      <Modal
+        open={open}
+        onClose={() => setOpen(false)}
+        title={t("secretsTitle")}
+        closeLabel={t("cancel")}
+        footer={
+          <>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setOpen(false)}
+            >
+              {t("cancel")}
+            </Button>
+            <Button
+              variant="primary"
+              size="sm"
+              disabled={!canCreate}
+              onClick={submit}
+            >
+              {t("createSecret")}
+            </Button>
+          </>
+        }
+      >
         <div
           style={{
             display: "flex",
-            flexWrap: "wrap",
-            alignItems: "center",
-            gap: "8px",
-            paddingTop: "8px",
+            flexDirection: "column",
+            gap: "12px",
           }}
         >
           <Input
             value={name}
             disabled={!writable || busy}
             placeholder={t("createSecret")}
+            autoFocus
             onChange={(event) => setName(event.target.value)}
             onKeyDown={(event) => {
               if (event.key === "Enter") submit();
             }}
-            style={{ width: "200px" }}
           />
           <Input
             type="number"
@@ -948,19 +1114,146 @@ function SecretsSection(props: {
             disabled={!writable || busy}
             aria-label={t("secretLength")}
             onChange={(event) => setLength(event.target.value)}
-            style={{ width: "100px" }}
           />
+        </div>
+      </Modal>
+    </section>
+  );
+}
+
+function ImageBuildModal(props: {
+  t: (key: ContainerPluginKey) => string;
+  open: boolean;
+  imageId: string;
+  baseImage: string;
+  packages: readonly string[];
+  onImageId: (value: string) => void;
+  onBaseImage: (value: string) => void;
+  onPackages: (tags: string[]) => void;
+  onClose: () => void;
+  onBuild: () => void;
+}): ReactNode {
+  const {
+    t,
+    open,
+    imageId,
+    baseImage,
+    packages,
+    onImageId,
+    onBaseImage,
+    onPackages,
+    onClose,
+    onBuild,
+  } = props;
+  const canBuild = imageId.trim() !== "" && baseImage.trim() !== "";
+  const imageIdLabel = useId();
+  const baseImageLabel = useId();
+  const packagesLabel = useId();
+  return (
+    <Modal
+      open={open}
+      onClose={onClose}
+      title={t("buildImageTitle")}
+      closeLabel={t("cancel")}
+      footer={
+        <>
           <Button
             variant="outline"
             size="sm"
-            disabled={!writable || !canCreate}
-            onClick={submit}
+            onClick={onClose}
           >
-            {t("createSecret")}
+            {t("cancel")}
           </Button>
+          <Button
+            variant="primary"
+            size="sm"
+            disabled={!canBuild}
+            onClick={onBuild}
+          >
+            {t("buildImage")}
+          </Button>
+        </>
+      }
+    >
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          gap: "12px",
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: "4px",
+          }}
+        >
+          <label
+            htmlFor={imageIdLabel}
+            style={{
+              fontSize: "13px",
+              color: "var(--dsw-alias-label-secondary)",
+            }}
+          >
+            {t("imageId")}
+          </label>
+          <Input
+            id={imageIdLabel}
+            value={imageId}
+            placeholder={t("imageId")}
+            onChange={(event) => onImageId(event.target.value)}
+          />
+        </div>
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: "4px",
+          }}
+        >
+          <label
+            htmlFor={baseImageLabel}
+            style={{
+              fontSize: "13px",
+              color: "var(--dsw-alias-label-secondary)",
+            }}
+          >
+            {t("baseImage")}
+          </label>
+          <Input
+            id={baseImageLabel}
+            value={baseImage}
+            placeholder={t("baseImage")}
+            onChange={(event) => onBaseImage(event.target.value)}
+          />
+        </div>
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: "4px",
+          }}
+        >
+          <label
+            htmlFor={packagesLabel}
+            style={{
+              fontSize: "13px",
+              color: "var(--dsw-alias-label-secondary)",
+            }}
+          >
+            {t("packages")}
+          </label>
+          <TagInput
+            id={packagesLabel}
+            t={t}
+            value={packages}
+            onChange={onPackages}
+            placeholder={t("packages")}
+          />
         </div>
       </div>
-    </DisclosureRow>
+    </Modal>
   );
 }
 
@@ -969,6 +1262,10 @@ export function ContainerCard(props: ContainerCardProps): ReactNode {
   const state = props.useContainerCard((snapshot) => snapshot);
   const [open, setOpen] = useState(false);
   const [hovered, setHovered] = useState(false);
+  const [buildOpen, setBuildOpen] = useState(false);
+  const [imageId, setImageId] = useState("");
+  const [baseImage, setBaseImage] = useState("");
+  const [packages, setPackages] = useState<string[]>([]);
   if (!state.available) {
     return (
       <p style={{ padding: "8px 0", fontSize: "13px", opacity: 0.8 }}>
@@ -1042,6 +1339,14 @@ export function ContainerCard(props: ContainerCardProps): ReactNode {
               variant="outline"
               size="sm"
               disabled={state.busy}
+              onClick={() => setBuildOpen(true)}
+            >
+              {t("buildImage")}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={state.busy}
               onClick={props.rebuildAllImages}
             >
               {t("rebuildAllImages")}
@@ -1061,7 +1366,24 @@ export function ContainerCard(props: ContainerCardProps): ReactNode {
               />
             ))
           )}
-          <div style={sectionTitle}>{t("volumesTitle")}</div>
+          <ImageBuildModal
+            t={t}
+            open={buildOpen}
+            imageId={imageId}
+            baseImage={baseImage}
+            packages={packages}
+            onImageId={setImageId}
+            onBaseImage={setBaseImage}
+            onPackages={setPackages}
+            onClose={() => setBuildOpen(false)}
+            onBuild={() => {
+              props.buildImage(imageId.trim(), baseImage.trim(), packages);
+              setImageId("");
+              setBaseImage("");
+              setPackages([]);
+              setBuildOpen(false);
+            }}
+          />
           <VolumesSection
             t={t}
             volumes={state.volumes}
@@ -1070,7 +1392,6 @@ export function ContainerCard(props: ContainerCardProps): ReactNode {
             onCreate={props.createVolume}
             onRemove={props.removeVolume}
           />
-          <div style={sectionTitle}>{t("secretsTitle")}</div>
           <SecretsSection
             t={t}
             secrets={state.secrets}

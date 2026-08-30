@@ -24,6 +24,7 @@ const commandSchema = z.object({
     z.const("image_rebuild_all"),
     z.const("container_secret_add"),
     z.const("container_secret_remove"),
+    z.const("image_build"),
   ]),
   workspace: z.string().default(""),
   image: z.string().default(""),
@@ -42,6 +43,7 @@ const commandSchema = z.object({
   secret: z.string().default(""),
   secretEnv: z.string().default(""),
   length: z.number().default(0),
+  packages: z.array(z.string()).default([]),
 });
 
 export const settingsSchema = z.object({
@@ -119,7 +121,7 @@ export const settingsSchema = z.object({
 }) as unknown as z<ContainerSettings>;
 
 export interface CommandRequest {
-  op: "refresh" | "remove" | "recreate" | "create" | "volume_create" | "volume_remove" | "image_remove" | "secret_create" | "secret_remove" | "secret_set" | "image_rebuild" | "image_rebuild_all" | "container_secret_add" | "container_secret_remove";
+  op: "refresh" | "remove" | "recreate" | "create" | "volume_create" | "volume_remove" | "image_remove" | "secret_create" | "secret_remove" | "secret_set" | "image_rebuild" | "image_rebuild_all" | "container_secret_add" | "container_secret_remove" | "image_build";
   workspace: string;
   image: string;
   at: number;
@@ -130,6 +132,7 @@ export interface CommandRequest {
   secret: string;
   secretEnv: string;
   length: number;
+  packages: string[];
 }
 export interface ContainerView {
   containerName: string;
@@ -369,6 +372,13 @@ export function installContainerSettings(
               workspaceSlug: command.workspace,
               container: command.container || "default",
               env: command.secretEnv,
+            });
+            break;
+          case "image_build":
+            await resolver.control("buildImage", {
+              imageId: command.workspace,
+              baseImage: command.image,
+              packages: command.packages,
             });
             break;
         }

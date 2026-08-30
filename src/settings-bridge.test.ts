@@ -402,6 +402,42 @@ test("image_rebuild_all command drives rebuildAllImages with an empty payload", 
   assert.equal(scope.value.command, null);
 });
 
+test("image_build command drives buildImage with the imageId, baseImage and packages", async () => {
+  const scope = fakeScope(baseValue());
+  const calls: Array<[string, unknown]> = [];
+  const resolver: any = {
+    getConfig: () => ({}),
+    setConfig: () => {},
+    async control(method: string, request: unknown) {
+      calls.push([method, request]);
+      if (method === "listContainers") return { containers: [] };
+      if (method === "listImages") return { images: [] };
+      if (method === "listWorkspaces") return { workspaces: [] };
+      if (method === "listVolumes") return { volumes: [] };
+      if (method === "listSecrets") return { secrets: [] };
+      return {};
+    },
+  };
+  installContainerSettings(fakeContext(scope), resolver);
+  await scope.update({
+    command: {
+      op: "image_build",
+      workspace: "valkey",
+      image: "localhost/dsh-podman/arch-base:latest",
+      packages: ["valkey", "git"],
+      at: 20,
+    },
+  });
+  await new Promise((resolve) => setImmediate(resolve));
+  const buildCall = calls.find(([method]) => method === "buildImage");
+  assert.deepEqual(buildCall?.[1], {
+    imageId: "valkey",
+    baseImage: "localhost/dsh-podman/arch-base:latest",
+    packages: ["valkey", "git"],
+  });
+  assert.equal(scope.value.command, null);
+});
+
 test("secret_create command drives createSecret with length when provided", async () => {
   const scope = fakeScope(baseValue());
   const calls: Array<[string, unknown]> = [];

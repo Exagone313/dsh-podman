@@ -48,6 +48,10 @@ export type ContainerPluginKey =
   | "removeImage"
   | "rebuildImage"
   | "rebuildAllImages"
+  | "buildImage"
+  | "buildImageTitle"
+  | "cancel"
+  | "removeTag"
   | "env"
   | "secretEnv"
   | "envTitle"
@@ -106,6 +110,10 @@ export const en: Record<ContainerPluginKey, string> = {
   removeImage: "Remove",
   rebuildImage: "Rebuild",
   rebuildAllImages: "Rebuild all",
+  buildImage: "Build image",
+  buildImageTitle: "Build an image",
+  cancel: "Cancel",
+  removeTag: "Remove",
   env: "Env",
   secretEnv: "Secret env",
   envTitle: "Environment variables",
@@ -165,6 +173,10 @@ export const zh: Record<ContainerPluginKey, string> = {
   removeImage: "移除",
   rebuildImage: "重建",
   rebuildAllImages: "重建全部",
+  buildImage: "构建镜像",
+  buildImageTitle: "构建镜像",
+  cancel: "取消",
+  removeTag: "移除",
   env: "环境变量",
   secretEnv: "机密环境变量",
   envTitle: "环境变量",

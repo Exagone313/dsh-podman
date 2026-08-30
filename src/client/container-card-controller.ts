@@ -48,7 +48,7 @@ export interface WorkspaceView {
   mounts: readonly { projectName: string; mode: string }[];
 }
 export interface CommandRequest {
-  op: "refresh" | "remove" | "recreate" | "create" | "volume_create" | "volume_remove" | "image_remove" | "secret_create" | "secret_remove" | "secret_set" | "image_rebuild" | "image_rebuild_all" | "container_secret_add" | "container_secret_remove";
+  op: "refresh" | "remove" | "recreate" | "create" | "volume_create" | "volume_remove" | "image_remove" | "secret_create" | "secret_remove" | "secret_set" | "image_rebuild" | "image_rebuild_all" | "container_secret_add" | "container_secret_remove" | "image_build";
   workspace: string;
   image: string;
   at: number;
@@ -59,6 +59,7 @@ export interface CommandRequest {
   secret: string;
   secretEnv: string;
   length: number;
+  packages: string[];
 }
 export interface ContainerSettings {
   defaultImage: string;
@@ -104,6 +105,7 @@ export interface ContainerCardFace {
   removeImage: (imageId: string) => void;
   rebuildImage: (imageId: string) => void;
   rebuildAllImages: () => void;
+  buildImage: (imageId: string, baseImage: string, packages: string[]) => void;
   createSecret: (name: string, length?: number) => void;
   removeSecret: (name: string) => void;
   setSecret: (name: string, value: string) => void;
@@ -175,6 +177,7 @@ export class ContainerCardController {
       secret?: string;
       secretEnv?: string;
       length?: number;
+      packages?: string[];
     } = {},
   ): void {
     void this.scope.set("command", {
@@ -186,6 +189,7 @@ export class ContainerCardController {
       secret: extra.secret ?? "",
       secretEnv: extra.secretEnv ?? "",
       length: extra.length ?? 0,
+      packages: extra.packages ?? [],
     });
   }
 
@@ -227,6 +231,8 @@ export class ContainerCardController {
       removeImage: (imageId) => this.command("image_remove", imageId, ""),
       rebuildImage: (imageId) => this.command("image_rebuild", imageId, ""),
       rebuildAllImages: () => this.command("image_rebuild_all", "", ""),
+      buildImage: (imageId, baseImage, packages) =>
+        this.command("image_build", imageId, baseImage, { packages }),
       createSecret: (name, length) =>
         this.command("secret_create", name, "", { ...(length ? { length } : {}) }),
       removeSecret: (name) => this.command("secret_remove", name, ""),

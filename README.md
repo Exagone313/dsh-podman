@@ -15,25 +15,105 @@ disposable, per-project Podman containers instead of the dsh host.
 
 | Component | Runs | What it does |
 |---|---|---|
-| `dsh-podman-orchestrator` | A container with access to the Podman API | Owns the control socket and persisted state; creates/removes guest containers; builds workspace images |
-| `dsh-podman-guest-agent` | Inside every guest container | Serves the exec/filesystem gRPC API for one workspace |
 | `@exagone313/dsh-podman` | Inside dsh itself | Registers `ctx.subprocess` and `ctx.fs` backed by the orchestrator |
+| `dsh-podman-guest-agent` | Inside every guest container | Serves the exec/filesystem gRPC API for one workspace |
+| `dsh-podman-orchestrator` | A container with access to the Podman API | Owns the control socket and persisted state; creates/removes guest containers; builds workspace images |
 
 The plugin auto-creates a missing workspace using its configured default
 image and a single read-write project mount. It never falls back to host
 execution.
 
+## Image model: primitive, base, and custom images
+
+dsh-podman organizes the images its containers run into three tiers:
+
+- **Primitive images** are public upstream images pulled from the internet,
+  e.g. `docker.io/library/ubuntu:latest`. The base registry pins their full
+  references; they serve only as the `FROM` when building a base image and are
+  never referenced directly.
+- **Base images** are the fixed, built-in set provided by dsh-podman:
+  `archlinux` (pacman), `ubuntu` (apt), and `alpine` (apk). Each is defined by
+  its primitive, a dsh-podman-owned default package list, and its package
+  manager. By default they are **built locally** from the primitive (installing
+  the default packages and baking in the guest agent + ENTRYPOINT); when
+  `DSH_PODMAN_BASE_IMAGE_PREFIX` points at a registry (anything not starting
+  with `localhost/`), they are **pulled** instead. Base images are listed in
+  the settings UI even when not yet built/pulled, are rebuilt or pulled from
+  the card, and their short names are reserved — they cannot be built over,
+  rebuilt, or removed as custom images.
+- **Custom images** are user-built images created from a **parent** — a base
+  image or another custom image — inheriting its package manager and adding
+  extra packages on top. They inherit the guest agent and ENTRYPOINT from the
+  parent chain and are referenced by their short name (e.g. `valkey`).
+
+Image references (`imageId`, `parent`, `image`) are **short names only** (no
+registry prefix, no `:tag`).
+
 ## Build
 
 ```sh
-go test ./...        # Go tests (orchestrator + guest agent)
+go test -tags "containers_image_openpgp exclude_graphdriver_btrfs exclude_graphdriver_devicemapper" ./...   # Go tests (orchestrator + guest agent)
 pnpm install
 pnpm run build       # tsc host + tsc client -> dist/, copies proto/ -> dist/grpc/proto/
 ```
 
+The Go build tags skip the btrfs and devicemapper storage drivers, which need
+host C headers; `make` applies the same tags automatically.
+
 Protobuf bindings are generated with Buf (`buf generate`); the raw `.proto`
 files are copied into `dist/grpc/proto/` at build time and loaded at runtime
 by `@grpc/proto-loader`.
+
+## Releasing and installing from a hosted tarball
+
+The compiled output (`dist/`) is **not committed** to this repository. To
+install the plugin on another machine, build a package tarball and host it
+over HTTPS, then point `dsh plugin add` at that URL. A `.tgz` is the form
+pnpm/npm accept for remote tarball dependencies — a `.zip` archive is not
+supported as a dependency spec.
+
+**1. Build and pack** (in a checkout with dev dependencies):
+
+```sh
+pnpm install
+pnpm run build        # tsc + copy proto/ into dist/
+npm pack              # emits exagone313-dsh-podman-<version>.tgz
+```
+
+The tarball contains `package.json` (with the `dsh.bundle` declaration),
+`dist/` (the compiled plugin), `cordis.patch.yml`, and `README.md`. It
+carries **no build scripts**, so installation never runs one (pnpm ≥10
+blocks dependency build scripts by default anyway).
+
+**2. Host the `.tgz`** over HTTPS on your own server or as a release asset.
+
+**3. Install** into a dsh profile:
+
+```sh
+dsh plugin --profile web add https://your-host/dsh-podman.tgz --allow-build=protobufjs
+```
+
+`dsh plugin` forwards the URL to pnpm, which installs the package and
+reconciles it into the profile's bundle layer stack (it declares
+`dsh.bundle`). The bundled `cordis.patch.yml` disables the built-in
+`subprocess` and `fs-sandbox` rows and mounts the plugin:
+
+```yaml
+- id: subprocess
+  disabled: true
+- id: fs-sandbox
+  disabled: true
+- insert:
+    - id: podman
+      name: '@exagone313/dsh-podman'
+```
+
+Restart dsh for the plugin to load.
+
+**Updating:** a tarball URL pins an exact artifact. Give each release a
+versioned filename (`…-0.1.1.tgz`) and re-add / `dsh plugin --profile web
+update` with the new URL; a fixed "latest" URL can serve a stale copy from
+the pnpm cache.
 
 ## Configuration
 
@@ -70,13 +150,13 @@ Configuration section and the images' Set-default popup):
 |---|---|---|
 | `DSH_PODMAN_BASE_IMAGE_PREFIX` | `localhost/dsh-podman/base/` | Prefix under which base images are tagged; a `localhost/` prefix builds them locally, otherwise they are pulled from a public registry |
 | `DSH_PODMAN_GUEST_AGENT_BIN` | `dsh-podman-guest-agent` | Guest agent binary path (container-internal); see [Variable details](#variable-details) |
-| `DSH_PODMAN_GUEST_AGENT_IMAGE` | — | Prebuilt guest-agent image baked into workspace images; unset disables the feature; see [Variable details](#variable-details) |
 | `DSH_PODMAN_GUEST_AGENT_IMAGE_AGENT_BIN` | `/bin/dsh-podman-guest-agent` | Path of the guest agent binary inside the guest-agent image; see [Variable details](#variable-details) |
 | `DSH_PODMAN_GUEST_AGENT_IMAGE_DEST_AGENT_BIN` | `/usr/local/bin/dsh-podman-guest-agent` | Destination path for the copied binary inside built workspace images; see [Variable details](#variable-details) |
+| `DSH_PODMAN_GUEST_AGENT_IMAGE` | — | Prebuilt guest-agent image baked into workspace images; unset disables the feature; see [Variable details](#variable-details) |
+| `DSH_PODMAN_HOST_APK_CACHE` | — | Host-absolute directory mounted at `/etc/apk/cache` to persist downloaded packages across apk builds; unset disables caching |
+| `DSH_PODMAN_HOST_APT_CACHE` | — | Host-absolute directory mounted at `/var/cache/apt/archives` to persist downloaded packages across apt builds; unset disables caching |
 | `DSH_PODMAN_HOST_GUEST_AGENT_BIN` | — | Host-side guest agent binary path; bind-mounted when set; see [Variable details](#variable-details) |
 | `DSH_PODMAN_HOST_PACMAN_CACHE` | — | Host-absolute directory mounted at `/var/cache/pacman/pkg` to persist downloaded packages across pacman builds; unset disables caching |
-| `DSH_PODMAN_HOST_APT_CACHE` | — | Host-absolute directory mounted at `/var/cache/apt/archives` to persist downloaded packages across apt builds; unset disables caching |
-| `DSH_PODMAN_HOST_APK_CACHE` | — | Host-absolute directory mounted at `/etc/apk/cache` to persist downloaded packages across apk builds; unset disables caching |
 | `DSH_PODMAN_HOST_PROJECTS_ROOT` | `DSH_PODMAN_PROJECTS_ROOT` | Host-side projects root used as the source of bind mounts |
 | `DSH_PODMAN_HOST_SOCKETS_ROOT` | `DSH_PODMAN_SOCKETS_ROOT` | Host-side sockets root for guest socket bind mounts |
 | `DSH_PODMAN_IMAGE_PREFIX` | `localhost/dsh-podman/` | Prefix prepended to built workspace image references |
@@ -84,9 +164,9 @@ Configuration section and the images' Set-default popup):
 | `DSH_PODMAN_ORCHESTRATOR_STATE` | `/var/lib/dsh-orchestrator` | Persisted state directory |
 | `DSH_PODMAN_ORCHESTRATOR_TOKEN` | — | Shared secret authenticating control-plane gRPC calls; see [Variable details](#variable-details) |
 | `DSH_PODMAN_PROJECTS_ROOT` | `/projects` | Project root inside every guest container |
+| `DSH_PODMAN_SECRET_PREFIX` | `dsh-podman-` | Prefix applied to managed podman secrets (see [Secrets](#secrets)) |
 | `DSH_PODMAN_SOCKETS_ROOT` | `/run/dsh-podman` | Socket root directory (bind-mounted from the host); holds `orchestrator.sock` and per-workspace guest sockets; see [Variable details](#variable-details) |
 | `DSH_PODMAN_VOLUME_PREFIX` | `dsh-podman-` | Prefix applied to managed named volumes (see [Mounts and volumes](#mounts-and-volumes)) |
-| `DSH_PODMAN_SECRET_PREFIX` | `dsh-podman-` | Prefix applied to managed podman secrets (see [Secrets](#secrets)) |
 
 ### Guest agent (`dsh-podman-guest-agent`)
 
@@ -188,19 +268,25 @@ directory. The control socket file is explicitly set to `0600`.
 
 The plugin ships a browser half (`./client`, built to `dist/client`) that
 registers a card in the dsh **Settings → Plugins** page. The card lists the
-orchestrator-created guest containers and the built images, and offers
-**Remove**, **Recreate** (same image), and **Recreate with image** plus a
-**Reload this view** button. The container rows show their environment and
-secret-environment variables, let you edit environment variables before
-creating or recreating a container, and attach/detach named secrets to a
-container's environment variables. The images section can rebuild a single
-image or **rebuild all** in dependency order; **Build image** opens a popup
-with an image-id/base-image form and a chip input for the package list (type a
-name and press space/comma, or paste a list, to add removable chips). Volumes
-and secrets are listed as individual expandable rows, each with its own
-actions, and **Create volume** / **Create secret** open popup forms (the secret
-form takes an optional length; a secret's value can be overwritten, never
-read). Card actions are direct control calls and are not approval-gated.
+orchestrator-created guest containers and the built images. A workspace with
+no container gets a **Create container** button that opens a configuration
+modal — image, environment, mounts (project, tmpfs, volume, and secret), and
+secret environment variables — and workspaces that already have containers
+offer an **Add container** button for additional, named containers through
+the same modal. Container rows show their environment and secret-environment
+variables and their mounts, let you edit environment variables and
+add/remove mounts (each removal is confirmed), and attach/detach named
+secrets to a container's environment variables; each row also offers
+**Remove**, **Recreate** (same image), and **Recreate with image**. The
+card header has a **Reload this view** button. The images section can
+rebuild a single image or **rebuild all** in dependency order; **Build
+image** opens a popup with an image-id/base-image form and a chip input for
+the package list (type a name and press space/comma, or paste a list, to add
+removable chips). Volumes and secrets are listed as individual expandable
+rows, each with its own actions, and **Create volume** / **Create secret**
+open popup forms (the secret form takes an optional length; a secret's value
+can be overwritten, never read). Card actions are direct control calls and
+are not approval-gated.
 
 Data and actions travel over the settings transport:
 
@@ -208,20 +294,21 @@ Data and actions travel over the settings transport:
   view (`containers`, `images`, `volumes`, `secrets`, `notice`) in it.
 - The card writes an action into `command` (`refresh` / `remove` / `recreate`
   / `create` / `image_rebuild` / `image_rebuild_all` / volume / secret /
-  secret-env ops); the host `watch` handler executes it against the
+  secret-env / mount ops); the host `watch` handler executes it against the
   orchestrator and pushes the refreshed view back.
 
 The orchestrator service exposes gRPC methods to back the UI and the tools:
 `ListContainers` (returns only the guest containers the orchestrator created —
-containers it does not own are never exposed, and a client cannot name a
-container directly; workspace slugs are validated so the container name is
-always derived server-side from `dsh-workspace-<slug>`), `StartContainer`,
-`RecreateContainer{workspace_slug, container, image_id, mounts}` (stops,
-removes, and recreates the container, optionally with a new image or project
-mounts; an empty `image_id` keeps the workspace's current image),
-`RemoveContainer`, `AddContainerMount`, and `RemoveContainerMount`. Containers
-of a workspace run
-inside a shared podman pod (`dsh-pod-<slug>`) so they share a network
+containers it does not own are never exposed), `StartContainer{workspace_slug,
+container, image_id, mounts, env, secret_env}` (creates or replaces a
+container in the workspace's pod; an empty `container` targets the default
+container and other names are validated), `RecreateContainer{workspace_slug,
+container, image_id, mounts, env, secret_env}` (stops, removes, and recreates
+a container, optionally with a new image, project mounts, environment, or
+secret environment; an empty `image_id` keeps the workspace's current image),
+`RemoveContainer`, `AddContainerMount`, `RemoveContainerMount`,
+`AddContainerSecret`, and `RemoveContainerSecret`. Containers of a workspace
+run inside a shared podman pod (`dsh-pod-<slug>`) so they share a network
 namespace, and their root filesystems are mounted read-only. Recreating a
 container or shutting down the orchestrator first asks the container's guest
 agent to gracefully stop its daemons (SIGTERM, ~10s grace) before podman tears
@@ -255,9 +342,9 @@ policy that reads the session's permission knobs (sandbox mode + approval
 policy, folded from the session log):
 - **Read Only** — only the get/list tools run (`image_list`, `image_get`,
   `container_list`, `container_read`, `container_glob`, `container_grep`,
-  `container_mount_list`, `volume_list`, `daemon_list`, `daemon_logs`); every
-  other plugin tool is denied. DSH-native tools keep their own sandbox
-  behavior.
+  `container_mount_list`, `volume_list`, `secret_list`, `daemon_list`,
+  `daemon_logs`); every other plugin tool is denied. DSH-native tools keep
+  their own sandbox behavior.
 - **Workspace Write** — the `✱` tools ask through DSH's approval service
   (the call shows the standard approval prompt and is denied when no approval
   channel is available); `container_start` asks only when `mounts` is passed.
@@ -271,12 +358,95 @@ direct control calls and are not gated.
 `container_start`, `container_recreate`, and `container_bash` accept an `env`
 map applied to the container (or the bash process); `container_exec` and
 `daemon_start` already accept `env`, and `daemon_restart` reuses a daemon's
-stored environment. Environment variables are not treated as secrets, so the
-approval reason and `container_list` show the variable **keys**. Keys starting
-with `DSH_PODMAN` are reserved and rejected, since the orchestrator uses that
-namespace for guest-agent wiring.
+stored environment. `container_start` and `container_recreate` also accept a
+`secretEnv` map (env var name → secret short name) that attaches existing
+secrets to the container's environment — see [Secrets](#secrets).
+Environment variables are not treated as secrets, so the approval reason and
+`container_list` show the variable **keys**. Keys starting with `DSH_PODMAN`
+are reserved and rejected, since the orchestrator uses that namespace for
+guest-agent wiring.
 
-### Podman operator mode
+### Images
+
+| Tool | Params | Description |
+|---|---|---|
+| `image_build` ✱ | `imageId`, `parent`, `packages` | Build a new custom image from a base or custom parent and package list |
+| `image_get` | `imageId` | Details for one image |
+| `image_list` | — | List the built workspace images, base images first |
+| `image_rebuild_all` ✱ | — | Ensure every base, then rebuild every custom image in dependency order, skipping any image whose rebuild fails and its dependents |
+| `image_rebuild` ✱ | `imageId` | Rebuild an existing custom image in place |
+| `image_remove` ✱ | `imageId` | Remove a built image; refused while a workspace or container still references it |
+
+### Containers
+
+| Tool | Params | Description |
+|---|---|---|
+| `container_bash` | `container`, `command`, optional `workdir`, `env` | Run a shell command |
+| `container_edit` | `container`, `path`, `oldString`, `newString`, optional `replaceAll` | Edit a file |
+| `container_exec` | `container`, `argv`, optional `cwd`, `env` | Run a program |
+| `container_glob` | `container`, `pattern`, optional `cwd` | List files matching a pattern |
+| `container_grep` | `container`, `pattern`, optional `path`, `cwd` | Search files for a regex |
+| `container_list` | — | List the containers of the current workspace |
+| `container_read` | `container`, `path` | Read a file |
+| `container_recreate` ✱ | `container`, optional `image`, `mounts`, `env`, `secretEnv` | Recreate a container, keeping its current image when `image` is omitted, optionally with new project mounts or environment |
+| `container_remove` ✱ | `container` | Remove a container (stops its daemons gracefully first) |
+| `container_start` ✱ | `container`, optional `image`, `mounts`, `env`, `secretEnv` | Start a container (default image when `image` is omitted); approval required only when `mounts` is passed |
+| `container_write` | `container`, `path`, `content`, optional `create`, `truncate` | Write a file |
+
+### Mounts and volumes
+
+| Tool | Params | Description |
+|---|---|---|
+| `container_mount_add` ✱ | `container`, optional `kind`, `project`, `path`, `destination`, `mode`, `volume`, `secret` | Add a mount; `kind` is `project` (default), `tmpfs`, `volume`, or `secret` |
+| `container_mount_list` | `container` | List the container's mounts |
+| `container_mount_remove` ✱ | `container`, optional `kind`, `project`, `path`, `volume`, `destination`, `secret` | Remove a mount |
+| `volume_create` | `name` | Create a managed named volume |
+| `volume_list` | — | List the managed named volumes (short names) |
+| `volume_remove` ✱ | `name` | Remove a managed named volume |
+
+A `project` mount binds a directory from the project's workspace; `tmpfs`
+mounts a writable in-memory filesystem and `volume` mounts a podman named
+volume (auto-created on first use) — both at an arbitrary absolute container
+path, never under the projects root. A `secret` mount exposes a managed
+secret as a read-only file at an absolute container path (see
+[Secrets](#secrets)). `mode` is `read_only` or `read_write`.
+
+### Secrets
+
+| Tool | Params | Description |
+|---|---|---|
+| `container_secret_add` ✱ | `container`, `env`, `secret` | Attach a secret to a container as an environment variable |
+| `container_secret_remove` ✱ | `container`, `env` | Detach a secret environment variable from a container |
+| `secret_create` | `name`, optional `length`, `charset` | Create a secret with an **orchestrator-generated random** value (`length` default 32; `charset` `alphanumeric` \| `hex` \| `base64url`) |
+| `secret_list` | — | List the managed secrets (short names) |
+| `secret_remove` ✱ | `name` | Remove a managed secret |
+
+Secrets are stored in podman under `DSH_PODMAN_SECRET_PREFIX` (default
+`dsh-podman-`); the tools and UI use short names. `secret_create` values are
+generated server-side with `crypto/rand` and **never exposed** — there is no
+read tool. A secret can be attached to a container either as a **mount**
+(`container_mount_add kind="secret"` + `secret` + `destination`, read-only, at
+an absolute path never under the projects root) or as an **environment
+variable** (`container_secret_add`; the env var name must not start with
+`DSH_PODMAN`). The settings card can **overwrite** a secret with user-typed
+content (write-only) but never reads it.
+
+### Daemons
+
+| Tool | Params | Description |
+|---|---|---|
+| `daemon_list` | `container` | List the daemons (including their effective `uid`/`gid`) |
+| `daemon_logs` | `container`, `name`, optional `tailBytes` | Tail a daemon's stdout/stderr |
+| `daemon_restart` | `container`, `name` | Restart a daemon with the same command, environment, and user |
+| `daemon_start` | `container`, `argv`, optional `name`, `cwd`, `env`, `uid`, `gid`, `groups` | Start a background daemon; optional `uid`/`gid`/`groups` run it as another user |
+| `daemon_stop` | `container`, `name`, optional `signal` | Stop a daemon |
+
+Daemons run as the container user by default. When only `uid` is set, `gid`
+defaults to the same value; when neither is set, the daemon runs without any
+uid/gid override. `daemon_list` reports the effective `uid`/`gid` of each
+daemon.
+
+## Podman operator mode
 
 The plugin ships an **agent preset** named *Podman operator mode* (id
 `podman-ops`). On every load it (re)writes the preset into the harness's
@@ -293,7 +463,8 @@ are global and all remain available, split as:
 - **Direct:** `image_list`, `image_get`, `container_list`, `container_read`,
   `container_glob`, `container_grep`, `container_mount_list`, `volume_list`,
   `secret_list`, `secret_create`, `daemon_list`, `daemon_logs`,
-  `container_start` (asks only when `mounts` is passed).
+  `daemon_stop`, `daemon_restart`, `container_start` (asks only when `mounts`
+  is passed).
 - **Approval-gated** (the usual `✱` tools): `image_build`, `image_rebuild`,
   `image_rebuild_all`, `image_remove`, `container_recreate`,
   `container_remove`, `container_mount_add`, `container_mount_remove`,
@@ -304,170 +475,8 @@ are global and all remain available, split as:
   commands, edit container files, or start daemons once the user approves,
   without those tools asking in other presets.
 
-The permission knobs above still apply (Read Only allows only the direct
-read/list tools; Full access skips every prompt).
-
-### Image model: primitive, base, and custom images
-
-dsh-podman distinguishes three image tiers:
-
-- **Primitive images** are public upstream images pulled from the internet,
-  e.g. `docker.io/library/ubuntu:latest`. The base registry pins their full
-  references; they serve only as the `FROM` when building a base image and are
-  never referenced directly.
-- **Base images** are the fixed, built-in set provided by dsh-podman:
-  `archlinux` (pacman), `ubuntu` (apt), and `alpine` (apk). Each is defined by
-  its primitive, a dsh-podman-owned default package list, and its package
-  manager. By default they are **built locally** from the primitive (installing
-  the default packages and baking in the guest agent + ENTRYPOINT); when
-  `DSH_PODMAN_BASE_IMAGE_PREFIX` points at a registry (anything not starting
-  with `localhost/`), they are **pulled** instead. Base images are listed in
-  the settings UI even when not yet built/pulled, are rebuilt or pulled from
-  the card, and their short names are reserved — they cannot be built over,
-  rebuilt, or removed as custom images.
-- **Custom images** are user-built images created with `image_build`,
-  referenced by their short name (e.g. `valkey`). A custom image is built
-  **from a parent** — a base image or another custom image — inherits the
-  parent's package manager, and only adds the extra packages on top; it
-  inherits the guest agent and ENTRYPOINT from the parent chain.
-
-Image references (`imageId`, `parent`, `image`) are **short names only** (no
-registry prefix, no `:tag`).
-
-`image_rebuild_all` first ensures every base image (building locally or pulling
-from a public registry per `DSH_PODMAN_BASE_IMAGE_PREFIX`), then rebuilds the
-stored custom images **in dependency order** — each parent before the images
-derived from it. An image whose rebuild fails, and every image that depends on
-it, is reported in `skipped` while the rest continue.
-
-### Images
-
-| Tool | Params | Description |
-|---|---|---|
-| `image_list` | — | List the built workspace images, base images first |
-| `image_get` | `imageId` | Details for one image |
-| `image_build` ✱ | `imageId`, `parent`, `packages` | Build a new custom image from a base or custom parent and package list |
-| `image_rebuild` ✱ | `imageId` | Rebuild an existing custom image in place |
-| `image_rebuild_all` ✱ | — | Ensure every base, then rebuild every custom image in dependency order, skipping any image whose rebuild fails and its dependents |
-| `image_remove` ✱ | `imageId` | Remove a built image; refused while a workspace or container still references it |
-
-### Containers
-
-| Tool | Params | Description |
-|---|---|---|
-| `container_list` | — | List the containers of the current workspace |
-| `container_start` `✱*` | `container`, optional `image`, `mounts`, `env` | Start a container (default image when `image` is omitted); approval required only when `mounts` is passed |
-| `container_recreate` ✱ | `container`, optional `image`, `mounts`, `env` | Recreate a container, keeping its current image when `image` is omitted, optionally with new project mounts or environment |
-| `container_remove` ✱ | `container` | Remove a container (stops its daemons gracefully first) |
-| `container_bash` | `container`, `command`, optional `workdir`, `env` | Run a shell command |
-| `container_exec` | `container`, `argv`, optional `cwd`, `env` | Run a program |
-| `container_read` | `container`, `path` | Read a file |
-| `container_write` | `container`, `path`, `content`, optional `create`, `truncate` | Write a file |
-| `container_edit` | `container`, `path`, `oldString`, `newString`, optional `replaceAll` | Edit a file |
-| `container_glob` | `container`, `pattern`, optional `cwd` | List files matching a pattern |
-| `container_grep` | `container`, `pattern`, optional `path`, `cwd` | Search files for a regex |
-
-### Mounts and volumes
-
-| Tool | Params | Description |
-|---|---|---|
-| `container_mount_list` | `container` | List the container's mounts |
-| `container_mount_add` ✱ | `container`, optional `kind`, `project`, `path`, `destination`, `mode`, `volume`, `secret` | Add a mount; `kind` is `project` (default), `tmpfs`, `volume`, or `secret` |
-| `container_mount_remove` ✱ | `container`, optional `kind`, `project`, `path`, `volume`, `destination`, `secret` | Remove a mount |
-| `volume_list` | — | List the managed named volumes (short names) |
-| `volume_create` | `name` | Create a managed named volume |
-| `volume_remove` ✱ | `name` | Remove a managed named volume |
-
-A `project` mount binds a directory from the project's workspace; `tmpfs`
-mounts a writable in-memory filesystem and `volume` mounts a podman named
-volume (auto-created on first use) — both at an arbitrary absolute container
-path, never under the projects root. `mode` is `read_only` or `read_write`.
-
-### Secrets
-
-| Tool | Params | Description |
-|---|---|---|
-| `secret_list` | — | List the managed secrets (short names) |
-| `secret_create` | `name`, optional `length`, `charset` | Create a secret with an **orchestrator-generated random** value (`length` default 32; `charset` `alphanumeric` \| `hex` \| `base64url`) |
-| `secret_remove` ✱ | `name` | Remove a managed secret |
-| `container_secret_add` ✱ | `container`, `env`, `secret` | Attach a secret to a container as an environment variable |
-| `container_secret_remove` ✱ | `container`, `env` | Detach a secret environment variable from a container |
-
-Secrets are stored in podman under `DSH_PODMAN_SECRET_PREFIX` (default
-`dsh-podman-`); the tools and UI use short names. `secret_create` values are
-generated server-side with `crypto/rand` and **never exposed** — there is no
-read tool. A secret can be attached to a container either as a **mount**
-(`container_mount_add kind="secret"` + `secret` + `destination`, read-only, at
-an absolute path never under the projects root) or as an **environment
-variable** (`container_secret_add`; the env var name must not start with
-`DSH_PODMAN`). The settings card can **overwrite** a secret with user-typed
-content (write-only) but never reads it.
-
-### Daemons
-
-| Tool | Params | Description |
-|---|---|---|
-| `daemon_start` | `container`, `argv`, optional `name`, `cwd`, `env`, `uid`, `gid`, `groups` | Start a background daemon; optional `uid`/`gid`/`groups` run it as another user |
-| `daemon_list` | `container` | List the daemons (including their effective `uid`/`gid`) |
-| `daemon_stop` | `container`, `name`, optional `signal` | Stop a daemon |
-| `daemon_restart` | `container`, `name` | Restart a daemon with the same command, environment, and user |
-| `daemon_logs` | `container`, `name`, optional `tailBytes` | Tail a daemon's stdout/stderr |
-
-Daemons run as the container user by default. When only `uid` is set, `gid`
-defaults to the same value; when neither is set, the daemon runs without any
-uid/gid override. `daemon_list` reports the effective `uid`/`gid` of each
-daemon.
-
-## Releasing and installing from a hosted tarball
-
-The compiled output (`dist/`) is **not committed** to this repository. To
-install the plugin on another machine, build a package tarball and host it
-over HTTPS, then point `dsh plugin add` at that URL. A `.tgz` is the form
-pnpm/npm accept for remote tarball dependencies — a `.zip` archive is not
-supported as a dependency spec.
-
-**1. Build and pack** (in a checkout with dev dependencies):
-
-```sh
-pnpm install
-pnpm run build        # tsc + copy proto/ into dist/
-npm pack              # emits exagone313-dsh-podman-<version>.tgz
-```
-
-The tarball contains `package.json` (with the `dsh.bundle` declaration),
-`dist/` (the compiled plugin), `cordis.patch.yml`, and `README.md`. It
-carries **no build scripts**, so installation never runs one (pnpm ≥10
-blocks dependency build scripts by default anyway).
-
-**2. Host the `.tgz`** over HTTPS on your own server or as a release asset.
-
-**3. Install** into a dsh profile:
-
-```sh
-dsh plugin --profile web add https://your-host/dsh-podman.tgz --allow-build=protobufjs
-```
-
-`dsh plugin` forwards the URL to pnpm, which installs the package and
-reconciles it into the profile's bundle layer stack (it declares
-`dsh.bundle`). The bundled `cordis.patch.yml` disables the built-in
-`subprocess` and `fs-sandbox` rows and mounts the plugin:
-
-```yaml
-- id: subprocess
-  disabled: true
-- id: fs-sandbox
-  disabled: true
-- insert:
-    - id: podman
-      name: '@exagone313/dsh-podman'
-```
-
-Restart dsh for the plugin to load.
-
-**Updating:** a tarball URL pins an exact artifact. Give each release a
-versioned filename (`…-0.1.1.tgz`) and re-add / `dsh plugin --profile web
-update` with the new URL; a fixed "latest" URL can serve a stale copy from
-the pnpm cache.
+The permission knobs in the approval policy above still apply (Read Only
+allows only the direct read/list tools; Full access skips every prompt).
 
 ## License
 

@@ -4,6 +4,9 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
+import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import {
   remoteArgv,
   outputReader,
@@ -18,6 +21,9 @@ import {
   foldSandboxMode,
   foldApprovalPolicy,
   READ_ONLY_TOOLS,
+  PODMAN_OPS_PRESET_YML,
+  PODMAN_OPS_AGENT_CORDIS_YML,
+  ensurePodmanOpsPreset,
 } from "./index.js";
 
 test("remoteArgv remaps ripgrep onto the guest path", () => {
@@ -666,6 +672,40 @@ test("summarizeArgs renders reasons for the podman-ops gated tools", () => {
   assert.equal(summarizeArgs("container_write", { container: "c", path: "/etc/valkey/valkey.conf" }), "write /etc/valkey/valkey.conf in container c");
   assert.equal(summarizeArgs("container_edit", { container: "c", path: "/etc/valkey/valkey.conf" }), "edit /etc/valkey/valkey.conf in container c");
   assert.equal(summarizeArgs("container_bash", { container: "c", command: "ping -c 1 8.8.8.8" }), "run shell in container c: ping -c 1 8.8.8.8");
+});
+
+test("Podman-ops preset content covers the recent tools", () => {
+  for (const tool of [
+    "image_rebuild_all",
+    "secret_list",
+    "secret_create",
+    "secret_remove",
+    "container_secret_add",
+    "container_secret_remove",
+  ]) {
+    assert.ok(
+      PODMAN_OPS_AGENT_CORDIS_YML.includes(tool),
+      `podman-ops composition must mention ${tool}`,
+    );
+  }
+  assert.ok(PODMAN_OPS_PRESET_YML.includes("secrets"), "podman-ops metadata must mention secrets");
+});
+
+test("Podman-ops preset writer overwrites existing content", () => {
+  const dir = mkdtempSync(join(tmpdir(), "dsh-podman-"));
+  ensurePodmanOpsPreset(undefined, dir);
+  const composition = join(dir, "agent.cordis.yml");
+  const metadata = join(dir, "preset.yml");
+  assert.equal(readFileSync(composition, "utf8"), PODMAN_OPS_AGENT_CORDIS_YML);
+  assert.equal(readFileSync(metadata, "utf8"), PODMAN_OPS_PRESET_YML);
+
+  writeFileSync(composition, "# stale user copy\n");
+  ensurePodmanOpsPreset(undefined, dir);
+  assert.equal(
+    readFileSync(composition, "utf8"),
+    PODMAN_OPS_AGENT_CORDIS_YML,
+    "a second load must overwrite the stale copy",
+  );
 });
 
 const MOUNT_TOOLS = [

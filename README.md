@@ -265,10 +265,10 @@ namespace for guest-agent wiring.
 ### Podman operator mode
 
 The plugin ships an **agent preset** named *Podman operator mode* (id
-`podman-ops`). On load it installs the preset into the harness's user-presets
-root (`~/.dsh/.agent-presets/podman-ops/`) unless a composition already exists
-there, so the user can edit or delete it and it is never overwritten. It
-appears in the session's agent-preset picker next to the shipped presets.
+`podman-ops`). On every load it (re)writes the preset into the harness's
+user-presets root (`~/.dsh/.agent-presets/podman-ops/`), overwriting any local
+copy so the shipped content stays authoritative. It appears in the session's
+agent-preset picker next to the shipped presets.
 
 The preset composes a Podman-focused persona with the built-in task tools
 (`ask_user_question`, `todo_write`) and `web_search` (web fetch disabled). It
@@ -278,11 +278,13 @@ are global and all remain available, split as:
 
 - **Direct:** `image_list`, `image_get`, `container_list`, `container_read`,
   `container_glob`, `container_grep`, `container_mount_list`, `volume_list`,
-  `daemon_list`, `daemon_logs`, `container_start` (asks only when `mounts` is
-  passed).
+  `secret_list`, `secret_create`, `daemon_list`, `daemon_logs`,
+  `container_start` (asks only when `mounts` is passed).
 - **Approval-gated** (the usual `✱` tools): `image_build`, `image_rebuild`,
-  `image_remove`, `container_recreate`, `container_remove`,
-  `container_mount_add`, `container_mount_remove`, `volume_remove`.
+  `image_rebuild_all`, `image_remove`, `container_recreate`,
+  `container_remove`, `container_mount_add`, `container_mount_remove`,
+  `volume_remove`, `secret_remove`, `container_secret_add`,
+  `container_secret_remove`.
 - **Approval-gated only in this preset:** `container_bash`, `container_exec`,
   `container_write`, `container_edit`, `daemon_start` — so the agent can run
   commands, edit container files, or start daemons once the user approves,

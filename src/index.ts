@@ -7,7 +7,7 @@ import { installContainerSettings } from "./settings-bridge.js";
 import { metadata } from "./workspace-binding.js";
 import { PassThrough } from "node:stream";
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
@@ -1012,16 +1012,16 @@ export async function preExecutePolicy(
 
 // The "Podman operator mode" preset metadata, shipped verbatim into the
 // harness's user-presets root.
-const PODMAN_OPS_PRESET_YML = `name: Podman operator mode
-description: Podman-focused container operations — manage images, containers, volumes, mounts, and daemons. Inspections and lifecycle run directly; commands, container file edits, and daemon starts ask for approval; supports web research.
+export const PODMAN_OPS_PRESET_YML = `name: Podman operator mode
+description: Podman-focused container operations — manage images, containers, volumes, mounts, secrets, and daemons. Inspections and lifecycle run directly; commands, container file edits, daemon starts, and secret changes ask for approval; supports web research.
 order: 2
 `;
 
 // The "Podman operator mode" agent composition: a Podman-focused persona plus
 // the built-in task and web tools. The plugin's own container tools are global
-// and need no rows; the command/file/daemon tools stay available but gated by
-// the pre-execute policy (PODMAN_OPS_APPROVAL_TOOLS).
-const PODMAN_OPS_AGENT_CORDIS_YML = `- id: persona
+// and need no rows; the command/file/daemon/secret tools stay available but
+// gated by the pre-execute policy (PODMAN_OPS_APPROVAL_TOOLS + global flags).
+export const PODMAN_OPS_AGENT_CORDIS_YML = `- id: persona
   name: '@deepseek-ai/dsh-persona'
   config:
     text: >-
@@ -1029,20 +1029,24 @@ const PODMAN_OPS_AGENT_CORDIS_YML = `- id: persona
       Your working directory is {{cwd}}.
 
       You manage container infrastructure through the dsh-podman tools: images
-      (image_list, image_get, image_build, image_rebuild, image_remove),
-      containers (container_list, container_start, container_recreate,
-      container_remove), mounts (container_mount_list, container_mount_add,
-      container_mount_remove), volumes (volume_list, volume_create,
-      volume_remove), daemons (daemon_list, daemon_start, daemon_stop,
-      daemon_restart, daemon_logs), and container inspection (container_read,
-      container_glob, container_grep).
+      (image_list, image_get, image_build, image_rebuild, image_rebuild_all,
+      image_remove), containers (container_list, container_start,
+      container_recreate, container_remove), mounts (container_mount_list,
+      container_mount_add, container_mount_remove), volumes (volume_list,
+      volume_create, volume_remove), secrets (secret_list, secret_create,
+      secret_remove, container_secret_add, container_secret_remove), daemons
+      (daemon_list, daemon_start, daemon_stop, daemon_restart, daemon_logs),
+      and container inspection (container_read, container_glob,
+      container_grep).
 
       Inspection and lifecycle operations run directly. Running commands inside
       a container (container_bash, container_exec), editing container files
-      (container_write, container_edit), and starting daemons (daemon_start)
-      require the user's approval. Use web_search to research images and
-      documentation. Use ask_user_question for user decisions and todo_write to
-      track work.
+      (container_write, container_edit), starting daemons (daemon_start),
+      exposing or removing secret environment variables (container_secret_add,
+      container_secret_remove), removing secrets (secret_remove), and
+      rebuilding all images (image_rebuild_all) require the user's approval.
+      Use web_search to research images and documentation. Use
+      ask_user_question for user decisions and todo_write to track work.
 - id: tool-ask-user
   name: '@deepseek-ai/dsh-tool-ask-user'
 - id: tool-todo
@@ -1057,10 +1061,10 @@ const PODMAN_OPS_AGENT_CORDIS_YML = `- id: persona
 `;
 
 // Install the "Podman operator mode" agent preset into the harness's
-// user-presets root (~/.dsh/.agent-presets/<id>), idempotently: an existing
-// composition is never overwritten so the user keeps ownership of any edits.
-// Best-effort — a failure only logs.
-export function ensurePodmanOpsPreset(ctx: any): void {
+// user-presets root (~/.dsh/.agent-presets/<id>). The plugin owns the preset
+// content and (re)writes it on every load, so a local copy is always brought
+// back to the shipped composition. Best-effort — a failure only logs.
+export function ensurePodmanOpsPreset(ctx: any, dir?: string): void {
   const log = (message: string, ...args: unknown[]): void => {
     try {
       ctx?.logger?.warn?.(message, ...args);
@@ -1069,17 +1073,19 @@ export function ensurePodmanOpsPreset(ctx: any): void {
     }
   };
   try {
-    const home = process.env.DSH_HOME ?? join(homedir(), ".dsh");
-    const dir = join(home, ".agent-presets", PODMAN_OPS_PRESET);
-    const composition = join(dir, "agent.cordis.yml");
-    if (existsSync(composition)) return;
-    mkdirSync(dir, { recursive: true });
-    writeFileSync(join(dir, "preset.yml"), PODMAN_OPS_PRESET_YML);
-    writeFileSync(composition, PODMAN_OPS_AGENT_CORDIS_YML);
-    log(`[dsh-podman] installed the "${PODMAN_OPS_PRESET}" agent preset at %s`, dir);
+    const target = dir ?? join(homePresetsRoot(), PODMAN_OPS_PRESET);
+    mkdirSync(target, { recursive: true });
+    writeFileSync(join(target, "preset.yml"), PODMAN_OPS_PRESET_YML);
+    writeFileSync(join(target, "agent.cordis.yml"), PODMAN_OPS_AGENT_CORDIS_YML);
+    log(`[dsh-podman] wrote the "${PODMAN_OPS_PRESET}" agent preset to %s`, target);
   } catch (error) {
     log(`[dsh-podman] could not install the "${PODMAN_OPS_PRESET}" agent preset: %o`, error);
   }
+}
+
+// The harness user-presets root ($DSH_HOME or ~/.dsh, plus .agent-presets).
+export function homePresetsRoot(): string {
+  return join(process.env.DSH_HOME ?? join(homedir(), ".dsh"), ".agent-presets");
 }
 
 const TOOL_DESCRIPTIONS: Record<string, string> = {

@@ -11,10 +11,10 @@ import (
 	"os"
 	"path/filepath"
 
-	"gitlab.com/Exagone313/dsh-podman/internal/auth"
-	workspacefs "gitlab.com/Exagone313/dsh-podman/internal/guestagent/fs"
-	"gitlab.com/Exagone313/dsh-podman/internal/guestagent/grpcserver"
-	guest "gitlab.com/Exagone313/dsh-podman/internal/genproto/dshguest/v1"
+	"github.com/Exagone313/dsh-podman/internal/auth"
+	workspacefs "github.com/Exagone313/dsh-podman/internal/guestagent/fs"
+	"github.com/Exagone313/dsh-podman/internal/guestagent/grpcserver"
+	guest "github.com/Exagone313/dsh-podman/internal/genproto/dshguest/v1"
 	"google.golang.org/grpc"
 )
 

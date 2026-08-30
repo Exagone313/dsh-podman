@@ -2863,7 +2863,7 @@ const file_dshctl_v1_control_proto_rawDesc = "" +
 	"\x10WriteSecretValue\x12\".dshctl.v1.WriteSecretValueRequest\x1a\x11.dshctl.v1.Secret\x12O\n" +
 	"\fRemoveSecret\x12\x1e.dshctl.v1.RemoveSecretRequest\x1a\x1f.dshctl.v1.RemoveSecretResponse\x12P\n" +
 	"\x12AddContainerSecret\x12$.dshctl.v1.AddContainerSecretRequest\x1a\x14.dshctl.v1.Container\x12V\n" +
-	"\x15RemoveContainerSecret\x12'.dshctl.v1.RemoveContainerSecretRequest\x1a\x14.dshctl.v1.ContainerBGZEgitlab.com/Exagone313/dsh-podman/internal/genproto/dshctl/v1;dshctlv1b\x06proto3"
+	"\x15RemoveContainerSecret\x12'.dshctl.v1.RemoveContainerSecretRequest\x1a\x14.dshctl.v1.ContainerBGZEgithub.com/Exagone313/dsh-podman/internal/genproto/dshctl/v1;dshctlv1b\x06proto3"
 
 var (
 	file_dshctl_v1_control_proto_rawDescOnce sync.Once

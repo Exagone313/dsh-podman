@@ -17,12 +17,12 @@ import (
 
 	"github.com/containers/podman/v5/pkg/bindings"
 	"github.com/containers/podman/v5/pkg/bindings/system"
-	"gitlab.com/Exagone313/dsh-podman/internal/auth"
-	ctl "gitlab.com/Exagone313/dsh-podman/internal/genproto/dshctl/v1"
-	"gitlab.com/Exagone313/dsh-podman/internal/orchestrator/grpcserver"
-	"gitlab.com/Exagone313/dsh-podman/internal/orchestrator/images"
-	"gitlab.com/Exagone313/dsh-podman/internal/orchestrator/podman"
-	"gitlab.com/Exagone313/dsh-podman/internal/orchestrator/state"
+	"github.com/Exagone313/dsh-podman/internal/auth"
+	ctl "github.com/Exagone313/dsh-podman/internal/genproto/dshctl/v1"
+	"github.com/Exagone313/dsh-podman/internal/orchestrator/grpcserver"
+	"github.com/Exagone313/dsh-podman/internal/orchestrator/images"
+	"github.com/Exagone313/dsh-podman/internal/orchestrator/podman"
+	"github.com/Exagone313/dsh-podman/internal/orchestrator/state"
 	"google.golang.org/grpc"
 )
 

@@ -4,7 +4,7 @@
 
 syntax = "proto3";
 package dshguest.v1;
-option go_package = "gitlab.com/Exagone313/dsh-podman/internal/genproto/dshguest/v1;dshguestv1";
+option go_package = "github.com/Exagone313/dsh-podman/internal/genproto/dshguest/v1;dshguestv1";
 
 import "google/protobuf/wrappers.proto";
 

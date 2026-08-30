@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: MIT
 
-module gitlab.com/Exagone313/dsh-podman
+module github.com/Exagone313/dsh-podman
 
 go 1.27
 

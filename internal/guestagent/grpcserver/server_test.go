@@ -12,8 +12,8 @@ import (
 	"testing"
 	"time"
 
-	guest "gitlab.com/Exagone313/dsh-podman/internal/genproto/dshguest/v1"
-	workspacefs "gitlab.com/Exagone313/dsh-podman/internal/guestagent/fs"
+	guest "github.com/Exagone313/dsh-podman/internal/genproto/dshguest/v1"
+	workspacefs "github.com/Exagone313/dsh-podman/internal/guestagent/fs"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/wrapperspb"

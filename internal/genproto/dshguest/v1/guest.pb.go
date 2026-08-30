@@ -1860,7 +1860,7 @@ const file_dshguest_v1_guest_proto_rawDesc = "" +
 	"\x0eStopAllDaemons\x12\".dshguest.v1.StopAllDaemonsRequest\x1a#.dshguest.v1.StopAllDaemonsResponse\x12K\n" +
 	"\rRestartDaemon\x12!.dshguest.v1.RestartDaemonRequest\x1a\x17.dshguest.v1.DaemonInfo\x12M\n" +
 	"\n" +
-	"DaemonLogs\x12\x1e.dshguest.v1.DaemonLogsRequest\x1a\x1f.dshguest.v1.DaemonLogsResponseBKZIgitlab.com/Exagone313/dsh-podman/internal/genproto/dshguest/v1;dshguestv1b\x06proto3"
+	"DaemonLogs\x12\x1e.dshguest.v1.DaemonLogsRequest\x1a\x1f.dshguest.v1.DaemonLogsResponseBKZIgithub.com/Exagone313/dsh-podman/internal/genproto/dshguest/v1;dshguestv1b\x06proto3"
 
 var (
 	file_dshguest_v1_guest_proto_rawDescOnce sync.Once

@@ -17,10 +17,10 @@ import (
 	"syscall"
 	"time"
 
-	guest "gitlab.com/Exagone313/dsh-podman/internal/genproto/dshguest/v1"
-	"gitlab.com/Exagone313/dsh-podman/internal/guestagent/daemon"
-	"gitlab.com/Exagone313/dsh-podman/internal/guestagent/exec"
-	workspacefs "gitlab.com/Exagone313/dsh-podman/internal/guestagent/fs"
+	guest "github.com/Exagone313/dsh-podman/internal/genproto/dshguest/v1"
+	"github.com/Exagone313/dsh-podman/internal/guestagent/daemon"
+	"github.com/Exagone313/dsh-podman/internal/guestagent/exec"
+	workspacefs "github.com/Exagone313/dsh-podman/internal/guestagent/fs"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )

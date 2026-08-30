@@ -520,6 +520,97 @@ test("read-only wins over a never approval policy", async () => {
   assert.equal(result.kind, "deny", "read-only must deny mutating tools even under full access");
 });
 
+const presetExec = (name: string, preset: string, args?: unknown, events: any[] = []): any => ({
+  name,
+  arguments: args,
+  agent: { session: { header: { agentPreset: preset }, events } },
+});
+
+test("podman-ops preset asks for its approval-gated tools only", async () => {
+  const workspaceWrite = [
+    { type: "sandbox/mode", data: { mode: "workspace-write" } },
+    { type: "approval/policy", data: { policy: "ask" } },
+  ];
+  const asked = (await preExecutePolicy(
+    presetExec("container_bash", "podman-ops", { container: "valkey-ctr", command: "valkey-cli ping" }, workspaceWrite),
+    () => Promise.resolve({ kind: "allow" }),
+  )) as { kind: string; reason: string };
+  assert.equal(asked.kind, "ask");
+  assert.equal(asked.reason, "run shell in container valkey-ctr: valkey-cli ping");
+
+  const daemon = (await preExecutePolicy(
+    presetExec("daemon_start", "podman-ops", { container: "valkey-ctr", name: "v1", argv: ["valkey-server"], uid: 1001 }, workspaceWrite),
+    () => Promise.resolve({ kind: "allow" }),
+  )) as { kind: string; reason: string };
+  assert.equal(daemon.kind, "ask");
+  assert.equal(daemon.reason, "start daemon v1 in container valkey-ctr: valkey-server • uid: 1001");
+});
+
+test("podman-ops approval does not leak into other presets", async () => {
+  const workspaceWrite = [
+    { type: "sandbox/mode", data: { mode: "workspace-write" } },
+    { type: "approval/policy", data: { policy: "ask" } },
+  ];
+  for (const preset of ["standard", undefined]) {
+    let delegated = false;
+    const result = (await preExecutePolicy(
+      presetExec("container_bash", preset as string, { container: "c", command: "ls" }, workspaceWrite),
+      () => {
+        delegated = true;
+        return Promise.resolve({ kind: "allow" });
+      },
+    )) as { kind: string };
+    assert.equal(delegated, true, `${preset}: container_bash must delegate`);
+    assert.equal(result.kind, "allow");
+  }
+});
+
+test("podman-ops keeps open tools ungated and respects permissions", async () => {
+  const workspaceWrite = [
+    { type: "sandbox/mode", data: { mode: "workspace-write" } },
+    { type: "approval/policy", data: { policy: "ask" } },
+  ];
+  let delegated = false;
+  const open = (await preExecutePolicy(
+    presetExec("image_list", "podman-ops", {}, workspaceWrite),
+    () => {
+      delegated = true;
+      return Promise.resolve({ kind: "allow" });
+    },
+  )) as { kind: string };
+  assert.equal(delegated, true, "image_list must stay open in podman-ops");
+  assert.equal(open.kind, "allow");
+
+  const readOnly = [{ type: "sandbox/mode", data: { mode: "read-only" } }];
+  const denied = (await preExecutePolicy(
+    presetExec("container_bash", "podman-ops", { container: "c", command: "ls" }, readOnly),
+    () => Promise.resolve({ kind: "allow" }),
+  )) as { kind: string };
+  assert.equal(denied.kind, "deny", "read-only wins over podman-ops approval");
+
+  const never = [{ type: "approval/policy", data: { policy: "never" } }];
+  let fullDelegated = false;
+  const full = (await preExecutePolicy(
+    presetExec("daemon_start", "podman-ops", { container: "c", argv: ["x"] }, never),
+    () => {
+      fullDelegated = true;
+      return Promise.resolve({ kind: "allow" });
+    },
+  )) as { kind: string };
+  assert.equal(fullDelegated, true, "full access must not ask");
+  assert.equal(full.kind, "allow");
+});
+
+test("summarizeArgs renders reasons for the podman-ops gated tools", () => {
+  assert.equal(
+    summarizeArgs("container_exec", { container: "c", argv: ["python", "run.py", "--x", "1", "--y", "2", "--z", "3", "--w", "4", "--v", "5"] }),
+    "run in container c: python run.py --x 1 --y 2 --z 3 …",
+  );
+  assert.equal(summarizeArgs("container_write", { container: "c", path: "/etc/valkey/valkey.conf" }), "write /etc/valkey/valkey.conf in container c");
+  assert.equal(summarizeArgs("container_edit", { container: "c", path: "/etc/valkey/valkey.conf" }), "edit /etc/valkey/valkey.conf in container c");
+  assert.equal(summarizeArgs("container_bash", { container: "c", command: "ping -c 1 8.8.8.8" }), "run shell in container c: ping -c 1 8.8.8.8");
+});
+
 const MOUNT_TOOLS = [
   "container_mount_list",
   "container_mount_add",

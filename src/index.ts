@@ -7,6 +7,9 @@ import { installContainerSettings } from "./settings-bridge.js";
 import { metadata } from "./workspace-binding.js";
 import { PassThrough } from "node:stream";
 import { createHash } from "node:crypto";
+import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { homedir } from "node:os";
+import { join } from "node:path";
 
 export function defineTool<T>(definition: T): T {
   return definition;
@@ -30,6 +33,7 @@ export interface PluginConfig {
 }
 export function apply(ctx: any, config: PluginConfig = {}): void {
   ctx.on("tools/pre-execute", preExecutePolicy);
+  ensurePodmanOpsPreset(ctx);
   const imagePrefix = withTrailingSlash(
     config.imagePrefix ?? process.env.DSH_PODMAN_IMAGE_PREFIX ?? "localhost/dsh-podman/",
   );
@@ -721,6 +725,48 @@ export function summarizeArgs(name: string, args: Record<string, unknown>): stri
       const suffix = destination === undefined ? "" : ` at ${destination}`;
       return `container ${container}: ${verb} ${target}${suffix}${name === "container_mount_add" ? mountMode(args.mode) : ""}`;
     }
+    case "container_bash": {
+      const container = str("container");
+      const command = str("command");
+      if (container === undefined || command === undefined) return "";
+      return `run shell in container ${container}: ${command}`;
+    }
+    case "container_exec": {
+      const container = str("container");
+      const argv = args.argv;
+      if (container === undefined || !Array.isArray(argv) || argv.length === 0) return "";
+      const words = argv.map((word) => String(word)).slice(0, 8);
+      const tail = argv.length > 8 ? " …" : "";
+      return `run in container ${container}: ${words.join(" ")}${tail}`;
+    }
+    case "container_write": {
+      const container = str("container");
+      const path = str("path");
+      if (container === undefined || path === undefined) return "";
+      return `write ${path} in container ${container}`;
+    }
+    case "container_edit": {
+      const container = str("container");
+      const path = str("path");
+      if (container === undefined || path === undefined) return "";
+      return `edit ${path} in container ${container}`;
+    }
+    case "daemon_start": {
+      const container = str("container");
+      const argv = args.argv;
+      if (container === undefined || !Array.isArray(argv) || argv.length === 0) return "";
+      const named = str("name");
+      const words = argv.map((word) => String(word)).slice(0, 8);
+      const tail = argv.length > 8 ? " …" : "";
+      const command = `${named === undefined ? "" : ` ${named}`}`;
+      const uid = typeof args.uid === "number" ? String(args.uid) : undefined;
+      const gid = typeof args.gid === "number" ? String(args.gid) : undefined;
+      return part(
+        `start daemon${command} in container ${container}: ${words.join(" ")}${tail}`,
+        uid === undefined ? undefined : `uid: ${uid}`,
+        gid === undefined ? undefined : `gid: ${gid}`,
+      );
+    }
     default:
       return "";
   }
@@ -761,6 +807,21 @@ export const READ_ONLY_TOOLS: ReadonlySet<string> = new Set([
   "daemon_logs",
 ]);
 
+// The agent preset id this plugin ships ("Podman operator mode"). Tools in
+// PODMAN_OPS_APPROVAL_TOOLS are gated behind approval only for agents composed
+// from this preset, so it can "do other things" (run commands, edit container
+// files, start daemons) once the user approves.
+export const PODMAN_OPS_PRESET = "podman-ops";
+
+// Tools the Podman operator-mode preset keeps available but approval-gated.
+export const PODMAN_OPS_APPROVAL_TOOLS: ReadonlySet<string> = new Set([
+  "container_bash",
+  "container_exec",
+  "container_write",
+  "container_edit",
+  "daemon_start",
+]);
+
 // Every tool this plugin registers, so the permission policy only gates its
 // own tools and delegates DSH-native ones (bash, write, ...) to the harness.
 const OUR_TOOL_NAMES = new Set(TOOLS.map((tool) => tool.name));
@@ -792,13 +853,15 @@ export function foldApprovalPolicy(
 //   denied with a reason. DSH-native tools are delegated so their own sandbox
 //   policy applies.
 // - approval policy "never" (Full access): run without asking.
-// - otherwise (Workspace Write): ask for the approval-gated tools.
+// - otherwise (Workspace Write): ask for the approval-gated tools, including
+//   the tools the Podman operator-mode preset gates per preset.
 export async function preExecutePolicy(
   exec: {
     name: string;
     arguments?: unknown;
     agent?: {
       session?: {
+        header?: { agentPreset?: string };
         events?: readonly { type: string; data?: { mode?: string; policy?: string } }[];
       };
     };
@@ -817,10 +880,85 @@ export async function preExecutePolicy(
   }
   if (foldApprovalPolicy(events) === "never") return next();
   const args = exec.arguments;
-  return approvalDecision(
-    name,
-    typeof args === "object" && args !== null ? (args as Record<string, unknown>) : undefined,
-  ) ?? next();
+  const parsed =
+    typeof args === "object" && args !== null ? (args as Record<string, unknown>) : undefined;
+  const preset = exec.agent?.session?.header?.agentPreset;
+  if (preset === PODMAN_OPS_PRESET && PODMAN_OPS_APPROVAL_TOOLS.has(name)) {
+    return { kind: "ask", reason: summarizeArgs(name, parsed ?? {}) };
+  }
+  return approvalDecision(name, parsed) ?? next();
+}
+
+// The "Podman operator mode" preset metadata, shipped verbatim into the
+// harness's user-presets root.
+const PODMAN_OPS_PRESET_YML = `name: Podman operator mode
+description: Podman-focused container operations — manage images, containers, volumes, mounts, and daemons. Inspections and lifecycle run directly; commands, container file edits, and daemon starts ask for approval; supports web research.
+order: 2
+`;
+
+// The "Podman operator mode" agent composition: a Podman-focused persona plus
+// the built-in task and web tools. The plugin's own container tools are global
+// and need no rows; the command/file/daemon tools stay available but gated by
+// the pre-execute policy (PODMAN_OPS_APPROVAL_TOOLS).
+const PODMAN_OPS_AGENT_CORDIS_YML = `- id: persona
+  name: '@deepseek-ai/dsh-persona'
+  config:
+    text: >-
+      You are a Podman container-operations agent powered by the {{model}} model.
+      Your working directory is {{cwd}}.
+
+      You manage container infrastructure through the dsh-podman tools: images
+      (image_list, image_get, image_build, image_rebuild, image_remove),
+      containers (container_list, container_start, container_recreate,
+      container_remove), mounts (container_mount_list, container_mount_add,
+      container_mount_remove), volumes (volume_list, volume_create,
+      volume_remove), daemons (daemon_list, daemon_start, daemon_stop,
+      daemon_restart, daemon_logs), and container inspection (container_read,
+      container_glob, container_grep).
+
+      Inspection and lifecycle operations run directly. Running commands inside
+      a container (container_bash, container_exec), editing container files
+      (container_write, container_edit), and starting daemons (daemon_start)
+      require the user's approval. Use web_search to research images and
+      documentation. Use ask_user_question for user decisions and todo_write to
+      track work.
+- id: tool-ask-user
+  name: '@deepseek-ai/dsh-tool-ask-user'
+- id: tool-todo
+  name: '@deepseek-ai/dsh-tool-todo'
+  config:
+    allowParallelInProgress: true
+- id: tool-web
+  name: '@deepseek-ai/dsh-tool-web'
+  config:
+    fetch: false
+    searchTimeoutMs: 60000
+`;
+
+// Install the "Podman operator mode" agent preset into the harness's
+// user-presets root (~/.dsh/.agent-presets/<id>), idempotently: an existing
+// composition is never overwritten so the user keeps ownership of any edits.
+// Best-effort — a failure only logs.
+export function ensurePodmanOpsPreset(ctx: any): void {
+  const log = (message: string, ...args: unknown[]): void => {
+    try {
+      ctx?.logger?.warn?.(message, ...args);
+    } catch {
+      // Logger failure must not abort preset installation.
+    }
+  };
+  try {
+    const home = process.env.DSH_HOME ?? join(homedir(), ".dsh");
+    const dir = join(home, ".agent-presets", PODMAN_OPS_PRESET);
+    const composition = join(dir, "agent.cordis.yml");
+    if (existsSync(composition)) return;
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, "preset.yml"), PODMAN_OPS_PRESET_YML);
+    writeFileSync(composition, PODMAN_OPS_AGENT_CORDIS_YML);
+    log(`[dsh-podman] installed the "${PODMAN_OPS_PRESET}" agent preset at %s`, dir);
+  } catch (error) {
+    log(`[dsh-podman] could not install the "${PODMAN_OPS_PRESET}" agent preset: %o`, error);
+  }
 }
 
 const TOOL_DESCRIPTIONS: Record<string, string> = {

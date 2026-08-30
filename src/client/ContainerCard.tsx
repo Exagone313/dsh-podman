@@ -257,6 +257,58 @@ function ConfigField(props: {
   );
 }
 
+function ConfirmButton(props: {
+  t: (key: ContainerPluginKey) => string;
+  label: string;
+  title: string;
+  description: string;
+  disabled?: boolean;
+  ariaLabel?: string;
+  onConfirm: () => void;
+}): ReactNode {
+  const { t, label, title, description, disabled, ariaLabel, onConfirm } = props;
+  const [open, setOpen] = useState(false);
+  const confirm = (): void => {
+    setOpen(false);
+    onConfirm();
+  };
+  return (
+    <>
+      <Button
+        variant="outline"
+        size="sm"
+        disabled={disabled}
+        aria-label={ariaLabel}
+        onClick={() => setOpen(true)}
+      >
+        {label}
+      </Button>
+      <Modal
+        open={open}
+        onClose={() => setOpen(false)}
+        title={title}
+        closeLabel={t("cancel")}
+        footer={
+          <>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setOpen(false)}
+            >
+              {t("cancel")}
+            </Button>
+            <Button variant="primary" size="sm" onClick={confirm}>
+              {t("confirm")}
+            </Button>
+          </>
+        }
+      >
+        <p style={{ ...hint, margin: 0 }}>{description}</p>
+      </Modal>
+    </>
+  );
+}
+
 function Chip(props: {
   t: (key: ContainerPluginKey) => string;
   label: string;
@@ -539,22 +591,22 @@ function ContainerRow(props: {
         </tbody>
       </table>
       <div style={actions}>
-        <Button
-          variant="outline"
-          size="sm"
+        <ConfirmButton
+          t={t}
+          label={t("remove")}
+          title={t("confirmTitle")}
+          description={t("confirmRemoveContainer")}
           disabled={!enabled}
-          onClick={() => onRemove(container.workspaceSlug)}
-        >
-          {t("remove")}
-        </Button>
-        <Button
-          variant="outline"
-          size="sm"
+          onConfirm={() => onRemove(container.workspaceSlug)}
+        />
+        <ConfirmButton
+          t={t}
+          label={t("recreate")}
+          title={t("confirmTitle")}
+          description={t("confirmRecreate")}
           disabled={!enabled}
-          onClick={() => onRecreate(container.workspaceSlug, "", env)}
-        >
-          {t("recreate")}
-        </Button>
+          onConfirm={() => onRecreate(container.workspaceSlug, "", env)}
+        />
         <select
           style={imageSelect}
           value={selected}
@@ -571,14 +623,14 @@ function ContainerRow(props: {
             </option>
           ))}
         </select>
-        <Button
-          variant="outline"
-          size="sm"
+        <ConfirmButton
+          t={t}
+          label={t("recreateWithImage")}
+          title={t("confirmTitle")}
+          description={t("confirmRecreate")}
           disabled={!enabled || selected === ""}
-          onClick={() => onRecreate(container.workspaceSlug, selected, env)}
-        >
-          {t("recreateWithImage")}
-        </Button>
+          onConfirm={() => onRecreate(container.workspaceSlug, selected, env)}
+        />
       </div>
       <DisclosureRow
         icon={<span />}
@@ -619,16 +671,16 @@ function ContainerRow(props: {
               >
                 {envVar}={secretName}
               </code>
-              <Button
-                variant="outline"
-                size="sm"
+              <ConfirmButton
+                t={t}
+                label={t("detachSecret")}
+                title={t("confirmTitle")}
+                description={t("confirmDetachSecret")}
                 disabled={busy}
-                onClick={() =>
+                onConfirm={() =>
                   onRemoveContainerSecret(container.workspaceSlug, envVar)
                 }
-              >
-                {t("detachSecret")}
-              </Button>
+              />
             </div>
           ))}
           <div
@@ -815,22 +867,22 @@ function ImageItem(props: {
           </tbody>
         </table>
         <div style={actions}>
-          <Button
-            variant="outline"
-            size="sm"
+          <ConfirmButton
+            t={t}
+            label={t("rebuildImage")}
+            title={t("confirmTitle")}
+            description={t("confirmRebuildImage")}
             disabled={busy}
-            onClick={() => onRebuild(image.imageId)}
-          >
-            {t("rebuildImage")}
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
+            onConfirm={() => onRebuild(image.imageId)}
+          />
+          <ConfirmButton
+            t={t}
+            label={t("removeImage")}
+            title={t("confirmTitle")}
+            description={t("confirmRemoveImage")}
             disabled={busy}
-            onClick={() => onRemove(image.imageId)}
-          >
-            {t("removeImage")}
-          </Button>
+            onConfirm={() => onRemove(image.imageId)}
+          />
         </div>
       </div>
     </DisclosureRow>
@@ -899,14 +951,14 @@ function VolumesSection(props: {
                   gap: "8px",
                 }}
               >
-                <Button
-                  variant="outline"
-                  size="sm"
+                <ConfirmButton
+                  t={t}
+                  label={t("removeVolume")}
+                  title={t("confirmTitle")}
+                  description={t("confirmRemoveVolume")}
                   disabled={busy}
-                  onClick={() => onRemove(volume.name)}
-                >
-                  {t("removeVolume")}
-                </Button>
+                  onConfirm={() => onRemove(volume.name)}
+                />
               </div>
             </div>
           </DisclosureRow>
@@ -998,22 +1050,22 @@ function SecretRow(props: {
         }}
         style={{ width: "200px" }}
       />
-      <Button
-        variant="outline"
-        size="sm"
+      <ConfirmButton
+        t={t}
+        label={t("setSecret")}
+        title={t("confirmTitle")}
+        description={t("confirmSetSecret")}
         disabled={!writable || !canSave}
-        onClick={submit}
-      >
-        {t("setSecret")}
-      </Button>
-      <Button
-        variant="outline"
-        size="sm"
+        onConfirm={submit}
+      />
+      <ConfirmButton
+        t={t}
+        label={t("removeSecret")}
+        title={t("confirmTitle")}
+        description={t("confirmRemoveSecret")}
         disabled={busy}
-        onClick={() => onRemove(name)}
-      >
-        {t("removeSecret")}
-      </Button>
+        onConfirm={() => onRemove(name)}
+      />
     </div>
   );
 }
@@ -1368,14 +1420,14 @@ export function ContainerCard(props: ContainerCardProps): ReactNode {
             >
               {t("buildImage")}
             </Button>
-            <Button
-              variant="outline"
-              size="sm"
+            <ConfirmButton
+              t={t}
+              label={t("rebuildAllImages")}
+              title={t("confirmTitle")}
+              description={t("confirmRebuildAllImages")}
               disabled={state.busy}
-              onClick={props.rebuildAllImages}
-            >
-              {t("rebuildAllImages")}
-            </Button>
+              onConfirm={props.rebuildAllImages}
+            />
           </div>
           {state.images.length === 0 ? (
             <p style={hint}>{t("none")}</p>

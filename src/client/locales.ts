@@ -66,7 +66,18 @@ export type ContainerPluginKey =
   | "detachSecret"
   | "none"
   | "unavailable"
-  | "busy";
+  | "busy"
+  | "confirmTitle"
+  | "confirm"
+  | "confirmRemoveContainer"
+  | "confirmRecreate"
+  | "confirmRemoveImage"
+  | "confirmRebuildImage"
+  | "confirmRebuildAllImages"
+  | "confirmRemoveVolume"
+  | "confirmSetSecret"
+  | "confirmRemoveSecret"
+  | "confirmDetachSecret";
 
 export const en: Record<ContainerPluginKey, string> = {
   cardTitle: "Podman",
@@ -129,6 +140,22 @@ export const en: Record<ContainerPluginKey, string> = {
   none: "None",
   unavailable: "The container plugin is not available.",
   busy: "Working…",
+  confirmTitle: "Confirm action",
+  confirm: "Confirm",
+  confirmRemoveContainer: "Remove the default container of this workspace?",
+  confirmRecreate:
+    "Recreate this container? Its ephemeral state is lost.",
+  confirmRemoveImage:
+    "Remove this image? Containers using it must be recreated from another image.",
+  confirmRebuildImage: "Rebuild this image in place?",
+  confirmRebuildAllImages:
+    "Rebuild every image in dependency order (base first)?",
+  confirmRemoveVolume: "Remove this volume and its data?",
+  confirmSetSecret: "Overwrite this secret's value?",
+  confirmRemoveSecret:
+    "Remove this secret? Containers using it must drop it first.",
+  confirmDetachSecret:
+    "Detach this secret environment variable from the container?",
 };
 
 export const zh: Record<ContainerPluginKey, string> = {
@@ -192,6 +219,17 @@ export const zh: Record<ContainerPluginKey, string> = {
   none: "无",
   unavailable: "容器插件不可用。",
   busy: "处理中…",
+  confirmTitle: "确认操作",
+  confirm: "确认",
+  confirmRemoveContainer: "移除该工作区的默认容器？",
+  confirmRecreate: "重建该容器？其临时状态将丢失。",
+  confirmRemoveImage: "移除该镜像？使用它的容器需要用其他镜像重建。",
+  confirmRebuildImage: "就地重建该镜像？",
+  confirmRebuildAllImages: "按依赖顺序重建全部镜像（先基础镜像）？",
+  confirmRemoveVolume: "移除该卷及其数据？",
+  confirmSetSecret: "覆盖该机密的值？",
+  confirmRemoveSecret: "移除该机密？使用它的容器需先移除注入。",
+  confirmDetachSecret: "从容器上移除该机密环境变量？",
 };
 
 declare module "@deepseek-ai/dsh-client-ui-slots" {

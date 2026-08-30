@@ -712,6 +712,68 @@ func TestRemoveContainerMissingWorkspace(t *testing.T) {
 	}
 }
 
+func TestValidateEnv(t *testing.T) {
+	for _, env := range []map[string]string{
+		{"DSH_PODMAN_X": "1"},
+		{"": "v"},
+		{"a=b": "v"},
+		{"a\x00b": "v"},
+		{"a": "b\x00c"},
+	} {
+		if err := validateEnv(env); err == nil {
+			t.Errorf("accepted invalid env %#v", env)
+		}
+	}
+	if err := validateEnv(map[string]string{"FOO": "bar", "BAZ": "qux"}); err != nil {
+		t.Fatalf("rejected valid env: %v", err)
+	}
+	if err := validateEnv(nil); err != nil {
+		t.Fatalf("rejected nil env: %v", err)
+	}
+}
+
+func TestStartContainerRejectsReservedEnv(t *testing.T) {
+	store := newTestStore(t)
+	if err := store.SaveWorkspaces([]state.Workspace{{WorkspaceSlug: "proj", ContainerName: "dsh-workspace-proj"}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.SaveImages([]state.Image{{ImageID: "arch", ImageTag: "localhost/dsh-podman/arch:latest"}}); err != nil {
+		t.Fatal(err)
+	}
+	server := &Server{Store: store, Logger: silentLogger()}
+	_, err := server.StartContainer(context.Background(), &ctl.StartContainerRequest{WorkspaceSlug: "proj", Container: "dev", ImageId: "arch", Env: map[string]string{"DSH_PODMAN_X": "1"}})
+	if status.Code(err) != codes.InvalidArgument {
+		t.Fatalf("expected InvalidArgument, got %v", err)
+	}
+}
+
+func TestRecreateContainerRejectsReservedEnv(t *testing.T) {
+	store := newTestStore(t)
+	if err := store.SaveWorkspaces([]state.Workspace{{WorkspaceSlug: "proj", Containers: []state.Container{{Name: "dev", PodmanName: "dsh-workspace-proj-dev", ImageID: "arch"}}}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.SaveImages([]state.Image{{ImageID: "arch", ImageTag: "localhost/dsh-podman/arch:latest"}}); err != nil {
+		t.Fatal(err)
+	}
+	server := &Server{Store: store, Logger: silentLogger()}
+	_, err := server.RecreateContainer(context.Background(), &ctl.RecreateContainerRequest{WorkspaceSlug: "proj", Container: "dev", ImageId: "arch", Env: map[string]string{"DSH_PODMAN_X": "1"}})
+	if status.Code(err) != codes.InvalidArgument {
+		t.Fatalf("expected InvalidArgument, got %v", err)
+	}
+}
+
+func TestCreateWorkspaceRejectsReservedEnv(t *testing.T) {
+	store := newTestStore(t)
+	if err := store.SaveImages([]state.Image{{ImageID: "arch-base", ImageTag: "t1"}}); err != nil {
+		t.Fatal(err)
+	}
+	server := &Server{Store: store, Logger: silentLogger()}
+	_, err := server.CreateWorkspace(context.Background(), &ctl.CreateWorkspaceRequest{WorkspaceSlug: "proj", ImageId: "arch-base", Env: map[string]string{"DSH_PODMAN_X": "1"}})
+	if status.Code(err) != codes.InvalidArgument {
+		t.Fatalf("expected InvalidArgument, got %v", err)
+	}
+}
+
 func TestContainerMountsFallback(t *testing.T) {
 	ws := state.Workspace{Mounts: []state.Mount{{ProjectName: "a", Mode: "read_only"}}}
 	if got := containerMounts(ws, state.Container{}); len(got) != 1 || got[0].ProjectName != "a" {

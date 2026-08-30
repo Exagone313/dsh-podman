@@ -266,6 +266,11 @@ const mountsParam = {
   items: projectMountItemParam,
   description: "Optional project mounts to apply.",
 };
+export const envParam = {
+  type: "object",
+  additionalProperties: { type: "string" },
+  description: "Environment variables.",
+};
 
 export const imageListParameters = {
   type: "object",
@@ -307,6 +312,7 @@ export const containerStartParameters = {
     container: containerParam,
     image: { type: "string", description: "Optional image ID." },
     mounts: mountsParam,
+    env: envParam,
   },
   required: ["container"],
 };
@@ -320,6 +326,7 @@ export const containerRecreateParameters = {
         "Image ID to recreate the container with; defaults to the container's current image.",
     },
     mounts: mountsParam,
+    env: envParam,
   },
   required: ["container"],
 };
@@ -385,6 +392,7 @@ export const containerBashParameters = {
     container: containerParam,
     command: { type: "string", description: "Shell command to run." },
     workdir: { type: "string", description: "Working directory." },
+    env: envParam,
   },
   required: ["container", "command"],
 };
@@ -394,11 +402,7 @@ export const containerExecParameters = {
     container: containerParam,
     argv: { type: "array", items: { type: "string" } },
     cwd: { type: "string", description: "Working directory." },
-    env: {
-      type: "object",
-      additionalProperties: { type: "string" },
-      description: "Environment variables.",
-    },
+    env: envParam,
   },
   required: ["container", "argv"],
 };
@@ -465,11 +469,7 @@ export const daemonStartParameters = {
       description: "Command to run as a daemon.",
     },
     cwd: { type: "string", description: "Working directory." },
-    env: {
-      type: "object",
-      additionalProperties: { type: "string" },
-      description: "Environment variables.",
-    },
+    env: envParam,
     uid: {
       type: "integer",
       minimum: 0,
@@ -664,6 +664,15 @@ export function summarizeArgs(name: string, args: Record<string, unknown>): stri
     const beyond = items.length - LIST_CAP;
     return beyond > 0 ? `${shown.join(", ")}, +${beyond} more` : shown.join(", ");
   };
+  const envKeys = (): string | undefined => {
+    const value = args.env;
+    if (typeof value !== "object" || value === null || Array.isArray(value)) {
+      return undefined;
+    }
+    const keys = Object.keys(value);
+    if (keys.length === 0) return undefined;
+    return list(keys, (key) => String(key));
+  };
 
   switch (name) {
     case "image_build": {
@@ -689,11 +698,13 @@ export function summarizeArgs(name: string, args: Record<string, unknown>): stri
       const container = str("container");
       const image = str("image");
       const mountItems = mounts();
+      const env = envKeys();
       if (container === undefined) return "";
       const phrase = `recreate container ${container}${image === undefined ? "" : ` with ${image}`}`;
       return part(
         phrase,
         mountItems === undefined ? undefined : `mounts: ${mountItems}`,
+        env === undefined ? undefined : `env: ${env}`,
       );
     }
     case "container_remove": {
@@ -704,11 +715,13 @@ export function summarizeArgs(name: string, args: Record<string, unknown>): stri
       const container = str("container");
       const image = str("image");
       const mountItems = mounts();
+      const env = envKeys();
       if (container === undefined) return "";
       const phrase = `start container ${container}${image === undefined ? "" : ` with ${image}`}`;
       return part(
         phrase,
         mountItems === undefined ? undefined : `mounts: ${mountItems}`,
+        env === undefined ? undefined : `env: ${env}`,
       );
     }
     case "volume_remove": {
@@ -1045,13 +1058,22 @@ export const toolHandlers: Record<
       (row: any) => row.workspaceSlug === slug,
     );
     const lines = [`workspace ${slug}`];
+    const envList = (env: unknown): string | undefined => {
+      if (typeof env !== "object" || env === null || Array.isArray(env)) {
+        return undefined;
+      }
+      const keys = Object.keys(env);
+      if (keys.length === 0) return undefined;
+      return list(keys, (key) => String(key));
+    };
     const defaultRow = rows.find((row: any) => row.containerName === "default");
+    const defaultEnv = envList(defaultRow?.env);
     lines.push(
       defaultRow === undefined
         ? "default: not started (will be started on demand)"
         : `default: ${defaultRow.status}${
             defaultRow.imageId ? ` (image ${defaultRow.imageId})` : ""
-          }`,
+          }${defaultEnv === undefined ? "" : `  env=${defaultEnv}`}`,
     );
     const named = rows.filter((row: any) => row.containerName !== "default");
     if (named.length === 0) {
@@ -1059,10 +1081,11 @@ export const toolHandlers: Record<
     } else {
       lines.push("named containers:");
       for (const row of named) {
+        const env = envList(row.env);
         lines.push(
           `  ${row.containerName}: ${row.status}${
             row.imageId ? ` (image ${row.imageId})` : ""
-          }`,
+          }${env === undefined ? "" : `  env=${env}`}`,
         );
       }
     }
@@ -1075,6 +1098,7 @@ export const toolHandlers: Record<
       container: input.container,
       imageId: input.image,
       ...(mounts === undefined ? {} : { mounts }),
+      ...(input.env !== undefined ? { env: input.env } : {}),
     });
   },
   container_recreate: async (resolver, input, exec) => {
@@ -1084,6 +1108,7 @@ export const toolHandlers: Record<
       container: input.container,
       imageId: input.image ?? "",
       ...(mounts === undefined ? {} : { mounts }),
+      ...(input.env !== undefined ? { env: input.env } : {}),
     });
   },
   container_remove: async (resolver, input, exec) =>
@@ -1097,7 +1122,7 @@ export const toolHandlers: Record<
       currentCwd(exec),
       input.container,
     );
-    return runExec(binding, ["bash", "-lc", input.command], input.workdir);
+    return runExec(binding, ["bash", "-lc", input.command], input.workdir, input.env);
   },
   container_exec: async (resolver, input, exec) => {
     const binding = await resolveToolBinding(

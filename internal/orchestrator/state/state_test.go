@@ -88,7 +88,7 @@ func TestWorkspacesWithNamedContainersRoundTrip(t *testing.T) {
 		Mounts:        []Mount{{ProjectName: "team", Mode: "read_write"}},
 		Containers: []Container{
 			{Name: "default", PodmanName: "dsh-workspace-proj", ImageID: "arch", Status: "running", CreatedAt: "now", AgentSocketPath: "/run/dsh-podman/dsh-workspace-proj/guest.sock", AgentToken: "secret"},
-			{Name: "dev", PodmanName: "dsh-workspace-proj-dev", ImageID: "devimg", Status: "running", CreatedAt: "later", AgentSocketPath: "/run/dsh-podman/dsh-workspace-proj-dev/guest.sock", AgentToken: "devtok"},
+			{Name: "dev", PodmanName: "dsh-workspace-proj-dev", ImageID: "devimg", Status: "running", CreatedAt: "later", AgentSocketPath: "/run/dsh-podman/dsh-workspace-proj-dev/guest.sock", AgentToken: "devtok", Env: map[string]string{"FOO": "bar", "BAZ": "qux"}},
 		},
 	}}
 	if err := store.SaveWorkspaces(workspaces); err != nil {
@@ -106,6 +106,9 @@ func TestWorkspacesWithNamedContainersRoundTrip(t *testing.T) {
 	}
 	if got[0].Containers[1].Name != "dev" || got[0].Containers[1].PodmanName != "dsh-workspace-proj-dev" || got[0].Containers[1].ImageID != "devimg" || got[0].Containers[1].AgentToken != "devtok" {
 		t.Fatalf("named container mismatch: %#v", got[0].Containers[1])
+	}
+	if len(got[0].Containers[1].Env) != 2 || got[0].Containers[1].Env["FOO"] != "bar" || got[0].Containers[1].Env["BAZ"] != "qux" {
+		t.Fatalf("container env did not survive round trip: %#v", got[0].Containers[1].Env)
 	}
 }
 

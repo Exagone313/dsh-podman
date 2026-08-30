@@ -30,14 +30,15 @@ type Mount struct {
 	Volume      string `toml:"volume,omitempty"`
 }
 type Container struct {
-	Name            string  `toml:"name"` // "default" or logical name
-	PodmanName      string  `toml:"podman_name"`
-	ImageID         string  `toml:"image_id"`
-	Status          string  `toml:"status"`
-	CreatedAt       string  `toml:"created_at"`
-	AgentSocketPath string  `toml:"agent_socket_path"`
-	AgentToken      string  `toml:"agent_token"`
-	Mounts          []Mount `toml:"mounts"`
+	Name            string            `toml:"name"` // "default" or logical name
+	PodmanName      string            `toml:"podman_name"`
+	ImageID         string            `toml:"image_id"`
+	Status          string            `toml:"status"`
+	CreatedAt       string            `toml:"created_at"`
+	AgentSocketPath string            `toml:"agent_socket_path"`
+	AgentToken      string            `toml:"agent_token"`
+	Mounts          []Mount           `toml:"mounts"`
+	Env             map[string]string `toml:"env,omitempty"`
 }
 type Workspace struct {
 	WorkspaceSlug   string      `toml:"workspace_slug"`

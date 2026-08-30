@@ -40,7 +40,7 @@ message ProjectMount {
   MountKind kind = 5;
   string volume = 6;
 }
-message CreateWorkspaceRequest { string workspace_slug = 1; string image_id = 2; repeated ProjectMount mounts = 3; }
+message CreateWorkspaceRequest { string workspace_slug = 1; string image_id = 2; repeated ProjectMount mounts = 3; map<string, string> env = 4; }
 message DescribeWorkspaceRequest { string workspace_slug = 1; }
 message ListWorkspacesRequest {}
 message ListWorkspacesResponse { repeated Workspace workspaces = 1; }
@@ -53,6 +53,7 @@ message Workspace {
   string agent_socket_path = 6;
   string agent_token = 7;
   string created_at = 8;
+  map<string, string> env = 9;
 }
 message ListImagesRequest {}
 message ListImagesResponse { repeated Image images = 1; }
@@ -74,9 +75,10 @@ message Container {
   string podman_name = 7;
   string agent_socket_path = 8;
   string agent_token = 9;
+  map<string, string> env = 10;
 }
-message StartContainerRequest { string workspace_slug = 1; string container = 2; string image_id = 3; repeated ProjectMount mounts = 4; }
-message RecreateContainerRequest { string workspace_slug = 1; string image_id = 2; string container = 3; repeated ProjectMount mounts = 4; }
+message StartContainerRequest { string workspace_slug = 1; string container = 2; string image_id = 3; repeated ProjectMount mounts = 4; map<string, string> env = 5; }
+message RecreateContainerRequest { string workspace_slug = 1; string image_id = 2; string container = 3; repeated ProjectMount mounts = 4; map<string, string> env = 5; }
 message RemoveContainerRequest { string workspace_slug = 1; string container = 2; }
 message RemoveContainerResponse {}
 message AddContainerMountRequest { string workspace_slug = 1; string container = 2; string project = 3; string path = 4; string destination = 5; MountMode mode = 6; MountKind kind = 7; string volume = 8; }

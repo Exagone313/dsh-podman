@@ -86,6 +86,28 @@ func TestClassifyMounts(t *testing.T) {
 	}
 }
 
+func TestContainerEnv(t *testing.T) {
+	env := containerEnv("/run/dsh-podman", "dsh-workspace-proj", "/workspaces", "tok", map[string]string{"FOO": "bar", "DSH_PODMAN_X": "should-be-skipped", "DSH_PODMAN_GUEST_TOKEN": "must-not-override"})
+	if env["DSH_PODMAN_GUEST_TOKEN"] != "tok" {
+		t.Fatalf("guest token must be the orchestrator value, got %q", env["DSH_PODMAN_GUEST_TOKEN"])
+	}
+	if env["DSH_PODMAN_GUEST_SOCKET"] != filepath.Join("/run/dsh-podman", "dsh-workspace-proj", "guest.sock") {
+		t.Fatalf("unexpected guest socket: %q", env["DSH_PODMAN_GUEST_SOCKET"])
+	}
+	if env["DSH_PODMAN_PROJECTS_ROOT"] != "/workspaces" {
+		t.Fatalf("unexpected projects root: %q", env["DSH_PODMAN_PROJECTS_ROOT"])
+	}
+	if env["FOO"] != "bar" {
+		t.Fatalf("user env not merged: %#v", env)
+	}
+	if _, ok := env["DSH_PODMAN_X"]; ok {
+		t.Fatalf("reserved user key must be skipped: %#v", env)
+	}
+	if len(env) != 4 {
+		t.Fatalf("unexpected env size: %#v", env)
+	}
+}
+
 func TestGuestAgentMountsSourceCopied(t *testing.T) {
 	original := []specs.Mount{{Type: "bind", Source: "/proj", Destination: "/projects/proj"}}
 	generated := guestAgentMounts("/run/sockets/proj", "/run/dsh-podman", "proj", "", "dsh-podman-guest-agent")

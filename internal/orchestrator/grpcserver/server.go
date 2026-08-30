@@ -261,7 +261,7 @@ func (s *Server) ListContainers(context.Context, *ctl.ListContainersRequest) (*c
 // Container message, including the container's effective project mounts
 // (its own list when present, else the workspace's default mounts).
 func containerProto(ws state.Workspace, c state.Container) *ctl.Container {
-	row := &ctl.Container{ContainerName: c.Name, PodmanName: c.PodmanName, WorkspaceSlug: ws.WorkspaceSlug, ImageId: c.ImageID, Status: c.Status, CreatedAt: c.CreatedAt, AgentSocketPath: c.AgentSocketPath, AgentToken: c.AgentToken}
+	row := &ctl.Container{ContainerName: c.Name, PodmanName: c.PodmanName, WorkspaceSlug: ws.WorkspaceSlug, ImageId: c.ImageID, Status: c.Status, CreatedAt: c.CreatedAt, AgentSocketPath: c.AgentSocketPath, AgentToken: c.AgentToken, Env: cloneMap(c.Env)}
 	for _, mount := range containerMounts(ws, c) {
 		mode := ctl.MountMode_MOUNT_MODE_READ_ONLY
 		if mount.Mode == "read_write" {
@@ -319,13 +319,13 @@ func (s *Server) stopContainerDaemons(ctx context.Context, record state.Containe
 // recreateContainer gracefully stops the container's daemons, then recreates
 // the podman container with the given image tag and a fresh token, using the
 // container's effective mounts.
-func (s *Server) recreateContainer(workspace state.Workspace, record *state.Container, imageTag, newToken string) error {
+func (s *Server) recreateContainer(workspace state.Workspace, record *state.Container, imageTag, newToken string, env map[string]string) error {
 	s.stopContainerDaemons(context.Background(), *record)
 	podmanMounts, err := s.podmanMounts(containerMounts(workspace, *record))
 	if err != nil {
 		return err
 	}
-	return s.Podman.RecreateWorkspace(podNameFor(workspace.WorkspaceSlug), record.PodmanName, imageTag, newToken, podmanMounts)
+	return s.Podman.RecreateWorkspace(podNameFor(workspace.WorkspaceSlug), record.PodmanName, imageTag, newToken, podmanMounts, env)
 }
 
 // StopAllContainerDaemons gracefully stops daemons in every container, in
@@ -367,6 +367,12 @@ func (s *Server) RecreateContainer(ctx context.Context, request *ctl.RecreateCon
 		s.log().Warn("control request failed", "method", "RecreateContainer", "workspace_slug", request.GetWorkspaceSlug(), "container", container, "reason", "container not found")
 		return nil, status.Error(codes.NotFound, "container not found")
 	}
+	if err := validateEnv(request.GetEnv()); err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+	if len(request.GetEnv()) > 0 {
+		record.Env = cloneMap(request.GetEnv())
+	}
 	if len(request.GetMounts()) > 0 {
 		record.Mounts = stateMounts(request.GetMounts())
 	} else {
@@ -391,7 +397,7 @@ func (s *Server) RecreateContainer(ctx context.Context, request *ctl.RecreateCon
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	if err := s.recreateContainer(workspace, record, imageTag, secret); err != nil {
+	if err := s.recreateContainer(workspace, record, imageTag, secret, record.Env); err != nil {
 		s.log().Error("control request failed", "method", "RecreateContainer", "workspace_slug", request.GetWorkspaceSlug(), "container", container, "error", err)
 		return nil, status.Error(codes.Internal, err.Error())
 	}
@@ -430,6 +436,10 @@ func (s *Server) StartContainer(ctx context.Context, request *ctl.StartContainer
 		s.log().Error("StartContainer project validation failed", "workspace_slug", workspace.WorkspaceSlug, "error", err)
 		return nil, err
 	}
+	if err := validateEnv(request.GetEnv()); err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+	record.Env = cloneMap(request.GetEnv())
 	imageTag, err := s.resolveImageTag(imageID)
 	if err != nil {
 		return nil, err
@@ -451,7 +461,7 @@ func (s *Server) StartContainer(ctx context.Context, request *ctl.StartContainer
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	if err := s.Podman.CreateWorkspace(podNameFor(workspace.WorkspaceSlug), record.PodmanName, imageTag, secret, podmanMounts); err != nil {
+	if err := s.Podman.CreateWorkspace(podNameFor(workspace.WorkspaceSlug), record.PodmanName, imageTag, secret, podmanMounts, record.Env); err != nil {
 		s.log().Error("control request failed", "method", "StartContainer", "workspace_slug", request.GetWorkspaceSlug(), "container", request.GetContainer(), "error", err)
 		return nil, status.Error(codes.Internal, err.Error())
 	}
@@ -536,7 +546,7 @@ func (s *Server) AddContainerMount(ctx context.Context, request *ctl.AddContaine
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	if err := s.recreateContainer(workspace, record, imageTag, secret); err != nil {
+	if err := s.recreateContainer(workspace, record, imageTag, secret, record.Env); err != nil {
 		s.log().Error("control request failed", "method", "AddContainerMount", "workspace_slug", request.GetWorkspaceSlug(), "container", request.GetContainer(), "error", err)
 		return nil, status.Error(codes.Internal, err.Error())
 	}
@@ -605,7 +615,7 @@ func (s *Server) RemoveContainerMount(ctx context.Context, request *ctl.RemoveCo
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	if err := s.recreateContainer(workspace, record, imageTag, secret); err != nil {
+	if err := s.recreateContainer(workspace, record, imageTag, secret, record.Env); err != nil {
 		s.log().Error("control request failed", "method", "RemoveContainerMount", "workspace_slug", request.GetWorkspaceSlug(), "container", request.GetContainer(), "error", err)
 		return nil, status.Error(codes.Internal, err.Error())
 	}
@@ -695,6 +705,10 @@ func (s *Server) CreateWorkspace(ctx context.Context, request *ctl.CreateWorkspa
 		s.log().Error("CreateWorkspace project validation failed", "root", s.ProjectsRoot, "error", mountErr)
 		return nil, mountErr
 	}
+	userEnv := cloneMap(request.GetEnv())
+	if err := validateEnv(userEnv); err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
 	if s.Podman == nil {
 		return nil, status.Error(codes.FailedPrecondition, "podman is not configured")
 	}
@@ -717,13 +731,13 @@ func (s *Server) CreateWorkspace(ctx context.Context, request *ctl.CreateWorkspa
 		s.log().Info("CreateWorkspace rebuilt stale default image", "image_id", image.ImageID, "image_tag", image.ImageTag)
 	}
 	name := "dsh-workspace-" + request.GetWorkspaceSlug()
-	if err := s.Podman.CreateWorkspace(podNameFor(request.GetWorkspaceSlug()), name, imageTag, secret, podmanMounts); err != nil {
+	if err := s.Podman.CreateWorkspace(podNameFor(request.GetWorkspaceSlug()), name, imageTag, secret, podmanMounts, userEnv); err != nil {
 		s.log().Error("control request failed", "method", "CreateWorkspace", "workspace_slug", request.GetWorkspaceSlug(), "error", err)
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 	agentSocket := filepath.Join(s.SocketsRoot, name, "guest.sock")
 	createdAt := time.Now().UTC().Format(time.RFC3339)
-	workspace := state.Workspace{WorkspaceSlug: request.GetWorkspaceSlug(), ContainerName: name, ImageID: request.GetImageId(), Mounts: mounts, Status: "running", AgentSocketPath: agentSocket, AgentToken: secret, CreatedAt: createdAt, Containers: []state.Container{{Name: "default", PodmanName: name, ImageID: request.GetImageId(), Mounts: defaultMounts, Status: "running", CreatedAt: createdAt, AgentSocketPath: agentSocket, AgentToken: secret}}}
+	workspace := state.Workspace{WorkspaceSlug: request.GetWorkspaceSlug(), ContainerName: name, ImageID: request.GetImageId(), Mounts: mounts, Status: "running", AgentSocketPath: agentSocket, AgentToken: secret, CreatedAt: createdAt, Containers: []state.Container{{Name: "default", PodmanName: name, ImageID: request.GetImageId(), Mounts: defaultMounts, Status: "running", CreatedAt: createdAt, AgentSocketPath: agentSocket, AgentToken: secret, Env: userEnv}}}
 	if err := s.Store.UpdateWorkspaces(func(all []state.Workspace) ([]state.Workspace, error) {
 		replaced := false
 		for i := range all {
@@ -1015,6 +1029,49 @@ func containerMounts(ws state.Workspace, c state.Container) []state.Mount {
 		return c.Mounts
 	}
 	return ws.Mounts
+}
+
+// cloneMap returns a shallow copy of a string map, or nil when the source is
+// empty. A nil source yields nil.
+func cloneMap(source map[string]string) map[string]string {
+	if len(source) == 0 {
+		return nil
+	}
+	result := make(map[string]string, len(source))
+	for key, value := range source {
+		result[key] = value
+	}
+	return result
+}
+
+// validateEnv rejects user environment variables whose keys are empty, contain
+// '=' or a NUL byte, or collide with the reserved DSH_PODMAN namespace. Values
+// containing a NUL byte are rejected as well. Keys are visited in sorted order
+// so the returned message is deterministic.
+func validateEnv(env map[string]string) error {
+	keys := make([]string, 0, len(env))
+	for key := range env {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	for _, key := range keys {
+		if strings.HasPrefix(key, "DSH_PODMAN") {
+			return fmt.Errorf("env key %q is reserved (DSH_PODMAN prefix)", key)
+		}
+		if key == "" {
+			return fmt.Errorf("env key is empty")
+		}
+		if strings.ContainsRune(key, '=') {
+			return fmt.Errorf("env key %q contains '='", key)
+		}
+		if strings.ContainsRune(key, '\x00') {
+			return fmt.Errorf("env key %q contains a NUL byte", key)
+		}
+		if strings.ContainsRune(env[key], '\x00') {
+			return fmt.Errorf("env value for key %q contains a NUL byte", key)
+		}
+	}
+	return nil
 }
 
 // stateMounts projects the control plane's project mounts onto the state
@@ -1355,6 +1412,9 @@ func (s *Server) RemoveVolume(_ context.Context, request *ctl.RemoveVolumeReques
 }
 func toProto(workspace state.Workspace) *ctl.Workspace {
 	result := &ctl.Workspace{WorkspaceSlug: workspace.WorkspaceSlug, ContainerName: workspace.ContainerName, ImageId: workspace.ImageID, Status: workspace.Status, AgentSocketPath: workspace.AgentSocketPath, AgentToken: workspace.AgentToken, CreatedAt: workspace.CreatedAt}
+	if defaultContainer, ok := containerByLogical(&workspace, "default"); ok {
+		result.Env = cloneMap(defaultContainer.Env)
+	}
 	for _, mount := range workspace.Mounts {
 		mode := ctl.MountMode_MOUNT_MODE_READ_ONLY
 		if mount.Mode == "read_write" {

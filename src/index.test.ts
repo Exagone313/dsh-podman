@@ -813,3 +813,102 @@ test("daemon tools require no approval and are valid object-rooted schemas", () 
     assert.ok(tool!.parameters.required.includes("container"));
   }
 });
+
+test("container start/recreate/bash accept an env map schema", () => {
+  for (const name of ["container_start", "container_recreate", "container_bash"]) {
+    const tool = TOOLS.find((entry) => entry.name === name);
+    assert.ok(tool, `${name} registered`);
+    const env = tool!.parameters.properties.env;
+    assert.equal(env.type, "object", `${name}.env type`);
+    assert.equal(
+      env.additionalProperties.type,
+      "string",
+      `${name}.env values type`,
+    );
+    assert.ok(
+      !Array.isArray(tool!.parameters.required.includes("env")),
+      `${name}.env must stay optional`,
+    );
+  }
+});
+
+test("summarizeArgs includes env keys for container start/recreate", () => {
+  assert.equal(
+    summarizeArgs("container_start", {
+      container: "web",
+      env: { A: "1", B: "2" },
+    }),
+    "start container web • env: A, B",
+  );
+  assert.equal(
+    summarizeArgs("container_start", {
+      container: "web",
+      image: "localhost/dsh-podman/nginx:latest",
+      mounts: [{ project: "team", mode: "read_only" }],
+      env: { A: "1", B: "2", C: "3" },
+    }),
+    "start container web with localhost/dsh-podman/nginx:latest • mounts: team (ro) • env: A, B, C",
+  );
+  assert.equal(
+    summarizeArgs("container_start", {
+      container: "web",
+      env: { A: "1", B: "2", C: "3", D: "4", E: "5", F: "6", G: "7", H: "8", I: "9", J: "10" },
+    }),
+    "start container web • env: A, B, C, D, E, F, G, H, +2 more",
+  );
+  assert.equal(
+    summarizeArgs("container_recreate", {
+      container: "c",
+      image: "img",
+      env: { A: "1" },
+    }),
+    "recreate container c with img • env: A",
+  );
+  assert.equal(
+    summarizeArgs("container_recreate", { container: "c", env: {} }),
+    "recreate container c",
+  );
+});
+
+test("container_list renders env keys on container rows", async () => {
+  const resolver = {
+    registry: {
+      resolveByPath: async () => ({ id: "team" }),
+    },
+    control: async (method: string) => {
+      if (method === "listContainers") {
+        return {
+          containers: [
+            {
+              workspaceSlug: "team",
+              containerName: "default",
+              status: "running",
+              imageId: "img-1",
+              env: { PATH: "/bin", HOME: "/root" },
+            },
+            {
+              workspaceSlug: "team",
+              containerName: "db",
+              status: "running",
+              env: { PORT: "5432", DB: "main", X: "1", Y: "2" },
+            },
+            {
+              workspaceSlug: "team",
+              containerName: "worker",
+              status: "stopped",
+            },
+          ],
+        };
+      }
+      return { workspaces: [] };
+    },
+  } as never;
+  const exec = { agent: { session: { header: { cwd: "/proj" } } } };
+  const out = (await toolHandlers.container_list(resolver, {}, exec)) as string;
+  assert.ok(
+    out.includes("default: running (image img-1)  env=PATH, HOME"),
+    out,
+  );
+  assert.ok(out.includes("  db: running  env=PORT, DB, X, Y"), out);
+  assert.ok(out.includes("  worker: stopped"), out);
+});

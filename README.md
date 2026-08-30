@@ -244,6 +244,14 @@ The prompt's reason summarizes the call's key parameters inline
 destination, and `(ro)` read-only marker). The settings-card actions are
 direct control calls and are not gated.
 
+`container_start`, `container_recreate`, and `container_bash` accept an `env`
+map applied to the container (or the bash process); `container_exec` and
+`daemon_start` already accept `env`, and `daemon_restart` reuses a daemon's
+stored environment. Environment variables are not treated as secrets, so the
+approval reason and `container_list` show the variable **keys**. Keys starting
+with `DSH_PODMAN` are reserved and rejected, since the orchestrator uses that
+namespace for guest-agent wiring.
+
 ### Podman operator mode
 
 The plugin ships an **agent preset** named *Podman operator mode* (id
@@ -294,10 +302,10 @@ rebuilt, or removed.
 | Tool | Params | Description |
 |---|---|---|
 | `container_list` | — | List the containers of the current workspace |
-| `container_start` `✱*` | `container`, optional `image`, `mounts` | Start a container (default image when `image` is omitted); approval required only when `mounts` is passed |
-| `container_recreate` ✱ | `container`, optional `image`, `mounts` | Recreate a container, keeping its current image when `image` is omitted, optionally with new project mounts |
+| `container_start` `✱*` | `container`, optional `image`, `mounts`, `env` | Start a container (default image when `image` is omitted); approval required only when `mounts` is passed |
+| `container_recreate` ✱ | `container`, optional `image`, `mounts`, `env` | Recreate a container, keeping its current image when `image` is omitted, optionally with new project mounts or environment |
 | `container_remove` ✱ | `container` | Remove a container (stops its daemons gracefully first) |
-| `container_bash` | `container`, `command`, optional `workdir` | Run a shell command |
+| `container_bash` | `container`, `command`, optional `workdir`, `env` | Run a shell command |
 | `container_exec` | `container`, `argv`, optional `cwd`, `env` | Run a program |
 | `container_read` | `container`, `path` | Read a file |
 | `container_write` | `container`, `path`, `content`, optional `create`, `truncate` | Write a file |

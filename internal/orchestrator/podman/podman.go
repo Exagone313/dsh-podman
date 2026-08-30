@@ -11,6 +11,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/containers/podman/v5/pkg/bindings"
 	"github.com/containers/podman/v5/pkg/bindings/containers"
@@ -79,7 +80,7 @@ func (c *Client) RemovePod(name string) error {
 	return nil
 }
 
-func (c *Client) CreateWorkspace(pod, name, image, token string, mounts []specs.Mount) error {
+func (c *Client) CreateWorkspace(pod, name, image, token string, mounts []specs.Mount, env map[string]string) error {
 	c.log().Info("creating guest container", "pod_name", pod, "container_name", name, "image", image, "mount_count", len(mounts))
 	socketDir := filepath.Join(c.socketRoot, name)
 	hostSocketDir := filepath.Join(c.hostSocketRoot, name)
@@ -94,7 +95,7 @@ func (c *Client) CreateWorkspace(pod, name, image, token string, mounts []specs.
 	generator.Name = name
 	generator.Pod = pod
 	generator.Command = []string{c.guestBinary}
-	generator.Env = map[string]string{"DSH_PODMAN_GUEST_TOKEN": token, "DSH_PODMAN_GUEST_SOCKET": filepath.Join(c.socketRoot, name, "guest.sock"), "DSH_PODMAN_PROJECTS_ROOT": c.projectRoot}
+	generator.Env = containerEnv(c.socketRoot, name, c.projectRoot, token, env)
 	generator.Init = &init
 	generator.ReadOnlyFilesystem = boolPtr(true)
 	ociMounts, volumes := classifyMounts(mounts)
@@ -203,7 +204,7 @@ func (c *Client) Remove(name string) error {
 	return err
 }
 
-func (c *Client) RecreateWorkspace(pod, name, image, token string, mounts []specs.Mount) error {
+func (c *Client) RecreateWorkspace(pod, name, image, token string, mounts []specs.Mount, env map[string]string) error {
 	c.log().Info("recreating guest container", "pod_name", pod, "container_name", name, "image", image, "mount_count", len(mounts))
 	if err := c.Stop(name); err != nil {
 		return err
@@ -211,7 +212,26 @@ func (c *Client) RecreateWorkspace(pod, name, image, token string, mounts []spec
 	if err := c.Remove(name); err != nil {
 		return err
 	}
-	return c.CreateWorkspace(pod, name, image, token, mounts)
+	return c.CreateWorkspace(pod, name, image, token, mounts, env)
+}
+
+// containerEnv builds the guest container environment: the reserved
+// orchestrator agent variables, then every user variable. User keys that
+// collide with the reserved DSH_PODMAN namespace are skipped defensively (the
+// caller has already validated them).
+func containerEnv(socketRoot, name, projectRoot, token string, user map[string]string) map[string]string {
+	env := map[string]string{
+		"DSH_PODMAN_GUEST_TOKEN":   token,
+		"DSH_PODMAN_GUEST_SOCKET":  filepath.Join(socketRoot, name, "guest.sock"),
+		"DSH_PODMAN_PROJECTS_ROOT": projectRoot,
+	}
+	for key, value := range user {
+		if strings.HasPrefix(key, "DSH_PODMAN") {
+			continue
+		}
+		env[key] = value
+	}
+	return env
 }
 
 func (c *Client) VolumeExists(name string) (bool, error) {

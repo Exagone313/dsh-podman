@@ -1,0 +1,137 @@
+# SPDX-FileCopyrightText: 2026 Elouan Martinet <exa@elou.world>
+#
+# SPDX-License-Identifier: MIT
+
+name: Release
+
+on:
+  push:
+    tags:
+      - "[0-9]*.[0-9]*.[0-9]*"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Release ${{ github.ref_name }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # create the GitHub release
+      packages: write # push container images to GHCR
+      id-token: write # sign the npm package with provenance
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+        with:
+          version: "10.30.0"
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "22"
+          registry-url: "https://registry.npmjs.org"
+          package-manager-cache: false
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: "1.27"
+          cache: false
+
+      - name: Set version from tag
+        run: |
+          VERSION="$GITHUB_REF_NAME"
+          npm pkg set version="$VERSION"
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: pnpm build
+
+      - name: Test
+        run: pnpm test
+
+      - name: Build binaries (amd64)
+        run: GOOS=linux GOARCH=amd64 make build-go
+
+      - name: Build binaries (arm64)
+        run: GOOS=linux GOARCH=arm64 make build-go
+
+      - name: Set up buildx
+        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
+
+      - name: Log in to GHCR
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Metadata (orchestrator)
+        id: meta-orchestrator
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
+        with:
+          images: ghcr.io/exagone313/dsh-podman/orchestrator
+          tags: |
+            type=semver,pattern={{version}}
+
+      - name: Metadata (guest-agent)
+        id: meta-guestagent
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
+        with:
+          images: ghcr.io/exagone313/dsh-podman/guest-agent
+          tags: |
+            type=semver,pattern={{version}}
+
+      - name: Build and push orchestrator image
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        with:
+          context: .
+          file: Containerfile.orchestrator
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta-orchestrator.outputs.tags }}
+          labels: ${{ steps.meta-orchestrator.outputs.labels }}
+
+      - name: Build and push guest-agent image
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        with:
+          context: .
+          file: Containerfile.guestagent
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta-guestagent.outputs.tags }}
+          labels: ${{ steps.meta-guestagent.outputs.labels }}
+
+      - name: Pack npm tarball
+        run: npm pack
+
+      - name: Publish to npm
+        run: |
+          args="--provenance --no-git-checks"
+          if [[ "$VERSION" == *-* ]]; then args="$args --tag next"; fi
+          pnpm publish $args
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Create GitHub release
+        run: |
+          args=(--generate-notes)
+          if [[ "$VERSION" == *-* ]]; then args+=(--prerelease); fi
+          gh release create "$GITHUB_REF_NAME" "${args[@]}" \
+            exagone313-dsh-podman-*.tgz \
+            bin/linux-amd64/dsh-podman-orchestrator \
+            bin/linux-amd64/dsh-podman-guest-agent \
+            bin/linux-arm64/dsh-podman-orchestrator \
+            bin/linux-arm64/dsh-podman-guest-agent
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

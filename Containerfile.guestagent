@@ -4,5 +4,7 @@
 
 FROM scratch
 ENV PATH=/bin
-COPY bin/dsh-podman-guest-agent /bin/dsh-podman-guest-agent
+ARG TARGETOS
+ARG TARGETARCH
+COPY bin/${TARGETOS}-${TARGETARCH}/dsh-podman-guest-agent /bin/dsh-podman-guest-agent
 ENTRYPOINT ["/bin/dsh-podman-guest-agent"]

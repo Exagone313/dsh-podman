@@ -23,23 +23,23 @@ all: build
 
 build: build-go pnpm-build
 
-build-go: $(BIN_DIR)/dsh-podman-guest-agent $(BIN_DIR)/dsh-podman-orchestrator
+build-go: $(BIN_DIR)/$(GOOS)-$(GOARCH)/dsh-podman-guest-agent $(BIN_DIR)/$(GOOS)-$(GOARCH)/dsh-podman-orchestrator
 
 image: image-orchestrator image-guestagent
 
 image-orchestrator: build-go
-	$(CONTAINER) build -f Containerfile.orchestrator -t $(IMAGE_PREFIX)orchestrator:$(IMAGE_TAG) .
+	$(CONTAINER) build --build-arg TARGETOS=$(GOOS) --build-arg TARGETARCH=$(GOARCH) -f Containerfile.orchestrator -t $(IMAGE_PREFIX)orchestrator:$(IMAGE_TAG) .
 
 image-guestagent: build-go
-	$(CONTAINER) build -f Containerfile.guestagent -t $(IMAGE_PREFIX)guest-agent:$(IMAGE_TAG) .
+	$(CONTAINER) build --build-arg TARGETOS=$(GOOS) --build-arg TARGETARCH=$(GOARCH) -f Containerfile.guestagent -t $(IMAGE_PREFIX)guest-agent:$(IMAGE_TAG) .
 
-$(BIN_DIR)/dsh-podman-guest-agent: $(GO_SOURCES) go.mod go.sum
-	mkdir -p $(BIN_DIR)
-	CGO_ENABLED=0 GOOS=$(GOOS) GOARCH=$(GOARCH) $(GO) build $(GO_BUILD_FLAGS) -o $(BIN_DIR)/dsh-podman-guest-agent ./cmd/dsh-podman-guest-agent
+$(BIN_DIR)/$(GOOS)-$(GOARCH)/dsh-podman-guest-agent: $(GO_SOURCES) go.mod go.sum
+	mkdir -p $(BIN_DIR)/$(GOOS)-$(GOARCH)
+	CGO_ENABLED=0 GOOS=$(GOOS) GOARCH=$(GOARCH) $(GO) build $(GO_BUILD_FLAGS) -o $(BIN_DIR)/$(GOOS)-$(GOARCH)/dsh-podman-guest-agent ./cmd/dsh-podman-guest-agent
 
-$(BIN_DIR)/dsh-podman-orchestrator: $(GO_SOURCES) go.mod go.sum
-	mkdir -p $(BIN_DIR)
-	CGO_ENABLED=0 GOOS=$(GOOS) GOARCH=$(GOARCH) $(GO) build $(GO_BUILD_FLAGS) -o $(BIN_DIR)/dsh-podman-orchestrator ./cmd/dsh-podman-orchestrator
+$(BIN_DIR)/$(GOOS)-$(GOARCH)/dsh-podman-orchestrator: $(GO_SOURCES) go.mod go.sum
+	mkdir -p $(BIN_DIR)/$(GOOS)-$(GOARCH)
+	CGO_ENABLED=0 GOOS=$(GOOS) GOARCH=$(GOARCH) $(GO) build $(GO_BUILD_FLAGS) -o $(BIN_DIR)/$(GOOS)-$(GOARCH)/dsh-podman-orchestrator ./cmd/dsh-podman-orchestrator
 
 pnpm-install:
 	pnpm install --frozen-lockfile

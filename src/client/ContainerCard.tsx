@@ -257,6 +257,53 @@ function ConfigField(props: {
   );
 }
 
+function Chip(props: {
+  t: (key: ContainerPluginKey) => string;
+  label: string;
+  disabled?: boolean;
+  onRemove?: () => void;
+}): ReactNode {
+  const { t, label, disabled, onRemove } = props;
+  return (
+    <span
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: "2px",
+        height: "24px",
+        padding: onRemove === undefined ? "0 8px" : "0 4px 0 8px",
+        borderRadius: "999px",
+        border: "1px solid var(--dsw-alias-border-l2)",
+        background: "var(--dsw-alias-bg-layer-3)",
+        fontSize: "12px",
+        fontFamily: "var(--dsw-alias-font-mono, ui-monospace, monospace)",
+        color: "var(--dsw-alias-label-primary)",
+      }}
+    >
+      {label}
+      {onRemove === undefined ? null : (
+        <Button
+          variant="ghost"
+          size="sm"
+          aria-label={t("removeTag")}
+          disabled={disabled}
+          onClick={onRemove}
+          style={{
+            padding: 0,
+            minWidth: "18px",
+            height: "18px",
+            lineHeight: 1,
+            fontSize: "13px",
+            color: "var(--dsw-alias-label-tertiary)",
+          }}
+        >
+          ×
+        </Button>
+      )}
+    </span>
+  );
+}
+
 function TagInput(props: {
   t: (key: ContainerPluginKey) => string;
   value: readonly string[];
@@ -282,41 +329,13 @@ function TagInput(props: {
       }}
     >
       {value.map((tag) => (
-        <span
+        <Chip
           key={tag}
-          style={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: "2px",
-            height: "24px",
-            padding: "0 4px 0 8px",
-            borderRadius: "999px",
-            border: "1px solid var(--dsw-alias-border-l2)",
-            background: "var(--dsw-alias-bg-layer-3)",
-            fontSize: "12px",
-            fontFamily: "var(--dsw-alias-font-mono, ui-monospace, monospace)",
-            color: "var(--dsw-alias-label-primary)",
-          }}
-        >
-          {tag}
-          <Button
-            variant="ghost"
-            size="sm"
-            aria-label={t("removeTag")}
-            disabled={disabled}
-            onClick={() => onChange(value.filter((item) => item !== tag))}
-            style={{
-              padding: 0,
-              minWidth: "18px",
-              height: "18px",
-              lineHeight: 1,
-              fontSize: "13px",
-              color: "var(--dsw-alias-label-tertiary)",
-            }}
-          >
-            ×
-          </Button>
-        </span>
+          t={t}
+          label={tag}
+          disabled={disabled}
+          onRemove={() => onChange(value.filter((item) => item !== tag))}
+        />
       ))}
       <Input
         id={id}
@@ -782,9 +801,15 @@ function ImageItem(props: {
             <tr>
               <th style={thStyle} scope="row">{t("packages")}</th>
               <td style={tdStyle}>
-                {image.packages.length === 0
-                  ? t("none")
-                  : image.packages.join(", ")}
+                {image.packages.length === 0 ? (
+                  t("none")
+                ) : (
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+                    {image.packages.map((pkg) => (
+                      <Chip key={pkg} t={t} label={pkg} />
+                    ))}
+                  </div>
+                )}
               </td>
             </tr>
           </tbody>

@@ -1588,6 +1588,7 @@ export function ContainerCard(props: ContainerCardProps): ReactNode {
               />
             ))
           )}
+          <div style={sectionTitle}>{t("customImagesTitle")}</div>
           {customImages.length === 0 ? (
             <p style={hint}>{t("none")}</p>
           ) : (

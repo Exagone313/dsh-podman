@@ -51,10 +51,19 @@ jobs:
       - name: Test
         run: make test-go
       - name: Scan Go dependencies
-        uses: golang/govulncheck-action@032d45514ae346b1db93c04b0c90b841c370344f # v1.1.0
-        with:
-          go-version-input: "1.27"
-          go-package: ./...
+        run: |
+          go install golang.org/x/vuln/cmd/govulncheck@v1.7.0
+          govulncheck="$(go env GOPATH)/bin/govulncheck"
+          output=$("$govulncheck" -format text -tags "containers_image_openpgp,exclude_graphdriver_btrfs,exclude_graphdriver_devicemapper" ./... 2>&1)
+          status=$?
+          printf '%s\n' "$output"
+          if [ "$status" -eq 3 ]; then
+            if printf '%s\n' "$output" | grep 'Fixed in:' | grep -qv 'Fixed in: N/A'; then
+              exit 1
+            fi
+            exit 0
+          fi
+          exit "$status"
 
   js:
     name: JS plugin

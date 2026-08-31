@@ -9,7 +9,7 @@ go 1.27
 require (
 	github.com/containers/buildah v1.43.2
 	github.com/containers/podman/v5 v5.8.6
-	github.com/opencontainers/runtime-spec v1.2.1
+	github.com/opencontainers/runtime-spec v1.3.0
 	github.com/pelletier/go-toml/v2 v2.4.3
 	google.golang.org/grpc v1.83.2
 	google.golang.org/protobuf v1.36.12

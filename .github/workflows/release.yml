@@ -26,10 +26,13 @@ jobs:
       id-token: write # sign the npm package with provenance
     steps:
       - name: Fail early if the npm token is missing
-        if: ${{ secrets.NPM_TOKEN == '' }}
         run: |
-          echo "::error::The NPM_TOKEN secret is not set; cannot publish to npm"
-          exit 1
+          if [ -z "$NODE_AUTH_TOKEN" ]; then
+            echo "::error::The NPM_TOKEN secret is not set; cannot publish to npm"
+            exit 1
+          fi
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

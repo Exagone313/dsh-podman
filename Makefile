@@ -17,11 +17,16 @@ JS_SOURCES := $(shell find src -type f \( -name '*.ts' -o -name '*.tsx' \) -prin
 PROTO_SOURCES := $(shell find proto -type f -name '*.proto' -print)
 NODE_MODULES_TSC := node_modules/.bin/tsc
 
-.PHONY: all build build-go image image-orchestrator image-guestagent pnpm-install pnpm-build pnpm-test pnpm-prune clean
+.PHONY: all build build-go test test-go image image-orchestrator image-guestagent pnpm-install pnpm-build pnpm-test pnpm-prune clean
 
 all: build
 
 build: build-go pnpm-build
+
+test: test-go pnpm-test
+
+test-go:
+	$(GO) test $(GO_BUILD_FLAGS) ./...
 
 build-go: $(BIN_DIR)/$(GOOS)-$(GOARCH)/dsh-podman-guest-agent $(BIN_DIR)/$(GOOS)-$(GOARCH)/dsh-podman-orchestrator
 
@@ -52,7 +57,7 @@ $(NODE_MODULES_TSC): package.json pnpm-lock.yaml
 
 pnpm-build: dist/index.js
 
-pnpm-test:
+pnpm-test: pnpm-build
 	pnpm test
 
 pnpm-prune:

@@ -13,6 +13,7 @@ import (
 	"time"
 
 	guest "github.com/Exagone313/dsh-podman/internal/genproto/dshguest/v1"
+	"github.com/Exagone313/dsh-podman/internal/guestagent/daemon"
 	workspacefs "github.com/Exagone313/dsh-podman/internal/guestagent/fs"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -401,6 +402,9 @@ func TestStartDaemonRejectsNegativeGid(t *testing.T) {
 }
 
 func TestStartDaemonUidOnlyDefaultsGid(t *testing.T) {
+	if !daemon.CanSwitchUser() {
+		t.Skip("requires uid switching")
+	}
 	server := New()
 	info, err := server.StartDaemon(context.Background(), &guest.StartDaemonRequest{
 		Name: "web",

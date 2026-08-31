@@ -94,11 +94,25 @@ func credentialFor(opts StartOptions) *syscall.Credential {
 	return cred
 }
 
+// effectiveUid returns the uid the daemon will run as given opts.
 func effectiveUid(opts StartOptions) uint32 {
 	if opts.Uid != nil {
 		return *opts.Uid
 	}
 	return 0
+}
+
+// CanSwitchUser reports whether the current process can start commands as a
+// different uid/gid. It requires root with the setuid/setgid capabilities,
+// which sandboxes and some CI containers lack, so tests that exercise a real
+// identity switch skip when it is unavailable.
+func CanSwitchUser() bool {
+	if os.Geteuid() != 0 {
+		return false
+	}
+	cmd := exec.Command("true")
+	cmd.SysProcAttr = &syscall.SysProcAttr{Credential: &syscall.Credential{Uid: 1, Gid: 1}}
+	return cmd.Run() == nil
 }
 
 func effectiveGid(opts StartOptions) uint32 {

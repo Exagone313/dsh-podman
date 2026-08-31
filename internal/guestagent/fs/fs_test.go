@@ -11,6 +11,18 @@ import (
 	"testing"
 )
 
+// tempDir returns a canonicalized temporary directory, matching how Resolve
+// evaluates host roots, so the tests are robust when TMPDIR points through a
+// symlink (e.g. /tmp -> /run/user/<uid>).
+func tempDir(t *testing.T) string {
+	t.Helper()
+	dir, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	return dir
+}
+
 func TestNewRejectsRelativeMounts(t *testing.T) {
 	for _, mount := range []Mount{{Virtual: "workspace", Host: "/tmp"}, {Virtual: "/workspace", Host: "tmp"}} {
 		if _, err := New([]Mount{mount}); err == nil {
@@ -61,7 +73,7 @@ func TestResolveRejectsUnsafePaths(t *testing.T) {
 }
 
 func TestResolveAllowsMount(t *testing.T) {
-	root := t.TempDir()
+	root := tempDir(t)
 	w, _ := New([]Mount{{Virtual: "/workspace", Host: root}})
 	path, _, err := w.Resolve("/workspace/file", true)
 	if err != nil || path != filepath.Join(root, "file") {
@@ -70,7 +82,7 @@ func TestResolveAllowsMount(t *testing.T) {
 }
 
 func TestResolveRejectsWriteToMountRoot(t *testing.T) {
-	root := t.TempDir()
+	root := tempDir(t)
 	w, _ := New([]Mount{{Virtual: "/workspace", Host: root}})
 	for _, path := range []string{"/workspace", "/workspace/"} {
 		if _, _, err := w.Resolve(path, true); err == nil {
@@ -83,7 +95,7 @@ func TestResolveRejectsWriteToMountRoot(t *testing.T) {
 }
 
 func TestResolveAllowsNonExistentPathWithinMount(t *testing.T) {
-	root := t.TempDir()
+	root := tempDir(t)
 	w, _ := New([]Mount{{Virtual: "/workspace", Host: root}})
 	path, _, err := w.Resolve("/workspace/new/dir/file", true)
 	if err != nil {

@@ -6,7 +6,6 @@ package daemon
 
 import (
 	"errors"
-	"os"
 	"strings"
 	"syscall"
 	"testing"
@@ -268,8 +267,8 @@ func TestCredentialFor(t *testing.T) {
 }
 
 func TestStartWithUidRunsAsUser(t *testing.T) {
-	if os.Geteuid() != 0 {
-		t.Skip("requires root")
+	if !CanSwitchUser() {
+		t.Skip("requires uid switching")
 	}
 	m := NewManager()
 	uid := uint32(1000)
@@ -295,8 +294,8 @@ func TestStartWithUidRunsAsUser(t *testing.T) {
 }
 
 func TestStartUidOnlyDefaultsGid(t *testing.T) {
-	if os.Geteuid() != 0 {
-		t.Skip("requires root")
+	if !CanSwitchUser() {
+		t.Skip("requires uid switching")
 	}
 	m := NewManager()
 	uid := uint32(1000)

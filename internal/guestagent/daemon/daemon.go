@@ -8,7 +8,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"os"
 	"os/exec"
 	"regexp"
@@ -154,20 +153,6 @@ func (m *Manager) Start(name string, argv []string, cwd string, env map[string]s
 	if cred := credentialFor(opts); cred != nil {
 		cmd.SysProcAttr.Credential = cred
 	}
-	stdout, err := cmd.StdoutPipe()
-	if err != nil {
-		return "", err
-	}
-	stderr, err := cmd.StderrPipe()
-	if err != nil {
-		_ = stdout.Close()
-		return "", err
-	}
-	if err := cmd.Start(); err != nil {
-		_ = stdout.Close()
-		_ = stderr.Close()
-		return "", err
-	}
 	registered := &daemon{
 		info: Daemon{
 			Name:      name,
@@ -186,9 +171,12 @@ func (m *Manager) Start(name string, argv []string, cwd string, env map[string]s
 		stdout: newRing(ringCapacity),
 		stderr: newRing(ringCapacity),
 	}
+	cmd.Stdout = registered.stdout
+	cmd.Stderr = registered.stderr
+	if err := cmd.Start(); err != nil {
+		return "", err
+	}
 	m.daemons[name] = registered
-	go func() { _, _ = io.Copy(registered.stdout, stdout) }()
-	go func() { _, _ = io.Copy(registered.stderr, stderr) }()
 	go m.wait(registered)
 	return name, nil
 }

@@ -54,8 +54,11 @@ jobs:
         run: |
           go install golang.org/x/vuln/cmd/govulncheck@v1.7.0
           govulncheck="$(go env GOPATH)/bin/govulncheck"
-          output=$("$govulncheck" -format text -tags "containers_image_openpgp,exclude_graphdriver_btrfs,exclude_graphdriver_devicemapper" ./... 2>&1)
-          status=$?
+          if output=$("$govulncheck" -format text -tags "containers_image_openpgp,exclude_graphdriver_btrfs,exclude_graphdriver_devicemapper" ./... 2>&1); then
+            status=0
+          else
+            status=$?
+          fi
           printf '%s\n' "$output"
           if [ "$status" -eq 3 ]; then
             if printf '%s\n' "$output" | grep 'Fixed in:' | grep -qv 'Fixed in: N/A'; then

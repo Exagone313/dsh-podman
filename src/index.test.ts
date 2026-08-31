@@ -935,7 +935,7 @@ test("mount schemas are object-rooted without per-property required", () => {
     assert.equal(typeof tool!.parameters.properties, "object");
     assert.ok(Array.isArray(tool!.parameters.required));
     for (const key of Object.keys(tool!.parameters.properties)) {
-      const property = tool!.parameters.properties[key];
+      const property: any = tool!.parameters.properties[key];
       assert.ok(
         !Object.prototype.hasOwnProperty.call(property, "required"),
         `${name}.${key} must not carry per-property required`,

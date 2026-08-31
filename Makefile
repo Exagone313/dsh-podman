@@ -17,11 +17,14 @@ JS_SOURCES := $(shell find src -type f \( -name '*.ts' -o -name '*.tsx' \) -prin
 PROTO_SOURCES := $(shell find proto -type f -name '*.proto' -print)
 NODE_MODULES_TSC := node_modules/.bin/tsc
 
-.PHONY: all build build-go test test-go image image-orchestrator image-guestagent pnpm-install pnpm-build pnpm-test pnpm-prune clean
+.PHONY: all build build-go vet test test-go image image-orchestrator image-guestagent pnpm-install pnpm-build pnpm-test pnpm-prune clean
 
 all: build
 
 build: build-go pnpm-build
+
+vet:
+	$(GO) vet $(GO_BUILD_FLAGS) ./...
 
 test: test-go pnpm-test
 

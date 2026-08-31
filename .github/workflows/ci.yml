@@ -129,3 +129,4 @@ jobs:
           severity: HIGH,CRITICAL
           exit-code: "1"
           skip-dirs: bin,dist,node_modules
+          trivy-config: trivy.yaml

@@ -6,7 +6,15 @@ name: CI
 
 on:
   push:
+    paths-ignore:
+      - '**/*.md'
+      - 'docs/**'
+      - 'LICENSE*'
   pull_request:
+    paths-ignore:
+      - '**/*.md'
+      - 'docs/**'
+      - 'LICENSE*'
   workflow_dispatch:
 
 permissions:

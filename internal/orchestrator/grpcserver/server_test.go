@@ -13,7 +13,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/containers/podman/v5/pkg/specgen"
+	"go.podman.io/podman/v6/pkg/specgen"
 	ctl "github.com/Exagone313/dsh-podman/internal/genproto/dshctl/v1"
 	imagebuild "github.com/Exagone313/dsh-podman/internal/orchestrator/images"
 	"github.com/Exagone313/dsh-podman/internal/orchestrator/podman"

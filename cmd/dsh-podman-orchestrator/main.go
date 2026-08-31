@@ -15,8 +15,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/containers/podman/v5/pkg/bindings"
-	"github.com/containers/podman/v5/pkg/bindings/system"
+	"go.podman.io/podman/v6/pkg/bindings"
+	"go.podman.io/podman/v6/pkg/bindings/system"
 	"github.com/Exagone313/dsh-podman/internal/auth"
 	ctl "github.com/Exagone313/dsh-podman/internal/genproto/dshctl/v1"
 	"github.com/Exagone313/dsh-podman/internal/orchestrator/grpcserver"

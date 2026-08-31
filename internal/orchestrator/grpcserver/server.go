@@ -18,7 +18,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/containers/podman/v5/pkg/specgen"
+	"go.podman.io/podman/v6/pkg/specgen"
 	"github.com/opencontainers/runtime-spec/specs-go"
 	ctl "github.com/Exagone313/dsh-podman/internal/genproto/dshctl/v1"
 	guest "github.com/Exagone313/dsh-podman/internal/genproto/dshguest/v1"

@@ -13,9 +13,9 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/containers/buildah/define"
-	"github.com/containers/podman/v5/pkg/bindings/images"
-	entities "github.com/containers/podman/v5/pkg/domain/entities/types"
+	"go.podman.io/buildah/define"
+	"go.podman.io/podman/v6/pkg/bindings/images"
+	entities "go.podman.io/podman/v6/pkg/domain/entities/types"
 )
 
 var packageName = regexp.MustCompile(`^[A-Za-z0-9@+._:][A-Za-z0-9@+._:-]*$`)

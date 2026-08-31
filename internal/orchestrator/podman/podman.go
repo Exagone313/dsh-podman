@@ -14,14 +14,14 @@ import (
 	"strings"
 	"time"
 
-	"github.com/containers/podman/v5/pkg/bindings"
-	"github.com/containers/podman/v5/pkg/bindings/containers"
-	"github.com/containers/podman/v5/pkg/bindings/images"
-	"github.com/containers/podman/v5/pkg/bindings/pods"
-	"github.com/containers/podman/v5/pkg/bindings/secrets"
-	"github.com/containers/podman/v5/pkg/bindings/volumes"
-	entities "github.com/containers/podman/v5/pkg/domain/entities/types"
-	"github.com/containers/podman/v5/pkg/specgen"
+	"go.podman.io/podman/v6/pkg/bindings"
+	"go.podman.io/podman/v6/pkg/bindings/containers"
+	"go.podman.io/podman/v6/pkg/bindings/images"
+	"go.podman.io/podman/v6/pkg/bindings/pods"
+	"go.podman.io/podman/v6/pkg/bindings/secrets"
+	"go.podman.io/podman/v6/pkg/bindings/volumes"
+	entities "go.podman.io/podman/v6/pkg/domain/entities/types"
+	"go.podman.io/podman/v6/pkg/specgen"
 	"github.com/opencontainers/runtime-spec/specs-go"
 )
 

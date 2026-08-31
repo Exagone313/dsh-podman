@@ -1,0 +1,10 @@
+# SPDX-FileCopyrightText: 2026 Elouan Martinet <exa@elou.world>
+#
+# SPDX-License-Identifier: MIT
+
+misconfigurations:
+  - id: AVD-DS-0002
+    paths:
+      - "Containerfile.orchestrator"
+      - "Containerfile.guestagent"
+    statement: "The orchestrator and guest-agent containers run as root intentionally"

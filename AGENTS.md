@@ -6,9 +6,9 @@ SPDX-License-Identifier: MIT
 
 # AGENTS.md
 
-Build and test Go through `make` — bare `go test ./...` / `go build ./...`
-fail on a missing `btrfs/version.h` because they don't apply the required
-build tags (`containers_image_openpgp exclude_graphdriver_btrfs
+Build and test Go through `make` — bare `go test ./...` / `go build ./...` fail
+on a missing `btrfs/version.h` because they don't apply the required build tags
+(`containers_image_openpgp exclude_graphdriver_btrfs
 exclude_graphdriver_devicemapper`).
 
 - `make build` — Go binaries + pnpm build
@@ -21,6 +21,9 @@ exclude_graphdriver_devicemapper`).
 
 User-facing docs live in `docs/`; `README.md` only links to them. Users install
 the plugin from npm — the local build is for development only.
+
+Markdown must be formatted with `deno fmt` (`deno fmt **/*.md`); a docs-only
+workflow enforces this on `.md` changes.
 
 ## Conventions
 

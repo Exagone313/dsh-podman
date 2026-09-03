@@ -1,0 +1,19 @@
+FROM node:24-slim
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+ENV DISABLE_AUTOUPDATER=1
+ENV DO_NOT_TRACK=1
+ENV DSH_TELEMETRY_MODE=DISABLED
+ENV DSH_TELEMETRY_OTLP_URL=https://dsh-telemetry-disabled.invalid/v1/logs
+
+ARG DSH_VERSION=0.1.1-rc.2
+RUN npm install -g pnpm @deepseek-ai/dsh@${DSH_VERSION} \
+    && npm cache clean --force
+
+RUN mkdir -p /opt/dsh
+COPY ./dsh/defaults.cordis.patch.yml /opt/dsh/
+
+CMD ["dsh", "--profile", "web", "--patch", "/opt/dsh/defaults.cordis.patch.yml", "--no-open"]

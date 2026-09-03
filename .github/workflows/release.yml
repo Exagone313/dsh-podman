@@ -91,6 +91,14 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Metadata (dsh)
+        id: meta-dsh
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
+        with:
+          images: ghcr.io/exagone313/dsh-podman/dsh
+          tags: |
+            type=semver,pattern={{version}}
+
       - name: Metadata (orchestrator)
         id: meta-orchestrator
         uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
@@ -106,6 +114,16 @@ jobs:
           images: ghcr.io/exagone313/dsh-podman/guest-agent
           tags: |
             type=semver,pattern={{version}}
+
+      - name: Build and push dsh image
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        with:
+          context: .
+          file: Containerfile.dsh
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta-dsh.outputs.tags }}
+          labels: ${{ steps.meta-dsh.outputs.labels }}
 
       - name: Build and push orchestrator image
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0

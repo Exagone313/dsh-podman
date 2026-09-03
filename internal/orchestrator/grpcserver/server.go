@@ -18,8 +18,6 @@ import (
 	"sync"
 	"time"
 
-	"go.podman.io/podman/v6/pkg/specgen"
-	"github.com/opencontainers/runtime-spec/specs-go"
 	ctl "github.com/Exagone313/dsh-podman/internal/genproto/dshctl/v1"
 	guest "github.com/Exagone313/dsh-podman/internal/genproto/dshguest/v1"
 	imagebuild "github.com/Exagone313/dsh-podman/internal/orchestrator/images"
@@ -27,6 +25,8 @@ import (
 	"github.com/Exagone313/dsh-podman/internal/orchestrator/projects"
 	"github.com/Exagone313/dsh-podman/internal/orchestrator/state"
 	"github.com/Exagone313/dsh-podman/internal/orchestrator/token"
+	"github.com/opencontainers/runtime-spec/specs-go"
+	"go.podman.io/podman/v6/pkg/specgen"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
@@ -929,7 +929,7 @@ func (s *Server) RebuildBaseImage(_ context.Context, request *ctl.RebuildBaseIma
 	if s.ImageBuilder == nil {
 		return nil, status.Error(codes.FailedPrecondition, "image builder is not configured")
 	}
-	spec := imagebuild.BuildSpec{ImageID: base.ID, From: base.Primitive, PackageManager: base.PackageManager, Packages: base.Packages, IsBase: true, PostInstall: base.PostInstall, GuestAgent: s.ImageBuilder.GuestAgentImage}
+	spec := imagebuild.BuildSpec{ImageID: base.ID, From: base.Primitive, PackageManager: base.PackageManager, Packages: base.Packages, IsBase: true, PostInstall: base.PostInstall}
 	tag, err := s.ImageBuilder.Build(spec)
 	if err != nil {
 		s.log().Error("control request failed", "method", "RebuildBaseImage", "name", request.GetName(), "error", err)
@@ -1278,7 +1278,7 @@ func (s *Server) ensureBase(short string) (*imagebuild.BaseImage, string, error)
 	if s.ImageBuilder == nil {
 		return nil, "", status.Error(codes.FailedPrecondition, "image builder is not configured")
 	}
-	spec := imagebuild.BuildSpec{ImageID: short, From: base.Primitive, PackageManager: base.PackageManager, Packages: base.Packages, IsBase: true, PostInstall: base.PostInstall, GuestAgent: s.ImageBuilder.GuestAgentImage}
+	spec := imagebuild.BuildSpec{ImageID: short, From: base.Primitive, PackageManager: base.PackageManager, Packages: base.Packages, IsBase: true, PostInstall: base.PostInstall}
 	if _, err := s.ImageBuilder.Build(spec); err != nil {
 		return nil, "", status.Error(codes.Internal, err.Error())
 	}

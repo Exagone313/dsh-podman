@@ -16,8 +16,6 @@ import (
 	"syscall"
 	"time"
 
-	"go.podman.io/podman/v6/pkg/bindings"
-	"go.podman.io/podman/v6/pkg/bindings/system"
 	"github.com/Exagone313/dsh-podman/internal/auth"
 	ctl "github.com/Exagone313/dsh-podman/internal/genproto/dshctl/v1"
 	"github.com/Exagone313/dsh-podman/internal/orchestrator/grpcserver"
@@ -25,6 +23,8 @@ import (
 	"github.com/Exagone313/dsh-podman/internal/orchestrator/podman"
 	"github.com/Exagone313/dsh-podman/internal/orchestrator/state"
 	"github.com/Exagone313/dsh-podman/internal/version"
+	"go.podman.io/podman/v6/pkg/bindings"
+	"go.podman.io/podman/v6/pkg/bindings/system"
 	"google.golang.org/grpc"
 )
 
@@ -39,13 +39,14 @@ func main() {
 	stateDir := getenv("DSH_PODMAN_ORCHESTRATOR_STATE", "/var/lib/dsh-orchestrator")
 	hostProjectsRoot := getenv("DSH_PODMAN_HOST_PROJECTS_ROOT", root)
 	hostSocketsRoot := getenv("DSH_PODMAN_HOST_SOCKETS_ROOT", socketsRoot)
-	guestBinary := getenv("DSH_PODMAN_GUEST_AGENT_BIN", "dsh-podman-guest-agent")
 	hostGuestBinary := getenv("DSH_PODMAN_HOST_GUEST_AGENT_BIN", "")
 	hostPacmanCache := getenv("DSH_PODMAN_HOST_PACMAN_CACHE", "")
 	hostAptCache := getenv("DSH_PODMAN_HOST_APT_CACHE", "")
 	hostApkCache := getenv("DSH_PODMAN_HOST_APK_CACHE", "")
 	controlToken := getenv("DSH_PODMAN_ORCHESTRATOR_TOKEN", "")
 	guestAgentImage := getenv("DSH_PODMAN_GUEST_AGENT_IMAGE", "")
+	guestAgentBin := getenv("DSH_PODMAN_GUEST_AGENT_IMAGE_AGENT_BIN", "/bin/dsh-podman-guest-agent")
+	guestAgentMount := getenv("DSH_PODMAN_GUEST_AGENT_IMAGE_MOUNT", "/opt/dsh-podman/guest-agent")
 	if getenvBool("DSH_PODMAN_GUEST_AGENT_IMAGE_USE_VERSION_TAG") && guestAgentImage != "" {
 		guestAgentImage = imageRefWithTag(guestAgentImage, version.Version)
 	}
@@ -87,15 +88,11 @@ func main() {
 			panic(fmt.Errorf("Podman API is unreachable: %w", connectionErr))
 		}
 		logger.Info("Podman API reachable", "socket", podmanSocket)
-		podmanClient, err = podman.New(context.Background(), podmanSocket, socketsRoot, guestBinary, hostSocketsRoot, root, hostGuestBinary, logger)
+		podmanClient, err = podman.New(context.Background(), podmanSocket, socketsRoot, guestAgentImage, guestAgentBin, guestAgentMount, hostSocketsRoot, root, hostGuestBinary, logger)
 		if err != nil {
 			panic(fmt.Errorf("initialize Podman client: %w", err))
 		}
-		imageBuilder = &images.Builder{Context: podmanContext, StateDir: stateDir, HostPacmanCache: hostPacmanCache, HostAptCache: hostAptCache, HostApkCache: hostApkCache, GuestAgentImage: images.GuestAgentImage{
-			Image:        guestAgentImage,
-			AgentBin:     getenv("DSH_PODMAN_GUEST_AGENT_IMAGE_AGENT_BIN", "/bin/dsh-podman-guest-agent"),
-			DestAgentBin: getenv("DSH_PODMAN_GUEST_AGENT_IMAGE_DEST_AGENT_BIN", "/usr/local/bin/dsh-podman-guest-agent"),
-		}, ImagePrefix: getenv("DSH_PODMAN_IMAGE_PREFIX", "localhost/dsh-podman/"), BaseImagePrefix: getenv("DSH_PODMAN_BASE_IMAGE_PREFIX", "localhost/dsh-podman/base/"), Logger: logger}
+		imageBuilder = &images.Builder{Context: podmanContext, StateDir: stateDir, HostPacmanCache: hostPacmanCache, HostAptCache: hostAptCache, HostApkCache: hostApkCache, ImagePrefix: getenv("DSH_PODMAN_IMAGE_PREFIX", "localhost/dsh-podman/"), BaseImagePrefix: getenv("DSH_PODMAN_BASE_IMAGE_PREFIX", "localhost/dsh-podman/base/"), Logger: logger}
 	} else {
 		_, orchSocketSet := os.LookupEnv("DSH_PODMAN_ORCHESTRATOR_PODMAN_SOCKET")
 		logger.Error("Podman API configuration is missing", "DSH_PODMAN_ORCHESTRATOR_PODMAN_SOCKET_present", orchSocketSet, "expected", "DSH_PODMAN_ORCHESTRATOR_PODMAN_SOCKET=unix:///run/podman/podman.sock")

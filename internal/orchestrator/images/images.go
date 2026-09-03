@@ -21,7 +21,6 @@ import (
 var packageName = regexp.MustCompile(`^[A-Za-z0-9@+._:][A-Za-z0-9@+._:-]*$`)
 var baseImageName = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9._:/@-]*$`)
 var imageIDName = regexp.MustCompile(`^[a-zA-Z0-9_][a-zA-Z0-9_.\-/:]{0,127}$`)
-var containerPathName = regexp.MustCompile(`^/[a-zA-Z0-9._:@+=-]+(?:/[a-zA-Z0-9._:@+=-]+)*$`)
 
 func validPackage(pkg string) bool {
 	return pkg != "." && pkg != ".." && packageName.MatchString(pkg)
@@ -39,18 +38,6 @@ func validBaseImage(base string) bool {
 	return true
 }
 
-func validContainerPath(path string) bool {
-	if !containerPathName.MatchString(path) {
-		return false
-	}
-	for _, segment := range strings.Split(path, "/") {
-		if segment == "." || segment == ".." {
-			return false
-		}
-	}
-	return true
-}
-
 func validImageID(id string) bool {
 	if id == "." || id == ".." || !imageIDName.MatchString(id) {
 		return false
@@ -61,12 +48,6 @@ func validImageID(id string) bool {
 		}
 	}
 	return true
-}
-
-type GuestAgentImage struct {
-	Image        string
-	AgentBin     string
-	DestAgentBin string
 }
 
 // BaseImage is a fixed, hardcoded workspace base image. Base images live in
@@ -119,13 +100,13 @@ type BuildSpec struct {
 	IsBase         bool
 	PostInstall    []string
 	CachePackages  bool
-	GuestAgent     GuestAgentImage
 }
 
 // Containerfile renders a Containerfile for the given build spec. Every
-// package is validated, the FROM reference is validated as a base image
-// reference (a primitive full ref for bases, a resolved parent tag for
-// custom images), and the guest-agent stage is emitted only for base builds.
+// package is validated and the FROM reference is validated as a base image
+// reference (a primitive full ref for bases, a resolved parent tag for custom
+// images). Base and custom builds differ only by their FROM reference and
+// packages; no guest-agent stage is emitted.
 func Containerfile(spec BuildSpec) (string, error) {
 	for _, pkg := range spec.Packages {
 		if !validPackage(pkg) {
@@ -135,29 +116,7 @@ func Containerfile(spec BuildSpec) (string, error) {
 	if !validBaseImage(spec.From) {
 		return "", fmt.Errorf("invalid base image %q", spec.From)
 	}
-	var guest GuestAgentImage
-	if spec.IsBase {
-		guest = spec.GuestAgent
-		if guest.AgentBin == "" {
-			guest.AgentBin = "/bin/dsh-podman-guest-agent"
-		}
-		if guest.DestAgentBin == "" {
-			guest.DestAgentBin = "/usr/local/bin/dsh-podman-guest-agent"
-		}
-		if !validBaseImage(guest.Image) {
-			return "", fmt.Errorf("invalid guest agent image %q", guest.Image)
-		}
-		if !validContainerPath(guest.AgentBin) {
-			return "", fmt.Errorf("invalid guest agent binary path %q", guest.AgentBin)
-		}
-		if !validContainerPath(guest.DestAgentBin) {
-			return "", fmt.Errorf("invalid guest agent destination path %q", guest.DestAgentBin)
-		}
-	}
 	lines := make([]string, 0, 7)
-	if spec.IsBase {
-		lines = append(lines, "FROM "+guest.Image+" AS guestagent")
-	}
 	lines = append(lines, "FROM "+spec.From)
 	switch spec.PackageManager {
 	case "pacman":
@@ -188,10 +147,6 @@ func Containerfile(spec BuildSpec) (string, error) {
 	for _, cmd := range spec.PostInstall {
 		lines = append(lines, "RUN "+cmd)
 	}
-	if spec.IsBase {
-		lines = append(lines, "COPY --from=guestagent "+guest.AgentBin+" "+guest.DestAgentBin)
-		lines = append(lines, "ENTRYPOINT [\""+guest.DestAgentBin+"\"]")
-	}
 	return strings.Join(lines, "\n") + "\n", nil
 }
 
@@ -201,7 +156,6 @@ type Builder struct {
 	HostPacmanCache string
 	HostAptCache    string
 	HostApkCache    string
-	GuestAgentImage GuestAgentImage
 	ImagePrefix     string
 	BaseImagePrefix string
 	Logger          *slog.Logger

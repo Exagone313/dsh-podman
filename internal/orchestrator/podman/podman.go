@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/opencontainers/runtime-spec/specs-go"
 	"go.podman.io/podman/v6/pkg/bindings"
 	"go.podman.io/podman/v6/pkg/bindings/containers"
 	"go.podman.io/podman/v6/pkg/bindings/images"
@@ -22,21 +23,22 @@ import (
 	"go.podman.io/podman/v6/pkg/bindings/volumes"
 	entities "go.podman.io/podman/v6/pkg/domain/entities/types"
 	"go.podman.io/podman/v6/pkg/specgen"
-	"github.com/opencontainers/runtime-spec/specs-go"
 )
 
 type Client struct {
-	ctx                                                                   context.Context
-	socketRoot, hostSocketRoot, projectRoot, guestBinary, hostGuestBinary string
-	logger                                                                *slog.Logger
+	ctx                                             context.Context
+	socketRoot, hostSocketRoot, projectRoot         string
+	guestAgentImage, guestAgentBin, guestAgentMount string
+	hostGuestBinary                                 string
+	logger                                          *slog.Logger
 }
 
-func New(ctx context.Context, socket, socketRoot, guestBinary, hostSocketRoot, projectRoot, hostGuestBinary string, logger *slog.Logger) (*Client, error) {
+func New(ctx context.Context, socket, socketRoot, guestAgentImage, guestAgentBin, guestAgentMount, hostSocketRoot, projectRoot, hostGuestBinary string, logger *slog.Logger) (*Client, error) {
 	connected, err := bindings.NewConnection(ctx, socket)
 	if err != nil {
 		return nil, err
 	}
-	return &Client{ctx: connected, socketRoot: socketRoot, hostSocketRoot: hostSocketRoot, projectRoot: projectRoot, guestBinary: guestBinary, hostGuestBinary: hostGuestBinary, logger: logger}, nil
+	return &Client{ctx: connected, socketRoot: socketRoot, hostSocketRoot: hostSocketRoot, projectRoot: projectRoot, guestAgentImage: guestAgentImage, guestAgentBin: guestAgentBin, guestAgentMount: guestAgentMount, hostGuestBinary: hostGuestBinary, logger: logger}, nil
 }
 
 func (c *Client) log() *slog.Logger {
@@ -99,14 +101,18 @@ func (c *Client) CreateWorkspace(pod, name, image, token string, mounts []specs.
 	if err := os.MkdirAll(socketDir, 0700); err != nil {
 		return err
 	}
+	if err := guestAgentSourcesConfigured(c.hostGuestBinary, c.guestAgentImage); err != nil {
+		return err
+	}
 	if err := c.EnsurePod(pod); err != nil {
 		return err
 	}
 	init := true
+	binaryDest := filepath.Join(c.guestAgentMount, c.guestAgentBin)
 	generator := specgen.NewSpecGenerator(image, false)
 	generator.Name = name
 	generator.Pod = pod
-	generator.Command = []string{c.guestBinary}
+	generator.Command = []string{binaryDest}
 	generator.Env = containerEnv(c.socketRoot, name, c.projectRoot, token, env)
 	generator.EnvSecrets = envSecrets
 	generator.Secrets = append(generator.Secrets, secrets...)
@@ -119,7 +125,13 @@ func (c *Client) CreateWorkspace(pod, name, image, token string, mounts []specs.
 		}
 		generator.Volumes = append(generator.Volumes, volume)
 	}
-	generator.Mounts = append(ociMounts, guestAgentMounts(hostSocketDir, c.socketRoot, name, c.hostGuestBinary, c.guestBinary)...)
+	generator.Mounts = append(ociMounts, guestAgentMounts(hostSocketDir, c.socketRoot, name, c.hostGuestBinary, binaryDest)...)
+	if imageVolume := guestAgentImageVolume(c.guestAgentImage, c.guestAgentMount); imageVolume != nil {
+		if err := c.ensureImage(imageVolume.Source); err != nil {
+			return err
+		}
+		generator.ImageVolumes = append(generator.ImageVolumes, imageVolume)
+	}
 	if _, err := containers.CreateWithSpec(c.ctx, generator, nil); err != nil {
 		c.log().Error("guest container creation failed", "pod_name", pod, "container_name", name, "error", err)
 		return fmt.Errorf("create container: %w", err)
@@ -147,13 +159,47 @@ func classifyMounts(mounts []specs.Mount) (oci []specs.Mount, volumes []*specgen
 	return oci, volumes
 }
 
-func guestAgentMounts(hostSocketDir, socketRoot, name, hostGuestBinary, guestBinary string) []specs.Mount {
+// guestAgentMounts returns the socket bind mount and, when a host guest-agent
+// binary is configured, a read-only bind mount of that binary at binaryDest.
+func guestAgentMounts(hostSocketDir, socketRoot, name, hostGuestBinary, binaryDest string) []specs.Mount {
 	mounts := []specs.Mount{{Type: "bind", Source: hostSocketDir, Destination: filepath.Join(socketRoot, name), Options: []string{"rw"}}}
 	if hostGuestBinary != "" {
-		mounts = append([]specs.Mount{{Type: "bind", Source: hostGuestBinary, Destination: guestBinary, Options: []string{"ro"}}}, mounts...)
+		mounts = append([]specs.Mount{{Type: "bind", Source: hostGuestBinary, Destination: binaryDest, Options: []string{"ro"}}}, mounts...)
 	}
 	return mounts
 }
+
+// guestAgentImageVolume describes the guest-agent image mount, or nil when no
+// guest-agent image is configured. Image volumes are always read-only.
+func guestAgentImageVolume(image, mountDir string) *specgen.ImageVolume {
+	if image == "" {
+		return nil
+	}
+	return &specgen.ImageVolume{Source: image, Destination: mountDir, ReadWrite: false}
+}
+
+// guestAgentSourcesConfigured reports an error when neither a host guest-agent
+// binary nor a guest-agent image is configured.
+func guestAgentSourcesConfigured(hostGuestBinary, guestAgentImage string) error {
+	if hostGuestBinary == "" && guestAgentImage == "" {
+		return errors.New("no guest agent source configured: set DSH_PODMAN_GUEST_AGENT_IMAGE or DSH_PODMAN_HOST_GUEST_AGENT_BIN")
+	}
+	return nil
+}
+
+// ensureImage pulls the named image into local storage when it is not already
+// present.
+func (c *Client) ensureImage(name string) error {
+	exists, err := c.ImageExists(name)
+	if err != nil {
+		return err
+	}
+	if exists {
+		return nil
+	}
+	return c.ImagePull(name)
+}
+
 func (c *Client) Stop(name string) error {
 	c.log().Info("stopping guest container", "container_name", name)
 	err := containers.Stop(c.ctx, name, nil)

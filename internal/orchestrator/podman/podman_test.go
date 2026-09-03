@@ -12,7 +12,7 @@ import (
 )
 
 func TestGuestAgentMountsWithoutHostBinary(t *testing.T) {
-	mounts := guestAgentMounts("/run/sockets/proj", "/run/dsh-podman", "proj", "", "/bin/dsh-podman-guest-agent")
+	mounts := guestAgentMounts("/run/sockets/proj", "/run/dsh-podman", "proj", "", "/opt/dsh-podman/guest-agent/bin/dsh-podman-guest-agent")
 	if len(mounts) != 1 {
 		t.Fatalf("expected a single socket mount, got %#v", mounts)
 	}
@@ -28,12 +28,13 @@ func TestGuestAgentMountsWithoutHostBinary(t *testing.T) {
 }
 
 func TestGuestAgentMountsWithHostBinary(t *testing.T) {
-	mounts := guestAgentMounts("/run/sockets/proj", "/run/dsh-podman", "proj", "/opt/dsh/dsh-podman-guest-agent", "/bin/dsh-podman-guest-agent")
+	binaryDest := "/opt/dsh-podman/guest-agent/bin/dsh-podman-guest-agent"
+	mounts := guestAgentMounts("/run/sockets/proj", "/run/dsh-podman", "proj", "/opt/dsh/dsh-podman-guest-agent", binaryDest)
 	if len(mounts) != 2 {
 		t.Fatalf("expected a binary and socket mount, got %#v", mounts)
 	}
 	binary := mounts[0]
-	if binary.Type != "bind" || binary.Source != "/opt/dsh/dsh-podman-guest-agent" || binary.Destination != "/bin/dsh-podman-guest-agent" {
+	if binary.Type != "bind" || binary.Source != "/opt/dsh/dsh-podman-guest-agent" || binary.Destination != binaryDest {
 		t.Fatalf("unexpected binary mount: %#v", binary)
 	}
 	hasRo := false
@@ -52,12 +53,42 @@ func TestGuestAgentMountsWithHostBinary(t *testing.T) {
 }
 
 func TestGuestAgentMountsBareBinaryName(t *testing.T) {
-	mounts := guestAgentMounts("/run/sockets/proj", "/run/dsh-podman", "proj", "/opt/dsh/bin", "dsh-podman-guest-agent")
+	binaryDest := "/opt/dsh-podman/guest-agent/bin/dsh-podman-guest-agent"
+	mounts := guestAgentMounts("/run/sockets/proj", "/run/dsh-podman", "proj", "/opt/dsh/bin", binaryDest)
 	if len(mounts) != 2 {
 		t.Fatalf("unexpected mounts: %#v", mounts)
 	}
-	if mounts[0].Source != "/opt/dsh/bin" || mounts[0].Destination != "dsh-podman-guest-agent" {
+	if mounts[0].Source != "/opt/dsh/bin" || mounts[0].Destination != binaryDest {
 		t.Fatalf("unexpected binary mount: %#v", mounts[0])
+	}
+}
+
+func TestGuestAgentImageVolume(t *testing.T) {
+	if volume := guestAgentImageVolume("", "/opt/x"); volume != nil {
+		t.Fatalf("empty image should yield no image volume, got %#v", volume)
+	}
+	volume := guestAgentImageVolume("img:tag", "/opt/x")
+	if volume == nil {
+		t.Fatal("expected an image volume")
+	}
+	if volume.Source != "img:tag" || volume.Destination != "/opt/x" || volume.ReadWrite {
+		t.Fatalf("unexpected image volume: %#v", volume)
+	}
+}
+
+func TestGuestAgentSourcesConfigured(t *testing.T) {
+	if err := guestAgentSourcesConfigured("", ""); err == nil {
+		t.Fatal("expected an error when no guest agent source is configured")
+	}
+	for _, hostBinary := range []string{"", "/opt/dsh/dsh-podman-guest-agent"} {
+		for _, image := range []string{"", "localhost/dsh-podman-guest-agent:latest"} {
+			if hostBinary == "" && image == "" {
+				continue
+			}
+			if err := guestAgentSourcesConfigured(hostBinary, image); err != nil {
+				t.Fatalf("unexpected error for host=%q image=%q: %v", hostBinary, image, err)
+			}
+		}
 	}
 }
 
@@ -110,7 +141,7 @@ func TestContainerEnv(t *testing.T) {
 
 func TestGuestAgentMountsSourceCopied(t *testing.T) {
 	original := []specs.Mount{{Type: "bind", Source: "/proj", Destination: "/projects/proj"}}
-	generated := guestAgentMounts("/run/sockets/proj", "/run/dsh-podman", "proj", "", "dsh-podman-guest-agent")
+	generated := guestAgentMounts("/run/sockets/proj", "/run/dsh-podman", "proj", "", "/opt/dsh-podman/guest-agent/bin/dsh-podman-guest-agent")
 	combined := append(original, generated...)
 	original[0].Source = "mutated"
 	if combined[0].Source != "/proj" {

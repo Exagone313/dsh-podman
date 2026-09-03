@@ -25,6 +25,13 @@ containers.
 - [Usage](docs/usage.md)
 - [Development](docs/development.md)
 
+## AI-usage disclosure
+
+This repository was written in major parts using AI models:
+
+- early commits using OpenAI GPT-5.6 Luna
+- DeepSeek V4 Flash
+
 ## License
 
 MIT

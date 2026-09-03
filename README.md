@@ -34,4 +34,4 @@ This repository was written in major parts using AI models:
 
 ## License
 
-MIT
+[MIT](./LICENSE)

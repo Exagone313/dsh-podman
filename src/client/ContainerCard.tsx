@@ -2195,8 +2195,12 @@ export function ContainerCard(props: ContainerCardProps): ReactNode {
         onClick={() => setOpen(!open)}
       >
         <span style={cardHeadTextStyle}>
-          <span style={cardNameStyle}>{t("cardTitle")}</span>
-          <span style={cardDescriptionStyle}>{t("cardDescription")}</span>
+          <span style={cardNameStyle}>
+          {t("cardTitle")}
+          {state.version ? ` v${state.version}` : ""}
+          {state.commit ? ` · ${state.commit}` : ""}
+        </span>
+        <span style={cardDescriptionStyle}>{t("cardDescription")}</span>
         </span>
         <CardChevron open={open} />
       </button>

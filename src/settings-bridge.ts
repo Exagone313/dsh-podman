@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: MIT
 
 import z from "@deepseek-ai/schemastery";
+import { VERSION, GIT_COMMIT } from "./generated/version.js";
 import { workspaceSlug } from "./workspace-binding.js";
 import type { WorkspaceResolver } from "./workspace-binding.js";
 
@@ -66,6 +67,8 @@ const commandSchema = z.object({
 });
 
 export const settingsSchema = z.object({
+  version: z.string().default(""),
+  commit: z.string().default(""),
   defaultImage: z.string().default(""),
   socketsRoot: z.string().default(""),
   projectsRoot: z.string().default(""),
@@ -209,6 +212,8 @@ export interface WorkspaceView {
   mounts: readonly { projectName: string; mode: string }[];
 }
 export interface ContainerSettings {
+  version: string;
+  commit: string;
   defaultImage: string;
   socketsRoot: string;
   projectsRoot: string;
@@ -308,6 +313,8 @@ export function installContainerSettings(
   ctx.inject(["settings"], (sctx: any) => {
     const scope = sctx.settings.register(CONTAINER_NS, settingsSchema, {
       base: {
+        version: VERSION,
+        commit: GIT_COMMIT,
         defaultImage: resolver.getConfig().defaultImage,
         socketsRoot: resolver.getConfig().socketsRoot,
         projectsRoot: resolver.getConfig().projectsRoot,

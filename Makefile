@@ -11,6 +11,11 @@ BIN_DIR ?= bin
 CONTAINER ?= podman
 IMAGE_PREFIX ?= localhost/dsh-podman-
 IMAGE_TAG ?= latest
+GIT_DESCRIBE := $(shell git describe --tags 2>/dev/null)
+GIT_COMMIT := $(shell git rev-parse --short HEAD 2>/dev/null)
+VERSION := $(if $(GIT_DESCRIBE),$(GIT_DESCRIBE),dev)
+COMMIT := $(GIT_COMMIT)
+GO_LDFLAGS = -ldflags "-X github.com/Exagone313/dsh-podman/internal/version.Version=$(VERSION) -X github.com/Exagone313/dsh-podman/internal/version.Commit=$(COMMIT)"
 
 GO_SOURCES := $(shell find cmd internal -type f -name '*.go' -print)
 JS_SOURCES := $(shell find src -type f \( -name '*.ts' -o -name '*.tsx' \) -print)
@@ -43,11 +48,11 @@ image-guestagent: build-go
 
 $(BIN_DIR)/$(GOOS)-$(GOARCH)/dsh-podman-guest-agent: $(GO_SOURCES) go.mod go.sum
 	mkdir -p $(BIN_DIR)/$(GOOS)-$(GOARCH)
-	CGO_ENABLED=0 GOOS=$(GOOS) GOARCH=$(GOARCH) $(GO) build $(GO_BUILD_FLAGS) -o $(BIN_DIR)/$(GOOS)-$(GOARCH)/dsh-podman-guest-agent ./cmd/dsh-podman-guest-agent
+	CGO_ENABLED=0 GOOS=$(GOOS) GOARCH=$(GOARCH) $(GO) build $(GO_BUILD_FLAGS) $(GO_LDFLAGS) -o $(BIN_DIR)/$(GOOS)-$(GOARCH)/dsh-podman-guest-agent ./cmd/dsh-podman-guest-agent
 
 $(BIN_DIR)/$(GOOS)-$(GOARCH)/dsh-podman-orchestrator: $(GO_SOURCES) go.mod go.sum
 	mkdir -p $(BIN_DIR)/$(GOOS)-$(GOARCH)
-	CGO_ENABLED=0 GOOS=$(GOOS) GOARCH=$(GOARCH) $(GO) build $(GO_BUILD_FLAGS) -o $(BIN_DIR)/$(GOOS)-$(GOARCH)/dsh-podman-orchestrator ./cmd/dsh-podman-orchestrator
+	CGO_ENABLED=0 GOOS=$(GOOS) GOARCH=$(GOARCH) $(GO) build $(GO_BUILD_FLAGS) $(GO_LDFLAGS) -o $(BIN_DIR)/$(GOOS)-$(GOARCH)/dsh-podman-orchestrator ./cmd/dsh-podman-orchestrator
 
 pnpm-install:
 	pnpm install --frozen-lockfile

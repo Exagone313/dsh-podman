@@ -1,6 +1,7 @@
 /dist/
 /node_modules/
 /bin/
+/src/generated/
 *.test
 *.out
 *.tgz

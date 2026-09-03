@@ -90,6 +90,8 @@ export interface CommandRequest {
   mount: MountInput | null;
 }
 export interface ContainerSettings {
+  version: string;
+  commit: string;
   defaultImage: string;
   socketsRoot: string;
   projectsRoot: string;
@@ -107,6 +109,8 @@ export interface CardState {
   writable: boolean;
   busy: boolean;
   notice: string;
+  version: string;
+  commit: string;
   defaultImage: string;
   defaultImageDraft: string;
   socketsRoot: string;
@@ -177,6 +181,8 @@ export class ContainerCardController {
       writable: snapshot.writable,
       busy: value?.command !== null && value?.command !== undefined,
       notice: value?.notice ?? "",
+      version: value?.version ?? "",
+      commit: value?.commit ?? "",
       defaultImage: value?.defaultImage ?? "",
       defaultImageDraft: this.draft("defaultImage", value?.defaultImage ?? ""),
       socketsRoot: value?.socketsRoot ?? "",

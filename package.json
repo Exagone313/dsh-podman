@@ -37,8 +37,8 @@
     "README.md"
   ],
   "scripts": {
-    "build": "tsc -p tsconfig.json && tsc -p tsconfig.client.json && node scripts/copy-proto.mjs && node scripts/build-client-bundle.mjs",
-    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.client.json --noEmit",
+    "build": "node scripts/generate-version.mjs && tsc -p tsconfig.json && tsc -p tsconfig.client.json && node scripts/copy-proto.mjs && node scripts/build-client-bundle.mjs",
+    "typecheck": "node scripts/generate-version.mjs && tsc -p tsconfig.json --noEmit && tsc -p tsconfig.client.json --noEmit",
     "test": "node --test dist/*.test.js"
   },
   "dependencies": {

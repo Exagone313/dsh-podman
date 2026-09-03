@@ -23,14 +23,13 @@ import (
 	"github.com/Exagone313/dsh-podman/internal/orchestrator/images"
 	"github.com/Exagone313/dsh-podman/internal/orchestrator/podman"
 	"github.com/Exagone313/dsh-podman/internal/orchestrator/state"
+	"github.com/Exagone313/dsh-podman/internal/version"
 	"google.golang.org/grpc"
 )
 
-const version = "0.1.0"
-
 func main() {
 	if len(os.Args) == 2 && os.Args[1] == "--version" {
-		fmt.Println(version)
+		fmt.Printf("%s (commit %s)\n", version.Version, version.Commit)
 		return
 	}
 	socketsRoot := getenv("DSH_PODMAN_SOCKETS_ROOT", "/run/dsh-podman")
@@ -61,6 +60,7 @@ func main() {
 		panic(err)
 	}
 	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
+	logger.Info("dsh-podman-orchestrator starting", "version", version.Version, "commit", version.Commit)
 	var server *grpc.Server
 	if controlToken != "" {
 		logger.Info("control-plane authentication enabled")

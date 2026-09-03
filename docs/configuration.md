@@ -37,28 +37,27 @@ section and the images' Set-default popup):
 | `defaultImage` | `archlinux`               | Image **short name** used for new workspaces; chosen from base and custom images via the Set-default popup |
 | `socketsRoot`  | `DSH_PODMAN_SOCKETS_ROOT` | Socket root the plugin uses to reach the orchestrator; falls back to the env var                           |
 
-| Variable                                       | Default                                 | Description                                                                                                                                                                                                        |
-| ---------------------------------------------- | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `DSH_PODMAN_BASE_IMAGE_PREFIX`                 | `localhost/dsh-podman/base/`            | Prefix under which base images are tagged; a `localhost/` prefix builds them locally, otherwise they are pulled from a public registry                                                                             |
-| `DSH_PODMAN_GUEST_AGENT_BIN`                   | `dsh-podman-guest-agent`                | Guest agent binary path (container-internal); see [Variable details](#variable-details)                                                                                                                            |
-| `DSH_PODMAN_GUEST_AGENT_IMAGE_AGENT_BIN`       | `/bin/dsh-podman-guest-agent`           | Path of the guest agent binary inside the guest-agent image; see [Variable details](#variable-details)                                                                                                             |
-| `DSH_PODMAN_GUEST_AGENT_IMAGE_DEST_AGENT_BIN`  | `/usr/local/bin/dsh-podman-guest-agent` | Destination path for the copied binary inside built workspace images; see [Variable details](#variable-details)                                                                                                    |
-| `DSH_PODMAN_GUEST_AGENT_IMAGE`                 | —                                       | Prebuilt guest-agent image baked into workspace images; unset disables the feature; see [Variable details](#variable-details)                                                                                      |
-| `DSH_PODMAN_GUEST_AGENT_IMAGE_USE_VERSION_TAG` | `false`                                 | When truthy, the guest-agent image reference uses the orchestrator's git version as its tag (replacing the tag in `DSH_PODMAN_GUEST_AGENT_IMAGE`, or adding one when absent); a digest reference panics at startup |
-| `DSH_PODMAN_HOST_APK_CACHE`                    | —                                       | Host-absolute directory mounted at `/etc/apk/cache` to persist downloaded packages across apk builds; unset disables caching                                                                                       |
-| `DSH_PODMAN_HOST_APT_CACHE`                    | —                                       | Host-absolute directory mounted at `/var/cache/apt/archives` to persist downloaded packages across apt builds; unset disables caching                                                                              |
-| `DSH_PODMAN_HOST_GUEST_AGENT_BIN`              | —                                       | Host-side guest agent binary path; bind-mounted when set; see [Variable details](#variable-details)                                                                                                                |
-| `DSH_PODMAN_HOST_PACMAN_CACHE`                 | —                                       | Host-absolute directory mounted at `/var/cache/pacman/pkg` to persist downloaded packages across pacman builds; unset disables caching                                                                             |
-| `DSH_PODMAN_HOST_PROJECTS_ROOT`                | `DSH_PODMAN_PROJECTS_ROOT`              | Host-side projects root used as the source of bind mounts                                                                                                                                                          |
-| `DSH_PODMAN_HOST_SOCKETS_ROOT`                 | `DSH_PODMAN_SOCKETS_ROOT`               | Host-side sockets root for guest socket bind mounts                                                                                                                                                                |
-| `DSH_PODMAN_IMAGE_PREFIX`                      | `localhost/dsh-podman/`                 | Prefix prepended to built workspace image references                                                                                                                                                               |
-| `DSH_PODMAN_ORCHESTRATOR_PODMAN_SOCKET`        | required                                | Podman API socket, e.g. `unix:///run/podman/podman.sock`                                                                                                                                                           |
-| `DSH_PODMAN_ORCHESTRATOR_STATE`                | `/var/lib/dsh-orchestrator`             | Persisted state directory                                                                                                                                                                                          |
-| `DSH_PODMAN_ORCHESTRATOR_TOKEN`                | —                                       | Shared secret authenticating control-plane gRPC calls; see [Variable details](#variable-details)                                                                                                                   |
-| `DSH_PODMAN_PROJECTS_ROOT`                     | `/projects`                             | Project root inside every guest container                                                                                                                                                                          |
-| `DSH_PODMAN_SECRET_PREFIX`                     | `dsh-podman-`                           | Prefix applied to managed podman secrets (see [Usage](usage.md#secrets))                                                                                                                                           |
-| `DSH_PODMAN_SOCKETS_ROOT`                      | `/run/dsh-podman`                       | Socket root directory (bind-mounted from the host); holds `orchestrator.sock` and per-workspace guest sockets; see [Variable details](#variable-details)                                                           |
-| `DSH_PODMAN_VOLUME_PREFIX`                     | `dsh-podman-`                           | Prefix applied to managed named volumes (see [Usage](usage.md#mounts-and-volumes))                                                                                                                                 |
+| Variable                                       | Default                       | Description                                                                                                                                                                                                        |
+| ---------------------------------------------- | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `DSH_PODMAN_BASE_IMAGE_PREFIX`                 | `localhost/dsh-podman/base/`  | Prefix under which base images are tagged; a `localhost/` prefix builds them locally, otherwise they are pulled from a public registry                                                                             |
+| `DSH_PODMAN_GUEST_AGENT_IMAGE`                 | —                             | Guest-agent image mounted read-only into every guest container; unset disables the feature; see [Variable details](#variable-details)                                                                              |
+| `DSH_PODMAN_GUEST_AGENT_IMAGE_AGENT_BIN`       | `/bin/dsh-podman-guest-agent` | Path of the guest agent binary inside the guest-agent image; the container command is `<mount>/<agent_bin>`; see [Variable details](#variable-details)                                                             |
+| `DSH_PODMAN_GUEST_AGENT_IMAGE_MOUNT`           | `/opt/dsh-podman/guest-agent` | Container-internal directory where the guest-agent image is mounted read-only; see [Variable details](#variable-details)                                                                                           |
+| `DSH_PODMAN_GUEST_AGENT_IMAGE_USE_VERSION_TAG` | `false`                       | When truthy, the guest-agent image reference uses the orchestrator's git version as its tag (replacing the tag in `DSH_PODMAN_GUEST_AGENT_IMAGE`, or adding one when absent); a digest reference panics at startup |
+| `DSH_PODMAN_HOST_APK_CACHE`                    | —                             | Host-absolute directory mounted at `/etc/apk/cache` to persist downloaded packages across apk builds; unset disables caching                                                                                       |
+| `DSH_PODMAN_HOST_APT_CACHE`                    | —                             | Host-absolute directory mounted at `/var/cache/apt/archives` to persist downloaded packages across apt builds; unset disables caching                                                                              |
+| `DSH_PODMAN_HOST_GUEST_AGENT_BIN`              | —                             | Host-side guest agent binary path; bind-mounted when set; see [Variable details](#variable-details)                                                                                                                |
+| `DSH_PODMAN_HOST_PACMAN_CACHE`                 | —                             | Host-absolute directory mounted at `/var/cache/pacman/pkg` to persist downloaded packages across pacman builds; unset disables caching                                                                             |
+| `DSH_PODMAN_HOST_PROJECTS_ROOT`                | `DSH_PODMAN_PROJECTS_ROOT`    | Host-side projects root used as the source of bind mounts                                                                                                                                                          |
+| `DSH_PODMAN_HOST_SOCKETS_ROOT`                 | `DSH_PODMAN_SOCKETS_ROOT`     | Host-side sockets root for guest socket bind mounts                                                                                                                                                                |
+| `DSH_PODMAN_IMAGE_PREFIX`                      | `localhost/dsh-podman/`       | Prefix prepended to built workspace image references                                                                                                                                                               |
+| `DSH_PODMAN_ORCHESTRATOR_PODMAN_SOCKET`        | required                      | Podman API socket, e.g. `unix:///run/podman/podman.sock`                                                                                                                                                           |
+| `DSH_PODMAN_ORCHESTRATOR_STATE`                | `/var/lib/dsh-orchestrator`   | Persisted state directory                                                                                                                                                                                          |
+| `DSH_PODMAN_ORCHESTRATOR_TOKEN`                | —                             | Shared secret authenticating control-plane gRPC calls; see [Variable details](#variable-details)                                                                                                                   |
+| `DSH_PODMAN_PROJECTS_ROOT`                     | `/projects`                   | Project root inside every guest container                                                                                                                                                                          |
+| `DSH_PODMAN_SECRET_PREFIX`                     | `dsh-podman-`                 | Prefix applied to managed podman secrets (see [Usage](usage.md#secrets))                                                                                                                                           |
+| `DSH_PODMAN_SOCKETS_ROOT`                      | `/run/dsh-podman`             | Socket root directory (bind-mounted from the host); holds `orchestrator.sock` and per-workspace guest sockets; see [Variable details](#variable-details)                                                           |
+| `DSH_PODMAN_VOLUME_PREFIX`                     | `dsh-podman-`                 | Prefix applied to managed named volumes (see [Usage](usage.md#mounts-and-volumes))                                                                                                                                 |
 
 ## Guest agent (`dsh-podman-guest-agent`)
 
@@ -82,44 +81,36 @@ instead of building them. The built-in base images are `archlinux` (pacman),
 `ubuntu` (apt), and `alpine` (apk); their short names are reserved and cannot be
 built over, rebuilt, or removed as custom images.
 
-### `DSH_PODMAN_GUEST_AGENT_BIN` and `DSH_PODMAN_HOST_GUEST_AGENT_BIN`
+### `DSH_PODMAN_GUEST_AGENT_IMAGE` and `DSH_PODMAN_HOST_GUEST_AGENT_BIN`
 
-A guest container can run the guest agent either from a host binary bind-mounted
-into it, or from a binary already present in its image.
+When `DSH_PODMAN_GUEST_AGENT_IMAGE` is set, the orchestrator mounts that image
+read-only into every guest container at `DSH_PODMAN_GUEST_AGENT_IMAGE_MOUNT`
+(default `/opt/dsh-podman/guest-agent`) and runs the guest agent binary from
+`<mount>/<agent_bin>` — that path is the container command (see the next section
+for the binary path and mount location).
 
-`DSH_PODMAN_HOST_GUEST_AGENT_BIN` is the path _on the host_ of the guest agent
-binary. Setting it enables a bind mount of that binary into the workspace
-container. It is unset by default, so by default no bind mount is added and the
-binary must already be present in the image — either baked in via the
-multi-stage build below, or found through the image's `PATH`.
+`DSH_PODMAN_HOST_GUEST_AGENT_BIN` is the path _on the host_ of a guest agent
+binary. Setting it bind-mounts that binary read-only to the same in-container
+path instead of mounting the guest-agent image; it is an optional development
+fallback and takes precedence over the image mount. It is unset by default.
 
-`DSH_PODMAN_GUEST_AGENT_BIN` is the path of the guest agent binary _inside_ the
-guest container. It is both the command the orchestrator starts and the
-destination where `DSH_PODMAN_HOST_GUEST_AGENT_BIN` is bind-mounted when that
-variable is set. When no bind mount is used, a bare name (the default
-`dsh-podman-guest-agent`) is resolved through the image's `PATH`.
+If neither variable is configured, the guest container has no guest agent to
+run, and creating a workspace container fails.
 
-### `DSH_PODMAN_GUEST_AGENT_IMAGE`, `DSH_PODMAN_GUEST_AGENT_IMAGE_AGENT_BIN` and `DSH_PODMAN_GUEST_AGENT_IMAGE_DEST_AGENT_BIN`
+### `DSH_PODMAN_GUEST_AGENT_IMAGE`, `DSH_PODMAN_GUEST_AGENT_IMAGE_AGENT_BIN`, `DSH_PODMAN_GUEST_AGENT_IMAGE_MOUNT` and `DSH_PODMAN_GUEST_AGENT_IMAGE_USE_VERSION_TAG`
 
-Without `DSH_PODMAN_GUEST_AGENT_IMAGE`, the guest container must get the guest
-agent binary another way — typically a host bind mount (see the previous
-section). When it is set, workspace images are instead built as a multi-stage
-build that pulls the binary out of the prebuilt guest-agent image and bakes it
-into the base image, so no external provisioning is needed:
+The guest-agent image provides the agent at container creation: the orchestrator
+mounts it **read-only** into every guest container at
+`DSH_PODMAN_GUEST_AGENT_IMAGE_MOUNT` (default `/opt/dsh-podman/guest-agent`)
+using podman's image-mount mechanism, and the container command is
+`<mount>/<agent_bin>`. Podman image volumes are always mounted read-only.
 
-```
-FROM <DSH_PODMAN_GUEST_AGENT_IMAGE> AS guestagent
-FROM <base-image>
-RUN pacman -Syu --needed --noconfirm <packages...>
-COPY --from=guestagent <agent_bin> <dest_agent_bin>
-ENTRYPOINT ["<dest_agent_bin>"]
-```
+The mount is **hidden** — the orchestrator injects it itself, so it is not
+listed among the user mounts. Because the agent is provided at runtime,
+rebuilding base images is no longer needed when the guest-agent version changes.
 
 `DSH_PODMAN_GUEST_AGENT_IMAGE_AGENT_BIN` is the path of the binary inside the
-guest-agent image (default `/bin/dsh-podman-guest-agent`), and
-`DSH_PODMAN_GUEST_AGENT_IMAGE_DEST_AGENT_BIN` is where it lands in the built
-image (default `/usr/local/bin/dsh-podman-guest-agent`). The binary is only
-baked into the base image — other images are unaffected.
+guest-agent image (default `/bin/dsh-podman-guest-agent`).
 
 With `DSH_PODMAN_GUEST_AGENT_IMAGE_USE_VERSION_TAG` set to a truthy value, the
 orchestrator uses its own git version as the image tag instead of the one in

@@ -21,16 +21,15 @@ dsh-podman organizes the images its containers run into three tiers:
   `archlinux` (pacman), `ubuntu` (apt), and `alpine` (apk). Each is defined by
   its primitive, a dsh-podman-owned default package list, and its package
   manager. By default they are **built locally** from the primitive (installing
-  the default packages and baking in the guest agent + ENTRYPOINT); when
-  `DSH_PODMAN_BASE_IMAGE_PREFIX` points at a registry (anything not starting
-  with `localhost/`), they are **pulled** instead. Base images are listed in the
-  settings UI even when not yet built/pulled, are rebuilt or pulled from the
-  card, and their short names are reserved — they cannot be built over, rebuilt,
-  or removed as custom images.
+  the default packages); when `DSH_PODMAN_BASE_IMAGE_PREFIX` points at a
+  registry (anything not starting with `localhost/`), they are **pulled**
+  instead. Base images are listed in the settings UI even when not yet
+  built/pulled, are rebuilt or pulled from the card, and their short names are
+  reserved — they cannot be built over, rebuilt, or removed as custom images.
 - **Custom images** are user-built images created from a **parent** — a base
   image or another custom image — inheriting its package manager and adding
-  extra packages on top. They inherit the guest agent and ENTRYPOINT from the
-  parent chain and are referenced by their short name (e.g. `valkey`).
+  extra packages on top. They are referenced by their short name (e.g.
+  `valkey`).
 
 Image references (`imageId`, `parent`, `image`) are **short names only** (no
 registry prefix, no `:tag`).

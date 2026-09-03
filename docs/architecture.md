@@ -67,9 +67,10 @@ before podman tears the container down.
 The orchestrator builds workspace images through Podman (see
 [Usage](usage.md#image-model) for the primitive/base/custom tiers). Base images
 are built locally from their primitive reference (or pulled when
-`DSH_PODMAN_BASE_IMAGE_PREFIX` points at a registry) and bake in the guest
-agent + ENTRYPOINT. Custom images are layered on top of a parent image and add
-extra packages.
+`DSH_PODMAN_BASE_IMAGE_PREFIX` points at a registry) without any guest-agent
+binary. The guest agent is provided at container creation by mounting its own
+image read-only into the container (see [Configuration](configuration.md)).
+Custom images are layered on top of a parent image and add extra packages.
 
 `image_rebuild_all` first ensures every base image (building locally or pulling
 from a public registry per `DSH_PODMAN_BASE_IMAGE_PREFIX`), then rebuilds the

@@ -7,16 +7,14 @@ SPDX-License-Identifier: MIT
 # Development
 
 This page is for **contributors** building the plugin from this repository.
-Users install the published package from npm instead — see
-[Installation](installation.md).
 
 ## Repository layout
 
 - `src/` — the Cordis plugin (host half + browser client).
 - `cmd/dsh-podman-orchestrator/` and `cmd/dsh-podman-guest-agent/` — the two Go
   binaries.
-- `internal/` — Go implementation of the orchestrator, guest agent, and
-  protobuf bindings.
+- `internal/` — Go implementation of the orchestrator, guest agent, and protobuf
+  bindings.
 - `proto/` — the gRPC definitions.
 - `.github/workflows/` — CI and release automation.
 
@@ -26,7 +24,6 @@ Prerequisites: Go 1.27, Node ≥ 22, pnpm 10, and (for the browser half) the
 `@deepseek-ai/dsh-client-*` packages published on npm.
 
 ```sh
-go test -tags "containers_image_openpgp exclude_graphdriver_btrfs exclude_graphdriver_devicemapper" ./...   # Go tests (orchestrator + guest agent)
 pnpm install
 pnpm run build       # tsc host + tsc client -> dist/, copies proto/ -> dist/grpc/proto/
 ```
@@ -79,9 +76,8 @@ pre-releases like `1.0.0-rc.1` also work). The release workflow
 1. Runs the tests, then builds both binaries for `linux/amd64` and
    `linux/arm64`.
 2. Pushes the **orchestrator** and **guest-agent** images to GHCR
-   (`ghcr.io/exagone313/dsh-podman/{orchestrator,guest-agent}`), tagged with
-   the version plus `latest` for stable releases (pre-releases never get
-   `latest`).
+   (`ghcr.io/exagone313/dsh-podman/{orchestrator,guest-agent}`), tagged with the
+   version plus `latest` for stable releases (pre-releases never get `latest`).
 3. Publishes the plugin to **npm** (`@exagone313/dsh-podman`) with provenance;
    pre-releases are published under the `next` dist-tag.
 4. Creates a **GitHub release** with auto-generated notes and attaches the

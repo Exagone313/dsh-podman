@@ -1,0 +1,35 @@
+[Unit]
+Description=DeepSeek Harness
+Requires=dsh-podman-orchestrator.service
+After=dsh-podman-orchestrator.service
+
+[Container]
+Network=pasta:--mtu,1500,--dns-forward,1.0.0.1
+DNS=1.0.0.1
+DNS=1.1.1.1
+Image=ghcr.io/exagone313/dsh-podman/dsh:latest
+ContainerName=dsh
+AutoUpdate=registry
+PublishPort=127.0.0.1:3080:3080
+ReadOnly=true
+
+Environment=HOME=%h
+WorkingDir=$HOME
+
+Volume=%h/.dsh:%h/.dsh
+Environment=DSH_HOME=%h/.dsh
+
+Volume=%h/project:%h/project:ro
+Environment=DSH_PODMAN_PROJECTS_ROOT=%h/project
+
+Volume=%t/dsh-podman:/run/dsh-podman
+Environment=DSH_PODMAN_SOCKETS_ROOT=/run/dsh-podman
+
+[Service]
+ExecStartPre=/usr/bin/mkdir -p -m 0700 %h/project ; /usr/bin/mkdir -p -m 0700 %t/dsh-podman ; /usr/bin/mkdir -p -m 0700 %h/.dsh
+Restart=on-failure
+RestartSec=3
+SuccessExitStatus=0 143
+
+[Install]
+WantedBy=default.target

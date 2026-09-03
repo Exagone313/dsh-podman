@@ -38,13 +38,16 @@ test-go:
 
 build-go: $(BIN_DIR)/$(GOOS)-$(GOARCH)/dsh-podman-guest-agent $(BIN_DIR)/$(GOOS)-$(GOARCH)/dsh-podman-orchestrator
 
-image: image-orchestrator image-guestagent
+image: image-orchestrator image-guestagent image-dsh
 
 image-orchestrator: build-go
 	$(CONTAINER) build --build-arg TARGETOS=$(GOOS) --build-arg TARGETARCH=$(GOARCH) -f Containerfile.orchestrator -t $(IMAGE_PREFIX)orchestrator:$(IMAGE_TAG) .
 
 image-guestagent: build-go
 	$(CONTAINER) build --build-arg TARGETOS=$(GOOS) --build-arg TARGETARCH=$(GOARCH) -f Containerfile.guestagent -t $(IMAGE_PREFIX)guest-agent:$(IMAGE_TAG) .
+
+image-dsh:
+	$(CONTAINER) build -f Containerfile.dsh -t $(IMAGE_PREFIX)dsh:$(IMAGE_TAG) .
 
 $(BIN_DIR)/$(GOOS)-$(GOARCH)/dsh-podman-guest-agent: $(GO_SOURCES) go.mod go.sum
 	mkdir -p $(BIN_DIR)/$(GOOS)-$(GOARCH)

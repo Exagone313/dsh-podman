@@ -25,15 +25,6 @@ jobs:
       packages: write # push container images to GHCR
       id-token: write # sign the npm package with provenance
     steps:
-      - name: Fail early if the npm token is missing
-        run: |
-          if [ -z "$NODE_AUTH_TOKEN" ]; then
-            echo "::error::The NPM_TOKEN secret is not set; cannot publish to npm"
-            exit 1
-          fi
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
@@ -45,7 +36,7 @@ jobs:
 
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: "22"
+          node-version: "24"
           registry-url: "https://registry.npmjs.org"
           package-manager-cache: false
 
@@ -150,11 +141,9 @@ jobs:
 
       - name: Publish to npm
         run: |
-          args="--provenance --no-git-checks"
+          args="--access public --no-git-checks"
           if [[ "$VERSION" == *-* ]]; then args="$args --tag next"; fi
-          pnpm publish $args
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          npm publish $args
 
       - name: Create GitHub release
         run: |

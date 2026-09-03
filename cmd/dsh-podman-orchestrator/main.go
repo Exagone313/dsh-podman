@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strings"
 	"syscall"
 	"time"
 
@@ -44,6 +45,10 @@ func main() {
 	hostAptCache := getenv("DSH_PODMAN_HOST_APT_CACHE", "")
 	hostApkCache := getenv("DSH_PODMAN_HOST_APK_CACHE", "")
 	controlToken := getenv("DSH_PODMAN_ORCHESTRATOR_TOKEN", "")
+	guestAgentImage := getenv("DSH_PODMAN_GUEST_AGENT_IMAGE", "")
+	if getenvBool("DSH_PODMAN_GUEST_AGENT_IMAGE_USE_VERSION_TAG") && guestAgentImage != "" {
+		guestAgentImage = imageRefWithTag(guestAgentImage, version.Version)
+	}
 	if err := requireDirectory(filepath.Dir(socket)); err != nil {
 		panic(err)
 	}
@@ -87,7 +92,7 @@ func main() {
 			panic(fmt.Errorf("initialize Podman client: %w", err))
 		}
 		imageBuilder = &images.Builder{Context: podmanContext, StateDir: stateDir, HostPacmanCache: hostPacmanCache, HostAptCache: hostAptCache, HostApkCache: hostApkCache, GuestAgentImage: images.GuestAgentImage{
-			Image:        getenv("DSH_PODMAN_GUEST_AGENT_IMAGE", ""),
+			Image:        guestAgentImage,
 			AgentBin:     getenv("DSH_PODMAN_GUEST_AGENT_IMAGE_AGENT_BIN", "/bin/dsh-podman-guest-agent"),
 			DestAgentBin: getenv("DSH_PODMAN_GUEST_AGENT_IMAGE_DEST_AGENT_BIN", "/usr/local/bin/dsh-podman-guest-agent"),
 		}, ImagePrefix: getenv("DSH_PODMAN_IMAGE_PREFIX", "localhost/dsh-podman/"), BaseImagePrefix: getenv("DSH_PODMAN_BASE_IMAGE_PREFIX", "localhost/dsh-podman/base/"), Logger: logger}
@@ -119,6 +124,35 @@ func getenv(name, fallback string) string {
 		return value
 	}
 	return fallback
+}
+
+// getenvBool reports whether an env var is set to a truthy value ("1",
+// "true", "yes", "on"; case-insensitive). Anything else, including unset, is
+// falsy.
+func getenvBool(name string) bool {
+	switch strings.ToLower(os.Getenv(name)) {
+	case "1", "true", "yes", "on":
+		return true
+	default:
+		return false
+	}
+}
+
+// imageRefWithTag returns ref with its tag replaced by (or set to) tag. Only
+// the colon after the last slash is treated as a tag separator, so registry
+// ports (e.g. localhost:5000/...) are not mistaken for tags. A digest
+// reference cannot be overridden and panics, since it signals a misconfigured
+// DSH_PODMAN_GUEST_AGENT_IMAGE when DSH_PODMAN_GUEST_AGENT_IMAGE_USE_VERSION_TAG
+// is set.
+func imageRefWithTag(ref, tag string) string {
+	if strings.Contains(ref, "@") {
+		panic("DSH_PODMAN_GUEST_AGENT_IMAGE must not use a digest with DSH_PODMAN_GUEST_AGENT_IMAGE_USE_VERSION_TAG=true")
+	}
+	slash := strings.LastIndexByte(ref, '/')
+	if colon := strings.LastIndexByte(ref[slash+1:], ':'); colon >= 0 {
+		return ref[:slash+1+colon] + ":" + tag
+	}
+	return ref + ":" + tag
 }
 
 func requireDirectory(dir string) error {

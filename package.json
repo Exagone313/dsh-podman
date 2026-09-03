@@ -39,7 +39,8 @@
   "scripts": {
     "build": "node scripts/generate-version.mjs && tsc -p tsconfig.json && tsc -p tsconfig.client.json && node scripts/copy-proto.mjs && node scripts/build-client-bundle.mjs",
     "typecheck": "node scripts/generate-version.mjs && tsc -p tsconfig.json --noEmit && tsc -p tsconfig.client.json --noEmit",
-    "test": "node --test dist/*.test.js"
+    "test": "node --test dist/*.test.js",
+    "bump-version": "node scripts/bump-version.mjs"
   },
   "dependencies": {
     "@grpc/grpc-js": "^1.14.4",

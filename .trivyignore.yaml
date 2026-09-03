@@ -5,6 +5,7 @@
 misconfigurations:
   - id: AVD-DS-0002
     paths:
-      - "Containerfile.orchestrator"
+      - "Containerfile.dsh"
       - "Containerfile.guestagent"
+      - "Containerfile.orchestrator"
     statement: "The orchestrator and guest-agent containers run as root intentionally"

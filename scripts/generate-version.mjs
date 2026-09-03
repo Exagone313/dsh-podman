@@ -14,7 +14,11 @@ const root = dirname(dirname(fileURLToPath(import.meta.url)));
 
 function git(args) {
   try {
-    return execSync(`git ${args}`, { encoding: "utf8", cwd: root }).trim();
+    return execSync(`git ${args}`, {
+      encoding: "utf8",
+      cwd: root,
+      stdio: ["ignore", "pipe", "ignore"],
+    }).trim();
   } catch {
     return "";
   }

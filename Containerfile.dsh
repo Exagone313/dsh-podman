@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 Elouan Martinet <exa@elou.world>
+#
+# SPDX-License-Identifier: MIT
+
 FROM node:24-slim
 
 RUN apt-get update \

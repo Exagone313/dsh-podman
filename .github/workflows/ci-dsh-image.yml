@@ -2,34 +2,36 @@
 #
 # SPDX-License-Identifier: MIT
 
-name: CI (docs)
+name: CI (dsh image)
 
 on:
   push:
     paths:
-      - "**/*.md"
+      - "Containerfile.dsh"
   pull_request:
     paths:
-      - "**/*.md"
+      - "Containerfile.dsh"
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: ci-docs-${{ github.ref }}
+  group: ci-dsh-image-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  fmt:
-    name: Deno fmt
+  image:
+    name: Build dsh image
     runs-on: ubuntu-latest
+    needs: [go, js]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed # v2.0.5
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          deno-version: v2.9.6
-      - name: Check documentation formatting
-        run: deno fmt --check **/*.md
+          go-version: "1.27"
+          cache: true
+      - name: Build dsh image
+        run: make CONTAINER=docker image-dsh

@@ -8,9 +8,11 @@ on:
   push:
     paths-ignore:
       - "**/*.md"
+      - "Containerfile.dsh"
   pull_request:
     paths-ignore:
       - "**/*.md"
+      - "Containerfile.dsh"
   workflow_dispatch:
 
 permissions:
@@ -98,7 +100,7 @@ jobs:
         run: pnpm audit --audit-level=high
 
   images:
-    name: Build images
+    name: Build dsh-podman images
     runs-on: ubuntu-latest
     needs: [go, js]
     steps:
@@ -109,8 +111,8 @@ jobs:
         with:
           go-version: "1.27"
           cache: true
-      - name: Build images
-        run: make CONTAINER=docker image
+      - name: Build dsh-podman images
+        run: make CONTAINER=docker image-orchestrator image-guestagent
 
   trivy:
     name: Trivy scan

@@ -52,6 +52,32 @@ The `.proto` sources live in `proto/`; the generated Go bindings in
 changing a `.proto`. The raw `.proto` files are copied into `dist/grpc/proto/`
 at build time and loaded at runtime by `@grpc/proto-loader`.
 
+## Install development builds
+
+### Build
+
+```bash
+make  # builds plugin and go binaries
+make image  # build images
+```
+
+### Recreate containers
+
+```bash
+systemctl --user restart dsh dsh-podman-orchestrator
+```
+
+### Update plugin
+
+```bash
+npm pack
+v="$(jq -r .version package.json)"
+podman cp ./exagone313-dsh-podman-"${v}".tgz dsh:/tmp/
+podman exec -it dsh dsh plugin --profile web remove @exagone313/dsh-podman  # necessary, to force reinstall if the same version
+podman exec -it dsh dsh plugin --profile web add /tmp/exagone313-dsh-podman-"${v}".tgz --allow-build=protobufjs
+systemctl --user restart dsh
+```
+
 ## Continuous integration
 
 CI (`.github/workflows/ci.yml`) runs on every branch push and pull request:

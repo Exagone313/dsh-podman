@@ -56,8 +56,7 @@ could be added in the future.
 ## Requirements
 
 - A user to run dsh as (not root)
-- A Linux distribution powered by systemd and glibc (musl is not supported by
-  dsh)
+- A Linux distribution powered by systemd
 - Podman 5 or later; Podman 6 is recommended
 - A systemd session as your dsh user (**`sudo -iu` will not work**):
   - by using machinectl (recommended; on some distributions, this command is
@@ -153,6 +152,8 @@ which adds Podman integration into systemd.
   default container on first use).
 
 ## Enable daily auto-updates (optional)
+
+This requires enabling lingering for your user.
 
 ```bash
 systemctl --user enable --now podman-auto-update.timer

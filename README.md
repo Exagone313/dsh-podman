@@ -13,9 +13,10 @@ SPDX-License-Identifier: MIT
 [![guest-agent](https://img.shields.io/badge/guest--agent-GHCR-blue)](https://github.com/Exagone313/dsh-podman/pkgs/container/dsh-podman%2Fguest-agent)
 
 [Podman](https://podman.io/)-backed execution for
-[DeepSeek Harness](https://deepseek.com/harness) (`dsh`). dsh-podman routes all
-shell execution and file access through disposable and per-project Podman
-containers.
+[DeepSeek Harness](https://deepseek.com/harness) (`dsh`).
+
+dsh-podman routes all shell execution and file access through disposable and
+per-project Podman containers.
 
 ## Documentation
 

@@ -1,0 +1,11 @@
+# SPDX-FileCopyrightText: 2026 Elouan Martinet <exa@elou.world>
+#
+# SPDX-License-Identifier: MIT
+
+*
+!bin/
+!bin/linux-amd64/
+!bin/linux-arm64/
+!bin/linux-amd64/dsh-podman-guest-agent
+!bin/linux-arm64/dsh-podman-guest-agent
+!LICENSE.pkg

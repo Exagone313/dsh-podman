@@ -39,8 +39,18 @@ make build          # build-go + pnpm-build
 make vet            # go vet with the build tags
 make test-go        # go test with the build tags
 make test           # test-go + pnpm test (JS tests, which run against dist/)
+make download-licenses  # generate LICENSE.pkg from the project and third-party Go licenses
 make image          # build the orchestrator and guest-agent container images
 ```
+
+`make image` depends on `LICENSE.pkg`: the `download-licenses` target runs
+`scripts/download-licenses.bash`, which collects the project's MIT license and
+the licenses of every third-party Go module (via
+`go run github.com/google/go-licenses/v2@v2.0.1 save`) into `LICENSE.pkg`. That
+file is gitignored (never committed) and is baked into the orchestrator and
+guest-agent images at `/usr/share/licenses/dsh-podman/LICENSE.pkg`; because
+workspace containers mount the guest-agent image, it also rides along into every
+workspace container.
 
 `pnpm test` runs `node --test dist/*.test.js`, so it requires `pnpm build` to
 have run first (the `test` target handles this).

@@ -1,6 +1,7 @@
 /dist/
 /node_modules/
 /bin/
+/LICENSE.pkg
 /src/generated/
 *.test
 *.out

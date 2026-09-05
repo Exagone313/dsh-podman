@@ -77,6 +77,9 @@ jobs:
       - name: Build binaries (arm64)
         run: GOOS=linux GOARCH=arm64 make build-go
 
+      - name: Download third-party licenses
+        run: make download-licenses
+
       - name: Set up buildx
         uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
 

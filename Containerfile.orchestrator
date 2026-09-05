@@ -7,4 +7,5 @@ ENV PATH=/bin
 ARG TARGETOS
 ARG TARGETARCH
 COPY bin/${TARGETOS}-${TARGETARCH}/dsh-podman-orchestrator /bin/dsh-podman-orchestrator
+COPY LICENSE.pkg /usr/share/licenses/dsh-podman/LICENSE.pkg
 ENTRYPOINT ["/bin/dsh-podman-orchestrator"]

@@ -34,5 +34,11 @@ for f in "${license_dir}"/**/LICENSE; do
 		name="${name%/LICENSE}"
 		echo -e "\n---\n\nLicense for ${name}\n"
 		cat "${f}"
+		for notice in "${f%/LICENSE}"/NOTICE*; do
+			if [ -f "${notice}" ]; then
+				echo -e "\n\n---\n\nNotice for ${name}\n"
+				cat "${notice}"
+			fi
+		done
 	fi
 done

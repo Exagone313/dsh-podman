@@ -76,7 +76,7 @@ func run() error {
 	}
 	var out strings.Builder
 	out.Write(projectLicense)
-	out.WriteString("\n\n---\n\nTHIRD PARTY LICENSES")
+	out.WriteString("\n---\n\nTHIRD PARTY LICENSES\n")
 
 	perProject := map[string][]string{}
 	if err := filepath.WalkDir(licenseDir, func(path string, d os.DirEntry, err error) error {

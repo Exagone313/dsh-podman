@@ -20,7 +20,7 @@ trap at_exit EXIT
 license_dir="${tmpdir}/licenses"
 
 module="$(grep '^module' go.mod | sed 's/^module //')"
-go run github.com/google/go-licenses/v2@v2.0.1 save ./... --save_path="${license_dir}" --ignore "${module},github.com/cyberphone/json-canonicalization"
+go run github.com/google/go-licenses/v2@v2.0.1 save ./... --save_path="${license_dir}" --ignore "${module}"
 
 exec > LICENSE.pkg
 

@@ -40,10 +40,10 @@ build-go: $(BIN_DIR)/$(GOOS)-$(GOARCH)/dsh-podman-guest-agent $(BIN_DIR)/$(GOOS)
 
 image: image-orchestrator image-guestagent image-dsh
 
-image-orchestrator: build-go
+image-orchestrator: $(BIN_DIR)/$(GOOS)-$(GOARCH)/dsh-podman-orchestrator
 	$(CONTAINER) build --build-arg TARGETOS=$(GOOS) --build-arg TARGETARCH=$(GOARCH) -f Containerfile.orchestrator -t $(IMAGE_PREFIX)orchestrator:$(IMAGE_TAG) .
 
-image-guestagent: build-go
+image-guestagent: $(BIN_DIR)/$(GOOS)-$(GOARCH)/dsh-podman-guest-agent
 	$(CONTAINER) build --build-arg TARGETOS=$(GOOS) --build-arg TARGETARCH=$(GOARCH) -f Containerfile.guestagent -t $(IMAGE_PREFIX)guest-agent:$(IMAGE_TAG) .
 
 image-dsh:

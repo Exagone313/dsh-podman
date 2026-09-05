@@ -153,11 +153,6 @@ jobs:
         run: |
           args=(--generate-notes)
           if [[ "$VERSION" == *-* ]]; then args+=(--prerelease); fi
-          gh release create "$GITHUB_REF_NAME" "${args[@]}" \
-            exagone313-dsh-podman-*.tgz \
-            bin/linux-amd64/dsh-podman-orchestrator \
-            bin/linux-amd64/dsh-podman-guest-agent \
-            bin/linux-arm64/dsh-podman-orchestrator \
-            bin/linux-arm64/dsh-podman-guest-agent
+          gh release create "$GITHUB_REF_NAME" "${args[@]}"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

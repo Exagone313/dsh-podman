@@ -49,11 +49,11 @@ image-guestagent: $(BIN_DIR)/$(GOOS)-$(GOARCH)/dsh-podman-guest-agent LICENSE.pk
 image-dsh:
 	$(CONTAINER) build -f Containerfile.dsh -t $(IMAGE_PREFIX)dsh:$(IMAGE_TAG) .
 
-# LICENSE.pkg combines the project license with the licenses of every
-# third-party Go module; it is generated, gitignored, and baked into the
+# LICENSE.pkg combines the project license with the licenses and notices of
+# every third-party Go module; it is generated, gitignored, and baked into the
 # orchestrator and guest-agent images.
-LICENSE.pkg: scripts/download-licenses.bash go.mod go.sum
-	bash scripts/download-licenses.bash
+LICENSE.pkg: scripts/download-licenses/main.go go.mod go.sum
+	go run ./scripts/download-licenses
 
 download-licenses: LICENSE.pkg
 

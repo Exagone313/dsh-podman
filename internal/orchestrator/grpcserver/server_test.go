@@ -1020,12 +1020,42 @@ func TestContainerMountsFallback(t *testing.T) {
 }
 
 func TestMountFromProto(t *testing.T) {
-	mount := mountFromProto(&ctl.ProjectMount{ProjectName: "team", Path: "src", Destination: "/x", Mode: ctl.MountMode_MOUNT_MODE_READ_WRITE})
+	mount, err := mountFromProto(&ctl.ProjectMount{ProjectName: "team", Path: "src", Destination: "/x", Mode: ctl.MountMode_MOUNT_MODE_READ_WRITE})
+	if err != nil {
+		t.Fatal(err)
+	}
 	if mount.ProjectName != "team" || mount.Mode != "read_write" || mount.Path != "src" || mount.Destination != "/x" {
 		t.Fatalf("unexpected mount: %#v", mount)
 	}
-	if ro := mountFromProto(&ctl.ProjectMount{ProjectName: "team"}); ro.Mode != "read_only" {
-		t.Fatalf("expected read_only, got %q", ro.Mode)
+	ro, err := mountFromProto(&ctl.ProjectMount{ProjectName: "team", Mode: ctl.MountMode_MOUNT_MODE_READ_ONLY})
+	if err != nil || ro.Mode != "read_only" {
+		t.Fatalf("expected read_only, got %q %v", ro.Mode, err)
+	}
+}
+
+// TestMountFromProtoRejectsUnknown pins down that unrecognised enum values are
+// reported rather than coerced: an unknown kind must not become a project
+// mount, and an unspecified mode must not become a silent read_only.
+func TestMountFromProtoRejectsUnknown(t *testing.T) {
+	if _, err := mountFromProto(&ctl.ProjectMount{ProjectName: "team", Kind: ctl.MountKind(99), Mode: ctl.MountMode_MOUNT_MODE_READ_ONLY}); err == nil {
+		t.Error("accepted an unknown mount kind")
+	}
+	if _, err := mountFromProto(&ctl.ProjectMount{ProjectName: "team", Mode: ctl.MountMode(99)}); err == nil {
+		t.Error("accepted an unknown mount mode")
+	}
+	if _, err := mountFromProto(&ctl.ProjectMount{ProjectName: "team"}); err == nil {
+		t.Error("accepted an unspecified mount mode")
+	}
+	// Secret mounts are the one kind that carries no mode.
+	secret, err := mountFromProto(&ctl.ProjectMount{Kind: ctl.MountKind_MOUNT_KIND_SECRET, Secret: "tls", Destination: "/run/secrets/tls"})
+	if err != nil || secret.Kind != "secret" || secret.Secret != "tls" {
+		t.Fatalf("secret mount rejected: %#v %v", secret, err)
+	}
+	if _, err := stateMounts([]*ctl.ProjectMount{
+		{ProjectName: "team", Mode: ctl.MountMode_MOUNT_MODE_READ_ONLY},
+		{ProjectName: "other", Kind: ctl.MountKind(99)},
+	}); err == nil {
+		t.Error("stateMounts accepted a list containing an invalid mount")
 	}
 }
 
@@ -1762,16 +1792,18 @@ func TestContainerProtoProjectsTmpfsAndVolumeKinds(t *testing.T) {
 
 func TestMountFromProtoKindAndVolume(t *testing.T) {
 	for _, kind := range []ctl.MountKind{ctl.MountKind_MOUNT_KIND_UNSPECIFIED, ctl.MountKind_MOUNT_KIND_PROJECT} {
-		if m := mountFromProto(&ctl.ProjectMount{Kind: kind}); m.Kind != "" {
-			t.Fatalf("kind %v should map to empty, got %q", kind, m.Kind)
+		m, err := mountFromProto(&ctl.ProjectMount{Kind: kind, Mode: ctl.MountMode_MOUNT_MODE_READ_ONLY})
+		if err != nil || m.Kind != "" {
+			t.Fatalf("kind %v should map to empty, got %q %v", kind, m.Kind, err)
 		}
 	}
-	if m := mountFromProto(&ctl.ProjectMount{Kind: ctl.MountKind_MOUNT_KIND_TMPFS}); m.Kind != "tmpfs" {
-		t.Fatalf("tmpfs kind not mapped, got %q", m.Kind)
+	m, err := mountFromProto(&ctl.ProjectMount{Kind: ctl.MountKind_MOUNT_KIND_TMPFS, Mode: ctl.MountMode_MOUNT_MODE_READ_WRITE})
+	if err != nil || m.Kind != "tmpfs" {
+		t.Fatalf("tmpfs kind not mapped, got %q %v", m.Kind, err)
 	}
-	m := mountFromProto(&ctl.ProjectMount{Kind: ctl.MountKind_MOUNT_KIND_VOLUME, Volume: "data", Mode: ctl.MountMode_MOUNT_MODE_READ_WRITE})
-	if m.Kind != "volume" || m.Volume != "data" || m.Mode != "read_write" {
-		t.Fatalf("volume mount not mapped: %#v", m)
+	m, err = mountFromProto(&ctl.ProjectMount{Kind: ctl.MountKind_MOUNT_KIND_VOLUME, Volume: "data", Mode: ctl.MountMode_MOUNT_MODE_READ_WRITE})
+	if err != nil || m.Kind != "volume" || m.Volume != "data" || m.Mode != "read_write" {
+		t.Fatalf("volume mount not mapped: %#v %v", m, err)
 	}
 }
 
@@ -2010,9 +2042,9 @@ func TestSecretKindMapping(t *testing.T) {
 	if kind := mountKindToProto("secret"); kind != ctl.MountKind_MOUNT_KIND_SECRET {
 		t.Fatalf("secret kind projection: got %v", kind)
 	}
-	m := mountFromProto(&ctl.ProjectMount{Kind: ctl.MountKind_MOUNT_KIND_SECRET, Secret: "valkey-tls", Destination: "/run/secrets/tls"})
-	if m.Kind != "secret" || m.Secret != "valkey-tls" || m.Destination != "/run/secrets/tls" {
-		t.Fatalf("secret mount not mapped: %#v", m)
+	m, err := mountFromProto(&ctl.ProjectMount{Kind: ctl.MountKind_MOUNT_KIND_SECRET, Secret: "valkey-tls", Destination: "/run/secrets/tls"})
+	if err != nil || m.Kind != "secret" || m.Secret != "valkey-tls" || m.Destination != "/run/secrets/tls" {
+		t.Fatalf("secret mount not mapped: %#v %v", m, err)
 	}
 }
 

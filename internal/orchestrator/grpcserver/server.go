@@ -412,7 +412,11 @@ func (s *Server) RecreateContainer(ctx context.Context, request *ctl.RecreateCon
 		record.Env = cloneMap(request.GetEnv())
 	}
 	if len(request.GetMounts()) > 0 {
-		record.Mounts = stateMounts(request.GetMounts())
+		mounts, mountErr := stateMounts(request.GetMounts())
+		if mountErr != nil {
+			return nil, status.Error(codes.InvalidArgument, mountErr.Error())
+		}
+		record.Mounts = mounts
 	} else {
 		record.Mounts = containerMounts(workspace, *record)
 	}
@@ -470,7 +474,11 @@ func (s *Server) StartContainer(ctx context.Context, request *ctl.StartContainer
 	}
 	recordMounts := workspace.Mounts
 	if len(request.GetMounts()) > 0 {
-		recordMounts = stateMounts(request.GetMounts())
+		mounts, mountErr := stateMounts(request.GetMounts())
+		if mountErr != nil {
+			return nil, status.Error(codes.InvalidArgument, mountErr.Error())
+		}
+		recordMounts = mounts
 	}
 	record := state.Container{Name: container, PodmanName: podmanContainerName(workspace.WorkspaceSlug, container), ImageID: imageID, Mounts: recordMounts}
 	podmanMounts, err := s.podmanMounts(containerMounts(workspace, record))
@@ -776,7 +784,10 @@ func (s *Server) CreateWorkspace(ctx context.Context, request *ctl.CreateWorkspa
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	mounts := stateMounts(request.GetMounts())
+	mounts, err := stateMounts(request.GetMounts())
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
 	defaultMounts := mounts
 	if existing, storeErr := s.Store.Workspaces(); storeErr == nil {
 		for _, workspace := range existing {
@@ -1509,30 +1520,41 @@ func validateSecretEnv(secretEnv map[string]string) error {
 }
 
 // stateMounts projects the control plane's project mounts onto the state
-// model's read_only/read_write representation.
-func stateMounts(mounts []*ctl.ProjectMount) []state.Mount {
+// model's read_only/read_write representation, rejecting the whole list when
+// any mount is malformed.
+func stateMounts(mounts []*ctl.ProjectMount) ([]state.Mount, error) {
 	result := make([]state.Mount, 0, len(mounts))
 	for _, mount := range mounts {
-		result = append(result, mountFromProto(mount))
+		converted, err := mountFromProto(mount)
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, converted)
 	}
-	return result
+	return result, nil
 }
 
 // mountFromProto maps a control plane project mount onto its state
 // representation.
-func mountFromProto(mount *ctl.ProjectMount) state.Mount {
-	mode := "read_only"
-	if mount.GetMode() == ctl.MountMode_MOUNT_MODE_READ_WRITE {
-		mode = "read_write"
-	}
+//
+// An unrecognised kind or mode is an error rather than a default. Protobuf
+// keeps unknown enum numbers as-is on the wire, so coercing them would turn a
+// value this build does not understand into a project mount, or an
+// unspecified mode into a silent read_only, instead of telling the client.
+// Secret mounts are the one kind that carries no mode.
+func mountFromProto(mount *ctl.ProjectMount) (state.Mount, error) {
 	kind, err := mountKindFromProto(mount.GetKind())
 	if err != nil {
-		kind = ""
+		return state.Mount{}, err
 	}
 	if kind == "secret" {
-		return state.Mount{Kind: kind, Secret: mount.GetSecret(), Destination: mount.GetDestination()}
+		return state.Mount{Kind: kind, Secret: mount.GetSecret(), Destination: mount.GetDestination()}, nil
 	}
-	return state.Mount{ProjectName: mount.GetProjectName(), Path: mount.GetPath(), Destination: mount.GetDestination(), Mode: mode, Kind: kind, Volume: mount.GetVolume()}
+	mode, err := mountModeFromProto(mount.GetMode())
+	if err != nil {
+		return state.Mount{}, err
+	}
+	return state.Mount{ProjectName: mount.GetProjectName(), Path: mount.GetPath(), Destination: mount.GetDestination(), Mode: mode, Kind: kind, Volume: mount.GetVolume()}, nil
 }
 
 // mountKindFromProto maps a control plane mount kind onto the state's string

@@ -13,11 +13,11 @@ import (
 	"strings"
 	"testing"
 
-	"go.podman.io/podman/v6/pkg/specgen"
 	ctl "github.com/Exagone313/dsh-podman/internal/genproto/dshctl/v1"
 	imagebuild "github.com/Exagone313/dsh-podman/internal/orchestrator/images"
 	"github.com/Exagone313/dsh-podman/internal/orchestrator/podman"
 	"github.com/Exagone313/dsh-podman/internal/orchestrator/state"
+	"go.podman.io/podman/v6/pkg/specgen"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -36,8 +36,20 @@ func silentLogger() *slog.Logger {
 	return slog.New(slog.NewTextHandler(io.Discard, nil))
 }
 
+// tempRoot returns a temporary directory with every symlink resolved, so that
+// tests comparing against resolved paths do not depend on whether the
+// platform's temporary directory is itself reached through a symlink.
+func tempRoot(t *testing.T) string {
+	t.Helper()
+	root, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	return root
+}
+
 func TestValidateProject(t *testing.T) {
-	root := t.TempDir()
+	root := tempRoot(t)
 	if err := os.MkdirAll(filepath.Join(root, "team"), 0755); err != nil {
 		t.Fatal(err)
 	}
@@ -56,6 +68,28 @@ func TestValidateProject(t *testing.T) {
 	}
 	if _, err := ValidateProject(root, "file"); err == nil {
 		t.Fatal("accepted non-directory project")
+	}
+}
+
+// TestValidateProjectRejectsSymlinkedProject covers a project entry that is a
+// symlink leaving the projects root: the project must not resolve, or podman
+// would bind-mount the link's target.
+func TestValidateProjectRejectsSymlinkedProject(t *testing.T) {
+	root := tempRoot(t)
+	outside := tempRoot(t)
+	if err := os.MkdirAll(filepath.Join(outside, "secrets"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(filepath.Join(outside, "secrets"), filepath.Join(root, "escape")); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink("/", filepath.Join(root, "slash")); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"escape", "slash"} {
+		if _, err := ValidateProject(root, name); err == nil {
+			t.Errorf("accepted symlinked project %q", name)
+		}
 	}
 }
 
@@ -1008,7 +1042,7 @@ func TestMountModeFromProto(t *testing.T) {
 }
 
 func TestResolveMount(t *testing.T) {
-	root := t.TempDir()
+	root := tempRoot(t)
 	hostRoot := filepath.Join(t.TempDir(), "host")
 	if err := os.MkdirAll(filepath.Join(root, "team", "src"), 0755); err != nil {
 		t.Fatal(err)
@@ -1053,6 +1087,66 @@ func TestResolveMount(t *testing.T) {
 	}
 	if _, _, err := resolveMount(root, "", state.Mount{ProjectName: "nope"}); err == nil {
 		t.Fatal("accepted a missing project")
+	}
+}
+
+// TestResolveMountSymlinks covers the symlinks a writable project can contain.
+// Links leaving the projects root must be refused; links staying inside it
+// resolve, since mounting another project directory is supported.
+func TestResolveMountSymlinks(t *testing.T) {
+	root := tempRoot(t)
+	outside := tempRoot(t)
+	hostRoot := "/host/projects"
+	for _, dir := range []string{
+		filepath.Join(root, "team", "src"),
+		filepath.Join(root, "other", "shared"),
+		filepath.Join(outside, "secrets"),
+	} {
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	links := map[string]string{
+		"team/escape":   filepath.Join(outside, "secrets"),
+		"team/slash":    "/",
+		"team/inside":   filepath.Join("..", "other", "shared"),
+		"team/absolute": filepath.Join(root, "other", "shared"),
+		"team/loop":     filepath.Join(root, "team", "loop"),
+	}
+	for name, target := range links {
+		if err := os.Symlink(target, filepath.Join(root, filepath.FromSlash(name))); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// "absolute" points inside the projects root but through an absolute
+	// target. Resolution is confined with openat2(RESOLVE_BENEATH), which
+	// refuses absolute symlinks outright, so it is rejected too: that is the
+	// shape a planted link takes, and naming the other project directly is
+	// the supported way to mount it.
+	for _, path := range []string{"escape", "slash", "loop", "absolute"} {
+		if _, _, err := resolveMount(root, hostRoot, state.Mount{ProjectName: "team", Path: path}); err == nil {
+			t.Errorf("accepted symlinked subpath %q", path)
+		}
+	}
+	// A relative symlink that stays inside the projects root resolves to its
+	// target, and the host source is re-expressed against the host root.
+	host, dest, err := resolveMount(root, hostRoot, state.Mount{ProjectName: "team", Path: "inside"})
+	if err != nil {
+		t.Fatalf("rejected an internal symlink: %v", err)
+	}
+	if host != filepath.Join(hostRoot, "other", "shared") {
+		t.Errorf("host source not resolved: %q", host)
+	}
+	// The container-side path keeps the requested shape.
+	if dest != filepath.Join(root, "team", "inside") {
+		t.Errorf("destination should mirror the request: %q", dest)
+	}
+	// A symlinked project entry is refused the same way.
+	if err := os.Symlink(filepath.Join(outside, "secrets"), filepath.Join(root, "linked")); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := resolveMount(root, hostRoot, state.Mount{ProjectName: "linked"}); err == nil {
+		t.Error("accepted a symlinked project")
 	}
 }
 

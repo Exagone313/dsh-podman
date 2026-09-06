@@ -55,6 +55,16 @@ func (s *Server) Exec(stream guest.WorkspaceGuestAgent_ExecServer) error {
 	if err != nil {
 		return status.Error(codes.InvalidArgument, err.Error())
 	}
+	// The process is registered before it is started, so every path that
+	// gives up before Command.Start must drop it again. A leaked entry keeps
+	// a process with no os.Process in the map for the agent's lifetime, where
+	// any later Signal for that id would find it.
+	started := false
+	defer func() {
+		if !started {
+			s.Processes.Remove(process.ID)
+		}
+	}()
 	stdout, err := process.Command.StdoutPipe()
 	if err != nil {
 		return status.Error(codes.Internal, err.Error())
@@ -68,9 +78,9 @@ func (s *Server) Exec(stream guest.WorkspaceGuestAgent_ExecServer) error {
 		return status.Error(codes.Internal, err.Error())
 	}
 	if err := process.Command.Start(); err != nil {
-		s.Processes.Remove(process.ID)
 		return status.Error(codes.InvalidArgument, err.Error())
 	}
+	started = true
 	var sendMu sync.Mutex
 	send := func(output *guest.ExecOutput) error {
 		output.ProcessId = process.ID
@@ -153,12 +163,18 @@ func (s *Server) Exec(stream guest.WorkspaceGuestAgent_ExecServer) error {
 
 func (s *Server) Signal(_ context.Context, request *guest.SignalRequest) (*guest.SignalResponse, error) {
 	for _, process := range s.Processes.List() {
-		if process.ID == request.GetProcessId() {
-			if err := process.Command.Process.Signal(signalForName(request.GetSignal())); err != nil {
-				return nil, status.Error(codes.Internal, err.Error())
-			}
-			return &guest.SignalResponse{}, nil
+		if process.ID != request.GetProcessId() {
+			continue
 		}
+		// Command.Process is nil until Command.Start succeeds, and Exec
+		// registers the process before starting it.
+		if process.Command == nil || process.Command.Process == nil {
+			return nil, status.Error(codes.FailedPrecondition, "process is not running")
+		}
+		if err := process.Command.Process.Signal(signalForName(request.GetSignal())); err != nil {
+			return nil, status.Error(codes.Internal, err.Error())
+		}
+		return &guest.SignalResponse{}, nil
 	}
 	return nil, status.Error(codes.NotFound, "process not found")
 }

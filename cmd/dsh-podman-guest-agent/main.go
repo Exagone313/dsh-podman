@@ -44,7 +44,10 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	server := grpc.NewServer(grpc.UnaryInterceptor(auth.Unary(token)), grpc.StreamInterceptor(auth.Stream(token)))
+	server := grpc.NewServer(
+		grpc.ChainUnaryInterceptor(auth.Unary(token), grpcserver.RecoveryUnary(logger)),
+		grpc.ChainStreamInterceptor(auth.Stream(token), grpcserver.RecoveryStream(logger)),
+	)
 	guest.RegisterWorkspaceGuestAgentServer(server, grpcserver.New().WithFS(filesystem))
 	logger.Info("guest agent listening", "socket", socket)
 	if err := server.Serve(listener); err != nil {

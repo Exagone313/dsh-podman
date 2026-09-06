@@ -63,6 +63,53 @@ func TestSignalForName(t *testing.T) {
 	}
 }
 
+// TestSignalUnknownProcess covers a Signal for an id that was never handed
+// out.
+func TestSignalUnknownProcess(t *testing.T) {
+	server := New()
+	if _, err := server.Signal(context.Background(), &guest.SignalRequest{ProcessId: "1", Signal: "SIGTERM"}); status.Code(err) != codes.NotFound {
+		t.Fatalf("expected NotFound, got %v", err)
+	}
+}
+
+// TestSignalUnstartedProcess covers a Signal that lands between a process
+// being registered and being started. Exec registers first, so the process is
+// reachable while Command.Process is still nil; dereferencing it panicked and
+// took the whole agent down with it.
+func TestSignalUnstartedProcess(t *testing.T) {
+	server := New()
+	process, err := server.Processes.Start(context.Background(), []string{"sleep", "60"}, "", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer server.Processes.Remove(process.ID)
+	if process.Command.Process != nil {
+		t.Fatal("process should not be started yet")
+	}
+	response, err := server.Signal(context.Background(), &guest.SignalRequest{ProcessId: process.ID, Signal: "SIGTERM"})
+	if status.Code(err) != codes.FailedPrecondition {
+		t.Fatalf("expected FailedPrecondition, got %v (%v)", err, response)
+	}
+}
+
+// TestExecDropsProcessesItCannotStart covers the bookkeeping around a failed
+// start: leaving the entry behind would keep a process with no os.Process in
+// the map for the agent's lifetime.
+func TestExecDropsProcessesItCannotStart(t *testing.T) {
+	server := New()
+	process, err := server.Processes.Start(context.Background(), []string{filepath.Join(t.TempDir(), "missing")}, "", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := process.Command.Start(); err == nil {
+		t.Fatal("expected the command to fail to start")
+	}
+	server.Processes.Remove(process.ID)
+	if len(server.Processes.List()) != 0 {
+		t.Fatalf("process left registered: %#v", server.Processes.List())
+	}
+}
+
 func TestStatExistingFile(t *testing.T) {
 	server, root := newTestServer(t)
 	if err := os.WriteFile(filepath.Join(root, "file"), []byte("hello"), 0600); err != nil {

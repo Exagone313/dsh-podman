@@ -547,9 +547,12 @@ func (s *Server) AddContainerMount(ctx context.Context, request *ctl.AddContaine
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid mount kind")
 	}
-	mode, err := mountModeFromProto(request.GetMode())
-	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, "invalid mount mode")
+	// Secret mounts carry no mode; every other kind requires one.
+	mode := ""
+	if kind != "secret" {
+		if mode, err = mountModeFromProto(request.GetMode()); err != nil {
+			return nil, status.Error(codes.InvalidArgument, "invalid mount mode")
+		}
 	}
 	var newMount state.Mount
 	switch kind {
@@ -566,6 +569,15 @@ func (s *Server) AddContainerMount(ctx context.Context, request *ctl.AddContaine
 		newMount = state.Mount{Kind: "tmpfs", Destination: request.GetDestination(), Mode: mode}
 	case "volume":
 		newMount = state.Mount{Kind: "volume", Volume: request.GetVolume(), Destination: request.GetDestination(), Mode: mode}
+	case "secret":
+		if !secretName.MatchString(request.GetSecret()) {
+			return nil, status.Error(codes.InvalidArgument, "invalid secret name")
+		}
+		newMount = state.Mount{Kind: "secret", Secret: request.GetSecret(), Destination: request.GetDestination()}
+	default:
+		// Unreachable while mountKindFromProto is exhaustive, and kept so a
+		// new kind cannot silently append a zero-valued mount.
+		return nil, status.Error(codes.InvalidArgument, "invalid mount kind")
 	}
 	effective := containerMounts(workspace, *record)
 	for _, existing := range effective {
@@ -577,6 +589,8 @@ func (s *Server) AddContainerMount(ctx context.Context, request *ctl.AddContaine
 			duplicate = existing.Kind == "tmpfs" && existing.Destination == newMount.Destination
 		case "volume":
 			duplicate = existing.Kind == "volume" && existing.Volume == newMount.Volume
+		case "secret":
+			duplicate = existing.Kind == "secret" && existing.Destination == newMount.Destination
 		}
 		if duplicate {
 			return nil, status.Error(codes.AlreadyExists, "mount already exists")
@@ -585,6 +599,10 @@ func (s *Server) AddContainerMount(ctx context.Context, request *ctl.AddContaine
 	record.Mounts = append(append([]state.Mount(nil), effective...), newMount)
 	if _, err := s.podmanMounts(record.Mounts); err != nil {
 		s.log().Error("AddContainerMount project validation failed", "workspace_slug", workspace.WorkspaceSlug, "error", err)
+		return nil, err
+	}
+	if _, err := s.podmanSecrets(record.Mounts); err != nil {
+		s.log().Error("AddContainerMount secret validation failed", "workspace_slug", workspace.WorkspaceSlug, "error", err)
 		return nil, err
 	}
 	if s.Podman == nil {
@@ -630,6 +648,9 @@ func (s *Server) RemoveContainerMount(ctx context.Context, request *ctl.RemoveCo
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid mount kind")
 	}
+	if !knownMountKind(kind) {
+		return nil, status.Error(codes.InvalidArgument, "invalid mount kind")
+	}
 	effective := containerMounts(workspace, *record)
 	index := -1
 	for i, existing := range effective {
@@ -641,6 +662,13 @@ func (s *Server) RemoveContainerMount(ctx context.Context, request *ctl.RemoveCo
 			matched = existing.Kind == "tmpfs" && existing.Destination == request.GetDestination()
 		case "volume":
 			matched = existing.Kind == "volume" && existing.Volume == request.GetVolume()
+		case "secret":
+			// The destination identifies the mount; the secret name, when
+			// given, must agree.
+			matched = existing.Kind == "secret" && existing.Destination == request.GetDestination()
+			if matched && request.GetSecret() != "" {
+				matched = existing.Secret == request.GetSecret()
+			}
 		}
 		if matched {
 			index = i
@@ -654,6 +682,10 @@ func (s *Server) RemoveContainerMount(ctx context.Context, request *ctl.RemoveCo
 	record.Mounts = append(append([]state.Mount(nil), effective[:index]...), effective[index+1:]...)
 	if _, err := s.podmanMounts(record.Mounts); err != nil {
 		s.log().Error("RemoveContainerMount project validation failed", "workspace_slug", workspace.WorkspaceSlug, "error", err)
+		return nil, err
+	}
+	if _, err := s.podmanSecrets(record.Mounts); err != nil {
+		s.log().Error("RemoveContainerMount secret validation failed", "workspace_slug", workspace.WorkspaceSlug, "error", err)
 		return nil, err
 	}
 	if s.Podman == nil {
@@ -1518,6 +1550,15 @@ func mountKindFromProto(kind ctl.MountKind) (string, error) {
 	default:
 		return "", fmt.Errorf("invalid mount kind")
 	}
+}
+
+// knownMountKind reports whether kind is a mount kind the server handles.
+func knownMountKind(kind string) bool {
+	switch kind {
+	case "", "tmpfs", "volume", "secret":
+		return true
+	}
+	return false
 }
 
 // mountKindToProto projects a state mount kind onto the control plane enum;

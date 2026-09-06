@@ -1611,6 +1611,92 @@ func TestAddContainerMountDuplicateTmpfsAndVolume(t *testing.T) {
 	}
 }
 
+// TestAddContainerMountSecret covers secret mounts, which carry a destination
+// and a secret name but no mount mode.
+func TestAddContainerMountSecret(t *testing.T) {
+	root := t.TempDir()
+	store := newTestStore(t)
+	if err := store.SaveWorkspaces([]state.Workspace{{
+		WorkspaceSlug: "proj",
+		Containers: []state.Container{
+			{Name: "dev", PodmanName: "dsh-workspace-proj-dev", ImageID: "arch", Status: "running"},
+		},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	server := &Server{Store: store, ProjectsRoot: root, VolumePrefix: "dsh-podman-", SecretPrefix: "dsh-podman-", Logger: silentLogger()}
+
+	// An unspecified mode is accepted: secret mounts have no mode. Reaching
+	// FailedPrecondition means validation passed and podman was missing.
+	_, err := server.AddContainerMount(context.Background(), &ctl.AddContainerMountRequest{WorkspaceSlug: "proj", Container: "dev", Kind: ctl.MountKind_MOUNT_KIND_SECRET, Secret: "tls", Destination: "/run/secrets/tls"})
+	if status.Code(err) != codes.FailedPrecondition {
+		t.Fatalf("valid secret add: expected FailedPrecondition, got %v", err)
+	}
+	_, err = server.AddContainerMount(context.Background(), &ctl.AddContainerMountRequest{WorkspaceSlug: "proj", Container: "dev", Kind: ctl.MountKind_MOUNT_KIND_SECRET, Secret: "bad/name", Destination: "/run/secrets/tls"})
+	if status.Code(err) != codes.InvalidArgument {
+		t.Fatalf("invalid secret name: expected InvalidArgument, got %v", err)
+	}
+	_, err = server.AddContainerMount(context.Background(), &ctl.AddContainerMountRequest{WorkspaceSlug: "proj", Container: "dev", Kind: ctl.MountKind_MOUNT_KIND_SECRET, Secret: "tls"})
+	if status.Code(err) != codes.InvalidArgument {
+		t.Fatalf("missing destination: expected InvalidArgument, got %v", err)
+	}
+	_, err = server.AddContainerMount(context.Background(), &ctl.AddContainerMountRequest{WorkspaceSlug: "proj", Container: "dev", Kind: ctl.MountKind_MOUNT_KIND_SECRET, Secret: "tls", Destination: filepath.Join(root, "x")})
+	if status.Code(err) != codes.InvalidArgument {
+		t.Fatalf("secret under projects root: expected InvalidArgument, got %v", err)
+	}
+}
+
+func TestAddContainerMountDuplicateSecret(t *testing.T) {
+	store := newTestStore(t)
+	if err := store.SaveWorkspaces([]state.Workspace{{
+		WorkspaceSlug: "proj",
+		Containers: []state.Container{{
+			Name: "dev", PodmanName: "dsh-workspace-proj-dev", ImageID: "arch", Status: "running",
+			Mounts: []state.Mount{{Kind: "secret", Secret: "tls", Destination: "/run/secrets/tls"}},
+		}},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	server := &Server{Store: store, ProjectsRoot: t.TempDir(), SecretPrefix: "dsh-podman-", Logger: silentLogger()}
+	_, err := server.AddContainerMount(context.Background(), &ctl.AddContainerMountRequest{WorkspaceSlug: "proj", Container: "dev", Kind: ctl.MountKind_MOUNT_KIND_SECRET, Secret: "other", Destination: "/run/secrets/tls"})
+	if status.Code(err) != codes.AlreadyExists {
+		t.Fatalf("duplicate secret destination: expected AlreadyExists, got %v", err)
+	}
+}
+
+// TestRemoveContainerMountSecret covers removing a secret mount, which was
+// previously impossible: a secret mount could be created but never detached.
+func TestRemoveContainerMountSecret(t *testing.T) {
+	store := newTestStore(t)
+	if err := store.SaveWorkspaces([]state.Workspace{{
+		WorkspaceSlug: "proj",
+		Containers: []state.Container{{
+			Name: "dev", PodmanName: "dsh-workspace-proj-dev", ImageID: "arch", Status: "running",
+			Mounts: []state.Mount{{Kind: "secret", Secret: "tls", Destination: "/run/secrets/tls"}},
+		}},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	server := &Server{Store: store, ProjectsRoot: t.TempDir(), SecretPrefix: "dsh-podman-", Logger: silentLogger()}
+
+	_, err := server.RemoveContainerMount(context.Background(), &ctl.RemoveContainerMountRequest{WorkspaceSlug: "proj", Container: "dev", Kind: ctl.MountKind_MOUNT_KIND_SECRET, Destination: "/run/secrets/other"})
+	if status.Code(err) != codes.NotFound {
+		t.Fatalf("missing secret mount: expected NotFound, got %v", err)
+	}
+	_, err = server.RemoveContainerMount(context.Background(), &ctl.RemoveContainerMountRequest{WorkspaceSlug: "proj", Container: "dev", Kind: ctl.MountKind_MOUNT_KIND_SECRET, Destination: "/run/secrets/tls", Secret: "wrong"})
+	if status.Code(err) != codes.NotFound {
+		t.Fatalf("mismatched secret name: expected NotFound, got %v", err)
+	}
+	_, err = server.RemoveContainerMount(context.Background(), &ctl.RemoveContainerMountRequest{WorkspaceSlug: "proj", Container: "dev", Kind: ctl.MountKind_MOUNT_KIND_SECRET, Destination: "/run/secrets/tls"})
+	if status.Code(err) != codes.FailedPrecondition {
+		t.Fatalf("matching secret removal: expected FailedPrecondition, got %v", err)
+	}
+	_, err = server.RemoveContainerMount(context.Background(), &ctl.RemoveContainerMountRequest{WorkspaceSlug: "proj", Container: "dev", Kind: ctl.MountKind_MOUNT_KIND_SECRET, Destination: "/run/secrets/tls", Secret: "tls"})
+	if status.Code(err) != codes.FailedPrecondition {
+		t.Fatalf("matching secret removal by name: expected FailedPrecondition, got %v", err)
+	}
+}
+
 func TestRemoveContainerMountVolume(t *testing.T) {
 	root := t.TempDir()
 	store := newTestStore(t)

@@ -32,6 +32,7 @@ This repository was written in major parts using AI models:
 
 - early commits using OpenAI GPT-5.6 Luna
 - DeepSeek V4 Flash
+- source code weakness fixes by Anthropic Claude Opus 5
 
 ## License
 

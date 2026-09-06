@@ -71,6 +71,10 @@ and writes files. Each guest container gets exactly one socket directory
 bind-mounted into it, so a guest never sees the orchestrator's control socket
 nor any other workspace's socket directory.
 
+Commands and daemons inherit the guest agent's environment, minus the reserved
+`DSH_PODMAN` namespace: the agent's own token stays with the agent instead of
+being copied into everything it starts.
+
 Recreating a container or shutting down the orchestrator first asks the
 container's guest agent to gracefully stop its daemons (SIGTERM, ~10s grace)
 before podman tears the container down.

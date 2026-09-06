@@ -15,6 +15,8 @@ import (
 	"sync"
 	"syscall"
 	"time"
+
+	"github.com/Exagone313/dsh-podman/internal/guestagent/childenv"
 )
 
 var (
@@ -145,10 +147,7 @@ func (m *Manager) Start(name string, argv []string, cwd string, env map[string]s
 	}
 	cmd := exec.CommandContext(context.Background(), argv[0], argv[1:]...)
 	cmd.Dir = cwd
-	cmd.Env = os.Environ()
-	for key, value := range envCopy {
-		cmd.Env = append(cmd.Env, key+"="+value)
-	}
+	cmd.Env = childenv.Build(envCopy)
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	if cred := credentialFor(opts); cred != nil {
 		cmd.SysProcAttr.Credential = cred

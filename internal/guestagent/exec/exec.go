@@ -7,10 +7,11 @@ package exec
 import (
 	"context"
 	"fmt"
-	"os"
 	"os/exec"
 	"strconv"
 	"sync"
+
+	"github.com/Exagone313/dsh-podman/internal/guestagent/childenv"
 )
 
 type Process struct {
@@ -33,12 +34,9 @@ func (m *Manager) Start(ctx context.Context, argv []string, cwd string, env map[
 	}
 	cmd := exec.CommandContext(ctx, argv[0], argv[1:]...)
 	cmd.Dir = cwd
-	if len(env) != 0 {
-		cmd.Env = os.Environ()
-		for key, value := range env {
-			cmd.Env = append(cmd.Env, key+"="+value)
-		}
-	}
+	// Always set the environment explicitly: leaving cmd.Env nil would make
+	// the child inherit the agent's own, reserved variables included.
+	cmd.Env = childenv.Build(env)
 	proc := &Process{Argv: append([]string(nil), argv...), Command: cmd}
 	m.mu.Lock()
 	m.nextID++

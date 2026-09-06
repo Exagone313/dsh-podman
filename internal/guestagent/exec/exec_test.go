@@ -6,6 +6,7 @@ package exec
 
 import (
 	"context"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -73,14 +74,41 @@ func TestStartSetsEnv(t *testing.T) {
 	}
 }
 
-func TestStartLeavesEnvUnsetWhenAbsent(t *testing.T) {
+// TestStartAlwaysSetsEnv covers the case with no caller-supplied variables: a
+// nil Command.Env would make the child inherit the agent's own environment,
+// reserved variables and all.
+func TestStartAlwaysSetsEnv(t *testing.T) {
+	t.Setenv("PATH", "/usr/bin")
 	manager := NewManager()
 	process, err := manager.Start(context.Background(), []string{"env"}, "", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if process.Command.Env != nil {
-		t.Fatalf("expected nil env, got %#v", process.Command.Env)
+	if process.Command.Env == nil {
+		t.Fatal("command env is nil; the child would inherit the agent's environment")
+	}
+	if !slices.Contains(process.Command.Env, "PATH=/usr/bin") {
+		t.Errorf("ordinary variables should be inherited: %#v", process.Command.Env)
+	}
+}
+
+// TestStartWithholdsReservedEnv covers the agent's own credential: it must not
+// be handed to a process the agent starts, whether or not the caller supplies
+// an environment.
+func TestStartWithholdsReservedEnv(t *testing.T) {
+	t.Setenv("DSH_PODMAN_GUEST_TOKEN", "super-secret")
+	t.Setenv("DSH_PODMAN_PROJECTS_ROOT", "/projects")
+	manager := NewManager()
+	for _, env := range []map[string]string{nil, {"FOO": "bar"}} {
+		process, err := manager.Start(context.Background(), []string{"env"}, "", env)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, entry := range process.Command.Env {
+			if strings.HasPrefix(entry, "DSH_PODMAN") {
+				t.Errorf("reserved variable passed to child: %q", entry)
+			}
+		}
 	}
 }
 

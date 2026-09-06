@@ -65,6 +65,36 @@ func TestStartGeneratesName(t *testing.T) {
 	waitFor(t, m, name, false)
 }
 
+// TestStartWithholdsReservedEnv covers a daemon reading the agent's own
+// credential straight out of its environment. It matters most for a daemon
+// that drops privileges: it cannot read the agent's environment through
+// /proc, but it was being handed a copy of it.
+func TestStartWithholdsReservedEnv(t *testing.T) {
+	t.Setenv("DSH_PODMAN_GUEST_TOKEN", "super-secret")
+	t.Setenv("DSH_PODMAN_PROJECTS_ROOT", "/projects")
+	m := NewManager()
+	name, err := m.Start("printenv", []string{"env"}, "", map[string]string{"FOO": "bar"}, StartOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	cleanupDaemon(t, m, name)
+	waitFor(t, m, name, false)
+	stdout, _, err := m.Logs(name, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	output := string(stdout)
+	if strings.Contains(output, "super-secret") {
+		t.Error("the agent's credential reached the daemon's environment")
+	}
+	if strings.Contains(output, "DSH_PODMAN") {
+		t.Errorf("reserved variables reached the daemon: %q", output)
+	}
+	if !strings.Contains(output, "FOO=bar") {
+		t.Errorf("caller-supplied variables missing: %q", output)
+	}
+}
+
 func TestStartRejectsInvalidNames(t *testing.T) {
 	m := NewManager()
 	for _, name := range []string{"-foo", "foo bar", "a/b", "foo@bar", strings.Repeat("a", 65)} {

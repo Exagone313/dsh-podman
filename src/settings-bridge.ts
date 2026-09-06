@@ -6,6 +6,7 @@ import z from "@deepseek-ai/schemastery";
 import { VERSION, GIT_COMMIT } from "./generated/version.js";
 import { workspaceSlug } from "./workspace-binding.js";
 import type { WorkspaceResolver } from "./workspace-binding.js";
+import { mountKindToProto, mountModeToProto } from "./mount-enums.js";
 
 export const CONTAINER_NS = "podman";
 
@@ -239,12 +240,8 @@ export interface ContainerSettingsScope {
 }
 
 function mountInputToProto(mount: { kind: string; project: string; path: string; destination: string; mode: string; volume: string; secret: string }): Record<string, unknown> {
-  const kind =
-    mount.kind === "tmpfs" ? "MOUNT_KIND_TMPFS"
-    : mount.kind === "volume" ? "MOUNT_KIND_VOLUME"
-    : mount.kind === "secret" ? "MOUNT_KIND_SECRET"
-    : "MOUNT_KIND_PROJECT";
-  const mode = mount.mode === "read_only" ? "MOUNT_MODE_READ_ONLY" : "MOUNT_MODE_READ_WRITE";
+  const kind = mountKindToProto(mount.kind || undefined);
+  const mode = mountModeToProto(mount.mode || "read_write");
   const result: Record<string, unknown> = { projectName: mount.project ?? "", kind, mode };
   if (mount.path) result.path = mount.path;
   if (mount.destination) result.destination = mount.destination;
@@ -387,8 +384,8 @@ export function installContainerSettings(
           case "container_mount_add": {
             const m = command.mount;
             if (m === null) break;
-            const kind = m.kind === "tmpfs" ? "MOUNT_KIND_TMPFS" : m.kind === "volume" ? "MOUNT_KIND_VOLUME" : m.kind === "secret" ? "MOUNT_KIND_SECRET" : "MOUNT_KIND_PROJECT";
-            const mode = m.mode === "read_only" ? "MOUNT_MODE_READ_ONLY" : "MOUNT_MODE_READ_WRITE";
+            const kind = mountKindToProto(m.kind || undefined);
+            const mode = mountModeToProto(m.mode || "read_write");
             const request: Record<string, unknown> = { workspaceSlug: command.workspace, container: command.container || "default", kind };
             if (kind === "MOUNT_KIND_VOLUME") { request.volume = m.volume; request.destination = m.destination; request.mode = mode; }
             else if (kind === "MOUNT_KIND_TMPFS") { request.destination = m.destination; request.mode = mode; }
@@ -400,7 +397,7 @@ export function installContainerSettings(
           case "container_mount_remove": {
             const m = command.mount;
             if (m === null) break;
-            const kind = m.kind === "tmpfs" ? "MOUNT_KIND_TMPFS" : m.kind === "volume" ? "MOUNT_KIND_VOLUME" : m.kind === "secret" ? "MOUNT_KIND_SECRET" : "MOUNT_KIND_PROJECT";
+            const kind = mountKindToProto(m.kind || undefined);
             const request: Record<string, unknown> = { workspaceSlug: command.workspace, container: command.container || "default", kind };
             if (kind === "MOUNT_KIND_PROJECT") { request.project = m.project; if (m.path) request.path = m.path; }
             else if (kind === "MOUNT_KIND_VOLUME") { if (m.volume) request.volume = m.volume; }

@@ -1295,6 +1295,225 @@ test("container_mount_remove command drives removeContainerMount for each kind",
   assert.equal(scope.value.command, null);
 });
 
+async function installedMountScope(): Promise<{
+  scope: FakeScope;
+  calls: Array<[string, unknown]>;
+}> {
+  const scope = fakeScope(baseValue());
+  const calls: Array<[string, unknown]> = [];
+  const resolver: any = {
+    getConfig: () => ({}),
+    setConfig: () => {},
+    async control(method: string, request: unknown) {
+      calls.push([method, request]);
+      if (method === "listContainers") return { containers: [] };
+      if (method === "listImages") return { images: [] };
+      if (method === "listWorkspaces") return { workspaces: [] };
+      return {};
+    },
+  };
+  installContainerSettings(fakeContext(scope), resolver);
+  await scope.update({}); // settle the queued async refresh
+  await new Promise((resolve) => setImmediate(resolve));
+  calls.length = 0;
+  return { scope, calls };
+}
+
+function mountCommand(
+  op: string,
+  mount: Record<string, string>,
+): Record<string, unknown> {
+  return {
+    op,
+    workspace: "w1",
+    container: "web",
+    image: "",
+    at: 1,
+    mount: {
+      kind: "",
+      project: "",
+      path: "",
+      destination: "",
+      mode: "",
+      volume: "",
+      secret: "",
+      ...mount,
+    },
+  };
+}
+
+test("container_mount_add command reports an unknown kind as a notice", async () => {
+  const { scope, calls } = await installedMountScope();
+  await scope.update({
+    command: mountCommand("container_mount_add", {
+      kind: "bind",
+      project: "team",
+      mode: "read_write",
+    }),
+  });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(scope.value.notice, "unknown mount kind: bind");
+  assert.equal(scope.value.command, null);
+  assert.equal(
+    calls.some(([method]) => method === "addContainerMount"),
+    false,
+    "a rejected mount must not reach the orchestrator",
+  );
+});
+
+test("container_mount_add command reports an unknown mode as a notice", async () => {
+  const { scope, calls } = await installedMountScope();
+  await scope.update({
+    command: mountCommand("container_mount_add", {
+      kind: "project",
+      project: "team",
+      mode: "rw",
+    }),
+  });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(scope.value.notice, "unknown mount mode: rw");
+  assert.equal(scope.value.command, null);
+  assert.equal(
+    calls.some(([method]) => method === "addContainerMount"),
+    false,
+    "a rejected mount must not reach the orchestrator",
+  );
+});
+
+test("container_mount_remove command reports an unknown kind as a notice", async () => {
+  const { scope, calls } = await installedMountScope();
+  await scope.update({
+    command: mountCommand("container_mount_remove", {
+      kind: "bind",
+      project: "team",
+    }),
+  });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(scope.value.notice, "unknown mount kind: bind");
+  assert.equal(scope.value.command, null);
+  assert.equal(
+    calls.some(([method]) => method === "removeContainerMount"),
+    false,
+    "a rejected mount must not reach the orchestrator",
+  );
+});
+
+test("create command reports an unknown mount kind as a notice", async () => {
+  const { scope, calls } = await installedMountScope();
+  await scope.update({
+    command: {
+      op: "create",
+      workspace: "w1",
+      image: "",
+      at: 1,
+      mounts: [{
+        kind: "bind",
+        project: "team",
+        path: "",
+        destination: "",
+        mode: "read_write",
+        volume: "",
+        secret: "",
+      }],
+      env: {},
+      container: "",
+      secretEnvMap: {},
+      mount: null,
+    },
+  });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(scope.value.notice, "unknown mount kind: bind");
+  assert.equal(scope.value.command, null);
+  assert.equal(
+    calls.some(([method]) => method === "createWorkspace"),
+    false,
+    "a rejected mount must not reach the orchestrator",
+  );
+});
+
+test("create command reports an unknown mount mode as a notice", async () => {
+  const { scope, calls } = await installedMountScope();
+  await scope.update({
+    command: {
+      op: "create",
+      workspace: "w1",
+      image: "",
+      at: 1,
+      mounts: [{
+        kind: "project",
+        project: "team",
+        path: "",
+        destination: "",
+        mode: "rw",
+        volume: "",
+        secret: "",
+      }],
+      env: {},
+      container: "",
+      secretEnvMap: {},
+      mount: null,
+    },
+  });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(scope.value.notice, "unknown mount mode: rw");
+  assert.equal(scope.value.command, null);
+  assert.equal(
+    calls.some(([method]) => method === "createWorkspace"),
+    false,
+    "a rejected mount must not reach the orchestrator",
+  );
+});
+
+test("unset kind and mode strings still map to project and read_write", async () => {
+  const { scope, calls } = await installedMountScope();
+  await scope.update({
+    command: mountCommand("container_mount_add", { project: "team" }),
+  });
+  await new Promise((resolve) => setImmediate(resolve));
+  await scope.update({
+    command: {
+      op: "create",
+      workspace: "w1",
+      image: "",
+      at: 2,
+      mounts: [{
+        kind: "",
+        project: "team",
+        path: "",
+        destination: "",
+        mode: "",
+        volume: "",
+        secret: "",
+      }],
+      env: {},
+      container: "",
+      secretEnvMap: {},
+      mount: null,
+    },
+  });
+  await new Promise((resolve) => setImmediate(resolve));
+  const addCall = calls.find(([method]) => method === "addContainerMount");
+  assert.deepEqual(addCall?.[1], {
+    workspaceSlug: "w1",
+    container: "web",
+    kind: "MOUNT_KIND_PROJECT",
+    project: "team",
+    mode: "MOUNT_MODE_READ_WRITE",
+  });
+  const createCall = calls.find(([method]) => method === "createWorkspace");
+  assert.deepEqual(createCall?.[1], {
+    workspaceSlug: "w1",
+    imageId: undefined,
+    mounts: [{
+      projectName: "team",
+      kind: "MOUNT_KIND_PROJECT",
+      mode: "MOUNT_MODE_READ_WRITE",
+    }],
+  });
+  assert.equal(scope.value.notice, "");
+  assert.equal(scope.value.command, null);
+});
+
 test("listContainers container mounts carry the raw proto fields", async () => {
   const scope = fakeScope(baseValue());
   const resolver: any = {

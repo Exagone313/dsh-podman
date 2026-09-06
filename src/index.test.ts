@@ -902,6 +902,176 @@ test("secret mount kinds forward the secret to the orchestrator", async () => {
   });
 });
 
+function mountRequestRecorder() {
+  const requests: Array<[string, Record<string, unknown>]> = [];
+  const resolver = {
+    registry: {
+      resolveByPath: async () => ({ id: "team" }),
+    },
+    async control(method: string, request: unknown) {
+      requests.push([method, request as Record<string, unknown>]);
+      return {};
+    },
+  };
+  return { requests, resolver };
+}
+
+const MOUNT_EXEC = { agent: { session: { header: { cwd: "/proj" } } } };
+
+test("container_mount_add rejects unknown mount kinds and modes", async () => {
+  const { requests, resolver } = mountRequestRecorder();
+  await assert.rejects(
+    () =>
+      toolHandlers.container_mount_add(
+        resolver as never,
+        { container: "web", kind: "bind", project: "team" },
+        MOUNT_EXEC,
+      ),
+    /unknown mount kind: bind/,
+  );
+  await assert.rejects(
+    () =>
+      toolHandlers.container_mount_add(
+        resolver as never,
+        { container: "web", project: "team", mode: "rw" },
+        MOUNT_EXEC,
+      ),
+    /unknown mount mode: rw/,
+  );
+  assert.deepEqual(requests, [], "a rejected mount must not reach the orchestrator");
+});
+
+test("container_mount_remove rejects unknown mount kinds", async () => {
+  const { requests, resolver } = mountRequestRecorder();
+  await assert.rejects(
+    () =>
+      toolHandlers.container_mount_remove(
+        resolver as never,
+        { container: "web", kind: "bind", project: "team" },
+        MOUNT_EXEC,
+      ),
+    /unknown mount kind: bind/,
+  );
+  assert.deepEqual(requests, [], "a rejected mount must not reach the orchestrator");
+});
+
+test("mount tools keep defaulting a missing kind to project and a missing mode to read_write", async () => {
+  const { requests, resolver } = mountRequestRecorder();
+  await toolHandlers.container_mount_add(
+    resolver as never,
+    { container: "web", project: "team" },
+    MOUNT_EXEC,
+  );
+  await toolHandlers.container_mount_add(
+    resolver as never,
+    {
+      container: "web",
+      kind: "volume",
+      volume: "valkey-data",
+      destination: "/data",
+      mode: "read_only",
+    },
+    MOUNT_EXEC,
+  );
+  await toolHandlers.container_mount_remove(
+    resolver as never,
+    { container: "web", project: "team" },
+    MOUNT_EXEC,
+  );
+  assert.deepEqual(requests, [
+    ["addContainerMount", {
+      workspaceSlug: "team",
+      container: "web",
+      kind: "MOUNT_KIND_PROJECT",
+      project: "team",
+      mode: "MOUNT_MODE_READ_WRITE",
+    }],
+    ["addContainerMount", {
+      workspaceSlug: "team",
+      container: "web",
+      kind: "MOUNT_KIND_VOLUME",
+      volume: "valkey-data",
+      destination: "/data",
+      mode: "MOUNT_MODE_READ_ONLY",
+    }],
+    ["removeContainerMount", {
+      workspaceSlug: "team",
+      container: "web",
+      kind: "MOUNT_KIND_PROJECT",
+      project: "team",
+    }],
+  ]);
+});
+
+test("container start and recreate reject unknown mount kinds and modes", async () => {
+  const { requests, resolver } = mountRequestRecorder();
+  await assert.rejects(
+    () =>
+      toolHandlers.container_start(
+        resolver as never,
+        { container: "web", mounts: [{ project: "team", kind: "bind" }] },
+        MOUNT_EXEC,
+      ),
+    /unknown mount kind: bind/,
+  );
+  await assert.rejects(
+    () =>
+      toolHandlers.container_recreate(
+        resolver as never,
+        { container: "web", mounts: [{ project: "team", mode: "rw" }] },
+        MOUNT_EXEC,
+      ),
+    /unknown mount mode: rw/,
+  );
+  assert.deepEqual(requests, [], "a rejected mount must not reach the orchestrator");
+});
+
+test("container start maps valid mounts and defaults the mode to read_write", async () => {
+  const { requests, resolver } = mountRequestRecorder();
+  await toolHandlers.container_start(
+    resolver as never,
+    {
+      container: "web",
+      image: "img1",
+      mounts: [
+        { project: "team", path: "src", mode: "read_only" },
+        { kind: "volume", volume: "valkey-data", destination: "/data" },
+        { kind: "secret", secret: "valkey-tls", destination: "/run/secrets/tls" },
+      ],
+    },
+    MOUNT_EXEC,
+  );
+  assert.deepEqual(requests, [
+    ["startContainer", {
+      workspaceSlug: "team",
+      container: "web",
+      imageId: "img1",
+      mounts: [
+        {
+          projectName: "team",
+          kind: "MOUNT_KIND_PROJECT",
+          mode: "MOUNT_MODE_READ_ONLY",
+          path: "src",
+        },
+        {
+          projectName: "",
+          kind: "MOUNT_KIND_VOLUME",
+          mode: "MOUNT_MODE_READ_WRITE",
+          destination: "/data",
+          volume: "valkey-data",
+        },
+        {
+          projectName: "",
+          kind: "MOUNT_KIND_SECRET",
+          mode: "MOUNT_MODE_READ_WRITE",
+          destination: "/run/secrets/tls",
+          secret: "valkey-tls",
+        },
+      ],
+    }],
+  ]);
+});
+
 test("image_build requires imageId, parent and packages", () => {
   const tool = TOOLS.find((entry) => entry.name === "image_build");
   assert.ok(tool, "image_build registered");

@@ -4,6 +4,7 @@
 
 import { WorkspaceResolver, workspaceSlug } from "./workspace-binding.js";
 import { installContainerSettings } from "./settings-bridge.js";
+import { mountKindToProto, mountModeToProto } from "./mount-enums.js";
 import { metadata } from "./workspace-binding.js";
 import { PassThrough } from "node:stream";
 import { createHash } from "node:crypto";
@@ -1420,23 +1421,12 @@ export const toolHandlers: Record<
   },
   container_mount_add: async (resolver, input, exec) => {
     const kind = input.kind ?? "project";
-    const mode =
-      input.mode === "read_write"
-        ? "MOUNT_MODE_READ_WRITE"
-        : input.mode === "read_only"
-          ? "MOUNT_MODE_READ_ONLY"
-          : "MOUNT_MODE_READ_WRITE";
+    const protoKind = mountKindToProto(input.kind);
+    const mode = mountModeToProto(input.mode ?? "read_write");
     const request: Record<string, unknown> = {
       workspaceSlug: await sessionWorkspaceSlug(resolver, currentCwd(exec)),
       container: input.container,
-      kind:
-        kind === "tmpfs"
-          ? "MOUNT_KIND_TMPFS"
-          : kind === "volume"
-            ? "MOUNT_KIND_VOLUME"
-            : kind === "secret"
-              ? "MOUNT_KIND_SECRET"
-              : "MOUNT_KIND_PROJECT",
+      kind: protoKind,
     };
     if (kind === "volume") {
       request.volume = input.volume;
@@ -1458,17 +1448,11 @@ export const toolHandlers: Record<
   },
   container_mount_remove: async (resolver, input, exec) => {
     const kind = input.kind ?? "project";
+    const protoKind = mountKindToProto(input.kind);
     const request: Record<string, unknown> = {
       workspaceSlug: await sessionWorkspaceSlug(resolver, currentCwd(exec)),
       container: input.container,
-      kind:
-        kind === "tmpfs"
-          ? "MOUNT_KIND_TMPFS"
-          : kind === "volume"
-            ? "MOUNT_KIND_VOLUME"
-            : kind === "secret"
-              ? "MOUNT_KIND_SECRET"
-              : "MOUNT_KIND_PROJECT",
+      kind: protoKind,
     };
     if (kind === "project") {
       request.project = input.project;
@@ -1617,12 +1601,8 @@ function mountsFromInput(
 ): Record<string, unknown>[] | undefined {
   if (!Array.isArray(mounts) || mounts.length === 0) return undefined;
   return mounts.map((mount: any) => {
-    const kind =
-      mount.kind === "tmpfs" ? "MOUNT_KIND_TMPFS"
-      : mount.kind === "volume" ? "MOUNT_KIND_VOLUME"
-      : mount.kind === "secret" ? "MOUNT_KIND_SECRET"
-      : "MOUNT_KIND_PROJECT";
-    const mode = mount.mode === "read_only" ? "MOUNT_MODE_READ_ONLY" : "MOUNT_MODE_READ_WRITE";
+    const kind = mountKindToProto(mount.kind ?? undefined);
+    const mode = mountModeToProto(mount.mode ?? "read_write");
     const result: Record<string, unknown> = { projectName: mount.project ?? "", kind, mode };
     if (mount.path) result.path = mount.path;
     if (mount.destination) result.destination = mount.destination;

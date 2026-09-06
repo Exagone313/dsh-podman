@@ -146,12 +146,12 @@ type Server struct {
 	// from below it.
 	GuestAgentMount string
 	Store           *state.Store
-	Podman           *podman.Client
-	ImageBuilder     *imagebuild.Builder
-	BaseImagePrefix  string
-	VolumePrefix     string
-	SecretPrefix     string
-	Logger           *slog.Logger
+	Podman          *podman.Client
+	ImageBuilder    *imagebuild.Builder
+	BaseImagePrefix string
+	VolumePrefix    string
+	SecretPrefix    string
+	Logger          *slog.Logger
 }
 
 func (s *Server) log() *slog.Logger {
@@ -2345,6 +2345,7 @@ func toProto(workspace state.Workspace) *ctl.Workspace {
 	}
 	return result
 }
+
 // ValidateProject resolves a project name to its real directory under root.
 // The name must be lexically clean and relative, and the directory it names
 // must resolve, through any symlinks, to a path confined to root.

@@ -37,7 +37,7 @@ Environment=DSH_PODMAN_GUEST_AGENT_IMAGE=ghcr.io/exagone313/dsh-podman/guest-age
 Environment=DSH_PODMAN_GUEST_AGENT_IMAGE_USE_VERSION_TAG=true
 
 [Service]
-ExecStartPre=/usr/bin/mkdir -p -m 0700 %h/project ; /usr/bin/mkdir -p -m 0700 %t/dsh-podman ; /usr/bin/mkdir -p -m 0700 %h/.dsh/dsh-podman/state ; /usr/bin/mkdir -p -m 0755 %h/.dsh/dsh-podman/apk-cache ; /usr/bin/mkdir -p -m 0755 %h/.dsh/dsh-podman/apt-cache ; /usr/bin/mkdir -p -m 0755 %h/.dsh/dsh-podman/pacman-cache
+ExecStartPre=/usr/bin/mkdir -p -m 0700 %h/project ; /usr/bin/mkdir -p -m 0700 %t/dsh-podman ; /usr/bin/chmod 0700 %t/dsh-podman ; /usr/bin/mkdir -p -m 0700 %h/.dsh/dsh-podman/state ; /usr/bin/mkdir -p -m 0755 %h/.dsh/dsh-podman/apk-cache ; /usr/bin/mkdir -p -m 0755 %h/.dsh/dsh-podman/apt-cache ; /usr/bin/mkdir -p -m 0755 %h/.dsh/dsh-podman/pacman-cache
 Restart=on-failure
 RestartSec=3
 SuccessExitStatus=0 143

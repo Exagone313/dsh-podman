@@ -8,7 +8,6 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"net"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -22,6 +21,7 @@ import (
 	"github.com/Exagone313/dsh-podman/internal/orchestrator/images"
 	"github.com/Exagone313/dsh-podman/internal/orchestrator/podman"
 	"github.com/Exagone313/dsh-podman/internal/orchestrator/state"
+	socketpkg "github.com/Exagone313/dsh-podman/internal/socket"
 	"github.com/Exagone313/dsh-podman/internal/version"
 	"go.podman.io/podman/v6/pkg/bindings"
 	"go.podman.io/podman/v6/pkg/bindings/system"
@@ -33,6 +33,7 @@ func main() {
 		fmt.Printf("%s (commit %s)\n", version.Version, version.Commit)
 		return
 	}
+	socketpkg.Restrict()
 	socketsRoot := getenv("DSH_PODMAN_SOCKETS_ROOT", "/run/dsh-podman")
 	socket := filepath.Join(socketsRoot, "orchestrator.sock")
 	root := getenv("DSH_PODMAN_PROJECTS_ROOT", "/projects")
@@ -53,16 +54,12 @@ func main() {
 	if err := requireDirectory(filepath.Dir(socket)); err != nil {
 		panic(err)
 	}
-	_ = os.Remove(socket)
 	store, err := state.New(stateDir)
 	if err != nil {
 		panic(err)
 	}
-	listener, err := net.Listen("unix", socket)
+	listener, err := socketpkg.Listen(socket)
 	if err != nil {
-		panic(err)
-	}
-	if err := os.Chmod(socket, 0600); err != nil {
 		panic(err)
 	}
 	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
@@ -152,6 +149,10 @@ func imageRefWithTag(ref, tag string) string {
 	return ref + ":" + tag
 }
 
+// requireDirectory checks that the control socket's directory exists and is
+// private to its owner. The socket itself is created 0600, but that only
+// matters if the directory above it cannot be traversed by other users: the
+// control plane is a full-privilege interface onto the Podman API.
 func requireDirectory(dir string) error {
 	info, err := os.Stat(dir)
 	if err != nil {
@@ -159,6 +160,9 @@ func requireDirectory(dir string) error {
 	}
 	if !info.IsDir() {
 		return fmt.Errorf("socket root %q is not a directory", dir)
+	}
+	if mode := info.Mode().Perm(); mode&0o077 != 0 {
+		return fmt.Errorf("socket root %q is group- or world-accessible (mode %04o); it must be 0700", dir, mode)
 	}
 	return nil
 }

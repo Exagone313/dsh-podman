@@ -26,7 +26,7 @@ Volume=%t/dsh-podman:/run/dsh-podman
 Environment=DSH_PODMAN_SOCKETS_ROOT=/run/dsh-podman
 
 [Service]
-ExecStartPre=/usr/bin/mkdir -p -m 0700 %h/project ; /usr/bin/mkdir -p -m 0700 %t/dsh-podman ; /usr/bin/mkdir -p -m 0700 %h/.dsh
+ExecStartPre=/usr/bin/mkdir -p -m 0700 %h/project ; /usr/bin/mkdir -p -m 0700 %t/dsh-podman ; /usr/bin/chmod 0700 %t/dsh-podman ; /usr/bin/mkdir -p -m 0700 %h/.dsh
 Restart=on-failure
 RestartSec=3
 SuccessExitStatus=0 143

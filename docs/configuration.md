@@ -145,11 +145,16 @@ orchestrator and the guest containers. It holds the orchestrator control socket
 creates its `guest.sock`.
 
 The directory needs to be bind-mounted in the orchestrator container. Its mode
-should be `0700`, but that is not enforced by the orchestrator.
+must be `0700`: the orchestrator refuses to start when the socket root is group-
+or world-accessible, since the control plane is a full-privilege interface onto
+the Podman API and the socket's own mode only helps while the directory above it
+stays private.
 
 Each guest container gets exactly one socket directory bind-mounted into it: the
 host directory `<DSH_PODMAN_HOST_SOCKETS_ROOT>/<container>` is mounted at
 `<DSH_PODMAN_SOCKETS_ROOT>/<container>` inside the container. Because only that
 single per-workspace directory is mounted, a guest container never sees the
 orchestrator's `orchestrator.sock` nor any other workspace's socket directory.
-The control socket file is explicitly set to `0600`.
+Both the control socket and each guest socket are created with mode `0600`, and
+both processes set a `0077` umask at startup so the socket is never briefly
+reachable between `bind` and `chmod`.

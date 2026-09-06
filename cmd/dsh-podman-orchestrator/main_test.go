@@ -5,8 +5,49 @@
 package main
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 )
+
+// TestRequireDirectory covers the control socket's directory: the socket is
+// created 0600, but that is only meaningful while the directory above it stays
+// private to its owner.
+func TestRequireDirectory(t *testing.T) {
+	root := t.TempDir()
+	private := filepath.Join(root, "private")
+	if err := os.Mkdir(private, 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := requireDirectory(private); err != nil {
+		t.Fatalf("private directory rejected: %v", err)
+	}
+	for _, mode := range []os.FileMode{0750, 0705, 0777, 0770} {
+		open := filepath.Join(root, "open")
+		if err := os.Mkdir(open, 0700); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Chmod(open, mode); err != nil {
+			t.Fatal(err)
+		}
+		if err := requireDirectory(open); err == nil {
+			t.Errorf("accepted socket root with mode %04o", mode)
+		}
+		if err := os.Remove(open); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := requireDirectory(filepath.Join(root, "missing")); err == nil {
+		t.Error("accepted a missing socket root")
+	}
+	file := filepath.Join(root, "file")
+	if err := os.WriteFile(file, nil, 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := requireDirectory(file); err == nil {
+		t.Error("accepted a file as the socket root")
+	}
+}
 
 func TestImageRefWithTag(t *testing.T) {
 	cases := []struct {

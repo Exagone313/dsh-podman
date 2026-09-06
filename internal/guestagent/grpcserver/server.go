@@ -7,6 +7,7 @@ package grpcserver
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 	"os"
@@ -171,7 +172,11 @@ func (s *Server) Signal(_ context.Context, request *guest.SignalRequest) (*guest
 		if process.Command == nil || process.Command.Process == nil {
 			return nil, status.Error(codes.FailedPrecondition, "process is not running")
 		}
-		if err := process.Command.Process.Signal(signalForName(request.GetSignal())); err != nil {
+		signal, err := signalForName(request.GetSignal())
+		if err != nil {
+			return nil, status.Error(codes.InvalidArgument, err.Error())
+		}
+		if err := process.Command.Process.Signal(signal); err != nil {
 			return nil, status.Error(codes.Internal, err.Error())
 		}
 		return &guest.SignalResponse{}, nil
@@ -179,14 +184,31 @@ func (s *Server) Signal(_ context.Context, request *guest.SignalRequest) (*guest
 	return nil, status.Error(codes.NotFound, "process not found")
 }
 
-func signalForName(name string) os.Signal {
-	if name == "SIGKILL" {
-		return os.Kill
+// signals maps the names callers may use onto the signal actually delivered.
+// os.Interrupt is SIGINT, so SIGTERM must not be spelled with it: a process
+// that ignores SIGINT but honours SIGTERM would otherwise never stop.
+var signals = map[string]os.Signal{
+	"SIGHUP":  syscall.SIGHUP,
+	"SIGINT":  syscall.SIGINT,
+	"SIGQUIT": syscall.SIGQUIT,
+	"SIGKILL": syscall.SIGKILL,
+	"SIGTERM": syscall.SIGTERM,
+	"SIGUSR1": syscall.SIGUSR1,
+	"SIGUSR2": syscall.SIGUSR2,
+}
+
+// signalForName resolves a signal name. An empty name means SIGTERM, the
+// default for asking a process to stop; an unrecognised name is an error
+// rather than a silent substitution.
+func signalForName(name string) (os.Signal, error) {
+	if name == "" {
+		return syscall.SIGTERM, nil
 	}
-	if name == "SIGTERM" {
-		return os.Interrupt
+	signal, ok := signals[name]
+	if !ok {
+		return nil, fmt.Errorf("unknown signal %q", name)
 	}
-	return os.Interrupt
+	return signal, nil
 }
 
 func daemonInfoProto(d daemon.Daemon) *guest.DaemonInfo {
@@ -257,7 +279,11 @@ func (s *Server) ListDaemons(_ context.Context, _ *guest.ListDaemonsRequest) (*g
 
 func (s *Server) StopDaemon(_ context.Context, request *guest.StopDaemonRequest) (*guest.StopDaemonResponse, error) {
 	slog.Info("guest agent StopDaemon requested", "name", request.GetName())
-	if err := s.Daemons.Stop(request.GetName(), signalForName(request.GetSignal())); err != nil {
+	signal, err := signalForName(request.GetSignal())
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+	if err := s.Daemons.Stop(request.GetName(), signal); err != nil {
 		if errors.Is(err, daemon.ErrUnknown) {
 			return nil, status.Error(codes.NotFound, err.Error())
 		}

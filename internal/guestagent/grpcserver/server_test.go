@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 
@@ -52,14 +53,54 @@ func TestValidateProcessID(t *testing.T) {
 }
 
 func TestSignalForName(t *testing.T) {
-	if got := signalForName("SIGKILL"); got != os.Kill {
-		t.Fatalf("signalForName(SIGKILL) = %v", got)
+	cases := map[string]os.Signal{
+		"":        syscall.SIGTERM,
+		"SIGTERM": syscall.SIGTERM,
+		"SIGKILL": syscall.SIGKILL,
+		"SIGINT":  syscall.SIGINT,
+		"SIGHUP":  syscall.SIGHUP,
+		"SIGQUIT": syscall.SIGQUIT,
+		"SIGUSR1": syscall.SIGUSR1,
+		"SIGUSR2": syscall.SIGUSR2,
 	}
-	if got := signalForName("SIGTERM"); got != os.Interrupt {
-		t.Fatalf("signalForName(SIGTERM) = %v", got)
+	for name, want := range cases {
+		got, err := signalForName(name)
+		if err != nil || got != want {
+			t.Errorf("signalForName(%q) = %v, %v; want %v", name, got, err, want)
+		}
 	}
-	if got := signalForName("SIGUSR1"); got != os.Interrupt {
-		t.Fatalf("signalForName(SIGUSR1) = %v", got)
+	// SIGTERM must not resolve to os.Interrupt: that is SIGINT, and a process
+	// ignoring SIGINT would never stop.
+	if got, _ := signalForName("SIGTERM"); got == os.Interrupt {
+		t.Error("SIGTERM resolved to SIGINT")
+	}
+	for _, name := range []string{"SIGBOGUS", "sigterm", "TERM", "9", " SIGTERM"} {
+		if _, err := signalForName(name); err == nil {
+			t.Errorf("accepted unknown signal %q", name)
+		}
+	}
+}
+
+func TestSignalRejectsUnknownName(t *testing.T) {
+	server := New()
+	process, err := server.Processes.Start(context.Background(), []string{"sleep", "60"}, "", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer server.Processes.Remove(process.ID)
+	if err := process.Command.Start(); err != nil {
+		t.Skipf("cannot start a helper process: %v", err)
+	}
+	defer func() { _ = process.Command.Process.Kill() }()
+	if _, err := server.Signal(context.Background(), &guest.SignalRequest{ProcessId: process.ID, Signal: "SIGBOGUS"}); status.Code(err) != codes.InvalidArgument {
+		t.Fatalf("expected InvalidArgument, got %v", err)
+	}
+}
+
+func TestStopDaemonRejectsUnknownSignal(t *testing.T) {
+	server := New()
+	if _, err := server.StopDaemon(context.Background(), &guest.StopDaemonRequest{Name: "any", Signal: "SIGBOGUS"}); status.Code(err) != codes.InvalidArgument {
+		t.Fatalf("expected InvalidArgument, got %v", err)
 	}
 }
 

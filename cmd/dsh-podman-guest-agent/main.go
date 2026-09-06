@@ -7,14 +7,13 @@ package main
 import (
 	"fmt"
 	"log/slog"
-	"net"
 	"os"
-	"path/filepath"
 
 	"github.com/Exagone313/dsh-podman/internal/auth"
+	guest "github.com/Exagone313/dsh-podman/internal/genproto/dshguest/v1"
 	workspacefs "github.com/Exagone313/dsh-podman/internal/guestagent/fs"
 	"github.com/Exagone313/dsh-podman/internal/guestagent/grpcserver"
-	guest "github.com/Exagone313/dsh-podman/internal/genproto/dshguest/v1"
+	socketpkg "github.com/Exagone313/dsh-podman/internal/socket"
 	"github.com/Exagone313/dsh-podman/internal/version"
 	"google.golang.org/grpc"
 )
@@ -24,6 +23,7 @@ func main() {
 		fmt.Printf("%s (commit %s)\n", version.Version, version.Commit)
 		return
 	}
+	socketpkg.Restrict()
 	socket := os.Getenv("DSH_PODMAN_GUEST_SOCKET")
 	if socket == "" {
 		panic("DSH_PODMAN_GUEST_SOCKET is required")
@@ -36,11 +36,7 @@ func main() {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
 	slog.SetDefault(logger)
 	logger.Info("guest agent starting", "socket", socket, "workspace_root", root, "token_configured", token != "", "version", version.Version, "commit", version.Commit)
-	if err := os.MkdirAll(filepath.Dir(socket), 0700); err != nil {
-		panic(err)
-	}
-	_ = os.Remove(socket)
-	listener, err := net.Listen("unix", socket)
+	listener, err := socketpkg.Listen(socket)
 	if err != nil {
 		panic(err)
 	}

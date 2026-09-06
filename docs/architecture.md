@@ -46,8 +46,21 @@ lives in the project bind mount, named volumes, or tmpfs mounts.
 
 Beyond project mounts, a container can mount named volumes (prefixed
 `DSH_PODMAN_VOLUME_PREFIX`, default `dsh-podman-`, and auto-created by podman on
-first use) or tmpfs at arbitrary container paths — but never under the projects
-root, which is reserved for project mounts.
+first use), secrets, or tmpfs at arbitrary container paths — except where they
+would overlap a reserved path:
+
+- `DSH_PODMAN_PROJECTS_ROOT`, reserved for project mounts;
+- `DSH_PODMAN_SOCKETS_ROOT`, which carries the guest agent's socket;
+- `DSH_PODMAN_GUEST_AGENT_IMAGE_MOUNT`, which the container runs its entry point
+  from.
+
+A destination that contains a reserved path is refused as well as one that sits
+inside it, since it would hide everything beneath it.
+
+Project mounts resolve through symlinks and are confined to the projects root,
+so a symlink inside a writable project cannot redirect the bind mount to a path
+outside it. Symlinks with absolute targets are never followed; name the other
+project directly instead.
 
 ## Guest agent and daemons
 

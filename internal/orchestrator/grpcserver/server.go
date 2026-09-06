@@ -141,7 +141,11 @@ type Server struct {
 	ProjectsRoot     string
 	HostProjectsRoot string
 	SocketsRoot      string
-	Store            *state.Store
+	// GuestAgentMount is the container path the guest agent image is mounted
+	// at. Mounts must not shadow it: the container's entry point is executed
+	// from below it.
+	GuestAgentMount string
+	Store           *state.Store
 	Podman           *podman.Client
 	ImageBuilder     *imagebuild.Builder
 	BaseImagePrefix  string
@@ -1593,7 +1597,7 @@ func resolveDirUnderRoot(root, rel string) (resolvedRoot, resolved string, err e
 	if err != nil {
 		return "", "", err
 	}
-	if resolved != resolvedRoot && !strings.HasPrefix(resolved, resolvedRoot+string(filepath.Separator)) {
+	if resolved != resolvedRoot && !strings.HasPrefix(resolved, withSeparator(resolvedRoot)) {
 		return "", "", fmt.Errorf("%q escapes %q", rel, root)
 	}
 	return resolvedRoot, resolved, nil
@@ -1622,15 +1626,43 @@ func validMountDestination(projectsRoot, dest string) bool {
 		return false
 	}
 	root := filepath.Clean(projectsRoot)
-	return cleaned == root || strings.HasPrefix(cleaned, root+string(filepath.Separator))
+	return cleaned == root || strings.HasPrefix(cleaned, withSeparator(root))
 }
 
-// nonProjectDestination validates a tmpfs or named-volume mount destination:
-// it must be absolute, already cleaned (filepath.Clean equality precludes ".."
-// segments, redundant separators, and trailing slashes), and must not be the
-// projects root nor anything under it, which would collide with project
-// mounts.
-func nonProjectDestination(projectsRoot, dest string) error {
+// reservedDestinations lists the container paths a mount must not shadow: the
+// projects root, which is reserved for project mounts; the socket directory,
+// which carries the guest agent's socket; and the directory the guest agent
+// binary is mounted at, whose contents the container executes as its entry
+// point.
+func (s *Server) reservedDestinations() []string {
+	return []string{s.ProjectsRoot, s.SocketsRoot, s.GuestAgentMount}
+}
+
+// withSeparator returns path with a trailing separator, so that prefix
+// comparisons match whole path components. The filesystem root already ends
+// in a separator and must not gain a second one.
+func withSeparator(path string) string {
+	if strings.HasSuffix(path, string(filepath.Separator)) {
+		return path
+	}
+	return path + string(filepath.Separator)
+}
+
+// pathsOverlap reports whether two absolute, cleaned paths are equal or
+// whether either contains the other.
+func pathsOverlap(a, b string) bool {
+	return a == b || strings.HasPrefix(a, withSeparator(b)) || strings.HasPrefix(b, withSeparator(a))
+}
+
+// nonProjectDestination validates a tmpfs, named-volume, or secret mount
+// destination: it must be absolute and already cleaned (filepath.Clean
+// equality precludes ".." segments, redundant separators, and trailing
+// slashes), and it must not overlap any reserved path.
+//
+// Ancestors are rejected as well as descendants. Podman orders mounts by
+// depth, so a mount above a reserved path does not shadow it directly, but a
+// destination such as "/" would hide every reserved path beneath it.
+func (s *Server) nonProjectDestination(dest string) error {
 	if !filepath.IsAbs(dest) {
 		return fmt.Errorf("invalid mount destination")
 	}
@@ -1638,9 +1670,17 @@ func nonProjectDestination(projectsRoot, dest string) error {
 	if cleaned != dest {
 		return fmt.Errorf("invalid mount destination")
 	}
-	root := filepath.Clean(projectsRoot)
-	if cleaned == root || strings.HasPrefix(cleaned, root+string(filepath.Separator)) {
-		return fmt.Errorf("mount destination must not be under projects root")
+	for _, reserved := range s.reservedDestinations() {
+		if reserved == "" {
+			continue
+		}
+		root := filepath.Clean(reserved)
+		if !filepath.IsAbs(root) {
+			continue
+		}
+		if pathsOverlap(cleaned, root) {
+			return fmt.Errorf("mount destination %q overlaps the reserved path %q", cleaned, root)
+		}
 	}
 	return nil
 }
@@ -1716,7 +1756,7 @@ func (s *Server) podmanMounts(mounts []state.Mount) ([]specs.Mount, error) {
 			}
 			podmanMounts = append(podmanMounts, specs.Mount{Type: "bind", Source: hostPath, Destination: destination, Options: options})
 		case "tmpfs":
-			if err := nonProjectDestination(s.ProjectsRoot, mount.Destination); err != nil {
+			if err := s.nonProjectDestination(mount.Destination); err != nil {
 				return nil, status.Error(codes.InvalidArgument, err.Error())
 			}
 			podmanMounts = append(podmanMounts, specs.Mount{Type: "tmpfs", Destination: mount.Destination, Options: []string{"rw"}})
@@ -1724,7 +1764,7 @@ func (s *Server) podmanMounts(mounts []state.Mount) ([]specs.Mount, error) {
 			if !volumeName.MatchString(mount.Volume) {
 				return nil, status.Error(codes.InvalidArgument, "invalid volume name")
 			}
-			if err := nonProjectDestination(s.ProjectsRoot, mount.Destination); err != nil {
+			if err := s.nonProjectDestination(mount.Destination); err != nil {
 				return nil, status.Error(codes.InvalidArgument, err.Error())
 			}
 			options := []string{"ro"}
@@ -1758,7 +1798,7 @@ func (s *Server) podmanSecrets(mounts []state.Mount) ([]specgen.Secret, error) {
 		if mount.Destination == "" {
 			return nil, status.Error(codes.InvalidArgument, "secret mount needs a destination")
 		}
-		if err := nonProjectDestination(s.ProjectsRoot, mount.Destination); err != nil {
+		if err := s.nonProjectDestination(mount.Destination); err != nil {
 			return nil, status.Error(codes.InvalidArgument, err.Error())
 		}
 		secrets = append(secrets, specgen.Secret{Source: s.SecretPrefix + mount.Secret, Target: mount.Destination})

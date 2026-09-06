@@ -1460,13 +1460,53 @@ func TestPodmanMountsTmpfsAndVolume(t *testing.T) {
 
 func TestNonProjectDestination(t *testing.T) {
 	root := filepath.Join(t.TempDir(), "projects")
-	if err := nonProjectDestination(root, "/tmp/work"); err != nil {
+	server := &Server{ProjectsRoot: root, Logger: silentLogger()}
+	if err := server.nonProjectDestination("/tmp/work"); err != nil {
 		t.Fatalf("valid destination rejected: %v", err)
 	}
 	for _, destination := range []string{"relative", "/a/../b", "/a/", root, filepath.Join(root, "x"), filepath.Join(root, "x", "y")} {
-		if err := nonProjectDestination(root, destination); err == nil {
+		if err := server.nonProjectDestination(destination); err == nil {
 			t.Errorf("accepted invalid destination %q", destination)
 		}
+	}
+}
+
+// TestNonProjectDestinationReservedPaths covers the paths a mount must not
+// shadow beyond the projects root: the guest socket directory and the guest
+// agent mount, which the container executes its entry point from.
+func TestNonProjectDestinationReservedPaths(t *testing.T) {
+	server := &Server{
+		ProjectsRoot:    "/projects",
+		SocketsRoot:     "/run/dsh-podman",
+		GuestAgentMount: "/opt/dsh-podman/guest-agent",
+		Logger:          silentLogger(),
+	}
+	rejected := []string{
+		"/run/dsh-podman",
+		"/run/dsh-podman/dsh-workspace-x",
+		"/opt/dsh-podman/guest-agent",
+		"/opt/dsh-podman/guest-agent/bin",
+		// Ancestors hide every reserved path beneath them.
+		"/",
+		"/run",
+		"/opt",
+		"/opt/dsh-podman",
+		"/projects",
+	}
+	for _, destination := range rejected {
+		if err := server.nonProjectDestination(destination); err == nil {
+			t.Errorf("accepted reserved destination %q", destination)
+		}
+	}
+	for _, destination := range []string{"/data", "/var/cache", "/run/other", "/opt/tools"} {
+		if err := server.nonProjectDestination(destination); err != nil {
+			t.Errorf("rejected usable destination %q: %v", destination, err)
+		}
+	}
+	// An unset reserved path must not reject everything.
+	empty := &Server{ProjectsRoot: "/projects", Logger: silentLogger()}
+	if err := empty.nonProjectDestination("/run/dsh-podman"); err != nil {
+		t.Errorf("unset reserved paths should be skipped: %v", err)
 	}
 }
 

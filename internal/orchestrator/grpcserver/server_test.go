@@ -36,9 +36,13 @@ func silentLogger() *slog.Logger {
 	return slog.New(slog.NewTextHandler(io.Discard, nil))
 }
 
-// tempRoot returns a temporary directory with every symlink resolved, so that
-// tests comparing against resolved paths do not depend on whether the
-// platform's temporary directory is itself reached through a symlink.
+// tempRoot returns a temporary directory with every symlink resolved.
+//
+// Mount sources are resolved before being handed to podman, so a test that
+// compares a source against a path built from t.TempDir() would otherwise
+// depend on whether TMPDIR is itself reached through a symlink. Use this for
+// any directory standing in for the projects root. TestResolveMountSymlinkedRoot
+// covers the symlinked case deliberately.
 func tempRoot(t *testing.T) string {
 	t.Helper()
 	root, err := filepath.EvalSymlinks(t.TempDir())
@@ -185,7 +189,7 @@ func TestUnaryLoggerPassesThrough(t *testing.T) {
 }
 
 func TestListProjects(t *testing.T) {
-	root := t.TempDir()
+	root := tempRoot(t)
 	if err := os.MkdirAll(filepath.Join(root, "alpha"), 0755); err != nil {
 		t.Fatal(err)
 	}
@@ -1120,6 +1124,42 @@ func TestResolveMount(t *testing.T) {
 	}
 }
 
+// TestResolveMountSymlinkedRoot covers a projects root that is itself reached
+// through a symlink, as it is when TMPDIR or a home directory is symlinked.
+// The source handed to podman is resolved, while the container-side
+// destination keeps the configured path.
+func TestResolveMountSymlinkedRoot(t *testing.T) {
+	real := tempRoot(t)
+	if err := os.MkdirAll(filepath.Join(real, "team", "src"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	linked := filepath.Join(tempRoot(t), "projects")
+	if err := os.Symlink(real, linked); err != nil {
+		t.Fatal(err)
+	}
+
+	// Without a host projects root the resolved path is used directly.
+	host, dest, err := resolveMount(linked, "", state.Mount{ProjectName: "team", Path: "src"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if host != filepath.Join(real, "team", "src") {
+		t.Errorf("source not resolved: %q", host)
+	}
+	if dest != filepath.Join(linked, "team", "src") {
+		t.Errorf("destination should keep the configured root: %q", dest)
+	}
+
+	// With one, the resolved path is re-expressed against it.
+	host, _, err = resolveMount(linked, "/host/projects", state.Mount{ProjectName: "team", Path: "src"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if host != filepath.Join("/host/projects", "team", "src") {
+		t.Errorf("source not re-expressed against the host root: %q", host)
+	}
+}
+
 // TestResolveMountSymlinks covers the symlinks a writable project can contain.
 // Links leaving the projects root must be refused; links staying inside it
 // resolve, since mounting another project directory is supported.
@@ -1181,7 +1221,7 @@ func TestResolveMountSymlinks(t *testing.T) {
 }
 
 func TestPodmanMountsSubpathAndDestination(t *testing.T) {
-	root := t.TempDir()
+	root := tempRoot(t)
 	if err := os.MkdirAll(filepath.Join(root, "team", "src"), 0755); err != nil {
 		t.Fatal(err)
 	}
@@ -1221,7 +1261,7 @@ func TestContainerProtoProjectsContainerMounts(t *testing.T) {
 }
 
 func TestAddContainerMount(t *testing.T) {
-	root := t.TempDir()
+	root := tempRoot(t)
 	if err := os.MkdirAll(filepath.Join(root, "team", "src"), 0755); err != nil {
 		t.Fatal(err)
 	}
@@ -1279,7 +1319,7 @@ func TestAddContainerMount(t *testing.T) {
 }
 
 func TestRemoveContainerMount(t *testing.T) {
-	root := t.TempDir()
+	root := tempRoot(t)
 	if err := os.MkdirAll(filepath.Join(root, "team", "src"), 0755); err != nil {
 		t.Fatal(err)
 	}
@@ -1319,7 +1359,7 @@ func TestRemoveContainerMount(t *testing.T) {
 }
 
 func TestStartContainerMountsValidation(t *testing.T) {
-	root := t.TempDir()
+	root := tempRoot(t)
 	if err := os.MkdirAll(filepath.Join(root, "team", "src"), 0755); err != nil {
 		t.Fatal(err)
 	}
@@ -1342,7 +1382,7 @@ func TestStartContainerMountsValidation(t *testing.T) {
 }
 
 func TestRecreateContainerMountsValidation(t *testing.T) {
-	root := t.TempDir()
+	root := tempRoot(t)
 	if err := os.MkdirAll(filepath.Join(root, "team", "src"), 0755); err != nil {
 		t.Fatal(err)
 	}
@@ -1365,7 +1405,7 @@ func TestRecreateContainerMountsValidation(t *testing.T) {
 }
 
 func TestCreateWorkspacePreservesDefaultContainerMounts(t *testing.T) {
-	root := t.TempDir()
+	root := tempRoot(t)
 	if err := os.MkdirAll(filepath.Join(root, "team", "src"), 0755); err != nil {
 		t.Fatal(err)
 	}
@@ -1435,7 +1475,7 @@ func TestRecreateContainerStopsDaemons(t *testing.T) {
 }
 
 func TestPodmanMountsTmpfsAndVolume(t *testing.T) {
-	root := t.TempDir()
+	root := tempRoot(t)
 	server := &Server{ProjectsRoot: root, VolumePrefix: "dsh-podman-", Logger: silentLogger()}
 
 	mounts, err := server.podmanMounts([]state.Mount{{Kind: "tmpfs", Destination: "/tmp/work", Mode: "read_write"}})
@@ -1568,7 +1608,7 @@ func TestCreateVolumeRejectsInvalidName(t *testing.T) {
 }
 
 func TestAddContainerMountTmpfsAndVolume(t *testing.T) {
-	root := t.TempDir()
+	root := tempRoot(t)
 	store := newTestStore(t)
 	if err := store.SaveWorkspaces([]state.Workspace{{
 		WorkspaceSlug: "proj",
@@ -1619,7 +1659,7 @@ func TestAddContainerMountTmpfsAndVolume(t *testing.T) {
 }
 
 func TestAddContainerMountDuplicateTmpfsAndVolume(t *testing.T) {
-	root := t.TempDir()
+	root := tempRoot(t)
 	store := newTestStore(t)
 	if err := store.SaveWorkspaces([]state.Workspace{{
 		WorkspaceSlug: "proj",
@@ -1644,7 +1684,7 @@ func TestAddContainerMountDuplicateTmpfsAndVolume(t *testing.T) {
 // TestAddContainerMountSecret covers secret mounts, which carry a destination
 // and a secret name but no mount mode.
 func TestAddContainerMountSecret(t *testing.T) {
-	root := t.TempDir()
+	root := tempRoot(t)
 	store := newTestStore(t)
 	if err := store.SaveWorkspaces([]state.Workspace{{
 		WorkspaceSlug: "proj",
@@ -1687,7 +1727,7 @@ func TestAddContainerMountDuplicateSecret(t *testing.T) {
 	}}); err != nil {
 		t.Fatal(err)
 	}
-	server := &Server{Store: store, ProjectsRoot: t.TempDir(), SecretPrefix: "dsh-podman-", Logger: silentLogger()}
+	server := &Server{Store: store, ProjectsRoot: tempRoot(t), SecretPrefix: "dsh-podman-", Logger: silentLogger()}
 	_, err := server.AddContainerMount(context.Background(), &ctl.AddContainerMountRequest{WorkspaceSlug: "proj", Container: "dev", Kind: ctl.MountKind_MOUNT_KIND_SECRET, Secret: "other", Destination: "/run/secrets/tls"})
 	if status.Code(err) != codes.AlreadyExists {
 		t.Fatalf("duplicate secret destination: expected AlreadyExists, got %v", err)
@@ -1707,7 +1747,7 @@ func TestRemoveContainerMountSecret(t *testing.T) {
 	}}); err != nil {
 		t.Fatal(err)
 	}
-	server := &Server{Store: store, ProjectsRoot: t.TempDir(), SecretPrefix: "dsh-podman-", Logger: silentLogger()}
+	server := &Server{Store: store, ProjectsRoot: tempRoot(t), SecretPrefix: "dsh-podman-", Logger: silentLogger()}
 
 	_, err := server.RemoveContainerMount(context.Background(), &ctl.RemoveContainerMountRequest{WorkspaceSlug: "proj", Container: "dev", Kind: ctl.MountKind_MOUNT_KIND_SECRET, Destination: "/run/secrets/other"})
 	if status.Code(err) != codes.NotFound {
@@ -1728,7 +1768,7 @@ func TestRemoveContainerMountSecret(t *testing.T) {
 }
 
 func TestRemoveContainerMountVolume(t *testing.T) {
-	root := t.TempDir()
+	root := tempRoot(t)
 	store := newTestStore(t)
 	if err := store.SaveWorkspaces([]state.Workspace{{
 		WorkspaceSlug: "proj",
@@ -1826,7 +1866,7 @@ func TestMountKindFromProto(t *testing.T) {
 }
 
 func TestPodmanSecrets(t *testing.T) {
-	root := t.TempDir()
+	root := tempRoot(t)
 	server := &Server{ProjectsRoot: root, SecretPrefix: "dsh-podman-", Logger: silentLogger()}
 
 	secrets, err := server.podmanSecrets([]state.Mount{{Kind: "secret", Secret: "valkey-tls", Destination: "/run/secrets/tls"}})
@@ -1964,7 +2004,7 @@ func TestCreateSecretRejectsInvalidName(t *testing.T) {
 }
 
 func TestAddContainerSecretRejectsReservedEnv(t *testing.T) {
-	root := t.TempDir()
+	root := tempRoot(t)
 	store := newTestStore(t)
 	if err := store.SaveWorkspaces([]state.Workspace{{
 		WorkspaceSlug: "proj",
@@ -2004,7 +2044,7 @@ func TestAddContainerSecretRejectsReservedEnv(t *testing.T) {
 }
 
 func TestRemoveContainerSecret(t *testing.T) {
-	root := t.TempDir()
+	root := tempRoot(t)
 	store := newTestStore(t)
 	if err := store.SaveWorkspaces([]state.Workspace{{
 		WorkspaceSlug: "proj",
@@ -2067,7 +2107,7 @@ func TestContainerProtoProjectsSecretEnvAndMount(t *testing.T) {
 }
 
 func TestPodmanMountsSkipsSecretKinds(t *testing.T) {
-	root := t.TempDir()
+	root := tempRoot(t)
 	if err := os.MkdirAll(filepath.Join(root, "team"), 0755); err != nil {
 		t.Fatal(err)
 	}

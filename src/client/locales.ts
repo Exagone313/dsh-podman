@@ -111,7 +111,7 @@ export type ContainerPluginKey =
   | "invalidImageId";
 
 export const en: Record<ContainerPluginKey, string> = {
-  cardTitle: "Podman",
+  cardTitle: "dsh-podman",
   cardDescription: "Manage the guest containers and their images.",
   reload: "Reload this view",
   reloading: "Reloading…",
@@ -223,7 +223,7 @@ export const en: Record<ContainerPluginKey, string> = {
 };
 
 export const zh: Record<ContainerPluginKey, string> = {
-  cardTitle: "Podman",
+  cardTitle: "dsh-podman",
   cardDescription: "管理工作区容器及其镜像。",
   reload: "刷新此视图",
   reloading: "刷新中…",

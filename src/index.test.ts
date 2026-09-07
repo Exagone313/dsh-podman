@@ -127,11 +127,23 @@ test("filesystem provider resolves absolute safe paths", async () => {
   assert.deepEqual(target.binding, { kind: "binding" });
 });
 
+test("filesystem provider resolves relative paths against the cwd", async () => {
+  const provider = createFilesystemProvider(stubResolver);
+  const target = await provider.resolve("README.md", {
+    cwd: "/projects/team/app",
+  });
+  assert.equal(target.targetKey, "/projects/team/app/README.md");
+  assert.equal(target.displayPath, "/projects/team/app/README.md");
+  assert.deepEqual(target.binding, { kind: "binding" });
+});
+
 test("filesystem provider rejects unsafe paths", async () => {
   const provider = createFilesystemProvider(stubResolver);
-  await assert.rejects(() => provider.resolve("relative"));
   await assert.rejects(() => provider.resolve("/a/../b"));
   await assert.rejects(() => provider.resolve("/a/b/../../etc"));
+  await assert.rejects(() =>
+    provider.resolve("../escape", { cwd: "/projects/team/app" }),
+  );
 });
 
 test("filesystem provider maps targets", () => {

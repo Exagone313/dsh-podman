@@ -14,7 +14,7 @@ import { PassThrough } from "node:stream";
 import { createHash } from "node:crypto";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { isAbsolute, join, resolve as resolvePath } from "node:path";
 
 export function defineTool<T>(definition: T): T {
   return definition;
@@ -477,7 +477,7 @@ export const containerReadParameters = {
   type: "object",
   properties: {
     container: containerParam,
-    path: { type: "string", description: "Absolute path to read." },
+    path: { type: "string", description: "Path to read, resolved against the session working directory." },
   },
   required: ["container", "path"],
 };
@@ -485,7 +485,7 @@ export const containerWriteParameters = {
   type: "object",
   properties: {
     container: containerParam,
-    path: { type: "string", description: "Absolute path to write." },
+    path: { type: "string", description: "Path to write, resolved against the session working directory." },
     content: { type: "string", description: "Content to write." },
     create: { type: "boolean", description: "Create if absent (default true)." },
     truncate: {
@@ -499,7 +499,7 @@ export const containerEditParameters = {
   type: "object",
   properties: {
     container: containerParam,
-    path: { type: "string", description: "Absolute path to edit." },
+    path: { type: "string", description: "Path to edit, resolved against the session working directory." },
     oldString: { type: "string", description: "Text to replace." },
     newString: { type: "string", description: "Replacement text." },
     replaceAll: { type: "boolean", description: "Replace every occurrence." },
@@ -1636,11 +1636,14 @@ function registerTools(ctx: any, resolver: WorkspaceResolver): void {
 export function createFilesystemProvider(resolver: WorkspaceResolver): FilesystemProvider {
   return {
     resolve: async (path: string, opts?: any) => {
-      if (!path.startsWith("/") || path.split("/").includes(".."))
-        throw new Error("path must be an absolute safe workspace path");
+      if (path.split("/").includes(".."))
+        throw new Error("path must not escape the workspace");
+      const resolved = isAbsolute(path)
+        ? path
+        : resolvePath(opts?.cwd ?? process.cwd(), path);
       return {
-        targetKey: path,
-        displayPath: path,
+        targetKey: resolved,
+        displayPath: resolved,
         binding: await resolver.resolve(opts?.cwd),
       };
     },

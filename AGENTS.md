@@ -22,8 +22,9 @@ exclude_graphdriver_devicemapper`).
 User-facing docs live in `docs/`; `README.md` only links to them. Users install
 the plugin from npm — the local build is for development only.
 
-Markdown must be formatted with `deno fmt` (`deno fmt **/*.md`); a docs-only
-workflow enforces this on `.md` changes.
+Markdown must be formatted with `deno fmt` (`deno fmt "**/*.md"` — quote the
+glob so deno expands it, not the shell); a docs-only workflow enforces this on
+`.md` changes.
 
 ## Conventions
 

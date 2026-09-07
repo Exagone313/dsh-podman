@@ -32,4 +32,6 @@ jobs:
         with:
           deno-version: v2.9.6
       - name: Check documentation formatting
-        run: deno fmt --check **/*.md
+        # Quoted so deno expands the glob: unquoted, the shell treats "**" as
+        # "*" and markdown outside docs/ is never checked.
+        run: deno fmt --check "**/*.md"

@@ -23,6 +23,17 @@ export function mountKindToProto(kind: string | undefined): string {
   return proto;
 }
 
+/**
+ * The mount mode to use when a caller does not name one.
+ *
+ * Adding a mount should not grant write access nobody asked for, so every kind
+ * defaults to read-only. tmpfs is the exception: its contents are per-container
+ * scratch space and the orchestrator rejects a read-only one outright.
+ */
+export function defaultMountMode(kind: string | undefined): string {
+  return kind === "tmpfs" ? "read_write" : "read_only";
+}
+
 export function mountModeToProto(mode: string | undefined): string {
   const proto =
     mode !== undefined && Object.prototype.hasOwnProperty.call(MOUNT_MODES, mode)

@@ -4,7 +4,11 @@
 
 import { WorkspaceResolver, workspaceSlug } from "./workspace-binding.js";
 import { installContainerSettings } from "./settings-bridge.js";
-import { mountKindToProto, mountModeToProto } from "./mount-enums.js";
+import {
+  defaultMountMode,
+  mountKindToProto,
+  mountModeToProto,
+} from "./mount-enums.js";
 import { metadata } from "./workspace-binding.js";
 import { PassThrough } from "node:stream";
 import { createHash } from "node:crypto";
@@ -238,7 +242,8 @@ const packageListParam = {
 const mountModeParam = {
   type: "string",
   enum: ["read_only", "read_write"],
-  description: "Read mode of the mount.",
+  description:
+    "Read mode of the mount. Defaults to read_only, except for tmpfs mounts, which are always read_write.",
 };
 const mountKindParam = {
   type: "string",
@@ -1422,7 +1427,7 @@ export const toolHandlers: Record<
   container_mount_add: async (resolver, input, exec) => {
     const kind = input.kind ?? "project";
     const protoKind = mountKindToProto(input.kind);
-    const mode = mountModeToProto(input.mode ?? "read_write");
+    const mode = mountModeToProto(input.mode ?? defaultMountMode(kind));
     const request: Record<string, unknown> = {
       workspaceSlug: await sessionWorkspaceSlug(resolver, currentCwd(exec)),
       container: input.container,
@@ -1602,7 +1607,7 @@ function mountsFromInput(
   if (!Array.isArray(mounts) || mounts.length === 0) return undefined;
   return mounts.map((mount: any) => {
     const kind = mountKindToProto(mount.kind ?? undefined);
-    const mode = mountModeToProto(mount.mode ?? "read_write");
+    const mode = mountModeToProto(mount.mode ?? defaultMountMode(mount.kind));
     const result: Record<string, unknown> = { projectName: mount.project ?? "", kind, mode };
     if (mount.path) result.path = mount.path;
     if (mount.destination) result.destination = mount.destination;

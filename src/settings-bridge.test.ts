@@ -1464,7 +1464,7 @@ test("create command reports an unknown mount mode as a notice", async () => {
   );
 });
 
-test("unset kind and mode strings still map to project and read_write", async () => {
+test("unset kind and mode strings map to project and read_only", async () => {
   const { scope, calls } = await installedMountScope();
   await scope.update({
     command: mountCommand("container_mount_add", { project: "team" }),
@@ -1498,7 +1498,7 @@ test("unset kind and mode strings still map to project and read_write", async ()
     container: "web",
     kind: "MOUNT_KIND_PROJECT",
     project: "team",
-    mode: "MOUNT_MODE_READ_WRITE",
+    mode: "MOUNT_MODE_READ_ONLY",
   });
   const createCall = calls.find(([method]) => method === "createWorkspace");
   assert.deepEqual(createCall?.[1], {
@@ -1507,7 +1507,7 @@ test("unset kind and mode strings still map to project and read_write", async ()
     mounts: [{
       projectName: "team",
       kind: "MOUNT_KIND_PROJECT",
-      mode: "MOUNT_MODE_READ_WRITE",
+      mode: "MOUNT_MODE_READ_ONLY",
     }],
   });
   assert.equal(scope.value.notice, "");

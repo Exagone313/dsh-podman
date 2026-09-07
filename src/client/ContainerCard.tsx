@@ -313,12 +313,14 @@ const mountLabel = (
   }
   return `${mount.project}${mount.path !== "" ? `/${mount.path}` : ""}${mount.destination !== "" ? ` → ${mount.destination}` : ""}${mount.mode === "read_only" ? " (ro)" : " (rw)"}`;
 };
-const emptyMount = (): MountInput => ({
-  kind: "project",
+// Adding a mount defaults to read-only, so granting write access is always a
+// deliberate choice. tmpfs is scratch space and must be writable.
+const emptyMount = (kind = "project"): MountInput => ({
+  kind,
   project: "",
   path: "",
   destination: "",
-  mode: "read_write",
+  mode: kind === "tmpfs" ? "read_write" : "read_only",
   volume: "",
   secret: "",
 });
@@ -830,9 +832,7 @@ function MountsEditor(props: {
               style={imageSelect}
               value={draft.kind}
               disabled={busy}
-              onChange={(event) =>
-                setDraft({ ...emptyMount(), kind: event.target.value })
-              }
+              onChange={(event) => setDraft(emptyMount(event.target.value))}
             >
               <option value="project">{t("mountProject")}</option>
               <option value="tmpfs">tmpfs</option>

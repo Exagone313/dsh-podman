@@ -114,9 +114,14 @@ guest-agent wiring.
 A `project` mount binds a directory from the project's workspace; `tmpfs` mounts
 a writable in-memory filesystem and `volume` mounts a podman named volume
 (auto-created on first use) — both at an arbitrary absolute container path,
-never under the projects root. A `secret` mount exposes a managed secret as a
-read-only file at an absolute container path (see [Secrets](#secrets)). `mode`
-is `read_only` or `read_write`.
+never under the projects root or another reserved path. A `secret` mount exposes
+a managed secret as a read-only file at an absolute container path (see
+[Secrets](#secrets)).
+
+`mode` is `read_only` or `read_write`, and defaults to `read_only` so that
+adding a mount never grants write access that was not asked for. `tmpfs` mounts
+are always `read_write`, and `secret` mounts take no mode. The workspace's own
+project mount is created `read_write`; that is unchanged.
 
 ### Secrets
 

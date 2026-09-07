@@ -99,6 +99,7 @@ test("control and guest proto files resolve next to the runtime", () => {
 async function startControlServer(): Promise<{
   socketsRoot: string;
   received: string[];
+  createRequests: any[];
   stop: () => void;
 }> {
   const protoPath = resolve(
@@ -113,10 +114,22 @@ async function startControlServer(): Promise<{
   const loaded = grpc.loadPackageDefinition(definition) as any;
   const server = new grpc.Server();
   const received: string[] = [];
+  const createRequests: any[] = [];
   server.addService(loaded.dshctl.v1.OrchestratorControl.service, {
     listWorkspaces: (call: any, callback: any) => {
       received.push(call.metadata.get("authorization")[0]);
       callback(null, { workspaces: [] });
+    },
+    describeWorkspace: (_call: any, callback: any) => {
+      callback({ code: grpc.status.NOT_FOUND, details: "workspace not found" });
+    },
+    createWorkspace: (call: any, callback: any) => {
+      createRequests.push(call.request);
+      callback(null, {
+        workspaceSlug: call.request.workspaceSlug,
+        agentSocketPath: resolve(socketsRoot, "guest.sock"),
+        agentToken: "tok",
+      });
     },
   });
   const socketsRoot = resolve(
@@ -132,7 +145,22 @@ async function startControlServer(): Promise<{
       (error: any) => (error ? fail(error) : ok()),
     ),
   );
-  return { socketsRoot, received, stop: () => server.forceShutdown() };
+  // Also answer on the guest socket the fake createWorkspace hands back, so a
+  // resolved binding becomes ready immediately instead of waiting out the
+  // readiness deadline.
+  await new Promise<void>((ok, fail) =>
+    server.bindAsync(
+      `unix:${resolve(socketsRoot, "guest.sock")}`,
+      grpc.ServerCredentials.createInsecure(),
+      (error: any) => (error ? fail(error) : ok()),
+    ),
+  );
+  return {
+    socketsRoot,
+    received,
+    createRequests,
+    stop: () => server.forceShutdown(),
+  };
 }
 
 test("control calls carry the bearer token", async () => {
@@ -168,6 +196,31 @@ test("control calls omit the token when unset", async () => {
     );
     await resolver.control("listWorkspaces", {});
     assert.equal(received[0], undefined);
+  } finally {
+    stop();
+  }
+});
+
+test("the auto-created workspace mount stays read-write", async () => {
+  // Additional mounts default to read-only, but the workspace's own project
+  // directory must stay writable or the agent cannot edit the project.
+  const { socketsRoot, createRequests, stop } = await startControlServer();
+  try {
+    const resolver = new WorkspaceResolver(
+      {
+        socketsRoot,
+        defaultImage: "arch",
+        projectsRoot: "/projects",
+        controlToken: "",
+      },
+      { resolveByPath: () => ({ id: "w1", path: "/projects/team" }) } as any,
+    );
+    await resolver.resolve("/projects/team");
+    assert.equal(createRequests.length, 1);
+    const mounts = createRequests[0].mounts;
+    assert.equal(mounts.length, 1);
+    assert.equal(mounts[0].projectName, "team");
+    assert.equal(mounts[0].mode, "MOUNT_MODE_READ_WRITE");
   } finally {
     stop();
   }

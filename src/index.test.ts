@@ -955,7 +955,27 @@ test("container_mount_remove rejects unknown mount kinds", async () => {
   assert.deepEqual(requests, [], "a rejected mount must not reach the orchestrator");
 });
 
-test("mount tools keep defaulting a missing kind to project and a missing mode to read_write", async () => {
+test("adding a tmpfs mount without a mode stays read_write", async () => {
+  // The orchestrator rejects a read-only tmpfs, so the read-only default must
+  // not apply to it.
+  const { requests, resolver } = mountRequestRecorder();
+  await toolHandlers.container_mount_add(
+    resolver as never,
+    { container: "web", kind: "tmpfs", destination: "/scratch" },
+    MOUNT_EXEC,
+  );
+  assert.deepEqual(requests, [
+    ["addContainerMount", {
+      workspaceSlug: "team",
+      container: "web",
+      kind: "MOUNT_KIND_TMPFS",
+      destination: "/scratch",
+      mode: "MOUNT_MODE_READ_WRITE",
+    }],
+  ]);
+});
+
+test("mount tools default a missing kind to project and a missing mode to read_only", async () => {
   const { requests, resolver } = mountRequestRecorder();
   await toolHandlers.container_mount_add(
     resolver as never,
@@ -984,7 +1004,7 @@ test("mount tools keep defaulting a missing kind to project and a missing mode t
       container: "web",
       kind: "MOUNT_KIND_PROJECT",
       project: "team",
-      mode: "MOUNT_MODE_READ_WRITE",
+      mode: "MOUNT_MODE_READ_ONLY",
     }],
     ["addContainerMount", {
       workspaceSlug: "team",
@@ -1026,7 +1046,7 @@ test("container start and recreate reject unknown mount kinds and modes", async 
   assert.deepEqual(requests, [], "a rejected mount must not reach the orchestrator");
 });
 
-test("container start maps valid mounts and defaults the mode to read_write", async () => {
+test("container start maps valid mounts and defaults the mode to read_only", async () => {
   const { requests, resolver } = mountRequestRecorder();
   await toolHandlers.container_start(
     resolver as never,
@@ -1037,6 +1057,7 @@ test("container start maps valid mounts and defaults the mode to read_write", as
         { project: "team", path: "src", mode: "read_only" },
         { kind: "volume", volume: "valkey-data", destination: "/data" },
         { kind: "secret", secret: "valkey-tls", destination: "/run/secrets/tls" },
+        { kind: "tmpfs", destination: "/scratch" },
       ],
     },
     MOUNT_EXEC,
@@ -1056,16 +1077,22 @@ test("container start maps valid mounts and defaults the mode to read_write", as
         {
           projectName: "",
           kind: "MOUNT_KIND_VOLUME",
-          mode: "MOUNT_MODE_READ_WRITE",
+          mode: "MOUNT_MODE_READ_ONLY",
           destination: "/data",
           volume: "valkey-data",
         },
         {
           projectName: "",
           kind: "MOUNT_KIND_SECRET",
-          mode: "MOUNT_MODE_READ_WRITE",
+          mode: "MOUNT_MODE_READ_ONLY",
           destination: "/run/secrets/tls",
           secret: "valkey-tls",
+        },
+        {
+          projectName: "",
+          kind: "MOUNT_KIND_TMPFS",
+          mode: "MOUNT_MODE_READ_WRITE",
+          destination: "/scratch",
         },
       ],
     }],

@@ -6,7 +6,11 @@ import z from "@deepseek-ai/schemastery";
 import { VERSION, GIT_COMMIT } from "./generated/version.js";
 import { workspaceSlug } from "./workspace-binding.js";
 import type { WorkspaceResolver } from "./workspace-binding.js";
-import { mountKindToProto, mountModeToProto } from "./mount-enums.js";
+import {
+  defaultMountMode,
+  mountKindToProto,
+  mountModeToProto,
+} from "./mount-enums.js";
 
 export const CONTAINER_NS = "podman";
 
@@ -241,7 +245,7 @@ export interface ContainerSettingsScope {
 
 function mountInputToProto(mount: { kind: string; project: string; path: string; destination: string; mode: string; volume: string; secret: string }): Record<string, unknown> {
   const kind = mountKindToProto(mount.kind || undefined);
-  const mode = mountModeToProto(mount.mode || "read_write");
+  const mode = mountModeToProto(mount.mode || defaultMountMode(mount.kind || undefined));
   const result: Record<string, unknown> = { projectName: mount.project ?? "", kind, mode };
   if (mount.path) result.path = mount.path;
   if (mount.destination) result.destination = mount.destination;
@@ -385,7 +389,7 @@ export function installContainerSettings(
             const m = command.mount;
             if (m === null) break;
             const kind = mountKindToProto(m.kind || undefined);
-            const mode = mountModeToProto(m.mode || "read_write");
+            const mode = mountModeToProto(m.mode || defaultMountMode(m.kind || undefined));
             const request: Record<string, unknown> = { workspaceSlug: command.workspace, container: command.container || "default", kind };
             if (kind === "MOUNT_KIND_VOLUME") { request.volume = m.volume; request.destination = m.destination; request.mode = mode; }
             else if (kind === "MOUNT_KIND_TMPFS") { request.destination = m.destination; request.mode = mode; }

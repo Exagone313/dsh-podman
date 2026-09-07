@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: MIT
 
-package grpcserver
+package recovery
 
 import (
 	"context"
@@ -21,8 +21,8 @@ func quietLogger() *slog.Logger {
 
 type panicStream struct{ grpc.ServerStream }
 
-func TestRecoveryUnaryTurnsPanicsIntoErrors(t *testing.T) {
-	interceptor := RecoveryUnary(quietLogger())
+func TestUnaryTurnsPanicsIntoErrors(t *testing.T) {
+	interceptor := Unary(quietLogger())
 	handler := func(ctx context.Context, req any) (any, error) { panic("boom") }
 	response, err := interceptor(context.Background(), nil, &grpc.UnaryServerInfo{FullMethod: "/test/Method"}, handler)
 	if status.Code(err) != codes.Internal {
@@ -33,8 +33,8 @@ func TestRecoveryUnaryTurnsPanicsIntoErrors(t *testing.T) {
 	}
 }
 
-func TestRecoveryUnaryPassesThrough(t *testing.T) {
-	interceptor := RecoveryUnary(quietLogger())
+func TestUnaryPassesThrough(t *testing.T) {
+	interceptor := Unary(quietLogger())
 	handler := func(ctx context.Context, req any) (any, error) { return "ok", nil }
 	response, err := interceptor(context.Background(), nil, &grpc.UnaryServerInfo{FullMethod: "/test/Method"}, handler)
 	if err != nil || response != "ok" {
@@ -42,8 +42,8 @@ func TestRecoveryUnaryPassesThrough(t *testing.T) {
 	}
 }
 
-func TestRecoveryStreamTurnsPanicsIntoErrors(t *testing.T) {
-	interceptor := RecoveryStream(quietLogger())
+func TestStreamTurnsPanicsIntoErrors(t *testing.T) {
+	interceptor := Stream(quietLogger())
 	handler := func(srv any, stream grpc.ServerStream) error { panic("boom") }
 	err := interceptor(nil, &panicStream{}, &grpc.StreamServerInfo{FullMethod: "/test/Stream"}, handler)
 	if status.Code(err) != codes.Internal {
@@ -51,8 +51,8 @@ func TestRecoveryStreamTurnsPanicsIntoErrors(t *testing.T) {
 	}
 }
 
-func TestRecoveryStreamPassesThrough(t *testing.T) {
-	interceptor := RecoveryStream(quietLogger())
+func TestStreamPassesThrough(t *testing.T) {
+	interceptor := Stream(quietLogger())
 	handler := func(srv any, stream grpc.ServerStream) error { return nil }
 	if err := interceptor(nil, &panicStream{}, &grpc.StreamServerInfo{FullMethod: "/test/Stream"}, handler); err != nil {
 		t.Fatalf("unexpected error: %v", err)

@@ -21,6 +21,7 @@ import (
 	"github.com/Exagone313/dsh-podman/internal/orchestrator/images"
 	"github.com/Exagone313/dsh-podman/internal/orchestrator/podman"
 	"github.com/Exagone313/dsh-podman/internal/orchestrator/state"
+	"github.com/Exagone313/dsh-podman/internal/recovery"
 	socketpkg "github.com/Exagone313/dsh-podman/internal/socket"
 	"github.com/Exagone313/dsh-podman/internal/version"
 	"go.podman.io/podman/v6/pkg/bindings"
@@ -64,14 +65,18 @@ func main() {
 	}
 	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
 	logger.Info("dsh-podman-orchestrator starting", "version", version.Version, "commit", version.Commit)
-	var server *grpc.Server
+	// Authentication runs first so a rejected call is never logged as a
+	// request nor able to panic a handler; recovery runs innermost, closest
+	// to the handler it protects.
+	unary := []grpc.UnaryServerInterceptor{}
 	if controlToken != "" {
 		logger.Info("control-plane authentication enabled")
-		server = grpc.NewServer(grpc.ChainUnaryInterceptor(auth.Unary(controlToken), grpcserver.UnaryLogger(logger)))
+		unary = append(unary, auth.Unary(controlToken))
 	} else {
 		logger.Warn("control-plane authentication is disabled; set DSH_PODMAN_ORCHESTRATOR_TOKEN")
-		server = grpc.NewServer(grpc.UnaryInterceptor(grpcserver.UnaryLogger(logger)))
 	}
+	unary = append(unary, grpcserver.UnaryLogger(logger), recovery.Unary(logger))
+	server := grpc.NewServer(grpc.ChainUnaryInterceptor(unary...))
 	var podmanClient *podman.Client
 	var imageBuilder *images.Builder
 	podmanSocket := os.Getenv("DSH_PODMAN_ORCHESTRATOR_PODMAN_SOCKET")

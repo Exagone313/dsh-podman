@@ -13,6 +13,7 @@ import (
 	guest "github.com/Exagone313/dsh-podman/internal/genproto/dshguest/v1"
 	workspacefs "github.com/Exagone313/dsh-podman/internal/guestagent/fs"
 	"github.com/Exagone313/dsh-podman/internal/guestagent/grpcserver"
+	"github.com/Exagone313/dsh-podman/internal/recovery"
 	socketpkg "github.com/Exagone313/dsh-podman/internal/socket"
 	"github.com/Exagone313/dsh-podman/internal/version"
 	"google.golang.org/grpc"
@@ -45,8 +46,8 @@ func main() {
 		panic(err)
 	}
 	server := grpc.NewServer(
-		grpc.ChainUnaryInterceptor(auth.Unary(token), grpcserver.RecoveryUnary(logger)),
-		grpc.ChainStreamInterceptor(auth.Stream(token), grpcserver.RecoveryStream(logger)),
+		grpc.ChainUnaryInterceptor(auth.Unary(token), recovery.Unary(logger)),
+		grpc.ChainStreamInterceptor(auth.Stream(token), recovery.Stream(logger)),
 	)
 	guest.RegisterWorkspaceGuestAgentServer(server, grpcserver.New().WithFS(filesystem))
 	logger.Info("guest agent listening", "socket", socket)

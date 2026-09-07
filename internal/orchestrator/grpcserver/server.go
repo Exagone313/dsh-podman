@@ -349,8 +349,24 @@ func (s *Server) stopContainerDaemons(ctx context.Context, record state.Containe
 	s.log().Info("daemons stopped", "podman_name", record.PodmanName, "count", len(resp.GetDaemons()))
 }
 
+// ensureAgentToken returns the container's existing agent token, minting a
+// fresh one only when the record predates token storage. Recreates keep the
+// token stable so clients that cached it (the plugin's workspace binding) stay
+// valid across mount, secret, and start changes.
+func (s *Server) ensureAgentToken(record *state.Container) (string, error) {
+	if record.AgentToken != "" {
+		return record.AgentToken, nil
+	}
+	secret, err := token.New()
+	if err != nil {
+		return "", err
+	}
+	record.AgentToken = secret
+	return secret, nil
+}
+
 // recreateContainer gracefully stops the container's daemons, then recreates
-// the podman container with the given image tag and a fresh token, using the
+// the podman container with the given image tag and agent token, using the
 // container's effective mounts.
 func (s *Server) recreateContainer(workspace state.Workspace, record *state.Container, imageTag, newToken string, env map[string]string) error {
 	s.stopContainerDaemons(context.Background(), *record)
@@ -435,7 +451,7 @@ func (s *Server) RecreateContainer(ctx context.Context, request *ctl.RecreateCon
 	if s.Podman == nil {
 		return nil, status.Error(codes.FailedPrecondition, "podman is not configured")
 	}
-	secret, err := token.New()
+	secret, err := s.ensureAgentToken(record)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
@@ -509,6 +525,7 @@ func (s *Server) StartContainer(ctx context.Context, request *ctl.StartContainer
 	}
 	if existing, ok := containerByLogical(&workspace, request.GetContainer()); ok {
 		s.stopContainerDaemons(context.Background(), *existing)
+		record.AgentToken = existing.AgentToken
 		if err := s.Podman.Stop(existing.PodmanName); err != nil {
 			s.log().Warn("StartContainer replace stop failed", "workspace_slug", workspace.WorkspaceSlug, "container", request.GetContainer(), "error", err)
 		}
@@ -517,7 +534,7 @@ func (s *Server) StartContainer(ctx context.Context, request *ctl.StartContainer
 			return nil, status.Error(codes.Internal, err.Error())
 		}
 	}
-	secret, err := token.New()
+	secret, err := s.ensureAgentToken(&record)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
@@ -620,7 +637,7 @@ func (s *Server) AddContainerMount(ctx context.Context, request *ctl.AddContaine
 	if err != nil {
 		return nil, err
 	}
-	secret, err := token.New()
+	secret, err := s.ensureAgentToken(record)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
@@ -703,7 +720,7 @@ func (s *Server) RemoveContainerMount(ctx context.Context, request *ctl.RemoveCo
 	if err != nil {
 		return nil, err
 	}
-	secret, err := token.New()
+	secret, err := s.ensureAgentToken(record)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
@@ -2237,7 +2254,7 @@ func (s *Server) AddContainerSecret(ctx context.Context, request *ctl.AddContain
 	if err != nil {
 		return nil, err
 	}
-	secretToken, err := token.New()
+	secretToken, err := s.ensureAgentToken(record)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
@@ -2296,7 +2313,7 @@ func (s *Server) RemoveContainerSecret(ctx context.Context, request *ctl.RemoveC
 	if err != nil {
 		return nil, err
 	}
-	secretToken, err := token.New()
+	secretToken, err := s.ensureAgentToken(record)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}

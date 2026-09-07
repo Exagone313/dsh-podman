@@ -1158,6 +1158,35 @@ func TestResolveMountSymlinkedRoot(t *testing.T) {
 	}
 }
 
+func TestEnsureAgentToken(t *testing.T) {
+	server := &Server{Logger: silentLogger()}
+
+	// A stored token is reused, so recreates keep clients (the plugin's cached
+	// workspace binding) authenticated against the same credential.
+	record := state.Container{AgentToken: "stored-token"}
+	token, err := server.ensureAgentToken(&record)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if token != "stored-token" {
+		t.Fatalf("expected the stored token to be reused, got %q", token)
+	}
+
+	// A record without a token (a never-started container) gets a fresh one,
+	// which is written back so the upsert persists it.
+	record = state.Container{}
+	token, err = server.ensureAgentToken(&record)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if token == "" {
+		t.Fatal("expected a minted token")
+	}
+	if record.AgentToken != token {
+		t.Fatalf("minted token not written back: %q", record.AgentToken)
+	}
+}
+
 // TestResolveMountSymlinks covers the symlinks a writable project can contain.
 // Links leaving the projects root must be refused; links staying inside it
 // resolve, since mounting another project directory is supported.

@@ -12,17 +12,13 @@ Report vulnerabilities privately through GitHub, from the repository's
 **Security** tab → **Report a vulnerability**. This opens a private advisory
 visible only to you and the maintainers.
 
-If that option is not available, open a public issue asking for a private
-channel — **without** describing the problem — and you will be given one.
-
 There is no bounty programme and no guaranteed response time. Fixes ship as a
 normal release. Deployments using the provided quadlets pick up new images
 automatically (`AutoUpdate=registry`); the npm plugin must be updated by hand.
 
 ## Supported versions
 
-dsh-podman is pre-1.0. Only the latest release is supported, and fixes are not
-backported.
+Only the latest release is supported and fixes are not backported.
 
 ## Trust model
 

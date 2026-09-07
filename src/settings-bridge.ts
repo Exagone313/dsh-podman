@@ -248,7 +248,7 @@ function mountInputToProto(mount: { kind: string; project: string; path: string;
   const mode = mountModeToProto(mount.mode || defaultMountMode(mount.kind || undefined));
   const result: Record<string, unknown> = { projectName: mount.project ?? "", kind, mode };
   if (mount.path) result.path = mount.path;
-  if (mount.destination) result.destination = mount.destination;
+  if (kind !== "MOUNT_KIND_PROJECT" && mount.destination) result.destination = mount.destination;
   if (mount.volume) result.volume = mount.volume;
   if (mount.secret) result.secret = mount.secret;
   return result;
@@ -394,7 +394,7 @@ export function installContainerSettings(
             if (kind === "MOUNT_KIND_VOLUME") { request.volume = m.volume; request.destination = m.destination; request.mode = mode; }
             else if (kind === "MOUNT_KIND_TMPFS") { request.destination = m.destination; request.mode = mode; }
             else if (kind === "MOUNT_KIND_SECRET") { request.secret = m.secret; request.destination = m.destination; }
-            else { request.project = m.project; if (m.path) request.path = m.path; if (m.destination) request.destination = m.destination; request.mode = mode; }
+            else { request.project = m.project; if (m.path) request.path = m.path; request.mode = mode; }
             await resolver.control("addContainerMount", request);
             break;
           }
@@ -406,7 +406,7 @@ export function installContainerSettings(
             if (kind === "MOUNT_KIND_PROJECT") { request.project = m.project; if (m.path) request.path = m.path; }
             else if (kind === "MOUNT_KIND_VOLUME") { if (m.volume) request.volume = m.volume; }
             else if (kind === "MOUNT_KIND_SECRET") { if (m.secret) request.secret = m.secret; }
-            if (m.destination) request.destination = m.destination;
+            if (kind !== "MOUNT_KIND_PROJECT" && m.destination) request.destination = m.destination;
             await resolver.control("removeContainerMount", request);
             break;
           }

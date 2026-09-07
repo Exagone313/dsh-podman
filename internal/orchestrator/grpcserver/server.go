@@ -1678,20 +1678,6 @@ func validMountSubpath(path string) bool {
 	return !filepath.IsAbs(raw) && cleaned == raw && cleaned != "." && cleaned != ".." && !strings.HasPrefix(cleaned, ".."+string(filepath.Separator))
 }
 
-// validMountDestination reports whether dest is an acceptable container mount
-// destination: an absolute path under projectsRoot with no ".." segments.
-func validMountDestination(projectsRoot, dest string) bool {
-	if !filepath.IsAbs(dest) {
-		return false
-	}
-	cleaned := filepath.Clean(dest)
-	if cleaned != dest {
-		return false
-	}
-	root := filepath.Clean(projectsRoot)
-	return cleaned == root || strings.HasPrefix(cleaned, withSeparator(root))
-}
-
 // reservedDestinations lists the container paths a mount must not shadow: the
 // projects root, which is reserved for project mounts; the socket directory,
 // which carries the guest agent's socket; and the directory the guest agent
@@ -1789,13 +1775,11 @@ func resolveMount(projectsRoot, hostProjectsRoot string, mount state.Mount) (hos
 	// The destination mirrors the requested path rather than the resolved
 	// one: the container-side path must stay stable when a project contains
 	// an internal symlink, or the plugin and the guest agent would disagree
-	// about where the files are.
+	// about where the files are. Project mounts never take a caller-supplied
+	// destination; the fixed location below is the only one used.
 	destination = filepath.Join(projectsRoot, mount.ProjectName, subpath)
 	if mount.Destination != "" {
-		if !validMountDestination(projectsRoot, mount.Destination) {
-			return "", "", fmt.Errorf("invalid mount destination")
-		}
-		destination = mount.Destination
+		return "", "", fmt.Errorf("project mounts do not accept a destination; the directory will be mounted at %s", destination)
 	}
 	return hostPath, destination, nil
 }

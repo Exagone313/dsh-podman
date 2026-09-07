@@ -496,6 +496,62 @@ test("preExecutePolicy asks for gated tools and delegates the rest", async () =>
   assert.equal(allowed.kind, "allow");
 });
 
+test("preExecutePolicy denies project mounts that carry a destination", async () => {
+  const deny = (await preExecutePolicy(
+    {
+      name: "container_mount_add",
+      arguments: { kind: "project", project: "team", path: "src", destination: "/custom" },
+    },
+    () => Promise.resolve({ kind: "allow" }),
+    () => "/projects",
+  )) as { kind: string; reason: string };
+  assert.equal(deny.kind, "deny", "must deny instead of asking");
+  assert.equal(
+    deny.reason,
+    "project mounts do not accept a destination; the directory will be mounted at /projects/team/src",
+  );
+
+  const startDeny = (await preExecutePolicy(
+    {
+      name: "container_start",
+      arguments: {
+        container: "web",
+        mounts: [
+          { project: "team", mode: "read_only" },
+          { kind: "project", project: "team", destination: "/x" },
+        ],
+      },
+    },
+    () => Promise.resolve({ kind: "allow" }),
+    () => "/projects",
+  )) as { kind: string };
+  assert.equal(startDeny.kind, "deny", "a mounts array with a project destination must deny");
+
+  const volumeAllowed = (await preExecutePolicy(
+    {
+      name: "container_mount_add",
+      arguments: { kind: "volume", volume: "data", destination: "/data" },
+    },
+    () => Promise.resolve({ kind: "ask", reason: "x" }),
+  )) as { kind: string };
+  assert.equal(volumeAllowed.kind, "ask", "non-project mounts with a destination must still ask");
+
+  const underNever = (await preExecutePolicy(
+    {
+      name: "container_mount_add",
+      arguments: { kind: "project", project: "team", destination: "/x" },
+      agent: {
+        session: {
+          events: [{ type: "approval/policy", data: { policy: "never" } }],
+        },
+      },
+    },
+    () => Promise.resolve({ kind: "allow" }),
+    () => "/projects",
+  )) as { kind: string };
+  assert.equal(underNever.kind, "deny", "full access must not accept an invalid project mount");
+});
+
 test("foldSandboxMode and foldApprovalPolicy fold last-wins with defaults", () => {
   assert.equal(foldSandboxMode([]), undefined);
   assert.equal(foldApprovalPolicy([]), undefined);
@@ -872,6 +928,7 @@ test("secret mount kinds forward the secret to the orchestrator", async () => {
     registry: {
       resolveByPath: async () => ({ id: "team" }),
     },
+    getConfig: () => ({ projectsRoot: "/projects" }),
     async control(method: string, request: unknown) {
       if (method === "addContainerMount" || method === "removeContainerMount") {
         requests.push(request as Record<string, unknown>);
@@ -920,6 +977,7 @@ function mountRequestRecorder() {
     registry: {
       resolveByPath: async () => ({ id: "team" }),
     },
+    getConfig: () => ({ projectsRoot: "/projects" }),
     async control(method: string, request: unknown) {
       requests.push([method, request as Record<string, unknown>]);
       return {};
@@ -951,6 +1009,36 @@ test("container_mount_add rejects unknown mount kinds and modes", async () => {
     /unknown mount mode: rw/,
   );
   assert.deepEqual(requests, [], "a rejected mount must not reach the orchestrator");
+});
+
+test("container_mount_add rejects a destination on a project mount", async () => {
+  const { requests, resolver } = mountRequestRecorder();
+  await assert.rejects(
+    () =>
+      toolHandlers.container_mount_add(
+        resolver as never,
+        { container: "web", kind: "project", project: "team", path: "src", destination: "/custom" },
+        MOUNT_EXEC,
+      ),
+    /project mounts do not accept a destination; the directory will be mounted at \/projects\/team\/src/,
+  );
+  await assert.rejects(
+    () =>
+      toolHandlers.container_mount_add(
+        resolver as never,
+        { container: "web", project: "team", destination: "/custom" },
+        MOUNT_EXEC,
+      ),
+    /project mounts do not accept a destination/,
+  );
+  assert.deepEqual(requests, [], "a rejected mount must not reach the orchestrator");
+
+  await toolHandlers.container_mount_add(
+    resolver as never,
+    { container: "web", kind: "volume", volume: "data", destination: "/data" },
+    MOUNT_EXEC,
+  );
+  assert.equal(requests.length, 1, "a volume mount with a destination is still accepted");
 });
 
 test("container_mount_remove rejects unknown mount kinds", async () => {
@@ -1067,6 +1155,7 @@ test("container start maps valid mounts and defaults the mode to read_only", asy
       image: "img1",
       mounts: [
         { project: "team", path: "src", mode: "read_only" },
+        { project: "team", destination: "/custom", mode: "read_write" },
         { kind: "volume", volume: "valkey-data", destination: "/data" },
         { kind: "secret", secret: "valkey-tls", destination: "/run/secrets/tls" },
         { kind: "tmpfs", destination: "/scratch" },
@@ -1085,6 +1174,11 @@ test("container start maps valid mounts and defaults the mode to read_only", asy
           kind: "MOUNT_KIND_PROJECT",
           mode: "MOUNT_MODE_READ_ONLY",
           path: "src",
+        },
+        {
+          projectName: "team",
+          kind: "MOUNT_KIND_PROJECT",
+          mode: "MOUNT_MODE_READ_WRITE",
         },
         {
           projectName: "",

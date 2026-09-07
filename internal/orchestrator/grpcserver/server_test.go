@@ -1091,20 +1091,18 @@ func TestResolveMount(t *testing.T) {
 	if host != filepath.Join(root, "team", "src") || dest != filepath.Join(root, "team", "src") {
 		t.Fatalf("unexpected resolve: %q %q", host, dest)
 	}
-	validDest := filepath.Join(root, "custom", "mount")
-	host, dest, err = resolveMount(root, "", state.Mount{ProjectName: "team", Path: "src", Destination: validDest})
-	if err != nil {
-		t.Fatal(err)
+	// Project mounts never take a caller-supplied destination.
+	for _, dest := range []string{
+		filepath.Join(root, "custom", "mount"),
+		filepath.Join(root, "team", "code"),
+	} {
+		_, _, err := resolveMount(root, "", state.Mount{ProjectName: "team", Path: "src", Destination: dest})
+		if err == nil {
+			t.Errorf("accepted a project mount destination %q", dest)
+		}
 	}
-	if host != filepath.Join(root, "team", "src") || dest != validDest {
-		t.Fatalf("unexpected resolve: %q %q", host, dest)
-	}
-	host, dest, err = resolveMount(root, hostRoot, state.Mount{ProjectName: "team", Path: "src", Destination: filepath.Join(root, "team", "code")})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if host != filepath.Join(hostRoot, "team", "src") || dest != filepath.Join(root, "team", "code") {
-		t.Fatalf("unexpected resolve: %q %q", host, dest)
+	if _, _, err := resolveMount(root, "", state.Mount{ProjectName: "team", Path: "src", Destination: filepath.Join(root, "custom", "mount")}); err == nil || !strings.Contains(err.Error(), "will be mounted at "+filepath.Join(root, "team", "src")) {
+		t.Fatalf("rejection should name the fixed destination, got %v", err)
 	}
 	for _, path := range []string{"..", "../x", "/abs", "a/../b", "a//b", "a/b/", "."} {
 		if _, _, err := resolveMount(root, "", state.Mount{ProjectName: "team", Path: path}); err == nil {
@@ -1308,8 +1306,8 @@ func TestAddContainerMount(t *testing.T) {
 		t.Fatalf("valid add to named container: expected FailedPrecondition, got %v", err)
 	}
 	_, err = server.AddContainerMount(context.Background(), &ctl.AddContainerMountRequest{WorkspaceSlug: "proj", Container: "default", Project: "team", Path: "src", Destination: filepath.Join(root, "team", "other"), Mode: ctl.MountMode_MOUNT_MODE_READ_ONLY})
-	if status.Code(err) != codes.FailedPrecondition {
-		t.Fatalf("valid add to default container: expected FailedPrecondition, got %v", err)
+	if status.Code(err) != codes.InvalidArgument {
+		t.Fatalf("project mount with a destination: expected InvalidArgument, got %v", err)
 	}
 
 	_, err = server.AddContainerMount(context.Background(), &ctl.AddContainerMountRequest{WorkspaceSlug: "proj", Container: "dev", Project: "team", Mode: ctl.MountMode_MOUNT_MODE_READ_ONLY})

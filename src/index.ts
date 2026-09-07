@@ -37,7 +37,11 @@ export interface PluginConfig {
   imagePrefix?: string;
 }
 export function apply(ctx: any, config: PluginConfig = {}): void {
-  ctx.on("tools/pre-execute", preExecutePolicy);
+  ctx.on(
+    "tools/pre-execute",
+    (exec: any, next: any) =>
+      preExecutePolicy(exec, next, () => resolver.getConfig().projectsRoot),
+  );
   ensurePodmanOpsPreset(ctx);
   const imagePrefix = withTrailingSlash(
     config.imagePrefix ?? process.env.DSH_PODMAN_IMAGE_PREFIX ?? "localhost/dsh-podman/",
@@ -260,7 +264,8 @@ const projectMountItemParam = {
     path: { type: "string", description: "Path within the project to mount." },
     destination: {
       type: "string",
-      description: "Destination path inside the container.",
+      description:
+        "Destination path inside the container (volume, tmpfs, and secret mounts only; project mounts always mount at their project root).",
     },
     kind: mountKindParam,
     volume: { type: "string", description: "Volume name to mount." },
@@ -365,7 +370,8 @@ export const containerMountAddParameters = {
     path: { type: "string", description: "Path within the project to mount." },
     destination: {
       type: "string",
-      description: "Destination path inside the container.",
+      description:
+        "Destination path inside the container (volume, tmpfs, and secret mounts only; project mounts always mount at their project root).",
     },
     mode: mountModeParam,
     volume: { type: "string", description: "Named volume to mount." },
@@ -384,7 +390,8 @@ export const containerMountRemoveParameters = {
     secret: { type: "string", description: "Named secret to unmount." },
     destination: {
       type: "string",
-      description: "Destination path inside the container.",
+      description:
+        "Destination path inside the container (volume, tmpfs, and secret mounts only; project mounts are identified by project and path).",
     },
   },
   required: ["container"],
@@ -757,6 +764,51 @@ function replaceMountItem(mount: Record<string, unknown>): string {
   return item + mode;
 }
 
+// The mount kind, defaulting to "project" when the caller does not name one.
+export function mountKindOf(kind: unknown): string {
+  return typeof kind === "string" && kind !== "" ? kind : "project";
+}
+
+// The container-side destination a project mount always lands at: the project
+// root under projectsRoot plus the optional subpath. The container never gets a
+// caller-chosen destination for a project mount.
+export function projectMountMirror(
+  projectsRoot: string,
+  project: string,
+  path: unknown,
+): string {
+  return [projectsRoot, project, path]
+    .filter((part) => typeof part === "string" && part !== "")
+    .join("/");
+}
+
+// The reason to deny a mount item that carries a destination on a project (or
+// unnamed) mount, or undefined when the item is allowed. Project mounts never
+// take a destination; without one the directory lands at its project root.
+export function projectMountDestinationReason(
+  projectsRoot: string | undefined,
+  args: {
+    kind?: unknown;
+    project?: unknown;
+    path?: unknown;
+    destination?: unknown;
+  },
+): string | undefined {
+  if (mountKindOf(args.kind) !== "project") return undefined;
+  if (args.destination === undefined || args.destination === "") return undefined;
+  const mirror =
+    projectsRoot === undefined
+      ? ""
+      : projectMountMirror(
+          projectsRoot,
+          typeof args.project === "string" ? args.project : "",
+          args.path,
+        );
+  return mirror === ""
+    ? "project mounts do not accept a destination"
+    : `project mounts do not accept a destination; the directory will be mounted at ${mirror}`;
+}
+
 // Build the single-line approval summary shown for a gated tool call.
 export function summarizeArgs(name: string, args: Record<string, unknown>): string {
   const str = (key: string): string | undefined =>
@@ -1021,6 +1073,7 @@ export async function preExecutePolicy(
     };
   },
   next: () => Promise<unknown>,
+  getProjectsRoot?: () => string,
 ): Promise<unknown> {
   const name = exec.name;
   if (!OUR_TOOL_NAMES.has(name)) return next();
@@ -1032,15 +1085,45 @@ export async function preExecutePolicy(
       reason: `tool "${name}" requires a writable permission (current: read-only)`,
     };
   }
-  if (foldApprovalPolicy(events) === "never") return next();
   const args = exec.arguments;
   const parsed =
     typeof args === "object" && args !== null ? (args as Record<string, unknown>) : undefined;
+  const projectsRoot = getProjectsRoot?.();
+  const denyReason = mountDestinationsReason(name, parsed, projectsRoot);
+  if (denyReason !== undefined) {
+    return { kind: "deny", reason: denyReason };
+  }
+  if (foldApprovalPolicy(events) === "never") return next();
   const preset = exec.agent?.session?.header?.agentPreset;
   if (preset === PODMAN_OPS_PRESET && PODMAN_OPS_APPROVAL_TOOLS.has(name)) {
     return { kind: "ask", reason: summarizeArgs(name, parsed ?? {}) };
   }
   return approvalDecision(name, parsed) ?? next();
+}
+
+// The reason to deny a mount-bearing tool call that puts a destination on a
+// project (or unnamed) mount, or undefined when the call is allowed. Checks the
+// single-item tools (container_mount_add/remove) and the mounts arrays of
+// container_start/container_recreate.
+export function mountDestinationsReason(
+  name: string,
+  args: Record<string, unknown> | undefined,
+  projectsRoot: string | undefined,
+): string | undefined {
+  if (args === undefined) return undefined;
+  if (name === "container_mount_add" || name === "container_mount_remove") {
+    return projectMountDestinationReason(projectsRoot, args);
+  }
+  if (name === "container_start" || name === "container_recreate") {
+    const mounts = args.mounts;
+    if (!Array.isArray(mounts)) return undefined;
+    for (const item of mounts) {
+      if (typeof item !== "object" || item === null) continue;
+      const reason = projectMountDestinationReason(projectsRoot, item as Record<string, unknown>);
+      if (reason !== undefined) return reason;
+    }
+  }
+  return undefined;
 }
 
 // The "Podman operator mode" preset metadata, shipped verbatim into the
@@ -1426,6 +1509,9 @@ export const toolHandlers: Record<
   },
   container_mount_add: async (resolver, input, exec) => {
     const kind = input.kind ?? "project";
+    const projectsRoot = resolver.getConfig().projectsRoot;
+    const destinationReason = projectMountDestinationReason(projectsRoot, input);
+    if (destinationReason !== undefined) throw new Error(destinationReason);
     const protoKind = mountKindToProto(input.kind);
     const mode = mountModeToProto(input.mode ?? defaultMountMode(kind));
     const request: Record<string, unknown> = {
@@ -1446,7 +1532,6 @@ export const toolHandlers: Record<
     } else {
       request.project = input.project;
       if (input.path !== undefined) request.path = input.path;
-      if (input.destination !== undefined) request.destination = input.destination;
       request.mode = mode;
     }
     return resolver.control("addContainerMount", request);
@@ -1467,7 +1552,9 @@ export const toolHandlers: Record<
     } else if (kind === "secret") {
       if (input.secret !== undefined) request.secret = input.secret;
     }
-    if (input.destination !== undefined) request.destination = input.destination;
+    if (kind !== "project" && input.destination !== undefined) {
+      request.destination = input.destination;
+    }
     return resolver.control("removeContainerMount", request);
   },
   volume_list: async (resolver) => {
@@ -1610,7 +1697,9 @@ function mountsFromInput(
     const mode = mountModeToProto(mount.mode ?? defaultMountMode(mount.kind));
     const result: Record<string, unknown> = { projectName: mount.project ?? "", kind, mode };
     if (mount.path) result.path = mount.path;
-    if (mount.destination) result.destination = mount.destination;
+    if (mountKindOf(mount.kind) !== "project" && mount.destination) {
+      result.destination = mount.destination;
+    }
     if (mount.volume) result.volume = mount.volume;
     if (mount.secret) result.secret = mount.secret;
     return result;

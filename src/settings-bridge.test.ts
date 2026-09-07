@@ -1142,7 +1142,6 @@ test("container_mount_add command drives addContainerMount for each kind", async
       kind: "MOUNT_KIND_PROJECT",
       project: "team",
       path: "src",
-      destination: "/workspace/team",
       mode: "MOUNT_MODE_READ_ONLY",
     },
     {
@@ -1270,7 +1269,6 @@ test("container_mount_remove command drives removeContainerMount for each kind",
       kind: "MOUNT_KIND_PROJECT",
       project: "team",
       path: "src",
-      destination: "/workspace/team",
     },
     {
       workspaceSlug: "w1",

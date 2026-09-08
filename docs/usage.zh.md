@@ -107,6 +107,10 @@ bash 进程）的 `env` 映射；`container_exec` 和 `daemon_start` 已经接�
 根目录或其他保留路径之下。`secret`
 挂载将受管理的机密作为只读文件暴露在绝对容器路径（参见[机密](#机密)）。
 
+`project` 挂载不接受 `destination`：项目目录始终挂载在 projects
+根目录下与之对应的路径上。`destination` 仅适用于 `tmpfs`、`volume` 和 `secret`
+挂载。
+
 `mode` 为 `read_only` 或 `read_write`，默认为
 `read_only`，这样添加挂载永远不会授予未被请求的写权限。`tmpfs` 挂载始终为
 `read_write`，`secret` 挂载不带 mode。工作区自身的项目挂载以 `read_write`

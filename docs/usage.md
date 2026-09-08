@@ -124,6 +124,10 @@ never under the projects root or another reserved path. A `secret` mount exposes
 a managed secret as a read-only file at an absolute container path (see
 [Secrets](#secrets)).
 
+Project mounts do not take a `destination`: a project directory is always
+mounted at its mirrored path under the projects root. `destination` applies only
+to `tmpfs`, `volume` and `secret` mounts.
+
 `mode` is `read_only` or `read_write`, and defaults to `read_only` so that
 adding a mount never grants write access that was not asked for. `tmpfs` mounts
 are always `read_write`, and `secret` mounts take no mode. The workspace's own

@@ -2,7 +2,7 @@
 #
 # SPDX-License-Identifier: MIT
 
-name: CI
+name: CI (code)
 
 on:
   push:
@@ -19,26 +19,10 @@ permissions:
   contents: read
 
 concurrency:
-  group: ci-${{ github.ref }}
+  group: ci-code-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  actions-lint:
-    name: Lint GitHub Actions
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read # only needed for private or internal repos
-      actions: read # only needed for private or internal repos
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - name: Scan workflows with zizmor
-        uses: zizmorcore/zizmor-action@70fb788f84895a7701f5643d103d587e460b5c99 # v0.6.3
-        with:
-          advanced-security: false
-          annotations: true
-
   go:
     name: Go
     runs-on: ubuntu-latest

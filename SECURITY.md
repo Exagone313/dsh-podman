@@ -68,6 +68,11 @@ A guest container **is** a boundary against other containers and the host:
 A **workspace is a single trust domain**: its containers share a pod network
 namespace and can reach each other over localhost.
 
+The guest agent's token is minted when the container record is first created and
+reused for that record's lifetime, including across recreates — recreating a
+container is therefore not a way to rotate it. Removing the container, or the
+workspace, and starting it again mints a fresh one.
+
 ### The orchestrator is the enforcement point
 
 The plugin does not validate on the orchestrator's behalf. Every rule below is

@@ -30,5 +30,8 @@ glob so deno expands it, not the shell); a docs-only workflow enforces this on
 
 - Commit after each change, in small focused commits (one per logical change),
   with a single-line message.
-- Files carry SPDX headers; validate compliance with `reuse lint`.
+- Files carry SPDX headers; validate compliance with
+  `REUSE_ENCODING_MODULE=chardet reuse lint` (the `REUSE_ENCODING_MODULE`
+  variable works around a reuse bug that otherwise false-positives certain UTF-8
+  files, e.g. the Chinese `.zh.md` docs).
 - Prefer implementing with subagents when possible.

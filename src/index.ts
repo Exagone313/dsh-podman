@@ -809,8 +809,70 @@ export function projectMountDestinationReason(
     : `project mounts do not accept a destination; the directory will be mounted at ${mirror}`;
 }
 
+// Resolve a container-side path against the session working directory.
+// Absolute paths pass through unchanged. The session cwd and the container's
+// view of the project coincide because the orchestrator mounts each project at
+// its mirrored path under DSH_PODMAN_PROJECTS_ROOT.
+function resolveAgainstSession(path: string, sessionCwd: unknown): string {
+  if (isAbsolute(path)) return path;
+  const base =
+    typeof sessionCwd === "string" && sessionCwd !== "" ? sessionCwd : undefined;
+  if (base === undefined) {
+    throw new Error(
+      "relative paths need a session working directory; pass an absolute path",
+    );
+  }
+  return resolvePath(base, path);
+}
+
+// Resolve a guest filesystem path against the session working directory.
+//
+// A ".." segment is refused before resolution: afterwards it would have been
+// normalised away, and the guest agent would reject the result with a less
+// helpful error. The guest agent confines these paths to the projects root, so
+// this is a clearer error rather than the boundary itself.
+export function resolveGuestPath(path: string, sessionCwd: unknown): string {
+  if (path.split("/").includes("..")) {
+    throw new Error("path must not escape the workspace");
+  }
+  return resolveAgainstSession(path, sessionCwd);
+}
+
+// Resolve a working directory, or a path handed to a command, against the
+// session working directory. An unset value stays unset, leaving the guest
+// agent's own working directory in place.
+//
+// Unlike resolveGuestPath this does not refuse "..": commands are not confined
+// to the projects root, so rejecting it would be theatre while breaking a
+// legitimate "../sibling" working directory.
+export function resolveGuestCwd(
+  cwd: unknown,
+  sessionCwd: unknown,
+): string | undefined {
+  if (typeof cwd !== "string" || cwd === "") return undefined;
+  return resolveAgainstSession(cwd, sessionCwd);
+}
+
+// The path to show in an approval prompt: the resolved target when it can be
+// worked out, else the value as given. Never throws — a bad path is reported
+// by the handler, and the prompt must still render.
+function approvalPath(path: string, sessionCwd: unknown): string {
+  try {
+    return resolveGuestPath(path, sessionCwd);
+  } catch {
+    return path;
+  }
+}
+
 // Build the single-line approval summary shown for a gated tool call.
-export function summarizeArgs(name: string, args: Record<string, unknown>): string {
+//
+// sessionCwd is used to name the resolved target of a relative path, so the
+// prompt describes the file that will actually be touched.
+export function summarizeArgs(
+  name: string,
+  args: Record<string, unknown>,
+  sessionCwd?: unknown,
+): string {
   const str = (key: string): string | undefined =>
     typeof args[key] === "string" && args[key] !== "" ? (args[key] as string) : undefined;
   const count = (key: string): string | undefined => {
@@ -948,13 +1010,13 @@ export function summarizeArgs(name: string, args: Record<string, unknown>): stri
       const container = str("container");
       const path = str("path");
       if (container === undefined || path === undefined) return "";
-      return `write ${path} in container ${container}`;
+      return `write ${approvalPath(path, sessionCwd)} in container ${container}`;
     }
     case "container_edit": {
       const container = str("container");
       const path = str("path");
       if (container === undefined || path === undefined) return "";
-      return `edit ${path} in container ${container}`;
+      return `edit ${approvalPath(path, sessionCwd)} in container ${container}`;
     }
     case "daemon_start": {
       const container = str("container");
@@ -986,14 +1048,15 @@ export function summarizeArgs(name: string, args: Record<string, unknown>): stri
 export function approvalDecision(
   name: string,
   args?: Record<string, unknown>,
+  sessionCwd?: unknown,
 ): { kind: "ask"; reason: string } | undefined {
   const tool = TOOLS.find((entry) => entry.name === name);
   if (tool === undefined) return undefined;
   if (tool.approval === true) {
-    return { kind: "ask", reason: summarizeArgs(name, args ?? {}) };
+    return { kind: "ask", reason: summarizeArgs(name, args ?? {}, sessionCwd) };
   }
   if (tool.approvalWhen !== undefined && tool.approvalWhen(args ?? {})) {
-    return { kind: "ask", reason: summarizeArgs(name, args ?? {}) };
+    return { kind: "ask", reason: summarizeArgs(name, args ?? {}, sessionCwd) };
   }
   return undefined;
 }
@@ -1095,10 +1158,11 @@ export async function preExecutePolicy(
   }
   if (foldApprovalPolicy(events) === "never") return next();
   const preset = exec.agent?.session?.header?.agentPreset;
+  const sessionCwd = currentCwd(exec);
   if (preset === PODMAN_OPS_PRESET && PODMAN_OPS_APPROVAL_TOOLS.has(name)) {
-    return { kind: "ask", reason: summarizeArgs(name, parsed ?? {}) };
+    return { kind: "ask", reason: summarizeArgs(name, parsed ?? {}, sessionCwd) };
   }
-  return approvalDecision(name, parsed) ?? next();
+  return approvalDecision(name, parsed, sessionCwd) ?? next();
 }
 
 // The reason to deny a mount-bearing tool call that puts a destination on a
@@ -1391,48 +1455,45 @@ export const toolHandlers: Record<
       container: input.container,
     }),
   container_bash: async (resolver, input, exec) => {
-    const binding = await resolveToolBinding(
-      resolver,
-      currentCwd(exec),
-      input.container,
+    const sessionCwd = currentCwd(exec);
+    const binding = await resolveToolBinding(resolver, sessionCwd, input.container);
+    return runExec(
+      binding,
+      ["bash", "-lc", input.command],
+      resolveGuestCwd(input.workdir, sessionCwd),
+      input.env,
     );
-    return runExec(binding, ["bash", "-lc", input.command], input.workdir, input.env);
   },
   container_exec: async (resolver, input, exec) => {
-    const binding = await resolveToolBinding(
-      resolver,
-      currentCwd(exec),
-      input.container,
+    const sessionCwd = currentCwd(exec);
+    const binding = await resolveToolBinding(resolver, sessionCwd, input.container);
+    return runExec(
+      binding,
+      input.argv,
+      resolveGuestCwd(input.cwd, sessionCwd),
+      input.env,
     );
-    return runExec(binding, input.argv, input.cwd, input.env);
   },
   container_read: async (resolver, input, exec) => {
-    const binding = await resolveToolBinding(
-      resolver,
-      currentCwd(exec),
-      input.container,
-    );
-    return readGuestFile(binding, input.path);
+    const sessionCwd = currentCwd(exec);
+    const binding = await resolveToolBinding(resolver, sessionCwd, input.container);
+    return readGuestFile(binding, resolveGuestPath(input.path, sessionCwd));
   },
   container_write: async (resolver, input, exec) => {
-    const binding = await resolveToolBinding(
-      resolver,
-      currentCwd(exec),
-      input.container,
-    );
-    const bytesWritten = await writeGuestFile(binding, input.path, input.content, {
+    const sessionCwd = currentCwd(exec);
+    const binding = await resolveToolBinding(resolver, sessionCwd, input.container);
+    const path = resolveGuestPath(input.path, sessionCwd);
+    const bytesWritten = await writeGuestFile(binding, path, input.content, {
       create: input.create ?? true,
       truncate: input.truncate ?? true,
     });
     return { bytesWritten };
   },
   container_edit: async (resolver, input, exec) => {
-    const binding = await resolveToolBinding(
-      resolver,
-      currentCwd(exec),
-      input.container,
-    );
-    const before = await readGuestFile(binding, input.path);
+    const sessionCwd = currentCwd(exec);
+    const binding = await resolveToolBinding(resolver, sessionCwd, input.container);
+    const path = resolveGuestPath(input.path, sessionCwd);
+    const before = await readGuestFile(binding, path);
     if (typeof input.oldString !== "string" || input.oldString.length === 0) {
       throw new Error("oldString must be a non-empty string");
     }
@@ -1440,22 +1501,19 @@ export const toolHandlers: Record<
       ? before.split(input.oldString).join(input.newString)
       : before.replace(input.oldString, input.newString);
     if (after === before) throw new Error("oldString was not found");
-    await writeGuestFile(binding, input.path, after, {
+    await writeGuestFile(binding, path, after, {
       create: true,
       truncate: true,
     });
     return { before, after };
   },
   container_glob: async (resolver, input, exec) => {
-    const binding = await resolveToolBinding(
-      resolver,
-      currentCwd(exec),
-      input.container,
-    );
+    const sessionCwd = currentCwd(exec);
+    const binding = await resolveToolBinding(resolver, sessionCwd, input.container);
     const result = await runExec(
       binding,
       ["rg", "--files", input.pattern],
-      input.cwd,
+      resolveGuestCwd(input.cwd, sessionCwd),
     );
     return {
       files: outputLines(result.stdout),
@@ -1463,15 +1521,16 @@ export const toolHandlers: Record<
     };
   },
   container_grep: async (resolver, input, exec) => {
-    const binding = await resolveToolBinding(
-      resolver,
-      currentCwd(exec),
-      input.container,
-    );
-    const argv = input.path
-      ? ["rg", "-n", input.pattern, input.path]
+    const sessionCwd = currentCwd(exec);
+    const binding = await resolveToolBinding(resolver, sessionCwd, input.container);
+    const cwd = resolveGuestCwd(input.cwd, sessionCwd);
+    // A search path follows shell semantics: relative to the working
+    // directory when one is given, else to the session's.
+    const path = resolveGuestCwd(input.path, cwd ?? sessionCwd);
+    const argv = path
+      ? ["rg", "-n", input.pattern, path]
       : ["rg", "-n", input.pattern];
-    const result = await runExec(binding, argv, input.cwd);
+    const result = await runExec(binding, argv, cwd);
     return {
       matches: outputLines(result.stdout),
       ...(result.stderr ? { stderr: result.stderr.trim() } : {}),
@@ -1593,14 +1652,12 @@ export const toolHandlers: Record<
       env: input.env,
     }),
   daemon_start: async (resolver, input, exec) => {
-    const binding = await resolveToolBinding(
-      resolver,
-      currentCwd(exec),
-      input.container,
-    );
+    const sessionCwd = currentCwd(exec);
+    const binding = await resolveToolBinding(resolver, sessionCwd, input.container);
     const request: Record<string, unknown> = { argv: input.argv };
     if (input.name !== undefined) request.name = input.name;
-    if (input.cwd !== undefined) request.cwd = input.cwd;
+    const cwd = resolveGuestCwd(input.cwd, sessionCwd);
+    if (cwd !== undefined) request.cwd = cwd;
     if (input.env !== undefined) request.env = input.env;
     if (input.uid !== undefined) {
       if (!Number.isInteger(input.uid) || input.uid < 0) {
@@ -1725,11 +1782,7 @@ function registerTools(ctx: any, resolver: WorkspaceResolver): void {
 export function createFilesystemProvider(resolver: WorkspaceResolver): FilesystemProvider {
   return {
     resolve: async (path: string, opts?: any) => {
-      if (path.split("/").includes(".."))
-        throw new Error("path must not escape the workspace");
-      const resolved = isAbsolute(path)
-        ? path
-        : resolvePath(opts?.cwd ?? process.cwd(), path);
+      const resolved = resolveGuestPath(path, opts?.cwd);
       return {
         targetKey: resolved,
         displayPath: resolved,

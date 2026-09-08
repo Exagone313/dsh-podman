@@ -86,6 +86,10 @@ bash 进程）的 `env` 映射；`container_exec` 和 `daemon_start` 已经接�
 | `container_start` ✱    | `container`, optional `image`, `mounts`, `env`, `secretEnv`          | 启动容器（省略 `image` 时使用默认镜像）；仅在传入 `mounts` 时需要审批 |
 | `container_write`      | `container`, `path`, `content`, optional `create`, `truncate`        | 写入文件                                                              |
 
+路径和工作目录可以是绝对路径或相对路径。相对路径会相对于会话的工作目录解析，项目也正是挂载在容器中的该目录下。`container_read`、`container_write`
+和 `container_edit` 的 `path` 不能包含 `..`
+片段；工作目录可以包含，因为命令不受限于 projects 根目录。
+
 ### 挂载与卷
 
 | 工具                       | 参数                                                                                       | 描述                                                                 |

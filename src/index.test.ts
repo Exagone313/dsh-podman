@@ -18,6 +18,8 @@ import {
   approvalDecision,
   preExecutePolicy,
   summarizeArgs,
+  resolveGuestPath,
+  resolveGuestCwd,
   foldSandboxMode,
   foldApprovalPolicy,
   READ_ONLY_TOOLS,
@@ -1498,4 +1500,283 @@ test("container_list renders secret_env pairs on container rows", async () => {
     out,
   );
   assert.ok(out.includes("  worker: stopped"), out);
+});
+
+test("resolveGuestPath resolves relative paths and refuses traversal", () => {
+  assert.equal(resolveGuestPath("/abs/file", "/projects/team"), "/abs/file");
+  assert.equal(resolveGuestPath("README.md", "/projects/team"), "/projects/team/README.md");
+  assert.equal(resolveGuestPath("src/main.go", "/projects/team"), "/projects/team/src/main.go");
+  assert.equal(resolveGuestPath("./a", "/projects/team"), "/projects/team/a");
+  // ".." is refused before resolution, where it would be normalised away.
+  assert.throws(() => resolveGuestPath("../escape", "/projects/team"), /must not escape/);
+  assert.throws(() => resolveGuestPath("a/../b", "/projects/team"), /must not escape/);
+  assert.throws(() => resolveGuestPath("/a/../b", "/projects/team"), /must not escape/);
+  // A relative path is meaningless without a session working directory.
+  assert.throws(() => resolveGuestPath("rel", undefined), /session working directory/);
+  assert.throws(() => resolveGuestPath("rel", ""), /session working directory/);
+  assert.equal(resolveGuestPath("/abs", undefined), "/abs");
+});
+
+test("resolveGuestCwd resolves working directories but keeps traversal", () => {
+  assert.equal(resolveGuestCwd(undefined, "/projects/team"), undefined);
+  assert.equal(resolveGuestCwd("", "/projects/team"), undefined);
+  assert.equal(resolveGuestCwd("/abs", "/projects/team"), "/abs");
+  assert.equal(resolveGuestCwd("sub", "/projects/team"), "/projects/team/sub");
+  // Commands are not confined to the projects root, so ".." is allowed here.
+  assert.equal(resolveGuestCwd("../sibling", "/projects/team"), "/projects/sibling");
+});
+
+// Stubs the guest agent's streaming ReadFile/WriteFile calls, recording the
+// paths the tools ask for.
+function guestFileRecorder(content = "hello") {
+  const reads: string[] = [];
+  const writes: { path: string; content: string }[] = [];
+  const guest = {
+    readFile: (request: any) => {
+      reads.push(request.path);
+      const handlers: Record<string, ((value?: unknown) => void)[]> = {};
+      queueMicrotask(() => {
+        for (const handler of handlers.data ?? []) {
+          handler({ data: Buffer.from(content) });
+        }
+        for (const handler of handlers.end ?? []) handler();
+      });
+      return {
+        on(event: string, handler: (value?: unknown) => void) {
+          (handlers[event] ??= []).push(handler);
+        },
+      };
+    },
+    writeFile: (
+      _metadata: unknown,
+      _options: unknown,
+      callback: (error: Error | null, result: unknown) => void,
+    ) => {
+      let path = "";
+      let body = "";
+      return {
+        write(message: any) {
+          if (message.start !== undefined) path = message.start.path;
+          if (message.dataChunk !== undefined) body += String(message.dataChunk);
+        },
+        end() {
+          writes.push({ path, content: body });
+          callback(null, { bytesWritten: body.length });
+        },
+      };
+    },
+  };
+  const resolver = {
+    resolve: async () => ({ guest, token: "t", socket: "/run/x.sock" }),
+    containerBinding: async () => ({ guest, token: "t", socket: "/run/x.sock" }),
+  };
+  return { reads, writes, resolver };
+}
+
+test("file tools resolve relative paths against the session cwd", async () => {
+  const exec = { agent: { session: { header: { cwd: "/projects/team" } } } };
+
+  const read = guestFileRecorder();
+  await toolHandlers.container_read(
+    read.resolver as never,
+    { container: "default", path: "README.md" },
+    exec,
+  );
+  assert.deepEqual(read.reads, ["/projects/team/README.md"]);
+
+  const absolute = guestFileRecorder();
+  await toolHandlers.container_read(
+    absolute.resolver as never,
+    { container: "default", path: "/etc/hosts" },
+    exec,
+  );
+  assert.deepEqual(absolute.reads, ["/etc/hosts"], "absolute paths pass through");
+
+  const write = guestFileRecorder();
+  await toolHandlers.container_write(
+    write.resolver as never,
+    { container: "default", path: "out.txt", content: "x" },
+    exec,
+  );
+  assert.deepEqual(write.writes.map((entry) => entry.path), ["/projects/team/out.txt"]);
+
+  const edit = guestFileRecorder("hello");
+  await toolHandlers.container_edit(
+    edit.resolver as never,
+    { container: "default", path: "a.txt", oldString: "hello", newString: "bye" },
+    exec,
+  );
+  assert.deepEqual(edit.reads, ["/projects/team/a.txt"]);
+  assert.deepEqual(edit.writes.map((entry) => entry.path), ["/projects/team/a.txt"]);
+});
+
+test("file tools refuse traversal before reaching the guest", async () => {
+  const exec = { agent: { session: { header: { cwd: "/projects/team" } } } };
+  const { reads, writes, resolver } = guestFileRecorder();
+  for (const path of ["../escape", "a/../../b"]) {
+    await assert.rejects(
+      () => toolHandlers.container_read(resolver as never, { container: "default", path }, exec),
+      /must not escape/,
+    );
+  }
+  await assert.rejects(
+    () =>
+      toolHandlers.container_write(
+        resolver as never,
+        { container: "default", path: "../escape", content: "x" },
+        exec,
+      ),
+    /must not escape/,
+  );
+  assert.deepEqual(reads, [], "a refused path must not reach the guest");
+  assert.deepEqual(writes, []);
+});
+
+test("approval prompts name the resolved path", () => {
+  assert.equal(
+    summarizeArgs("container_write", { container: "c", path: "notes.md" }, "/projects/team"),
+    "write /projects/team/notes.md in container c",
+  );
+  assert.equal(
+    summarizeArgs("container_edit", { container: "c", path: "notes.md" }, "/projects/team"),
+    "edit /projects/team/notes.md in container c",
+  );
+  // Without a session cwd, or for a path that cannot resolve, the prompt still
+  // renders with the value as given.
+  assert.equal(
+    summarizeArgs("container_write", { container: "c", path: "notes.md" }),
+    "write notes.md in container c",
+  );
+  assert.equal(
+    summarizeArgs("container_write", { container: "c", path: "../x" }, "/projects/team"),
+    "write ../x in container c",
+  );
+});
+
+// Stubs the guest agent's streaming Exec call, recording the start message.
+function guestExecRecorder() {
+  const starts: { argv: string[]; cwd?: string }[] = [];
+  const guest = {
+    exec: () => {
+      const handlers: Record<string, ((value?: unknown) => void)[]> = {};
+      return {
+        on(event: string, handler: (value?: unknown) => void) {
+          (handlers[event] ??= []).push(handler);
+        },
+        write(message: any) {
+          starts.push({ argv: message.start.argv, cwd: message.start.cwd });
+        },
+        end() {
+          for (const handler of handlers.data ?? []) {
+            handler({ exit: { exitCode: 0, signaled: false } });
+          }
+        },
+      };
+    },
+  };
+  const resolver = {
+    resolve: async () => ({ guest, token: "t", socket: "/run/x.sock" }),
+    containerBinding: async () => ({ guest, token: "t", socket: "/run/x.sock" }),
+  };
+  return { starts, resolver };
+}
+
+test("command tools resolve a relative working directory", async () => {
+  const exec = { agent: { session: { header: { cwd: "/projects/team" } } } };
+
+  const bash = guestExecRecorder();
+  await toolHandlers.container_bash(
+    bash.resolver as never,
+    { container: "default", command: "ls", workdir: "sub" },
+    exec,
+  );
+  assert.equal(bash.starts[0].cwd, "/projects/team/sub");
+
+  const run = guestExecRecorder();
+  await toolHandlers.container_exec(
+    run.resolver as never,
+    { container: "default", argv: ["ls"], cwd: "/abs" },
+    exec,
+  );
+  assert.equal(run.starts[0].cwd, "/abs", "absolute working directories pass through");
+
+  // An unset working directory stays unset: the guest agent's own is used.
+  const bare = guestExecRecorder();
+  await toolHandlers.container_exec(
+    bare.resolver as never,
+    { container: "default", argv: ["ls"] },
+    exec,
+  );
+  assert.equal(bare.starts[0].cwd, undefined);
+
+  // Commands are not confined to the projects root, so ".." is allowed.
+  const up = guestExecRecorder();
+  await toolHandlers.container_bash(
+    up.resolver as never,
+    { container: "default", command: "ls", workdir: "../sibling" },
+    exec,
+  );
+  assert.equal(up.starts[0].cwd, "/projects/sibling");
+});
+
+test("container_grep resolves its search path like a shell would", async () => {
+  const exec = { agent: { session: { header: { cwd: "/projects/team" } } } };
+
+  // Without a working directory the path is relative to the session's.
+  const plain = guestExecRecorder();
+  await toolHandlers.container_grep(
+    plain.resolver as never,
+    { container: "default", pattern: "TODO", path: "src" },
+    exec,
+  );
+  assert.deepEqual(plain.starts[0].argv, ["/usr/bin/rg", "-n", "TODO", "/projects/team/src"]);
+
+  // With one, the path is relative to that working directory.
+  const nested = guestExecRecorder();
+  await toolHandlers.container_grep(
+    nested.resolver as never,
+    { container: "default", pattern: "TODO", path: "src", cwd: "app" },
+    exec,
+  );
+  assert.deepEqual(nested.starts[0].argv, ["/usr/bin/rg", "-n", "TODO", "/projects/team/app/src"]);
+  assert.equal(nested.starts[0].cwd, "/projects/team/app");
+
+  const none = guestExecRecorder();
+  await toolHandlers.container_grep(
+    none.resolver as never,
+    { container: "default", pattern: "TODO" },
+    exec,
+  );
+  assert.deepEqual(none.starts[0].argv, ["/usr/bin/rg", "-n", "TODO"]);
+});
+
+test("daemon_start resolves a relative working directory", async () => {
+  let captured: Record<string, unknown> | undefined;
+  const resolver = {
+    containerBinding: async () => ({
+      guest: {
+        startDaemon: (
+          request: Record<string, unknown>,
+          _metadata: unknown,
+          callback: (error: Error | null, result: unknown) => void,
+        ) => {
+          captured = request;
+          callback(null, { name: "d", running: true, argv: ["x"] });
+        },
+      },
+      token: "t",
+      socket: "/run/x.sock",
+    }),
+  };
+  const exec = { agent: { session: { header: { cwd: "/projects/team" } } } };
+  await toolHandlers.daemon_start(
+    resolver as never,
+    { container: "c", argv: ["x"], cwd: "sub" },
+    exec,
+  );
+  assert.equal(captured!.cwd, "/projects/team/sub");
+
+  captured = undefined;
+  await toolHandlers.daemon_start(resolver as never, { container: "c", argv: ["x"] }, exec);
+  assert.equal(captured!.cwd, undefined, "an unset working directory stays unset");
 });

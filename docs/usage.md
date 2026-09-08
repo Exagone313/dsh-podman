@@ -100,6 +100,12 @@ guest-agent wiring.
 | `container_start` ✱    | `container`, optional `image`, `mounts`, `env`, `secretEnv`          | Start a container (default image when `image` is omitted); approval required only when `mounts` is passed                  |
 | `container_write`      | `container`, `path`, `content`, optional `create`, `truncate`        | Write a file                                                                                                               |
 
+Paths and working directories may be absolute or relative. A relative value is
+resolved against the session's working directory, which is also where the
+project is mounted inside the container. A `path` on `container_read`,
+`container_write` and `container_edit` may not contain a `..` segment; working
+directories may, since commands are not confined to the projects root.
+
 ### Mounts and volumes
 
 | Tool                       | Params                                                                                     | Description                                                                |

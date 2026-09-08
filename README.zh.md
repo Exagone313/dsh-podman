@@ -12,30 +12,30 @@ SPDX-License-Identifier: MIT
 [![orchestrator](https://img.shields.io/badge/orchestrator-GHCR-blue)](https://github.com/Exagone313/dsh-podman/pkgs/container/dsh-podman%2Forchestrator)
 [![guest-agent](https://img.shields.io/badge/guest--agent-GHCR-blue)](https://github.com/Exagone313/dsh-podman/pkgs/container/dsh-podman%2Fguest-agent)
 
-English | [中文](README.zh.md)
+[English](README.md) | 中文
 
-[Podman](https://podman.io/)-backed execution for
-[DeepSeek Harness](https://deepseek.com/harness) (`dsh`).
+基于 [Podman](https://podman.io/) 的
+[DeepSeek Harness](https://deepseek.com/harness)（`dsh`）执行后端。
 
-dsh-podman routes all shell execution and file access through disposable and
-per-project Podman containers.
+dsh-podman 将所有的 shell 执行与文件访问都路由到一次性、按项目隔离的 Podman
+容器中。
 
-## Documentation
+## 文档
 
-- **[Install DeepSeek Harness & dsh-podman with Podman rootless](docs/install-dsh-and-dsh-podman.md)**
-- [Architecture](docs/architecture.md)
-- [Configuration](docs/configuration.md)
-- [Usage](docs/usage.md)
-- [Development](docs/development.md)
+- **[使用 Podman rootless 安装 DeepSeek Harness 与 dsh-podman](docs/install-dsh-and-dsh-podman.zh.md)**
+- [架构](docs/architecture.zh.md)
+- [配置](docs/configuration.zh.md)
+- [使用](docs/usage.zh.md)
+- [开发](docs/development.zh.md)
 
-## AI-usage disclosure
+## AI 使用声明
 
-This repository was written in major parts using AI models:
+本仓库的大部分代码由 AI 模型编写：
 
-- early commits using OpenAI GPT-5.6 Luna
+- 早期提交使用 OpenAI GPT-5.6 Luna
 - DeepSeek V4 Flash
-- source code weakness fixes by Anthropic Claude Opus 5
+- 源代码弱点修复由 Anthropic Claude Opus 5 完成
 
-## License
+## 许可证
 
 [MIT](./LICENSE)

@@ -26,6 +26,7 @@ import {
   PODMAN_OPS_PRESET_YML,
   PODMAN_OPS_AGENT_CORDIS_YML,
   ensurePodmanOpsPreset,
+  publicContainer,
 } from "./index.js";
 
 test("remoteArgv remaps ripgrep onto the guest path", () => {
@@ -1400,7 +1401,7 @@ test("summarizeArgs includes env keys for container start/recreate", () => {
   );
 });
 
-test("container_list renders env keys on container rows", async () => {
+test("container_list returns sanitized container objects with env values", async () => {
   const resolver = {
     registry: {
       resolveByPath: async () => ({ id: "team" }),
@@ -1430,20 +1431,38 @@ test("container_list renders env keys on container rows", async () => {
           ],
         };
       }
-      return { workspaces: [] };
+      return {};
     },
   } as never;
   const exec = { agent: { session: { header: { cwd: "/proj" } } } };
-  const out = (await toolHandlers.container_list(resolver, {}, exec)) as string;
-  assert.ok(
-    out.includes("default: running (image img-1)  env=PATH, HOME"),
-    out,
-  );
-  assert.ok(out.includes("  db: running  env=PORT, DB, X, Y"), out);
-  assert.ok(out.includes("  worker: stopped"), out);
+  const out = (await toolHandlers.container_list(resolver, {}, exec)) as any[];
+  assert.deepEqual(out, [
+    {
+      containerName: "default",
+      status: "running",
+      imageId: "img-1",
+      mounts: [],
+      env: { PATH: "/bin", HOME: "/root" },
+      secretEnv: {},
+    },
+    {
+      containerName: "db",
+      status: "running",
+      mounts: [],
+      env: { PORT: "5432", DB: "main", X: "1", Y: "2" },
+      secretEnv: {},
+    },
+    {
+      containerName: "worker",
+      status: "stopped",
+      mounts: [],
+      env: {},
+      secretEnv: {},
+    },
+  ]);
 });
 
-test("container_list renders secret_env pairs on container rows", async () => {
+test("container_list returns secret_env maps on container rows", async () => {
   const resolver = {
     registry: {
       resolveByPath: async () => ({ id: "team" }),
@@ -1484,22 +1503,260 @@ test("container_list renders secret_env pairs on container rows", async () => {
           ],
         };
       }
-      return { workspaces: [] };
+      return {};
     },
   } as never;
   const exec = { agent: { session: { header: { cwd: "/proj" } } } };
-  const out = (await toolHandlers.container_list(resolver, {}, exec)) as string;
-  assert.ok(
-    out.includes("default: running (image img-1)  secret_env=REDIS_PASSWORD=db-pass"),
-    out,
+  const out = (await toolHandlers.container_list(resolver, {}, exec)) as any[];
+  assert.deepEqual(out, [
+    {
+      containerName: "default",
+      status: "running",
+      imageId: "img-1",
+      mounts: [],
+      env: {},
+      secretEnv: { REDIS_PASSWORD: "db-pass" },
+    },
+    {
+      containerName: "db",
+      status: "running",
+      mounts: [],
+      env: {},
+      secretEnv: {
+        A: "a",
+        B: "b",
+        C: "c",
+        D: "d",
+        E: "e",
+        F: "f",
+        G: "g",
+        H: "h",
+        I: "i",
+        J: "j",
+      },
+    },
+    {
+      containerName: "worker",
+      status: "stopped",
+      mounts: [],
+      env: {},
+      secretEnv: {},
+    },
+  ]);
+});
+
+test("container_list reports an uncreated default container as not started", async () => {
+  const resolver = {
+    registry: {
+      resolveByPath: async () => ({ id: "team" }),
+    },
+    control: async () => ({ containers: [] }),
+  } as never;
+  const exec = { agent: { session: { header: { cwd: "/proj" } } } };
+  const out = (await toolHandlers.container_list(resolver, {}, exec)) as any[];
+  assert.deepEqual(out, [
+    { containerName: "default", status: "not started" },
+  ]);
+});
+
+const SECRET_BEARING_CONTAINER = {
+  workspaceSlug: "team",
+  containerName: "default",
+  imageId: "img-1",
+  status: "running",
+  createdAt: "2026-01-01T00:00:00Z",
+  podmanName: "dsh-workspace-team-default",
+  agentSocketPath: "/run/dsh-podman/team-default/guest.sock",
+  agentToken: "super-secret-token",
+  mounts: [
+    { projectName: "team", mode: "MOUNT_MODE_READ_WRITE", kind: "MOUNT_KIND_PROJECT" },
+  ],
+  env: { PATH: "/bin", DB_PASSWORD: "hunter2" },
+  secretEnv: { DB_PASS: "db-pass" },
+};
+
+function secretBearingResolver() {
+  return {
+    registry: {
+      resolveByPath: async () => ({ id: "team" }),
+    },
+    getConfig: () => ({ projectsRoot: "/projects" }),
+    control: async () => SECRET_BEARING_CONTAINER,
+  };
+}
+
+test("container tools never expose internal fields in their results", async () => {
+  const exec = { agent: { session: { header: { cwd: "/projects/team" } } } };
+  const cases: Array<[any, Record<string, unknown>]> = [
+    [toolHandlers.container_start, { container: "default", image: "img-1" }],
+    [toolHandlers.container_recreate, { container: "default" }],
+    [toolHandlers.container_mount_add, { container: "default", kind: "volume", volume: "v", destination: "/data" }],
+    [toolHandlers.container_mount_remove, { container: "default", kind: "volume", volume: "v", destination: "/data" }],
+    [toolHandlers.container_secret_add, { container: "default", env: "DB_PASS", secret: "db-pass" }],
+    [toolHandlers.container_secret_remove, { container: "default", env: "DB_PASS" }],
+  ];
+  for (const [handler, input] of cases) {
+    const out = await handler(secretBearingResolver(), input, exec);
+    const json = JSON.stringify(out);
+    assert.ok(!json.includes("agentSocketPath"), "must not expose agentSocketPath");
+    assert.ok(!json.includes("agentToken"), "must not expose agentToken");
+    assert.ok(!json.includes("podmanName"), "must not expose podmanName");
+    assert.ok(!json.includes("workspaceSlug"), "must not expose workspaceSlug");
+    assert.ok(!json.includes("createdAt"), "must not expose createdAt");
+    assert.ok(json.includes("hunter2"), "env values are returned to the model");
+    assert.equal(out.containerName, "default");
+    assert.equal(out.status, "running");
+    assert.equal(out.imageId, "img-1");
+    assert.equal(out.secretEnv.DB_PASS, "db-pass");
+  }
+});
+
+test("publicContainer rebuilds a safe object from an API row", () => {
+  const out = publicContainer(SECRET_BEARING_CONTAINER);
+  assert.deepEqual(Object.keys(out).sort(), [
+    "containerName",
+    "env",
+    "imageId",
+    "mounts",
+    "secretEnv",
+    "status",
+  ]);
+  assert.deepEqual(out.mounts, [
+    { projectName: "team", mode: "MOUNT_MODE_READ_WRITE", kind: "MOUNT_KIND_PROJECT" },
+  ]);
+  assert.deepEqual(out.env, { PATH: "/bin", DB_PASSWORD: "hunter2" });
+});
+
+test("image_list returns image objects", async () => {
+  const resolver = {
+    control: async () => ({
+      images: [
+        {
+          imageId: "archlinux",
+          isBase: true,
+          status: "built",
+          primitive: "docker.io/library/archlinux:latest",
+          packageManager: "pacman",
+          basePublic: false,
+        },
+        {
+          imageId: "dev",
+          parent: "ubuntu",
+          status: "built",
+          packages: ["git"],
+          packageManager: "apt",
+        },
+      ],
+    }),
+  } as never;
+  const out = await toolHandlers.image_list(resolver, {}, {});
+  assert.deepEqual(out, [
+    {
+      imageId: "archlinux",
+      isBase: true,
+      status: "built",
+      primitive: "docker.io/library/archlinux:latest",
+      packageManager: "pacman",
+      basePublic: false,
+      packages: [],
+    },
+    {
+      imageId: "dev",
+      parent: "ubuntu",
+      isBase: false,
+      status: "built",
+      packageManager: "apt",
+      basePublic: false,
+      packages: ["git"],
+    },
+  ]);
+});
+
+test("volume_list and secret_list return name objects", async () => {
+  const volumeResolver = {
+    control: async () => ({ volumes: [{ name: "myvol" }] }),
+  } as never;
+  assert.deepEqual(
+    await toolHandlers.volume_list(volumeResolver, {}, {}),
+    [{ name: "myvol" }],
   );
-  assert.ok(
-    out.includes(
-      "  db: running  secret_env=A=a, B=b, C=c, D=d, E=e, F=f, G=g, H=h, +2 more",
-    ),
-    out,
+  const secretResolver = {
+    control: async () => ({ secrets: [{ name: "dbpass" }] }),
+  } as never;
+  assert.deepEqual(
+    await toolHandlers.secret_list(secretResolver, {}, {}),
+    [{ name: "dbpass" }],
   );
-  assert.ok(out.includes("  worker: stopped"), out);
+});
+
+test("container_mount_list returns mount objects", async () => {
+  const resolver = {
+    registry: {
+      resolveByPath: async () => ({ id: "team" }),
+    },
+    control: async () => ({
+      containers: [
+        {
+          workspaceSlug: "team",
+          containerName: "default",
+          mounts: [
+            { projectName: "team", mode: "MOUNT_MODE_READ_WRITE", kind: "MOUNT_KIND_PROJECT" },
+            { volume: "myvol", destination: "/data", mode: "MOUNT_MODE_READ_ONLY", kind: "MOUNT_KIND_VOLUME" },
+          ],
+        },
+      ],
+    }),
+  } as never;
+  const exec = { agent: { session: { header: { cwd: "/projects/team" } } } };
+  const out = await toolHandlers.container_mount_list(
+    resolver,
+    { container: "default" },
+    exec,
+  );
+  assert.deepEqual(out, [
+    { projectName: "team", mode: "MOUNT_MODE_READ_WRITE", kind: "MOUNT_KIND_PROJECT" },
+    { volume: "myvol", destination: "/data", mode: "MOUNT_MODE_READ_ONLY", kind: "MOUNT_KIND_VOLUME" },
+  ]);
+});
+
+test("image_rebuild_all returns rebuilt and skipped arrays", async () => {
+  const resolver = {
+    control: async () => ({ rebuilt: ["archlinux", "dev"], skipped: ["broken"] }),
+  } as never;
+  const out = await toolHandlers.image_rebuild_all(resolver, {}, {});
+  assert.deepEqual(out, { rebuilt: ["archlinux", "dev"], skipped: ["broken"] });
+});
+
+test("daemon_start returns a daemon info object", async () => {
+  const resolver = {
+    resolve: async () => ({
+      guest: {
+        startDaemon: (_metadata: unknown, _request: unknown, callback: any) =>
+          callback(null, {
+            name: "web",
+            running: true,
+            argv: ["python3", "-m", "http.server", "8000"],
+            uid: 1000,
+            gid: 1000,
+          }),
+      },
+      token: "t",
+      socket: "/run/x.sock",
+    }),
+  } as never;
+  const exec = { agent: { session: { header: { cwd: "/proj" } } } };
+  const out = await toolHandlers.daemon_start(
+    resolver,
+    { container: "default", argv: ["python3", "-m", "http.server", "8000"], name: "web" },
+    exec,
+  );
+  assert.deepEqual(out, {
+    name: "web",
+    running: true,
+    argv: ["python3", "-m", "http.server", "8000"],
+    uid: 1000,
+    gid: 1000,
+  });
 });
 
 test("resolveGuestPath resolves relative paths and refuses traversal", () => {

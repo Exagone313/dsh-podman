@@ -1334,102 +1334,61 @@ export const toolHandlers: Record<
 > = {
   image_list: async (resolver) => {
     const result = await resolver.control<{ images?: any[] }>("listImages", {});
-    const rows = (result.images ?? []).map((image: any) => {
-      if (image.isBase) {
-        return `${image.imageId}  base  pm=${image.packageManager}  primitive=${image.primitive}  status=${image.status}`;
-      }
-      const packages = (image.packages ?? []).length > 0
-        ? (image.packages ?? []).join(", ")
-        : "(none)";
-      return `${image.imageId}  parent=${image.parent}  pm=${image.packageManager}  status=${image.status}  built=${image.builtAt}  packages=${packages}`;
-    });
-    return rows.length > 0 ? rows.join("\n") : "(no images)";
+    return (result.images ?? []).map(publicImage);
   },
   image_get: async (resolver, input) =>
-    resolver.control("getImage", { imageId: input.imageId }),
+    publicImage(
+      await resolver.control("getImage", { imageId: input.imageId }),
+    ),
   image_build: async (resolver, input) =>
-    resolver.control("buildImage", {
-      imageId: input.imageId,
-      parent: input.parent,
-      packages: input.packages,
-    }),
+    publicImage(
+      await resolver.control("buildImage", {
+        imageId: input.imageId,
+        parent: input.parent,
+        packages: input.packages,
+      }),
+    ),
   image_rebuild: async (resolver, input) =>
-    resolver.control("rebuildImage", { imageId: input.imageId }),
+    publicImage(
+      await resolver.control("rebuildImage", { imageId: input.imageId }),
+    ),
   image_rebuild_all: async (resolver) => {
     const result = await resolver.control<{ rebuilt?: string[]; skipped?: string[] }>(
       "rebuildAllImages",
       {},
     );
-    const rebuilt = (result.rebuilt ?? []).join(", ");
-    const skipped = (result.skipped ?? []).join(", ");
-    return `rebuilt: ${rebuilt || "(none)"}${skipped ? `\nskipped: ${skipped}` : ""}`;
+    return {
+      rebuilt: result.rebuilt ?? [],
+      skipped: result.skipped ?? [],
+    };
   },
-  image_remove: async (resolver, input) =>
-    resolver.control("removeImage", { imageId: input.imageId }),
+  image_remove: async (resolver, input) => {
+    await resolver.control("removeImage", { imageId: input.imageId });
+    return { removed: input.imageId };
+  },
   container_list: async (resolver, _input, exec) => {
     const slug = await sessionWorkspaceSlug(resolver, currentCwd(exec));
-    const [containersResult, workspacesResult] = await Promise.all([
-      resolver.control<{ containers?: any[] }>("listContainers", {}),
-      resolver.control<{ workspaces?: any[] }>("listWorkspaces", {}),
-    ]);
-    void workspacesResult;
-    const rows = (containersResult.containers ?? []).filter(
+    const result = await resolver.control<{ containers?: any[] }>(
+      "listContainers",
+      {},
+    );
+    const rows = (result.containers ?? []).filter(
       (row: any) => row.workspaceSlug === slug,
     );
-    const lines = [`workspace ${slug}`];
-    const envList = (env: unknown): string | undefined => {
-      if (typeof env !== "object" || env === null || Array.isArray(env)) {
-        return undefined;
-      }
-      const keys = Object.keys(env);
-      if (keys.length === 0) return undefined;
-      return list(keys, (key) => String(key));
-    };
-    const secretEnvList = (env: unknown): string | undefined => {
-      if (typeof env !== "object" || env === null || Array.isArray(env)) {
-        return undefined;
-      }
-      const entries = Object.entries(env);
-      if (entries.length === 0) return undefined;
-      return list(entries, (item) => {
-        const [key, value] = item as [string, unknown];
-        return `${key}=${String(value)}`;
-      });
-    };
     const defaultRow = rows.find((row: any) => row.containerName === "default");
-    const defaultEnv = envList(defaultRow?.env);
-    const defaultSecrets = secretEnvList(defaultRow?.secretEnv);
-    lines.push(
-      defaultRow === undefined
-        ? "default: not started (will be started on demand)"
-        : `default: ${defaultRow.status}${
-            defaultRow.imageId ? ` (image ${defaultRow.imageId})` : ""
-          }${defaultEnv === undefined ? "" : `  env=${defaultEnv}`}${
-            defaultSecrets === undefined ? "" : `  secret_env=${defaultSecrets}`
-          }`,
-    );
-    const named = rows.filter((row: any) => row.containerName !== "default");
-    if (named.length === 0) {
-      lines.push("named containers: (none)");
-    } else {
-      lines.push("named containers:");
-      for (const row of named) {
-        const env = envList(row.env);
-        const secrets = secretEnvList(row.secretEnv);
-        lines.push(
-          `  ${row.containerName}: ${row.status}${
-            row.imageId ? ` (image ${row.imageId})` : ""
-          }${env === undefined ? "" : `  env=${env}`}${
-            secrets === undefined ? "" : `  secret_env=${secrets}`
-          }`,
-        );
-      }
-    }
-    return lines.join("\n");
+    const listed = defaultRow === undefined
+      ? [{ containerName: "default", status: "not started" }]
+      : [publicContainer(defaultRow)];
+    return [
+      ...listed,
+      ...rows
+        .filter((row: any) => row.containerName !== "default")
+        .map(publicContainer),
+    ];
   },
   container_start: async (resolver, input, exec) => {
     const mounts = mountsFromInput(input.mounts);
-    return resolver.control("startContainer", {
+    const row = await resolver.control("startContainer", {
       workspaceSlug: await sessionWorkspaceSlug(resolver, currentCwd(exec)),
       container: input.container,
       imageId: input.image,
@@ -1437,10 +1396,11 @@ export const toolHandlers: Record<
       ...(input.env !== undefined ? { env: input.env } : {}),
       ...(input.secretEnv !== undefined ? { secretEnv: input.secretEnv } : {}),
     });
+    return publicContainer(row);
   },
   container_recreate: async (resolver, input, exec) => {
     const mounts = mountsFromInput(input.mounts);
-    return resolver.control("recreateContainer", {
+    const row = await resolver.control("recreateContainer", {
       workspaceSlug: await sessionWorkspaceSlug(resolver, currentCwd(exec)),
       container: input.container,
       imageId: input.image ?? "",
@@ -1448,12 +1408,15 @@ export const toolHandlers: Record<
       ...(input.env !== undefined ? { env: input.env } : {}),
       ...(input.secretEnv !== undefined ? { secretEnv: input.secretEnv } : {}),
     });
+    return publicContainer(row);
   },
-  container_remove: async (resolver, input, exec) =>
-    resolver.control("removeContainer", {
+  container_remove: async (resolver, input, exec) => {
+    await resolver.control("removeContainer", {
       workspaceSlug: await sessionWorkspaceSlug(resolver, currentCwd(exec)),
       container: input.container,
-    }),
+    });
+    return { removed: input.container };
+  },
   container_bash: async (resolver, input, exec) => {
     const sessionCwd = currentCwd(exec);
     const binding = await resolveToolBinding(resolver, sessionCwd, input.container);
@@ -1553,18 +1516,7 @@ export const toolHandlers: Record<
       );
     }
     const mounts = row.mounts ?? [];
-    if (mounts.length === 0) return "(no mounts)";
-    return mounts
-      .map((mount: any) => {
-        const parts = [
-          `project=${mount.projectName}`,
-          `mode=${mount.mode}`,
-          ...(mount.path ? [`path=${mount.path}`] : []),
-          ...(mount.destination ? [`destination=${mount.destination}`] : []),
-        ];
-        return parts.join("  ");
-      })
-      .join("\n");
+    return mounts.map(publicMount);
   },
   container_mount_add: async (resolver, input, exec) => {
     const kind = input.kind ?? "project";
@@ -1593,7 +1545,8 @@ export const toolHandlers: Record<
       if (input.path !== undefined) request.path = input.path;
       request.mode = mode;
     }
-    return resolver.control("addContainerMount", request);
+    const row = await resolver.control("addContainerMount", request);
+    return publicContainer(row);
   },
   container_mount_remove: async (resolver, input, exec) => {
     const kind = input.kind ?? "project";
@@ -1614,43 +1567,54 @@ export const toolHandlers: Record<
     if (kind !== "project" && input.destination !== undefined) {
       request.destination = input.destination;
     }
-    return resolver.control("removeContainerMount", request);
+    const row = await resolver.control("removeContainerMount", request);
+    return publicContainer(row);
   },
   volume_list: async (resolver) => {
     const result = await resolver.control<{ volumes?: any[] }>("listVolumes", {});
-    const rows = (result.volumes ?? []).map((volume: any) => volume.name);
-    return rows.length > 0 ? rows.join("\n") : "(no volumes)";
+    return (result.volumes ?? []).map((volume: any) => ({ name: volume.name }));
   },
-  volume_create: async (resolver, input) =>
-    resolver.control("createVolume", { name: input.name }),
-  volume_remove: async (resolver, input) =>
-    resolver.control("removeVolume", { name: input.name }),
+  volume_create: async (resolver, input) => {
+    await resolver.control("createVolume", { name: input.name });
+    return { name: input.name };
+  },
+  volume_remove: async (resolver, input) => {
+    await resolver.control("removeVolume", { name: input.name });
+    return { removed: input.name };
+  },
   secret_list: async (resolver) => {
     const result = await resolver.control<{ secrets?: any[] }>("listSecrets", {});
-    const rows = (result.secrets ?? []).map((secret: any) => secret.name);
-    return rows.length > 0 ? rows.join("\n") : "(no secrets)";
+    return (result.secrets ?? []).map((secret: any) => ({ name: secret.name }));
   },
-  secret_create: async (resolver, input) =>
-    resolver.control("createSecret", {
+  secret_create: async (resolver, input) => {
+    await resolver.control("createSecret", {
       name: input.name,
       ...(input.length ? { length: input.length } : {}),
       ...(input.charset ? { charset: input.charset } : {}),
-    }),
-  secret_remove: async (resolver, input) =>
-    resolver.control("removeSecret", { name: input.name }),
-  container_secret_add: async (resolver, input, exec) =>
-    resolver.control("addContainerSecret", {
+    });
+    return { name: input.name };
+  },
+  secret_remove: async (resolver, input) => {
+    await resolver.control("removeSecret", { name: input.name });
+    return { removed: input.name };
+  },
+  container_secret_add: async (resolver, input, exec) => {
+    const row = await resolver.control("addContainerSecret", {
       workspaceSlug: await sessionWorkspaceSlug(resolver, currentCwd(exec)),
       container: input.container,
       env: input.env,
       secret: input.secret,
-    }),
-  container_secret_remove: async (resolver, input, exec) =>
-    resolver.control("removeContainerSecret", {
+    });
+    return publicContainer(row);
+  },
+  container_secret_remove: async (resolver, input, exec) => {
+    const row = await resolver.control("removeContainerSecret", {
       workspaceSlug: await sessionWorkspaceSlug(resolver, currentCwd(exec)),
       container: input.container,
       env: input.env,
-    }),
+    });
+    return publicContainer(row);
+  },
   daemon_start: async (resolver, input, exec) => {
     const sessionCwd = currentCwd(exec);
     const binding = await resolveToolBinding(resolver, sessionCwd, input.container);
@@ -1684,7 +1648,7 @@ export const toolHandlers: Record<
       request.groups = input.groups;
     }
     const info = await unaryGuest({ binding }, "startDaemon", request);
-    return formatDaemonInfo(info);
+    return publicDaemon(info);
   },
   daemon_list: async (resolver, input, exec) => {
     const binding = await resolveToolBinding(
@@ -1697,10 +1661,7 @@ export const toolHandlers: Record<
       "listDaemons",
       {},
     )) as { daemons?: any[] };
-    const daemons = result.daemons ?? [];
-    return daemons.length > 0
-      ? daemons.map(formatDaemonInfo).join("\n")
-      : "(no daemons)";
+    return (result.daemons ?? []).map(publicDaemon);
   },
   daemon_stop: async (resolver, input, exec) => {
     const binding = await resolveToolBinding(
@@ -1708,11 +1669,12 @@ export const toolHandlers: Record<
       currentCwd(exec),
       input.container,
     );
-    return unaryGuest(
+    await unaryGuest(
       { binding },
       "stopDaemon",
       { name: input.name, signal: input.signal },
     );
+    return { stopped: input.name };
   },
   daemon_restart: async (resolver, input, exec) => {
     const binding = await resolveToolBinding(
@@ -1725,7 +1687,7 @@ export const toolHandlers: Record<
       "restartDaemon",
       { name: input.name },
     );
-    return formatDaemonInfo(info);
+    return publicDaemon(info);
   },
   daemon_logs: async (resolver, input, exec) => {
     const binding = await resolveToolBinding(
@@ -1967,9 +1929,59 @@ function outputLines(text: string): string[] {
     .filter((line) => line !== "");
 }
 
-function formatDaemonInfo(info: any): string {
-  const argv = Array.isArray(info?.argv) ? info.argv.join(" ") : "";
-  return `${info.name}  running=${info.running}  exitCode=${info.exitCode ?? ""}  startedAt=${info.startedAt ?? ""}  stoppedAt=${info.stoppedAt ?? ""}  argv=${argv}`;
+// Rebuild API objects so tool results never expose internal fields (see
+// AGENTS.md "Security"): only allow-listed attributes reach the model.
+export function publicMount(mount: any): Record<string, unknown> {
+  return {
+    ...(mount?.projectName ? { projectName: mount.projectName } : {}),
+    ...(mount?.path ? { path: mount.path } : {}),
+    ...(mount?.destination ? { destination: mount.destination } : {}),
+    ...(mount?.volume ? { volume: mount.volume } : {}),
+    ...(mount?.secret ? { secret: mount.secret } : {}),
+    ...(mount?.kind ? { kind: mount.kind } : {}),
+    ...(mount?.mode ? { mode: mount.mode } : {}),
+  };
+}
+
+export function publicContainer(row: any): Record<string, unknown> {
+  return {
+    containerName: row?.containerName ?? "",
+    status: row?.status ?? "",
+    ...(row?.imageId ? { imageId: row.imageId } : {}),
+    mounts: (row?.mounts ?? []).map(publicMount),
+    env: row?.env ?? {},
+    secretEnv: row?.secretEnv ?? {},
+  };
+}
+
+export function publicImage(image: any): Record<string, unknown> {
+  return {
+    imageId: image?.imageId ?? "",
+    ...(image?.parent ? { parent: image.parent } : {}),
+    packages: image?.packages ?? [],
+    isBase: image?.isBase ?? false,
+    status: image?.status ?? "",
+    ...(image?.primitive ? { primitive: image.primitive } : {}),
+    ...(image?.packageManager ? { packageManager: image.packageManager } : {}),
+    ...(image?.builtAt ? { builtAt: image.builtAt } : {}),
+    basePublic: image?.basePublic ?? false,
+    ...(image?.imageTag ? { imageTag: image.imageTag } : {}),
+  };
+}
+
+export function publicDaemon(info: any): Record<string, unknown> {
+  return {
+    name: info?.name ?? "",
+    argv: info?.argv ?? [],
+    running: info?.running ?? false,
+    ...(info?.exitCode !== undefined && info?.exitCode !== null
+      ? { exitCode: info.exitCode }
+      : {}),
+    ...(info?.startedAt ? { startedAt: info.startedAt } : {}),
+    ...(info?.stoppedAt ? { stoppedAt: info.stoppedAt } : {}),
+    ...(info?.uid !== undefined && info?.uid !== null ? { uid: info.uid } : {}),
+    ...(info?.gid !== undefined && info?.gid !== null ? { gid: info.gid } : {}),
+  };
 }
 
 function bytesText(value: unknown): string {

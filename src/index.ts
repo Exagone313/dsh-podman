@@ -1306,13 +1306,14 @@ const TOOL_DESCRIPTIONS: Record<string, string> = {
   volume_list:
     "List the named volumes available to the current workspace.",
   volume_create: "Create a named volume in the current workspace.",
-  volume_remove: "Remove a named volume from the current workspace.",
+  volume_remove:
+    "Remove a named volume from the current workspace. Refused while a container still mounts it; detach the mount first.",
   secret_list:
     "List the named secrets available to the current workspace (values are never exposed).",
   secret_create:
     "Create a secret with an orchestrator-generated random value (the value is never exposed).",
   secret_remove:
-    "Remove a named secret from the current workspace. Requires approval: removing deletes the secret so containers using it must drop it first.",
+    "Remove a named secret from the current workspace. Refused while a container mounts it or attaches it as an environment variable; detach it first. Requires approval: removing deletes the secret.",
   container_secret_add:
     "Inject a named secret into a container as an environment variable. Requires approval: exposing a secret to a container changes what it can read.",
   container_secret_remove:

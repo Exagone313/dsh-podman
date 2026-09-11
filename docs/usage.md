@@ -121,7 +121,7 @@ by processes running inside the container.
 | `container_mount_remove` ✱ | `container`, optional `kind`, `project`, `path`, `volume`, `destination`, `secret`         | Remove a mount                                                             |
 | `volume_create`            | `name`                                                                                     | Create a managed named volume                                              |
 | `volume_list`              | —                                                                                          | List the managed named volumes (short names)                               |
-| `volume_remove` ✱          | `name`                                                                                     | Remove a managed named volume                                              |
+| `volume_remove` ✱          | `name`                                                                                     | Remove a managed named volume; refused while a container still mounts it   |
 
 A `project` mount binds a directory from the project's workspace; `tmpfs` mounts
 a writable in-memory filesystem and `volume` mounts a podman named volume
@@ -147,7 +147,7 @@ project mount is created `read_write`; that is unchanged.
 | `container_secret_remove` ✱ | `container`, `env`                   | Detach a secret environment variable from a container                                                                                   |
 | `secret_create`             | `name`, optional `length`, `charset` | Create a secret with an **orchestrator-generated random** value (`length` default 32; `charset` `alphanumeric` \| `hex` \| `base64url`) |
 | `secret_list`               | —                                    | List the managed secrets (short names)                                                                                                  |
-| `secret_remove` ✱           | `name`                               | Remove a managed secret                                                                                                                 |
+| `secret_remove` ✱           | `name`                               | Remove a managed secret; refused while a container mounts it or attaches it as an environment variable                                  |
 
 Secrets are stored in podman under `DSH_PODMAN_SECRET_PREFIX` (default
 `dsh-podman-`); the tools and UI use short names. `secret_create` values are

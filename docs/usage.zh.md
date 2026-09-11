@@ -104,7 +104,7 @@ bash 进程）的 `env` 映射；`container_exec` 和 `daemon_start` 已经接�
 | `container_mount_remove` ✱ | `container`, optional `kind`, `project`, `path`, `volume`, `destination`, `secret`         | 移除挂载                                                             |
 | `volume_create`            | `name`                                                                                     | 创建受管理的命名卷                                                   |
 | `volume_list`              | —                                                                                          | 列出受管理的命名卷（短名称）                                         |
-| `volume_remove` ✱          | `name`                                                                                     | 移除受管理的命名卷                                                   |
+| `volume_remove` ✱          | `name`                                                                                     | 移除受管理的命名卷；当容器仍在挂载它时拒绝                           |
 
 `project` 挂载将项目工作区中的一个目录绑定到容器；`tmpfs`
 挂载可写的内存文件系统，`volume` 挂载 podman
@@ -129,7 +129,7 @@ bash 进程）的 `env` 映射；`container_exec` 和 `daemon_start` 已经接�
 | `container_secret_remove` ✱ | `container`, `env`                   | 从容器的环境变量中分离机密环境变量                                                                            |
 | `secret_create`             | `name`, optional `length`, `charset` | 创建具有**编排器生成的随机**值的机密（`length` 默认 32；`charset` 为 `alphanumeric` \| `hex` \| `base64url`） |
 | `secret_list`               | —                                    | 列出受管理的机密（短名称）                                                                                    |
-| `secret_remove` ✱           | `name`                               | 移除受管理的机密                                                                                              |
+| `secret_remove` ✱           | `name`                               | 移除受管理的机密；当容器挂载它或将其作为环境变量附加时拒绝                                                    |
 
 机密存储在 podman 的 `DSH_PODMAN_SECRET_PREFIX`（默认 `dsh-podman-`）下；工具和
 UI 使用短名称。`secret_create` 的值由服务端用 `crypto/rand`

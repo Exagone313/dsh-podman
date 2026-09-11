@@ -778,6 +778,124 @@ func TestRemoveImageRequiresPodman(t *testing.T) {
 	}
 }
 
+func TestRemoveVolumeInUse(t *testing.T) {
+	store := newTestStore(t)
+	if err := store.SaveWorkspaces([]state.Workspace{{
+		WorkspaceSlug: "ws",
+		Containers: []state.Container{{
+			Name:   "default",
+			Mounts: []state.Mount{{Kind: "volume", Volume: "data", Destination: "/data", Mode: "read_write"}},
+		}},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	server := &Server{Store: store, Logger: silentLogger()}
+	_, err := server.RemoveVolume(context.Background(), &ctl.RemoveVolumeRequest{Name: "data"})
+	if status.Code(err) != codes.FailedPrecondition {
+		t.Fatalf("expected FailedPrecondition, got %v", err)
+	}
+	if !strings.Contains(err.Error(), `volume "data" is mounted in workspace "ws" container "default"`) {
+		t.Fatalf("unexpected error message: %v", err)
+	}
+}
+
+func TestRemoveVolumeInUseOnNamedContainer(t *testing.T) {
+	store := newTestStore(t)
+	if err := store.SaveWorkspaces([]state.Workspace{{
+		WorkspaceSlug: "ws",
+		Containers: []state.Container{{
+			Name:   "db",
+			Mounts: []state.Mount{{Kind: "volume", Volume: "data", Destination: "/data"}},
+		}},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	server := &Server{Store: store, Logger: silentLogger()}
+	_, err := server.RemoveVolume(context.Background(), &ctl.RemoveVolumeRequest{Name: "data"})
+	if status.Code(err) != codes.FailedPrecondition {
+		t.Fatalf("expected FailedPrecondition, got %v", err)
+	}
+	if !strings.Contains(err.Error(), `container "db"`) {
+		t.Fatalf("unexpected error message: %v", err)
+	}
+}
+
+func TestRemoveVolumeInUseViaWorkspaceMounts(t *testing.T) {
+	// A container without its own mounts falls back to the workspace's default
+	// mounts, which must count as usage too.
+	store := newTestStore(t)
+	if err := store.SaveWorkspaces([]state.Workspace{{
+		WorkspaceSlug: "ws",
+		Mounts:        []state.Mount{{Kind: "volume", Volume: "data", Destination: "/data"}},
+		Containers:    []state.Container{{Name: "default"}},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	server := &Server{Store: store, Logger: silentLogger()}
+	_, err := server.RemoveVolume(context.Background(), &ctl.RemoveVolumeRequest{Name: "data"})
+	if status.Code(err) != codes.FailedPrecondition {
+		t.Fatalf("expected FailedPrecondition, got %v", err)
+	}
+}
+
+func TestRemoveVolumeNotInUseStillRequiresPodman(t *testing.T) {
+	server := &Server{Store: newTestStore(t), Logger: silentLogger()}
+	_, err := server.RemoveVolume(context.Background(), &ctl.RemoveVolumeRequest{Name: "data"})
+	if status.Code(err) != codes.FailedPrecondition || !strings.Contains(err.Error(), "podman is not configured") {
+		t.Fatalf("expected podman precondition, got %v", err)
+	}
+}
+
+func TestRemoveSecretInUse(t *testing.T) {
+	store := newTestStore(t)
+	if err := store.SaveWorkspaces([]state.Workspace{{
+		WorkspaceSlug: "ws",
+		Containers: []state.Container{{
+			Name:   "default",
+			Mounts: []state.Mount{{Kind: "secret", Secret: "dbpass", Destination: "/run/secrets/db"}},
+		}},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	server := &Server{Store: store, Logger: silentLogger()}
+	_, err := server.RemoveSecret(context.Background(), &ctl.RemoveSecretRequest{Name: "dbpass"})
+	if status.Code(err) != codes.FailedPrecondition {
+		t.Fatalf("mounted secret: expected FailedPrecondition, got %v", err)
+	}
+	if !strings.Contains(err.Error(), `secret "dbpass" is mounted in workspace "ws" container "default"`) {
+		t.Fatalf("unexpected error message: %v", err)
+	}
+}
+
+func TestRemoveSecretInUseAsEnvironment(t *testing.T) {
+	store := newTestStore(t)
+	if err := store.SaveWorkspaces([]state.Workspace{{
+		WorkspaceSlug: "ws",
+		Containers: []state.Container{{
+			Name:      "default",
+			SecretEnv: map[string]string{"DB_PASS": "dbpass"},
+		}},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	server := &Server{Store: store, Logger: silentLogger()}
+	_, err := server.RemoveSecret(context.Background(), &ctl.RemoveSecretRequest{Name: "dbpass"})
+	if status.Code(err) != codes.FailedPrecondition {
+		t.Fatalf("env-attached secret: expected FailedPrecondition, got %v", err)
+	}
+	if !strings.Contains(err.Error(), `secret "dbpass" is attached to the environment of workspace "ws" container "default"`) {
+		t.Fatalf("unexpected error message: %v", err)
+	}
+}
+
+func TestRemoveSecretNotInUseStillRequiresPodman(t *testing.T) {
+	server := &Server{Store: newTestStore(t), Logger: silentLogger()}
+	_, err := server.RemoveSecret(context.Background(), &ctl.RemoveSecretRequest{Name: "dbpass"})
+	if status.Code(err) != codes.FailedPrecondition || !strings.Contains(err.Error(), "podman is not configured") {
+		t.Fatalf("expected podman precondition, got %v", err)
+	}
+}
+
 func TestImageRefsMatch(t *testing.T) {
 	cases := []struct {
 		name  string
@@ -1608,7 +1726,7 @@ func TestNonProjectDestinationReservedPaths(t *testing.T) {
 }
 
 func TestVolumeRPCsRequirePodman(t *testing.T) {
-	server := &Server{Logger: silentLogger()}
+	server := &Server{Store: newTestStore(t), Logger: silentLogger()}
 	if _, err := server.ListVolumes(context.Background(), &ctl.ListVolumesRequest{}); status.Code(err) != codes.FailedPrecondition {
 		t.Fatalf("ListVolumes: expected FailedPrecondition, got %v", err)
 	}
@@ -1993,7 +2111,7 @@ func TestValidateEnvKey(t *testing.T) {
 }
 
 func TestSecretRPCsRequirePodman(t *testing.T) {
-	server := &Server{Logger: silentLogger()}
+	server := &Server{Store: newTestStore(t), Logger: silentLogger()}
 	if _, err := server.ListSecrets(context.Background(), &ctl.ListSecretsRequest{}); status.Code(err) != codes.FailedPrecondition {
 		t.Fatalf("ListSecrets: expected FailedPrecondition, got %v", err)
 	}

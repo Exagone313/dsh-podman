@@ -1462,6 +1462,42 @@ func containerMounts(ws state.Workspace, c state.Container) []state.Mount {
 	return ws.Mounts
 }
 
+// volumeInUse reports the first container whose effective mounts include the
+// named volume.
+func volumeInUse(workspaces []state.Workspace, name string) (slug, container string, ok bool) {
+	for _, ws := range workspaces {
+		for _, c := range ws.Containers {
+			for _, mount := range containerMounts(ws, c) {
+				if mount.Kind == "volume" && mount.Volume == name {
+					return ws.WorkspaceSlug, c.Name, true
+				}
+			}
+		}
+	}
+	return "", "", false
+}
+
+// secretInUse reports the first container that mounts the named secret as a
+// file, or attaches it to its environment. The second return value is the
+// prepositional phrase completing "secret %q is %s workspace %q container %q".
+func secretInUse(workspaces []state.Workspace, name string) (slug, container, usage string, ok bool) {
+	for _, ws := range workspaces {
+		for _, c := range ws.Containers {
+			for _, mount := range containerMounts(ws, c) {
+				if mount.Kind == "secret" && mount.Secret == name {
+					return ws.WorkspaceSlug, c.Name, "mounted in", true
+				}
+			}
+			for _, secret := range c.SecretEnv {
+				if secret == name {
+					return ws.WorkspaceSlug, c.Name, "attached to the environment of", true
+				}
+			}
+		}
+	}
+	return "", "", "", false
+}
+
 // cloneMap returns a shallow copy of a string map, or nil when the source is
 // empty. A nil source yields nil.
 func cloneMap(source map[string]string) map[string]string {
@@ -2063,6 +2099,13 @@ func (s *Server) RemoveVolume(_ context.Context, request *ctl.RemoveVolumeReques
 	if !volumeName.MatchString(request.GetName()) {
 		return nil, status.Error(codes.InvalidArgument, "invalid volume name")
 	}
+	workspaces, err := s.Store.Workspaces()
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	if slug, container, inUse := volumeInUse(workspaces, request.GetName()); inUse {
+		return nil, status.Error(codes.FailedPrecondition, fmt.Sprintf("volume %q is mounted in workspace %q container %q", request.GetName(), slug, container))
+	}
 	if s.Podman == nil {
 		return nil, status.Error(codes.FailedPrecondition, "podman is not configured")
 	}
@@ -2185,6 +2228,13 @@ func (s *Server) RemoveSecret(_ context.Context, request *ctl.RemoveSecretReques
 	s.log().Info("control request", "method", "RemoveSecret", "name", request.GetName())
 	if !secretName.MatchString(request.GetName()) {
 		return nil, status.Error(codes.InvalidArgument, "invalid secret name")
+	}
+	workspaces, err := s.Store.Workspaces()
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	if slug, container, usage, inUse := secretInUse(workspaces, request.GetName()); inUse {
+		return nil, status.Error(codes.FailedPrecondition, fmt.Sprintf("secret %q is %s workspace %q container %q", request.GetName(), usage, slug, container))
 	}
 	if s.Podman == nil {
 		return nil, status.Error(codes.FailedPrecondition, "podman is not configured")

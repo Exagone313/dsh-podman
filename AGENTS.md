@@ -17,6 +17,14 @@ exclude_graphdriver_devicemapper`).
 
 `pnpm test` runs against `dist/`, so run `pnpm build` first (or `make test`).
 
+## Security
+
+- Never return a raw API object from a tool result. Reconstruct the object
+  internally and omit every attribute that should not reach the model — for
+  example `agentToken`, `agentSocketPath`, `podmanName`, `workspaceSlug`. The
+  `public*` helpers in `src/index.ts` are the single place that builds these
+  safe shapes.
+
 ## Documentation
 
 User-facing docs live in `docs/`; `README.md` only links to them. Users install

@@ -5,9 +5,11 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"os"
+	"path/filepath"
 
 	"github.com/Exagone313/dsh-podman/internal/auth"
 	guest "github.com/Exagone313/dsh-podman/internal/genproto/dshguest/v1"
@@ -41,7 +43,14 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	filesystem, err := workspacefs.New([]workspacefs.Mount{{Virtual: root, Host: root}})
+	extra, err := guestMounts(os.Getenv("DSH_PODMAN_GUEST_MOUNTS"))
+	if err != nil {
+		panic(err)
+	}
+	filesystem, err := workspacefs.New(append(
+		[]workspacefs.Mount{{Virtual: root, Host: root}},
+		extra...,
+	))
 	if err != nil {
 		panic(err)
 	}
@@ -54,4 +63,31 @@ func main() {
 	if err := server.Serve(listener); err != nil {
 		panic(err)
 	}
+}
+
+// guestMounts decodes the orchestrator-provided DSH_PODMAN_GUEST_MOUNTS value
+// into the extra workspace mounts the file API may reach, or nil when unset.
+func guestMounts(encoded string) ([]workspacefs.Mount, error) {
+	if encoded == "" {
+		return nil, nil
+	}
+	var entries []struct {
+		Path     string `json:"path"`
+		ReadOnly bool   `json:"read_only"`
+	}
+	if err := json.Unmarshal([]byte(encoded), &entries); err != nil {
+		return nil, fmt.Errorf("decode DSH_PODMAN_GUEST_MOUNTS: %w", err)
+	}
+	mounts := make([]workspacefs.Mount, 0, len(entries))
+	for _, entry := range entries {
+		if !filepath.IsAbs(entry.Path) {
+			return nil, fmt.Errorf("mount path must be absolute: %q", entry.Path)
+		}
+		mounts = append(mounts, workspacefs.Mount{
+			Virtual:  entry.Path,
+			Host:     entry.Path,
+			ReadOnly: entry.ReadOnly,
+		})
+	}
+	return mounts, nil
 }

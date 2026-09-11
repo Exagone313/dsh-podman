@@ -6,6 +6,7 @@ package podman
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -113,7 +114,7 @@ func (c *Client) CreateWorkspace(pod, name, image, token string, mounts []specs.
 	generator.Name = name
 	generator.Pod = pod
 	generator.Command = []string{binaryDest}
-	generator.Env = containerEnv(c.socketRoot, name, c.projectRoot, token, env)
+	generator.Env = containerEnv(c.socketRoot, name, c.projectRoot, token, env, mounts)
 	generator.EnvSecrets = envSecrets
 	generator.Secrets = append(generator.Secrets, secrets...)
 	generator.Init = &init
@@ -320,11 +321,14 @@ func (c *Client) RecreateWorkspace(pod, name, image, token string, mounts []spec
 // orchestrator agent variables, then every user variable. User keys that
 // collide with the reserved DSH_PODMAN namespace are skipped defensively (the
 // caller has already validated them).
-func containerEnv(socketRoot, name, projectRoot, token string, user map[string]string) map[string]string {
+func containerEnv(socketRoot, name, projectRoot, token string, user map[string]string, mounts []specs.Mount) map[string]string {
 	env := map[string]string{
 		"DSH_PODMAN_GUEST_TOKEN":   token,
 		"DSH_PODMAN_GUEST_SOCKET":  filepath.Join(socketRoot, name, "guest.sock"),
 		"DSH_PODMAN_PROJECTS_ROOT": projectRoot,
+	}
+	if encoded := guestMountsEnv(mounts); encoded != "" {
+		env["DSH_PODMAN_GUEST_MOUNTS"] = encoded
 	}
 	for key, value := range user {
 		if strings.HasPrefix(key, "DSH_PODMAN") {
@@ -333,6 +337,38 @@ func containerEnv(socketRoot, name, projectRoot, token string, user map[string]s
 		env[key] = value
 	}
 	return env
+}
+
+// guestMountsEnv serializes the container's user mounts for the guest agent.
+// Project bind mounts are covered by the projects root and are not listed.
+// Secret mounts are deliberately omitted so the file API never reads them.
+func guestMountsEnv(mounts []specs.Mount) string {
+	entries := make([]map[string]any, 0, len(mounts))
+	for _, mount := range mounts {
+		switch mount.Type {
+		case "tmpfs":
+			entries = append(entries, map[string]any{"path": mount.Destination, "read_only": false})
+		case "volume":
+			entries = append(entries, map[string]any{"path": mount.Destination, "read_only": hasOption(mount.Options, "ro")})
+		}
+	}
+	if len(entries) == 0 {
+		return ""
+	}
+	encoded, err := json.Marshal(entries)
+	if err != nil {
+		return ""
+	}
+	return string(encoded)
+}
+
+func hasOption(options []string, want string) bool {
+	for _, option := range options {
+		if option == want {
+			return true
+		}
+	}
+	return false
 }
 
 func (c *Client) VolumeExists(name string) (bool, error) {

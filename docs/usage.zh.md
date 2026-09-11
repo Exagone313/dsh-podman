@@ -90,6 +90,11 @@ bash 进程）的 `env` 映射；`container_exec` 和 `daemon_start` 已经接�
 和 `container_edit` 的 `path` 不能包含 `..`
 片段；工作目录可以包含，因为命令不受限于 projects 根目录。
 
+文件工具（`container_read`、`container_write`、`container_edit`）可以访问
+工作区的挂载：projects 根目录下的项目目录，以及任何 `volume` 和 `tmpfs`
+挂载在其绝对目标路径上的内容。`secret` 挂载不会通过文件 API
+暴露——机密值只能由容器内运行的进程读取。
+
 ### 挂载与卷
 
 | 工具                       | 参数                                                                                       | 描述                                                                 |

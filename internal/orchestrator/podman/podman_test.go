@@ -5,6 +5,7 @@
 package podman
 
 import (
+	"encoding/json"
 	"path/filepath"
 	"testing"
 
@@ -118,7 +119,7 @@ func TestClassifyMounts(t *testing.T) {
 }
 
 func TestContainerEnv(t *testing.T) {
-	env := containerEnv("/run/dsh-podman", "dsh-workspace-proj", "/workspaces", "tok", map[string]string{"FOO": "bar", "DSH_PODMAN_X": "should-be-skipped", "DSH_PODMAN_GUEST_TOKEN": "must-not-override"})
+	env := containerEnv("/run/dsh-podman", "dsh-workspace-proj", "/workspaces", "tok", map[string]string{"FOO": "bar", "DSH_PODMAN_X": "should-be-skipped", "DSH_PODMAN_GUEST_TOKEN": "must-not-override"}, nil)
 	if env["DSH_PODMAN_GUEST_TOKEN"] != "tok" {
 		t.Fatalf("guest token must be the orchestrator value, got %q", env["DSH_PODMAN_GUEST_TOKEN"])
 	}
@@ -134,8 +135,53 @@ func TestContainerEnv(t *testing.T) {
 	if _, ok := env["DSH_PODMAN_X"]; ok {
 		t.Fatalf("reserved user key must be skipped: %#v", env)
 	}
+	if _, ok := env["DSH_PODMAN_GUEST_MOUNTS"]; ok {
+		t.Fatalf("guest mounts env must be omitted without mounts: %#v", env)
+	}
 	if len(env) != 4 {
 		t.Fatalf("unexpected env size: %#v", env)
+	}
+}
+
+func TestGuestMountsEnv(t *testing.T) {
+	mounts := []specs.Mount{
+		{Type: "bind", Source: "/host/proj", Destination: "/projects/proj", Options: []string{"ro"}},
+		{Type: "tmpfs", Destination: "/scratch", Options: []string{"rw"}},
+		{Type: "volume", Source: "dsh-podman-data", Destination: "/data", Options: []string{"ro"}},
+		{Type: "volume", Source: "dsh-podman-logs", Destination: "/var/log", Options: []string{"rw"}},
+	}
+	encoded := guestMountsEnv(mounts)
+	var entries []map[string]any
+	if err := json.Unmarshal([]byte(encoded), &entries); err != nil {
+		t.Fatalf("guest mounts must be valid JSON: %v", err)
+	}
+	if len(entries) != 3 {
+		t.Fatalf("expected 3 guest mounts (bind project skipped), got %d: %#v", len(entries), entries)
+	}
+	if entries[0]["path"] != "/scratch" || entries[0]["read_only"] != false {
+		t.Fatalf("unexpected tmpfs entry: %#v", entries[0])
+	}
+	if entries[1]["path"] != "/data" || entries[1]["read_only"] != true {
+		t.Fatalf("unexpected read-only volume entry: %#v", entries[1])
+	}
+	if entries[2]["path"] != "/var/log" || entries[2]["read_only"] != false {
+		t.Fatalf("unexpected read-write volume entry: %#v", entries[2])
+	}
+	if onlyProject := guestMountsEnv([]specs.Mount{{Type: "bind", Source: "/host", Destination: "/projects/p"}}); onlyProject != "" {
+		t.Fatalf("expected no guest mounts for a project-only container, got %q", onlyProject)
+	}
+	if empty := guestMountsEnv(nil); empty != "" {
+		t.Fatalf("expected empty guest mounts env for nil, got %q", empty)
+	}
+}
+
+func TestContainerEnvGuestMounts(t *testing.T) {
+	env := containerEnv("/run/dsh-podman", "dsh-workspace-proj", "/workspaces", "tok", nil, []specs.Mount{
+		{Type: "tmpfs", Destination: "/scratch", Options: []string{"rw"}},
+		{Type: "volume", Source: "dsh-podman-data", Destination: "/data", Options: []string{"ro"}},
+	})
+	if env["DSH_PODMAN_GUEST_MOUNTS"] != `[{"path":"/scratch","read_only":false},{"path":"/data","read_only":true}]` {
+		t.Fatalf("unexpected guest mounts env: %q", env["DSH_PODMAN_GUEST_MOUNTS"])
 	}
 }
 

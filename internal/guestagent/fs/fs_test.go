@@ -114,6 +114,37 @@ func TestResolveRejectsOutsideConfiguredMounts(t *testing.T) {
 	}
 }
 
+func TestResolveAcrossMultipleMounts(t *testing.T) {
+	projects, data := tempDir(t), tempDir(t)
+	w, err := New([]Mount{
+		{Virtual: "/projects", Host: projects},
+		{Virtual: "/data", Host: data, ReadOnly: true},
+		{Virtual: "/scratch", Host: t.TempDir()},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if path, _, err := w.Resolve("/projects/team/file", true); err != nil {
+		t.Fatalf("write to project mount failed: %v", err)
+	} else if !strings.HasPrefix(path, projects+string(filepath.Separator)) {
+		t.Fatalf("resolved %q outside projects mount %q", path, projects)
+	}
+	if _, _, err := w.Resolve("/scratch/tmp", true); err != nil {
+		t.Fatalf("write to tmpfs mount failed: %v", err)
+	}
+	if _, _, err := w.Resolve("/data/file", true); err == nil {
+		t.Fatal("accepted write to read-only volume mount")
+	}
+	if path, readonly, err := w.Resolve("/data/file", false); err != nil || !readonly {
+		t.Fatalf("read-only volume mount not reported: %v %v", readonly, err)
+	} else if !strings.HasPrefix(path, data+string(filepath.Separator)) {
+		t.Fatalf("resolved %q outside volume mount %q", path, data)
+	}
+	if _, _, err := w.Resolve("/etc/passwd", false); err == nil {
+		t.Fatal("accepted path outside every configured mount")
+	}
+}
+
 func TestResolveDetectsSymlinkedHostRoot(t *testing.T) {
 	realRoot, host := t.TempDir(), t.TempDir()
 	if err := os.Symlink(realRoot, filepath.Join(host, "projects")); err != nil {

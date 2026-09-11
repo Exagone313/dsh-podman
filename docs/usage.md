@@ -106,6 +106,12 @@ project is mounted inside the container. A `path` on `container_read`,
 `container_write` and `container_edit` may not contain a `..` segment; working
 directories may, since commands are not confined to the projects root.
 
+The file tools (`container_read`, `container_write`, `container_edit`) can reach
+the workspace's mounts: the project directory under the projects root, as well
+as any `volume` and `tmpfs` mounts at their absolute destinations. `secret`
+mounts are not exposed through the file API — the secret value is only readable
+by processes running inside the container.
+
 ### Mounts and volumes
 
 | Tool                       | Params                                                                                     | Description                                                                |

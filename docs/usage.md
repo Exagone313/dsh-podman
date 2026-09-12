@@ -104,6 +104,9 @@ The `container_bash`, `container_exec`, `container_read`, `container_write`,
 `container_edit`, `container_glob` and `container_grep` arguments mirror the
 harness's built-in `bash`/`read`/`write`/`edit`/`glob`/`grep` tools (plus the
 `container` target), so the same vocabulary works against a chosen container.
+The plugin also registers a dedicated UI row for every one of its tools (icon,
+title, summary, and result body), so they render like the built-in tools rather
+than as a generic `Tool call` row.
 
 Paths and working directories may be absolute or relative. A relative value is
 resolved against the session's working directory, which is also where the

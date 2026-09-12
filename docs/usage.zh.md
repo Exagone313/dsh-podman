@@ -89,7 +89,9 @@ bash 进程）的 `env` 映射；`container_exec` 和 `daemon_start` 已经接�
 `container_bash`、`container_exec`、`container_read`、`container_write`、
 `container_edit`、`container_glob` 和 `container_grep` 的参数与 harness 内置的
 `bash`/`read`/`write`/`edit`/`glob`/`grep` 工具保持一致（外加 `container`
-目标），因此同一套参数可直接用于指定的容器。
+目标），因此同一套参数可直接用于指定的容器。插件还为它的每个工具注册了专用的 UI
+行（图标、标题、摘要和结果正文），因此它们会像内置工具一样渲染，而不是显示为
+通用的 `Tool call` 行。
 
 路径和工作目录可以是绝对路径或相对路径。相对路径会相对于会话的工作目录解析，项目也正是挂载在容器中的该目录下。`container_read`、`container_write`
 和 `container_edit` 的 `file_path` 不能包含 `..`

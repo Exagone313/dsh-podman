@@ -816,15 +816,7 @@ function mountMode(mode: unknown): string {
 
 // Summarize the mount source for container_mount_add/remove.
 function mountTarget(args: Record<string, unknown>): string {
-  const kind =
-    args.kind === "tmpfs"
-      ? "tmpfs"
-      : args.kind === "volume"
-        ? "volume"
-        : args.kind === "secret"
-          ? "secret"
-          : "directory";
-  switch (kind) {
+  switch (inferMountKind(args)) {
     case "volume":
       return typeof args.volume === "string" ? `volume ${args.volume}` : "";
     case "tmpfs":
@@ -871,6 +863,21 @@ export function mountKindOf(kind: unknown): string {
   return typeof kind === "string" && kind !== "" ? kind : "project";
 }
 
+// The mount kind for a call: an explicit non-empty `kind` wins, otherwise it is
+// inferred from the source field the caller supplied (`secret`/`volume`), since
+// `kind` is optional in the mount schemas. Falls back to a project mount.
+export function inferMountKind(args: {
+  kind?: unknown;
+  project?: unknown;
+  volume?: unknown;
+  secret?: unknown;
+}): string {
+  if (typeof args.kind === "string" && args.kind !== "") return args.kind;
+  if (typeof args.secret === "string" && args.secret !== "") return "secret";
+  if (typeof args.volume === "string" && args.volume !== "") return "volume";
+  return "project";
+}
+
 // The container-side destination a project mount always lands at: the project
 // root under projectsRoot plus the optional subpath. The container never gets a
 // caller-chosen destination for a project mount.
@@ -896,7 +903,7 @@ export function projectMountDestinationReason(
     destination?: unknown;
   },
 ): string | undefined {
-  if (mountKindOf(args.kind) !== "project") return undefined;
+  if (inferMountKind(args) !== "project") return undefined;
   if (args.destination === undefined || args.destination === "") return undefined;
   const mirror =
     projectsRoot === undefined
@@ -1153,6 +1160,18 @@ export function summarizeArgs(
   }
 }
 
+// The ask reason, omitted when no summary can be derived so the approval panel
+// shows its own localized fallback instead of a blank headline (the panel only
+// substitutes for a nullish reason, not an empty string).
+function askReason(
+  name: string,
+  args: Record<string, unknown>,
+  sessionCwd?: unknown,
+): { reason?: string } {
+  const reason = summarizeArgs(name, args, sessionCwd);
+  return reason === "" ? {} : { reason };
+}
+
 // Decide whether a tool call needs approval. DSH resolves an `ask` decision
 // through its approval service (`ctx.get("approval").request(...)`), showing
 // the standard approval prompt; without one the call fails closed.
@@ -1163,14 +1182,14 @@ export function approvalDecision(
   name: string,
   args?: Record<string, unknown>,
   sessionCwd?: unknown,
-): { kind: "ask"; reason: string } | undefined {
+): { kind: "ask"; reason?: string } | undefined {
   const tool = TOOLS.find((entry) => entry.name === name);
   if (tool === undefined) return undefined;
   if (tool.approval === true) {
-    return { kind: "ask", reason: summarizeArgs(name, args ?? {}, sessionCwd) };
+    return { kind: "ask", ...askReason(name, args ?? {}, sessionCwd) };
   }
   if (tool.approvalWhen !== undefined && tool.approvalWhen(args ?? {})) {
-    return { kind: "ask", reason: summarizeArgs(name, args ?? {}, sessionCwd) };
+    return { kind: "ask", ...askReason(name, args ?? {}, sessionCwd) };
   }
   return undefined;
 }
@@ -1274,7 +1293,7 @@ export async function preExecutePolicy(
   const preset = exec.agent?.session?.header?.agentPreset;
   const sessionCwd = currentCwd(exec);
   if (preset === PODMAN_OPS_PRESET && PODMAN_OPS_APPROVAL_TOOLS.has(name)) {
-    return { kind: "ask", reason: summarizeArgs(name, parsed ?? {}, sessionCwd) };
+    return { kind: "ask", ...askReason(name, parsed ?? {}, sessionCwd) };
   }
   return approvalDecision(name, parsed, sessionCwd) ?? next();
 }
@@ -1651,11 +1670,11 @@ export const toolHandlers: Record<
     return mounts.map(publicMount);
   },
   container_mount_add: async (resolver, input, exec) => {
-    const kind = input.kind ?? "project";
+    const kind = inferMountKind(input);
     const projectsRoot = resolver.getConfig().projectsRoot;
     const destinationReason = projectMountDestinationReason(projectsRoot, input);
     if (destinationReason !== undefined) throw new Error(destinationReason);
-    const protoKind = mountKindToProto(input.kind);
+    const protoKind = mountKindToProto(kind);
     const mode = mountModeToProto(input.mode ?? defaultMountMode(kind));
     const request: Record<string, unknown> = {
       workspaceSlug: await sessionWorkspaceSlug(resolver, currentCwd(exec)),
@@ -1681,8 +1700,8 @@ export const toolHandlers: Record<
     return publicContainer(row);
   },
   container_mount_remove: async (resolver, input, exec) => {
-    const kind = input.kind ?? "project";
-    const protoKind = mountKindToProto(input.kind);
+    const kind = inferMountKind(input);
+    const protoKind = mountKindToProto(kind);
     const request: Record<string, unknown> = {
       workspaceSlug: await sessionWorkspaceSlug(resolver, currentCwd(exec)),
       container: input.container,
@@ -1844,11 +1863,12 @@ function mountsFromInput(
 ): Record<string, unknown>[] | undefined {
   if (!Array.isArray(mounts) || mounts.length === 0) return undefined;
   return mounts.map((mount: any) => {
-    const kind = mountKindToProto(mount.kind ?? undefined);
-    const mode = mountModeToProto(mount.mode ?? defaultMountMode(mount.kind));
+    const inferredKind = inferMountKind(mount);
+    const kind = mountKindToProto(inferredKind);
+    const mode = mountModeToProto(mount.mode ?? defaultMountMode(inferredKind));
     const result: Record<string, unknown> = { projectName: mount.project ?? "", kind, mode };
     if (mount.path) result.path = mount.path;
-    if (mountKindOf(mount.kind) !== "project" && mount.destination) {
+    if (inferredKind !== "project" && mount.destination) {
       result.destination = mount.destination;
     }
     if (mount.volume) result.volume = mount.volume;

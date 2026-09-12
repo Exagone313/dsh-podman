@@ -324,7 +324,7 @@ test("approvalDecision gates exactly the approval-flagged tools", () => {
     if (tool.approval === true) {
       assert.ok(decision, `${tool.name} must ask for approval`);
       assert.equal(decision!.kind, "ask");
-      assert.ok(decision!.reason.length > 0, `${tool.name} ask reason`);
+      assert.ok((decision!.reason ?? "").length > 0, `${tool.name} ask reason`);
     } else {
       assert.equal(decision, undefined, `${tool.name} must not ask`);
     }
@@ -469,6 +469,23 @@ test("summarizeArgs renders the approval reason for each gated tool", () => {
       secret: "valkey-tls",
     }),
     "container valkey-ctr: unmount secret valkey-tls",
+  );
+});
+
+test("summarizeArgs infers the mount target when kind is omitted", () => {
+  assert.equal(
+    summarizeArgs("container_mount_remove", {
+      container: "valkey-ctr",
+      secret: "valkey-tls",
+    }),
+    "container valkey-ctr: unmount secret valkey-tls",
+  );
+  assert.equal(
+    summarizeArgs("container_mount_add", {
+      container: "valkey-ctr",
+      volume: "valkey-data",
+    }),
+    "container valkey-ctr: mount volume valkey-data",
   );
 });
 
@@ -995,6 +1012,46 @@ function mountRequestRecorder() {
 }
 
 const MOUNT_EXEC = { agent: { session: { header: { cwd: "/proj" } } } };
+
+test("an omitted mount kind is inferred from the source field", async () => {
+  const { requests, resolver } = mountRequestRecorder();
+  await toolHandlers.container_mount_remove(
+    resolver as never,
+    { container: "valkey-ctr", secret: "valkey-tls" },
+    MOUNT_EXEC,
+  );
+  await toolHandlers.container_mount_add(
+    resolver as never,
+    { container: "valkey-ctr", volume: "valkey-data", destination: "/data" },
+    MOUNT_EXEC,
+  );
+  assert.deepEqual(requests[0], [
+    "removeContainerMount",
+    {
+      workspaceSlug: "team",
+      container: "valkey-ctr",
+      kind: "MOUNT_KIND_SECRET",
+      secret: "valkey-tls",
+    },
+  ]);
+  assert.deepEqual(requests[1], [
+    "addContainerMount",
+    {
+      workspaceSlug: "team",
+      container: "valkey-ctr",
+      kind: "MOUNT_KIND_VOLUME",
+      volume: "valkey-data",
+      destination: "/data",
+      mode: "MOUNT_MODE_READ_ONLY",
+    },
+  ]);
+});
+
+test("an approval ask omits the reason when no summary can be derived", () => {
+  assert.deepEqual(approvalDecision("container_mount_remove", { container: "c" }), {
+    kind: "ask",
+  });
+});
 
 test("container_mount_add rejects unknown mount kinds and modes", async () => {
   const { requests, resolver } = mountRequestRecorder();

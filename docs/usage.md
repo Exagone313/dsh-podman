@@ -106,6 +106,12 @@ project is mounted inside the container. A `path` on `container_read`,
 `container_write` and `container_edit` may not contain a `..` segment; working
 directories may, since commands are not confined to the projects root.
 
+When no working directory is given, `container_bash`, `container_exec`,
+`container_glob`, `container_grep` and `daemon_start` run in the session's
+working directory (like the harness's `bash` tool). That directory must be
+mounted in the container — otherwise the guest agent's own working directory is
+used. An explicit `workdir`/`cwd` always takes precedence.
+
 The file tools (`container_read`, `container_write`, `container_edit`) can reach
 the workspace's mounts: the project directory under the projects root, as well
 as any `volume` and `tmpfs` mounts at their absolute destinations. `secret`

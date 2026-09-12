@@ -90,6 +90,11 @@ bash 进程）的 `env` 映射；`container_exec` 和 `daemon_start` 已经接�
 和 `container_edit` 的 `path` 不能包含 `..`
 片段；工作目录可以包含，因为命令不受限于 projects 根目录。
 
+未指定工作目录时，`container_bash`、`container_exec`、`container_glob`、
+`container_grep` 和 `daemon_start` 会在会话的工作目录中运行（与 harness 的
+`bash` 工具一致）。该目录必须已挂载到容器中——否则将使用 guest agent
+自身的工作目录。显式的 `workdir`/`cwd` 始终优先。
+
 文件工具（`container_read`、`container_write`、`container_edit`）可以访问
 工作区的挂载：projects 根目录下的项目目录，以及任何 `volume` 和 `tmpfs`
 挂载在其绝对目标路径上的内容。`secret` 挂载不会通过文件 API

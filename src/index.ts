@@ -1282,7 +1282,8 @@ const TOOL_DESCRIPTIONS: Record<string, string> = {
     "Remove a built custom image by short name. Base images are managed from the settings. Requires approval: removing deletes the image so containers using it must be recreated from another image.",
   container_list:
     "List the containers of the current workspace, including the default container that is started on demand.",
-  container_start: "Start a container in the current workspace.",
+  container_start:
+    "Start a container in the current workspace. Named containers are created with exactly the mounts you pass — the project directory is not mounted automatically. The default container always keeps its workspace project mount.",
   container_recreate:
     "Recreate a container in the current workspace, keeping its current image when no image is given, optionally with new project mounts. Requires approval: recreating replaces the running container.",
   container_remove: "Remove a container from the current workspace.",

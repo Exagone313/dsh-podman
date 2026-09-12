@@ -37,6 +37,7 @@ const commandSchema = z.object({
     z.const("container_mount_remove"),
   ]),
   workspace: z.string().default(""),
+  projectName: z.string().default(""),
   image: z.string().default(""),
   at: z.number().default(0),
   mounts: z.array(z.object({
@@ -165,6 +166,7 @@ export interface MountInput {
 export interface CommandRequest {
   op: "refresh" | "remove" | "recreate" | "create" | "volume_create" | "volume_remove" | "image_remove" | "secret_create" | "secret_remove" | "secret_set" | "image_rebuild" | "image_rebuild_all" | "container_secret_add" | "container_secret_remove" | "image_build" | "image_base_rebuild" | "image_base_pull" | "container_mount_add" | "container_mount_remove";
   workspace: string;
+  projectName: string;
   image: string;
   at: number;
   mounts: readonly MountInput[];
@@ -257,7 +259,7 @@ function mountInputToProto(mount: { kind: string; project: string; path: string;
 function orchestratorWorkspaceViews(raw: unknown): WorkspaceView[] {
   return ((raw as any[] | undefined) ?? []).map((workspace: any) => ({
     workspaceSlug: workspace.workspaceSlug ?? "",
-    projectName: workspace.mounts?.[0]?.projectName ?? workspace.workspaceSlug ?? "",
+    projectName: workspace.projectName ?? workspace.mounts?.[0]?.projectName ?? workspace.workspaceSlug ?? "",
     containerName: workspace.containerName ?? "",
     imageId: workspace.imageId ?? "",
     status: workspace.status ?? "",
@@ -381,7 +383,10 @@ export function installContainerSettings(
             if (command.container !== "") {
               await resolver.control("startContainer", { ...payload, container: command.container });
             } else {
-              await resolver.control("createWorkspace", payload);
+              await resolver.control("createWorkspace", {
+                ...payload,
+                projectName: command.projectName,
+              });
             }
             break;
           }

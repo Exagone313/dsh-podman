@@ -180,6 +180,7 @@ test("create command drives createWorkspace with mounts and image", async () => 
     command: {
       op: "create",
       workspace: "w1",
+      projectName: "team",
       image: "img1",
       at: 1,
       mounts: [{ kind: "project", project: "team", mode: "read_write", path: "", destination: "", volume: "", secret: "" }],
@@ -193,6 +194,7 @@ test("create command drives createWorkspace with mounts and image", async () => 
   const createCall = calls.find(([method]) => method === "createWorkspace");
   assert.deepEqual(createCall?.[1], {
     workspaceSlug: "w1",
+    projectName: "team",
     imageId: "img1",
     mounts: [{ projectName: "team", kind: "MOUNT_KIND_PROJECT", mode: "MOUNT_MODE_READ_WRITE" }],
   });
@@ -649,6 +651,7 @@ test("create command drives createWorkspace with env", async () => {
     command: {
       op: "create",
       workspace: "w1",
+      projectName: "w1",
       image: "img1",
       at: 13,
       mounts: [],
@@ -662,6 +665,7 @@ test("create command drives createWorkspace with env", async () => {
   const createCall = calls.find(([method]) => method === "createWorkspace");
   assert.deepEqual(createCall?.[1], {
     workspaceSlug: "w1",
+    projectName: "w1",
     imageId: "img1",
     env: { A: "1", B: "2" },
   });
@@ -687,6 +691,7 @@ test("create command drives createWorkspace without env when empty", async () =>
     command: {
       op: "create",
       workspace: "w1",
+      projectName: "w1",
       image: "img1",
       at: 14,
       mounts: [],
@@ -700,6 +705,7 @@ test("create command drives createWorkspace without env when empty", async () =>
   const createCall = calls.find(([method]) => method === "createWorkspace");
   assert.deepEqual(createCall?.[1], {
     workspaceSlug: "w1",
+    projectName: "w1",
     imageId: "img1",
   });
   assert.equal(scope.value.command, null);
@@ -989,6 +995,7 @@ test("create command sends secret env", async () => {
     command: {
       op: "create",
       workspace: "w1",
+      projectName: "w1",
       image: "img1",
       at: 1,
       mounts: [],
@@ -1002,6 +1009,7 @@ test("create command sends secret env", async () => {
   const createCall = calls.find(([method]) => method === "createWorkspace");
   assert.deepEqual(createCall?.[1], {
     workspaceSlug: "w1",
+    projectName: "w1",
     imageId: "img1",
     secretEnv: { VALKEY_PASSWORD: "valkey-tls" },
   });
@@ -1025,6 +1033,7 @@ test("create command sends secret env", async () => {
     command: {
       op: "create",
       workspace: "w1",
+      projectName: "w1",
       image: "img1",
       at: 2,
       mounts: [],
@@ -1038,6 +1047,7 @@ test("create command sends secret env", async () => {
   const createCall2 = calls2.find(([method]) => method === "createWorkspace");
   assert.deepEqual(createCall2?.[1], {
     workspaceSlug: "w1",
+    projectName: "w1",
     imageId: "img1",
   });
   assert.equal(scope2.value.command, null);
@@ -1472,6 +1482,7 @@ test("unset kind and mode strings map to project and read_only", async () => {
     command: {
       op: "create",
       workspace: "w1",
+      projectName: "team",
       image: "",
       at: 2,
       mounts: [{
@@ -1501,6 +1512,7 @@ test("unset kind and mode strings map to project and read_only", async () => {
   const createCall = calls.find(([method]) => method === "createWorkspace");
   assert.deepEqual(createCall?.[1], {
     workspaceSlug: "w1",
+    projectName: "team",
     imageId: undefined,
     mounts: [{
       projectName: "team",

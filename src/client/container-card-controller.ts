@@ -205,6 +205,7 @@ export class ContainerCardController {
     workspace: string,
     image: string,
     extra: {
+      projectName?: string;
       mounts?: readonly MountInput[];
       value?: string;
       env?: Record<string, string>;
@@ -220,6 +221,7 @@ export class ContainerCardController {
   ): void {
     void this.scope.set("command", {
       op, workspace, image, at: Date.now(),
+      projectName: extra.projectName ?? "",
       mounts: extra.mounts ?? [],
       value: extra.value ?? "",
       env: extra.env ?? {},
@@ -263,6 +265,7 @@ export class ContainerCardController {
           workspace.workspaceSlug,
           config?.image ?? (workspace.imageId || this.scope.getSnapshot().value?.defaultImage || ""),
           {
+            projectName: workspace.projectName,
             ...(config?.mounts && config.mounts.length > 0 ? { mounts: config.mounts } : {}),
             ...(config?.env && Object.keys(config.env).length > 0 ? { env: config.env } : {}),
             ...(config?.secretEnv && Object.keys(config.secretEnv).length > 0 ? { secretEnvMap: config.secretEnv } : {}),

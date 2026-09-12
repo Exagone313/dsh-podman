@@ -119,6 +119,7 @@ export class WorkspaceResolver {
       if (error.code !== grpc.status.NOT_FOUND) throw error;
       workspace = await unary<any>(control, "createWorkspace", {
         workspaceSlug: slug,
+        projectName,
         imageId: this.config.defaultImage,
         mounts: [{ projectName, mode: "MOUNT_MODE_READ_WRITE" }],
       }, controlMetadata);

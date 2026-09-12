@@ -217,6 +217,7 @@ test("the auto-created workspace mount stays read-write", async () => {
     );
     await resolver.resolve("/projects/team");
     assert.equal(createRequests.length, 1);
+    assert.equal(createRequests[0].projectName, "team");
     const mounts = createRequests[0].mounts;
     assert.equal(mounts.length, 1);
     assert.equal(mounts[0].projectName, "team");

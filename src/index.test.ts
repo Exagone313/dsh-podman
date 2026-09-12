@@ -1627,6 +1627,35 @@ test("publicContainer rebuilds a safe object from an API row", () => {
   assert.deepEqual(out.env, { PATH: "/bin", DB_PASSWORD: "hunter2" });
 });
 
+test("container_recreate returns the logical container name", async () => {
+  const resolver = {
+    registry: {
+      resolveByPath: async () => ({ id: "team" }),
+    },
+    getConfig: () => ({ projectsRoot: "/projects" }),
+    control: async () => ({
+      workspaceSlug: "team",
+      containerName: "dsh-workspace-team",
+      imageId: "img-1",
+      status: "running",
+      mounts: [],
+    }),
+  } as never;
+  const exec = { agent: { session: { header: { cwd: "/projects/team" } } } };
+  const def = (await toolHandlers.container_recreate(
+    resolver,
+    { container: "default", image: "img-1" },
+    exec,
+  )) as any;
+  assert.equal(def.containerName, "default");
+  const named = (await toolHandlers.container_recreate(
+    resolver,
+    { container: "db", image: "img-1" },
+    exec,
+  )) as any;
+  assert.equal(named.containerName, "db");
+});
+
 test("image_list returns image objects", async () => {
   const resolver = {
     control: async () => ({

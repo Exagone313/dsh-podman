@@ -1410,7 +1410,10 @@ export const toolHandlers: Record<
       ...(input.env !== undefined ? { env: input.env } : {}),
       ...(input.secretEnv !== undefined ? { secretEnv: input.secretEnv } : {}),
     });
-    return publicContainer(row);
+    return {
+      ...publicContainer(row),
+      containerName: input.container || "default",
+    };
   },
   container_remove: async (resolver, input, exec) => {
     await resolver.control("removeContainer", {

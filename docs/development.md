@@ -57,9 +57,15 @@ have run first (the `test` target handles this).
 ## Protobuf
 
 The `.proto` sources live in `proto/`; the generated Go bindings in
-`internal/genproto/` are committed. Regenerate with Buf (`buf generate`) after
-changing a `.proto`. The raw `.proto` files are copied into `dist/grpc/proto/`
-at build time and loaded at runtime by `@grpc/proto-loader`.
+`internal/genproto/` are committed. After changing a `.proto`, regenerate them
+with Buf (`buf generate`), which must be installed separately (it has no `make`
+target). Commit the `.proto` change together with the regenerated Go bindings.
+
+`buf.gen.yaml` also emits TypeScript bindings into `src/grpc/` through
+`buf.build/bufbuild/es`, but that output is unused: the JS side loads the raw
+`.proto` files at runtime via `@grpc/proto-loader` (copied to `dist/grpc/proto/`
+at build time). Do not commit that TypeScript output. Optionally validate the
+schema with `buf lint` and `buf breaking`.
 
 ## Install development builds
 

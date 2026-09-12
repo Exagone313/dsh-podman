@@ -55,9 +55,14 @@ guest-agent 镜像，因此它也会随之进入每个工作区容器。
 ## Protobuf
 
 `.proto` 源文件位于 `proto/`；生成的 Go 绑定位于
-`internal/genproto/`，会被提交。修改 `.proto` 后，使用
-Buf（`buf generate`）重新生成。原始 `.proto` 文件在构建时被复制到
-`dist/grpc/proto/`， 并在运行时由 `@grpc/proto-loader` 加载。
+`internal/genproto/`，会被提交。修改 `.proto` 后，需要使用单独安装的
+Buf（`buf generate`）重新生成（没有对应的 `make` 目标）。请将 `.proto`
+改动与重新生成的 Go 绑定一起提交。
+
+`buf.gen.yaml` 还会通过 `buf.build/bufbuild/es` 将 TypeScript 绑定生成到
+`src/grpc/`，但该输出未被使用：JS 端在运行时通过 `@grpc/proto-loader` 加载原始
+`.proto` 文件（构建时复制到 `dist/grpc/proto/`）。不要提交该 TypeScript
+输出。也可以使用 `buf lint` 和 `buf breaking` 校验 schema。
 
 ## 安装开发构建
 

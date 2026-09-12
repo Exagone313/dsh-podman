@@ -108,7 +108,16 @@ export type ContainerPluginKey =
   | "invalidContainerName"
   | "containerNameTaken"
   | "invalidName"
-  | "invalidImageId";
+  | "invalidImageId"
+  | "terminalSignal"
+  | "terminalExitCode"
+  | "terminalRunning"
+  | "terminalFailed"
+  | "terminalDone"
+  | "terminalNoOutput"
+  | "terminalCollapseAria"
+  | "terminalExpandAria"
+  | "terminalExpandRest";
 
 export const en: Record<ContainerPluginKey, string> = {
   cardTitle: "dsh-podman",
@@ -220,6 +229,15 @@ export const en: Record<ContainerPluginKey, string> = {
     "Start with a letter or digit; only letters, digits, '.', '_', '-' (max 64).",
   invalidImageId:
     "Start with a letter, digit, or '_'; only letters, digits, '.', '_', '-', '/', ':' (max 128).",
+  terminalSignal: "signal {signal}",
+  terminalExitCode: "exit code {code}",
+  terminalRunning: "Running",
+  terminalFailed: "Failed",
+  terminalDone: "Done",
+  terminalNoOutput: "No output",
+  terminalCollapseAria: "Collapse output",
+  terminalExpandAria: "Expand the remaining {n} output lines",
+  terminalExpandRest: "… {n} more lines",
 };
 
 export const zh: Record<ContainerPluginKey, string> = {
@@ -325,6 +343,15 @@ export const zh: Record<ContainerPluginKey, string> = {
   containerNameTaken: "容器名称已存在",
   invalidName: "以字母或数字开头，仅可使用字母、数字、'.'、'_'、'-'（最长 64 个字符）。",
   invalidImageId: "以字母、数字或 '_' 开头，仅可使用字母、数字、'.'、'_'、'-'、'/'、':'（最长 128 个字符）。",
+  terminalSignal: "信号 {signal}",
+  terminalExitCode: "退出码 {code}",
+  terminalRunning: "运行中",
+  terminalFailed: "失败",
+  terminalDone: "已完成",
+  terminalNoOutput: "无输出",
+  terminalCollapseAria: "收起输出",
+  terminalExpandAria: "展开其余 {n} 行输出",
+  terminalExpandRest: "… 其余 {n} 行",
 };
 
 declare module "@deepseek-ai/dsh-client-ui-slots" {

@@ -21,8 +21,11 @@ import {
   IconTrashOutline16,
   StateDot,
   TerminalBlock,
+  type TerminalBlockLabels,
 } from "@deepseek-ai/dsh-client-ui-primitives";
+import type { PropsLocale, TranslateNS } from "@deepseek-ai/dsh-client-ui-slots";
 import type { ToolCallViewProps } from "@deepseek-ai/dsh-client-ui-tool/client";
+import { NS } from "./locales.js";
 import { TERMINAL_CLASS } from "./terminal-styles.js";
 
 // A domain-owned row for every podman tool, registered over the keyed
@@ -172,8 +175,38 @@ function prettyOutput(text: string | null): string | null {
   return text;
 }
 
+export type PodmanToolRowProps = ToolCallViewProps & PropsLocale<typeof NS>;
+
+// Terminal card copy, mirroring ui-tool's terminalBlockLabels; `copy`, `copied`
+// and `collapse` resolve from the shared common vocabulary.
+function terminalLabels(
+  t: TranslateNS<typeof NS>,
+): Partial<TerminalBlockLabels> {
+  return {
+    signal: (signal) => t("terminalSignal", { signal }),
+    exitCode: (code) => t("terminalExitCode", { code }),
+    running: t("terminalRunning"),
+    failed: t("terminalFailed"),
+    done: t("terminalDone"),
+    copy: t("copy"),
+    copied: t("copied"),
+    noOutput: t("terminalNoOutput"),
+    collapseAria: t("terminalCollapseAria"),
+    collapse: t("collapse"),
+    expandAria: (hidden) => t("terminalExpandAria", { n: hidden }),
+    expand: (hidden) => t("terminalExpandRest", { n: hidden }),
+  };
+}
+
 /** Render one podman tool call as an icon-titled, expandable row. */
-export function PodmanToolRow({ toolName, block, cwd, home, inspect }: ToolCallViewProps) {
+export function PodmanToolRow({
+  toolName,
+  block,
+  cwd,
+  home,
+  inspect,
+  t,
+}: PodmanToolRowProps) {
   const presentation = TOOL_PRESENTATION[toolName] ?? {
     title: toolName,
     icon: <IconSparkle16 size={14} />,
@@ -238,6 +271,7 @@ export function PodmanToolRow({ toolName, block, cwd, home, inspect }: ToolCallV
           running={!settled}
           maxLines={Infinity}
           className={TERMINAL_CLASS}
+          labels={terminalLabels(t)}
         />
       ) : expandable ? (
         <pre style={bodyStyle}>{output}</pre>

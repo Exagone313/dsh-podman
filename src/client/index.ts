@@ -56,7 +56,7 @@ export function apply(ctx: ClientContext): void {
   for (const key of TOOL_VIEW_KEYS) {
     ctx.slots.inject("tool.call.toolview", () =>
       ctx.slots.register(
-        { name: "tool.call.toolview", key },
+        { name: "tool.call.toolview", key, locale: NS },
         PodmanToolRow,
       ),
     );

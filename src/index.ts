@@ -285,6 +285,16 @@ export const envParam = {
   additionalProperties: { type: "string" },
   description: "Environment variables.",
 };
+const descriptionParam = {
+  type: "string",
+  description:
+    "Clear, concise description of what this command does in active voice, 5-10 words.",
+};
+const timeoutMsParam = {
+  type: "number",
+  description:
+    "Timeout in milliseconds; the command is killed when it expires.",
+};
 
 export const imageListParameters = {
   type: "object",
@@ -466,35 +476,59 @@ export const containerBashParameters = {
   type: "object",
   properties: {
     container: containerParam,
-    command: { type: "string", description: "Shell command to run." },
+    command: { type: "string", description: "The shell command to execute." },
+    description: descriptionParam,
     workdir: { type: "string", description: "Working directory." },
+    timeoutMs: timeoutMsParam,
     env: envParam,
   },
-  required: ["container", "command"],
+  required: ["container", "command", "description"],
 };
 export const containerExecParameters = {
   type: "object",
   properties: {
     container: containerParam,
-    argv: { type: "array", items: { type: "string" } },
-    cwd: { type: "string", description: "Working directory." },
+    argv: {
+      type: "array",
+      items: { type: "string" },
+      description: "The program and arguments to execute.",
+    },
+    description: descriptionParam,
+    workdir: { type: "string", description: "Working directory." },
+    timeoutMs: timeoutMsParam,
     env: envParam,
   },
-  required: ["container", "argv"],
+  required: ["container", "argv", "description"],
 };
 export const containerReadParameters = {
   type: "object",
   properties: {
     container: containerParam,
-    path: { type: "string", description: "Path to read, resolved against the session working directory." },
+    file_path: {
+      type: "string",
+      description: "Path to read, resolved against the session working directory.",
+    },
+    offset: {
+      type: "integer",
+      minimum: 1,
+      description: "1-based first line to return. Defaults to 1.",
+    },
+    limit: {
+      type: "integer",
+      minimum: 1,
+      description: "Maximum number of lines to return. Defaults to 2000.",
+    },
   },
-  required: ["container", "path"],
+  required: ["container", "file_path"],
 };
 export const containerWriteParameters = {
   type: "object",
   properties: {
     container: containerParam,
-    path: { type: "string", description: "Path to write, resolved against the session working directory." },
+    file_path: {
+      type: "string",
+      description: "Path to write, resolved against the session working directory.",
+    },
     content: { type: "string", description: "Content to write." },
     create: { type: "boolean", description: "Create if absent (default true)." },
     truncate: {
@@ -502,25 +536,36 @@ export const containerWriteParameters = {
       description: "Truncate before writing (default true).",
     },
   },
-  required: ["container", "path", "content"],
+  required: ["container", "file_path", "content"],
 };
 export const containerEditParameters = {
   type: "object",
   properties: {
     container: containerParam,
-    path: { type: "string", description: "Path to edit, resolved against the session working directory." },
-    oldString: { type: "string", description: "Text to replace." },
-    newString: { type: "string", description: "Replacement text." },
-    replaceAll: { type: "boolean", description: "Replace every occurrence." },
+    file_path: {
+      type: "string",
+      description: "Path to edit, resolved against the session working directory.",
+    },
+    old_string: { type: "string", description: "Literal text to replace." },
+    new_string: { type: "string", description: "Replacement text." },
+    replace_all: {
+      type: "boolean",
+      description:
+        "Replace every occurrence. Defaults to false; when false, old_string must appear exactly once.",
+    },
   },
-  required: ["container", "path", "oldString", "newString"],
+  required: ["container", "file_path", "old_string", "new_string"],
 };
 export const containerGlobParameters = {
   type: "object",
   properties: {
     container: containerParam,
     pattern: { type: "string", description: "File pattern." },
-    cwd: { type: "string", description: "Working directory." },
+    path: {
+      type: "string",
+      description:
+        "Directory to search in. Defaults to the session working directory.",
+    },
   },
   required: ["container", "pattern"],
 };
@@ -529,8 +574,16 @@ export const containerGrepParameters = {
   properties: {
     container: containerParam,
     pattern: { type: "string", description: "Regex to search for." },
-    path: { type: "string", description: "Path to search." },
-    cwd: { type: "string", description: "Working directory." },
+    path: {
+      type: "string",
+      description:
+        "File or directory to search. Defaults to the session working directory.",
+    },
+    include: {
+      type: "string",
+      description:
+        'One glob filter for which files to search (e.g. "*.ts").',
+    },
   },
   required: ["container", "pattern"],
 };
@@ -1022,13 +1075,13 @@ export function summarizeArgs(
     }
     case "container_write": {
       const container = str("container");
-      const path = str("path");
+      const path = str("file_path");
       if (container === undefined || path === undefined) return "";
       return `write ${approvalPath(path, sessionCwd)} in container ${container}`;
     }
     case "container_edit": {
       const container = str("container");
-      const path = str("path");
+      const path = str("file_path");
       if (container === undefined || path === undefined) return "";
       return `edit ${approvalPath(path, sessionCwd)} in container ${container}`;
     }
@@ -1444,6 +1497,7 @@ export const toolHandlers: Record<
       ["bash", "-lc", input.command],
       guestCwd(input.workdir, sessionCwd, binding),
       input.env,
+      input.timeoutMs,
     );
   },
   container_exec: async (resolver, input, exec) => {
@@ -1452,19 +1506,24 @@ export const toolHandlers: Record<
     return runExec(
       binding,
       input.argv,
-      guestCwd(input.cwd, sessionCwd, binding),
+      guestCwd(input.workdir, sessionCwd, binding),
       input.env,
+      input.timeoutMs,
     );
   },
   container_read: async (resolver, input, exec) => {
     const sessionCwd = currentCwd(exec);
     const binding = await resolveToolBinding(resolver, sessionCwd, input.container);
-    return readGuestFile(binding, resolveGuestPath(input.path, sessionCwd));
+    const content = await readGuestFile(
+      binding,
+      resolveGuestPath(input.file_path, sessionCwd),
+    );
+    return sliceLines(content, input.offset, input.limit);
   },
   container_write: async (resolver, input, exec) => {
     const sessionCwd = currentCwd(exec);
     const binding = await resolveToolBinding(resolver, sessionCwd, input.container);
-    const path = resolveGuestPath(input.path, sessionCwd);
+    const path = resolveGuestPath(input.file_path, sessionCwd);
     const bytesWritten = await writeGuestFile(binding, path, input.content, {
       create: input.create ?? true,
       truncate: input.truncate ?? true,
@@ -1474,15 +1533,21 @@ export const toolHandlers: Record<
   container_edit: async (resolver, input, exec) => {
     const sessionCwd = currentCwd(exec);
     const binding = await resolveToolBinding(resolver, sessionCwd, input.container);
-    const path = resolveGuestPath(input.path, sessionCwd);
+    const path = resolveGuestPath(input.file_path, sessionCwd);
     const before = await readGuestFile(binding, path);
-    if (typeof input.oldString !== "string" || input.oldString.length === 0) {
-      throw new Error("oldString must be a non-empty string");
+    if (typeof input.old_string !== "string" || input.old_string.length === 0) {
+      throw new Error("old_string must be a non-empty string");
     }
-    const after = input.replaceAll
-      ? before.split(input.oldString).join(input.newString)
-      : before.replace(input.oldString, input.newString);
-    if (after === before) throw new Error("oldString was not found");
+    const occurrences = before.split(input.old_string).length - 1;
+    if (occurrences === 0) throw new Error("old_string was not found");
+    if (!input.replace_all && occurrences > 1) {
+      throw new Error(
+        "old_string appears more than once; set replace_all to replace every occurrence",
+      );
+    }
+    const after = input.replace_all
+      ? before.split(input.old_string).join(input.new_string)
+      : before.replace(input.old_string, input.new_string);
     await writeGuestFile(binding, path, after, {
       create: true,
       truncate: true,
@@ -1495,7 +1560,7 @@ export const toolHandlers: Record<
     const result = await runExec(
       binding,
       ["rg", "--files", input.pattern],
-      guestCwd(input.cwd, sessionCwd, binding),
+      guestCwd(input.path, sessionCwd, binding),
     );
     return {
       files: outputLines(result.stdout),
@@ -1505,13 +1570,14 @@ export const toolHandlers: Record<
   container_grep: async (resolver, input, exec) => {
     const sessionCwd = currentCwd(exec);
     const binding = await resolveToolBinding(resolver, sessionCwd, input.container);
-    const cwd = guestCwd(input.cwd, sessionCwd, binding);
-    // A search path follows shell semantics: relative to the working
-    // directory when one is given, else to the session's.
+    const cwd = binding.defaultCwd;
     const path = resolveGuestCwd(input.path, cwd ?? sessionCwd);
-    const argv = path
-      ? ["rg", "-n", input.pattern, path]
-      : ["rg", "-n", input.pattern];
+    const argv = ["rg", "-n"];
+    if (typeof input.include === "string" && input.include !== "") {
+      argv.push("--glob", input.include);
+    }
+    argv.push(input.pattern);
+    if (path) argv.push(path);
     const result = await runExec(binding, argv, cwd);
     return {
       matches: outputLines(result.stdout),
@@ -1902,11 +1968,14 @@ async function readGuestFile(
   return Buffer.concat(chunks).toString("utf8");
 }
 
+const READ_LIMIT = 2000;
+
 async function runExec(
   binding: { guest: any; token: string },
   argv: readonly string[],
   cwd?: string,
   env?: Record<string, string>,
+  timeoutMs?: number,
 ): Promise<{
   exitCode: number;
   signal: string | null;
@@ -1917,10 +1986,33 @@ async function runExec(
   const stderr: Buffer[] = [];
   return new Promise((resolveDone, reject) => {
     const stream = (binding.guest as any).exec(metadata(binding.token));
+    let processId: string | undefined;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const stopTimer = (): void => {
+      if (timer !== undefined) {
+        clearTimeout(timer);
+        timer = undefined;
+      }
+    };
+    if (typeof timeoutMs === "number" && timeoutMs > 0) {
+      timer = setTimeout(() => {
+        timer = undefined;
+        if (processId !== undefined) {
+          // Best effort: ask the guest to terminate the running process.
+          unaryGuest({ binding }, "signal", {
+            processId,
+            signal: "SIGTERM",
+          }).catch(() => {});
+        }
+        reject(new Error(`command timed out after ${timeoutMs} ms`));
+      }, timeoutMs);
+    }
     stream.on("data", (output: any) => {
+      if (output.processId) processId = String(output.processId);
       if (output.stdoutChunk) stdout.push(Buffer.from(output.stdoutChunk));
       if (output.stderrChunk) stderr.push(Buffer.from(output.stderrChunk));
       if (output.exit) {
+        stopTimer();
         resolveDone({
           exitCode: output.exit.exitCode,
           signal: output.exit.signaled ? output.exit.signal : null,
@@ -1929,7 +2021,10 @@ async function runExec(
         });
       }
     });
-    stream.on("error", reject);
+    stream.on("error", (error: unknown) => {
+      stopTimer();
+      reject(error);
+    });
     stream.write({
       start: {
         argv: remoteArgv(argv),
@@ -1939,6 +2034,20 @@ async function runExec(
     });
     stream.end();
   });
+}
+
+// sliceLines returns the requested 1-based line range of a file's content,
+// defaulting to the first READ_LIMIT lines like the harness's read tool.
+function sliceLines(content: string, offset: unknown, limit: unknown): string {
+  const start =
+    typeof offset === "number" && Number.isInteger(offset) && offset > 0
+      ? offset
+      : 1;
+  const max =
+    typeof limit === "number" && Number.isInteger(limit) && limit > 0
+      ? limit
+      : READ_LIMIT;
+  return content.split("\n").slice(start - 1, start - 1 + max).join("\n");
 }
 
 function outputLines(text: string): string[] {

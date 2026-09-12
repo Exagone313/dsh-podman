@@ -740,8 +740,8 @@ test("summarizeArgs renders reasons for the podman-ops gated tools", () => {
     summarizeArgs("container_exec", { container: "c", argv: ["python", "run.py", "--x", "1", "--y", "2", "--z", "3", "--w", "4", "--v", "5"] }),
     "run in container c: python run.py --x 1 --y 2 --z 3 …",
   );
-  assert.equal(summarizeArgs("container_write", { container: "c", path: "/etc/valkey/valkey.conf" }), "write /etc/valkey/valkey.conf in container c");
-  assert.equal(summarizeArgs("container_edit", { container: "c", path: "/etc/valkey/valkey.conf" }), "edit /etc/valkey/valkey.conf in container c");
+  assert.equal(summarizeArgs("container_write", { container: "c", file_path: "/etc/valkey/valkey.conf" }), "write /etc/valkey/valkey.conf in container c");
+  assert.equal(summarizeArgs("container_edit", { container: "c", file_path: "/etc/valkey/valkey.conf" }), "edit /etc/valkey/valkey.conf in container c");
   assert.equal(summarizeArgs("container_bash", { container: "c", command: "ping -c 1 8.8.8.8" }), "run shell in container c: ping -c 1 8.8.8.8");
 });
 
@@ -1870,7 +1870,7 @@ test("file tools resolve relative paths against the session cwd", async () => {
   const read = guestFileRecorder();
   await toolHandlers.container_read(
     read.resolver as never,
-    { container: "default", path: "README.md" },
+    { container: "default", file_path: "README.md" },
     exec,
   );
   assert.deepEqual(read.reads, ["/projects/team/README.md"]);
@@ -1878,7 +1878,7 @@ test("file tools resolve relative paths against the session cwd", async () => {
   const absolute = guestFileRecorder();
   await toolHandlers.container_read(
     absolute.resolver as never,
-    { container: "default", path: "/etc/hosts" },
+    { container: "default", file_path: "/etc/hosts" },
     exec,
   );
   assert.deepEqual(absolute.reads, ["/etc/hosts"], "absolute paths pass through");
@@ -1886,7 +1886,7 @@ test("file tools resolve relative paths against the session cwd", async () => {
   const write = guestFileRecorder();
   await toolHandlers.container_write(
     write.resolver as never,
-    { container: "default", path: "out.txt", content: "x" },
+    { container: "default", file_path: "out.txt", content: "x" },
     exec,
   );
   assert.deepEqual(write.writes.map((entry) => entry.path), ["/projects/team/out.txt"]);
@@ -1894,7 +1894,7 @@ test("file tools resolve relative paths against the session cwd", async () => {
   const edit = guestFileRecorder("hello");
   await toolHandlers.container_edit(
     edit.resolver as never,
-    { container: "default", path: "a.txt", oldString: "hello", newString: "bye" },
+    { container: "default", file_path: "a.txt", old_string: "hello", new_string: "bye" },
     exec,
   );
   assert.deepEqual(edit.reads, ["/projects/team/a.txt"]);
@@ -1906,7 +1906,7 @@ test("file tools refuse traversal before reaching the guest", async () => {
   const { reads, writes, resolver } = guestFileRecorder();
   for (const path of ["../escape", "a/../../b"]) {
     await assert.rejects(
-      () => toolHandlers.container_read(resolver as never, { container: "default", path }, exec),
+      () => toolHandlers.container_read(resolver as never, { container: "default", file_path: path }, exec),
       /must not escape/,
     );
   }
@@ -1914,7 +1914,7 @@ test("file tools refuse traversal before reaching the guest", async () => {
     () =>
       toolHandlers.container_write(
         resolver as never,
-        { container: "default", path: "../escape", content: "x" },
+        { container: "default", file_path: "../escape", content: "x" },
         exec,
       ),
     /must not escape/,
@@ -1923,23 +1923,150 @@ test("file tools refuse traversal before reaching the guest", async () => {
   assert.deepEqual(writes, []);
 });
 
+test("container_read applies offset and limit like the built-in read tool", async () => {
+  const exec = { agent: { session: { header: { cwd: "/projects/team" } } } };
+  const { resolver } = guestFileRecorder("l1\nl2\nl3\nl4\n");
+  assert.equal(
+    await toolHandlers.container_read(
+      resolver as never,
+      { container: "default", file_path: "f" },
+      exec,
+    ),
+    "l1\nl2\nl3\nl4\n",
+    "no offset/limit returns the whole content",
+  );
+  assert.equal(
+    await toolHandlers.container_read(
+      resolver as never,
+      { container: "default", file_path: "f", offset: 2, limit: 2 },
+      exec,
+    ),
+    "l2\nl3",
+  );
+});
+
+test("container_edit requires a unique match unless replace_all is set", async () => {
+  const exec = { agent: { session: { header: { cwd: "/projects/team" } } } };
+
+  const duplicate = guestFileRecorder("a a a");
+  await assert.rejects(
+    () =>
+      toolHandlers.container_edit(
+        duplicate.resolver as never,
+        { container: "default", file_path: "f", old_string: "a", new_string: "b" },
+        exec,
+      ),
+    /more than once/,
+  );
+  assert.deepEqual(duplicate.writes, [], "a non-unique match must not be written");
+
+  const all = guestFileRecorder("a a a");
+  await toolHandlers.container_edit(
+    all.resolver as never,
+    { container: "default", file_path: "f", old_string: "a", new_string: "b", replace_all: true },
+    exec,
+  );
+  assert.equal(all.writes[0].content, "b b b");
+});
+
+test("container command and file tools mirror the built-in arguments", () => {
+  const parameters = (name: string): any =>
+    TOOLS.find((entry) => entry.name === name)!.parameters;
+
+  const bash = parameters("container_bash");
+  assert.ok(bash.required.includes("command"));
+  assert.ok(bash.required.includes("description"));
+  assert.equal(bash.properties.timeoutMs.type, "number");
+
+  const exec = parameters("container_exec");
+  assert.ok(exec.required.includes("description"));
+  assert.equal(exec.properties.workdir.type, "string");
+  assert.equal(exec.properties.cwd, undefined);
+
+  const read = parameters("container_read");
+  assert.equal(read.properties.file_path.type, "string");
+  assert.equal(read.properties.offset.type, "integer");
+  assert.equal(read.properties.limit.type, "integer");
+
+  const write = parameters("container_write");
+  assert.equal(write.properties.file_path.type, "string");
+
+  const edit = parameters("container_edit");
+  assert.equal(edit.properties.old_string.type, "string");
+  assert.equal(edit.properties.new_string.type, "string");
+  assert.equal(edit.properties.replace_all.type, "boolean");
+
+  const glob = parameters("container_glob");
+  assert.equal(glob.properties.path.type, "string");
+  assert.equal(glob.properties.cwd, undefined);
+
+  const grep = parameters("container_grep");
+  assert.equal(grep.properties.include.type, "string");
+  assert.equal(grep.properties.cwd, undefined);
+});
+
+test("container_bash enforces timeoutMs", async () => {
+  const exec = { agent: { session: { header: { cwd: "/projects/team" } } } };
+  let signaled: any;
+  const guest = {
+    exec: () => {
+      const handlers: Record<string, ((value?: unknown) => void)[]> = {};
+      return {
+        on(event: string, handler: (value?: unknown) => void) {
+          (handlers[event] ??= []).push(handler);
+          if (event === "data") queueMicrotask(() => handler({ processId: "42" }));
+        },
+        write() {},
+        end() {},
+      };
+    },
+    signal: (
+      request: any,
+      _metadata: unknown,
+      callback: (error: Error | null, result: unknown) => void,
+    ) => {
+      signaled = request;
+      callback(null, {});
+    },
+  };
+  const resolver = {
+    resolve: async () => ({
+      guest,
+      token: "t",
+      socket: "/run/x.sock",
+      defaultCwd: "/projects/team",
+    }),
+  };
+  await assert.rejects(
+    () =>
+      toolHandlers.container_bash(
+        resolver as never,
+        { container: "default", command: "sleep", description: "x", timeoutMs: 10 },
+        exec,
+      ),
+    /timed out/,
+  );
+  assert.equal(signaled.processId, "42");
+  assert.equal(signaled.signal, "SIGTERM");
+});
+
 test("approval prompts name the resolved path", () => {
   assert.equal(
-    summarizeArgs("container_write", { container: "c", path: "notes.md" }, "/projects/team"),
+    summarizeArgs("container_write", { container: "c", file_path: "notes.md" }, "/projects/team"),
     "write /projects/team/notes.md in container c",
   );
   assert.equal(
-    summarizeArgs("container_edit", { container: "c", path: "notes.md" }, "/projects/team"),
+    summarizeArgs("container_edit", { container: "c", file_path: "notes.md" }, "/projects/team"),
     "edit /projects/team/notes.md in container c",
   );
   // Without a session cwd, or for a path that cannot resolve, the prompt still
   // renders with the value as given.
   assert.equal(
-    summarizeArgs("container_write", { container: "c", path: "notes.md" }),
+    summarizeArgs("container_write", { container: "c", file_path: "notes.md" }),
     "write notes.md in container c",
   );
   assert.equal(
-    summarizeArgs("container_write", { container: "c", path: "../x" }, "/projects/team"),
+    summarizeArgs("container_write", { container: "c", file_path: "../x" }, "/projects/team"),
     "write ../x in container c",
   );
 });
@@ -1992,7 +2119,7 @@ test("command tools resolve a relative working directory", async () => {
   const run = guestExecRecorder("/projects/team");
   await toolHandlers.container_exec(
     run.resolver as never,
-    { container: "default", argv: ["ls"], cwd: "/abs" },
+    { container: "default", argv: ["ls"], workdir: "/abs" },
     exec,
   );
   assert.equal(run.starts[0].cwd, "/abs", "absolute working directories pass through");
@@ -2019,7 +2146,7 @@ test("command tools resolve a relative working directory", async () => {
 test("container_grep resolves its search path like a shell would", async () => {
   const exec = { agent: { session: { header: { cwd: "/projects/team" } } } };
 
-  // Without a working directory the path is relative to the session's.
+  // With a search path, it is relative to the session directory.
   const plain = guestExecRecorder("/projects/team");
   await toolHandlers.container_grep(
     plain.resolver as never,
@@ -2028,15 +2155,15 @@ test("container_grep resolves its search path like a shell would", async () => {
   );
   assert.deepEqual(plain.starts[0].argv, ["/usr/bin/rg", "-n", "TODO", "/projects/team/src"]);
 
-  // With one, the path is relative to that working directory.
-  const nested = guestExecRecorder("/projects/team");
+  // An include filter maps to ripgrep's --glob.
+  const filtered = guestExecRecorder("/projects/team");
   await toolHandlers.container_grep(
-    nested.resolver as never,
-    { container: "default", pattern: "TODO", path: "src", cwd: "app" },
+    filtered.resolver as never,
+    { container: "default", pattern: "TODO", path: "src", include: "*.ts" },
     exec,
   );
-  assert.deepEqual(nested.starts[0].argv, ["/usr/bin/rg", "-n", "TODO", "/projects/team/app/src"]);
-  assert.equal(nested.starts[0].cwd, "/projects/team/app");
+  assert.deepEqual(filtered.starts[0].argv, ["/usr/bin/rg", "-n", "--glob", "*.ts", "TODO", "/projects/team/src"]);
+  assert.equal(filtered.starts[0].cwd, "/projects/team");
 
   const none = guestExecRecorder("/projects/team");
   await toolHandlers.container_grep(
@@ -2098,7 +2225,7 @@ test("command tools fall back to the guest cwd when the session directory is not
   const explicit = guestExecRecorder();
   await toolHandlers.container_exec(
     explicit.resolver as never,
-    { container: "db", argv: ["ls"], cwd: "/data" },
+    { container: "db", argv: ["ls"], workdir: "/data" },
     exec,
   );
   assert.equal(explicit.starts[0].cwd, "/data");

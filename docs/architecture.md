@@ -73,7 +73,8 @@ nor any other workspace's socket directory.
 
 Commands and daemons inherit the guest agent's environment, minus the reserved
 `DSH_PODMAN` namespace: the agent's own token stays with the agent instead of
-being copied into everything it starts.
+being copied into everything it starts. A daemon started with `inheritEnv=false`
+instead receives only the `PATH`/`HOME` baseline plus its own `env`.
 
 Recreating a container or shutting down the orchestrator first asks the
 container's guest agent to gracefully stop its daemons (SIGTERM, ~10s grace)

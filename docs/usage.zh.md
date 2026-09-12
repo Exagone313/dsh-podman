@@ -165,21 +165,34 @@ UI 使用短名称。`secret_create` 的值由服务端用 `crypto/rand`
 `DSH_PODMAN`
 开头）。设置卡片可以用用户输入的内容**覆盖**机密（只写），但绝不读取它。
 
+挂载到某个路径的机密以 root 所有、且除 root
+外一律拒绝的权限创建，因此只有容器的默认（root）用户可以读取它；以其他 `uid`
+启动的守护进程无法读取挂载的机密。作为环境变量附加的机密会被 agent
+启动的每个进程继承，除非守护进程以 `inheritEnv=false`
+启动（参见[守护进程](#守护进程)）。
+
 ### 守护进程
 
-| 工具             | 参数                                                                       | 描述                                                               |
-| ---------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------ |
-| `daemon_list`    | `container`                                                                | 列出守护进程（包括其有效 `uid`/`gid`）                             |
-| `daemon_logs`    | `container`, `name`, optional `tailBytes`                                  | 查看守护进程 stdout/stderr 的尾部                                  |
-| `daemon_restart` | `container`, `name`                                                        | 使用相同的命令、环境、用户重启守护进程                             |
-| `daemon_start`   | `container`, `name`, `argv`, optional `cwd`, `env`, `uid`, `gid`, `groups` | 启动后台守护进程；可选的 `uid`/`gid`/`groups` 以其他用户身份运行它 |
-| `daemon_stop`    | `container`, `name`, optional `signal`                                     | 停止守护进程                                                       |
+| 工具             | 参数                                                                                     | 描述                                                               |
+| ---------------- | ---------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| `daemon_list`    | `container`                                                                              | 列出守护进程（包括其有效 `uid`/`gid`）                             |
+| `daemon_logs`    | `container`, `name`, optional `tailBytes`                                                | 查看守护进程 stdout/stderr 的尾部                                  |
+| `daemon_restart` | `container`, `name`                                                                      | 使用相同的命令、环境、用户重启守护进程                             |
+| `daemon_start`   | `container`, `name`, `argv`, optional `cwd`, `env`, `inheritEnv`, `uid`, `gid`, `groups` | 启动后台守护进程；可选的 `uid`/`gid`/`groups` 以其他用户身份运行它 |
+| `daemon_stop`    | `container`, `name`, optional `signal`                                                   | 停止守护进程                                                       |
 
 守护进程默认以容器用户身份运行。当只设置 `uid` 时，`gid`
 默认为相同值；两者都未设置时，守护进程在没有任何 uid/gid
 覆盖的情况下运行。`daemon_list` 报告每个守护进程的有效 `uid`/`gid`。
 使用已存在的名称启动守护进程时，会先停止该守护进程（如果它仍在运行）并将其替换；
 已停止的守护进程仍会列出，以便其日志仍可读取。
+
+守护进程默认继承容器的环境——即 guest agent 拥有的所有变量（包括用
+`container_secret_add` 附加的环境机密），但会去掉保留的 `DSH_PODMAN`
+命名空间。传入 `inheritEnv=false`
+可将其隔离启动：此时它只接收（来自容器的）`PATH` 和 `HOME` 以及自身的
+`env`，因此容器环境变量和机密环境变量都不可见。`daemon_restart`
+会沿用守护进程启动时的模式。
 
 ## 容器管理 UI
 

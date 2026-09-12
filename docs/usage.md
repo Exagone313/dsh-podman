@@ -189,15 +189,22 @@ variable** (`container_secret_add`; the env var name must not start with
 `DSH_PODMAN`). The settings card can **overwrite** a secret with user-typed
 content (write-only) but never reads it.
 
+A secret mounted at a path is created root-owned with permissions that deny
+everyone but root, so only the container's default (root) user can read it; a
+daemon started with a different `uid` cannot read a mounted secret. A secret
+attached as an environment variable is inherited by every process the agent
+starts unless the daemon is started with `inheritEnv=false` (see
+[Daemons](#daemons)).
+
 ### Daemons
 
-| Tool             | Params                                                                     | Description                                                                     |
-| ---------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
-| `daemon_list`    | `container`                                                                | List the daemons (including their effective `uid`/`gid`)                        |
-| `daemon_logs`    | `container`, `name`, optional `tailBytes`                                  | Tail a daemon's stdout/stderr                                                   |
-| `daemon_restart` | `container`, `name`                                                        | Restart a daemon with the same command, environment, and user                   |
-| `daemon_start`   | `container`, `name`, `argv`, optional `cwd`, `env`, `uid`, `gid`, `groups` | Start a background daemon; optional `uid`/`gid`/`groups` run it as another user |
-| `daemon_stop`    | `container`, `name`, optional `signal`                                     | Stop a daemon                                                                   |
+| Tool             | Params                                                                                   | Description                                                                     |
+| ---------------- | ---------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| `daemon_list`    | `container`                                                                              | List the daemons (including their effective `uid`/`gid`)                        |
+| `daemon_logs`    | `container`, `name`, optional `tailBytes`                                                | Tail a daemon's stdout/stderr                                                   |
+| `daemon_restart` | `container`, `name`                                                                      | Restart a daemon with the same command, environment, and user                   |
+| `daemon_start`   | `container`, `name`, `argv`, optional `cwd`, `env`, `inheritEnv`, `uid`, `gid`, `groups` | Start a background daemon; optional `uid`/`gid`/`groups` run it as another user |
+| `daemon_stop`    | `container`, `name`, optional `signal`                                                   | Stop a daemon                                                                   |
 
 Daemons run as the container user by default. When only `uid` is set, `gid`
 defaults to the same value; when neither is set, the daemon runs without any
@@ -205,6 +212,14 @@ uid/gid override. `daemon_list` reports the effective `uid`/`gid` of each
 daemon. Starting a daemon with a name that already exists stops that daemon
 first (when it is still running) and replaces it; stopped daemons stay listed so
 their logs remain readable.
+
+A daemon inherits the container's environment by default — every variable the
+guest agent has, including environment secrets attached with
+`container_secret_add` — minus the reserved `DSH_PODMAN` namespace. Pass
+`inheritEnv=false` to start it isolated: it then receives only `PATH` and `HOME`
+(from the container) plus its own `env`, so container and secret environment
+variables are not visible. `daemon_restart` replays the mode the daemon was
+started with.
 
 ## Container management UI
 

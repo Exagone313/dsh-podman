@@ -61,7 +61,8 @@ API，运行并监督后台**守护进程**，并读取和写入文件。每个 
 的 control socket，也不会看到任何其他工作区的套接字目录。
 
 命令和守护进程继承 guest agent 的环境，减去保留的 `DSH_PODMAN` 命名空间：agent
-自身的 token 保留在 agent 中，而不会被复制到它所启动的每个东西中。
+自身的 token 保留在 agent 中，而不会被复制到它所启动的每个东西中。以
+`inheritEnv=false` 启动的守护进程则只接收 `PATH`/`HOME` 基线以及自身的 `env`。
 
 重新创建容器或关闭 orchestrator 时，会先要求容器的 guest agent
 优雅地停止其守护进程（SIGTERM，约 10 秒宽限期），然后 podman 才会拆除该容器。

@@ -14,6 +14,18 @@ const MOUNT_MODES: Record<string, string> = {
   read_write: "MOUNT_MODE_READ_WRITE",
 };
 
+const KIND_FROM_PROTO: Record<string, string> = {
+  MOUNT_KIND_PROJECT: "project",
+  MOUNT_KIND_TMPFS: "tmpfs",
+  MOUNT_KIND_VOLUME: "volume",
+  MOUNT_KIND_SECRET: "secret",
+};
+
+const MODE_FROM_PROTO: Record<string, string> = {
+  MOUNT_MODE_READ_ONLY: "read_only",
+  MOUNT_MODE_READ_WRITE: "read_write",
+};
+
 export function mountKindToProto(kind: string | undefined): string {
   if (kind === undefined) return "MOUNT_KIND_PROJECT";
   const proto = Object.prototype.hasOwnProperty.call(MOUNT_KINDS, kind)
@@ -41,4 +53,20 @@ export function mountModeToProto(mode: string | undefined): string {
       : undefined;
   if (proto === undefined) throw new Error(`unknown mount mode: ${mode}`);
   return proto;
+}
+
+/** The logical mount kind for a proto enum value, or undefined when unspecified. */
+export function mountKindFromProto(proto: string | undefined): string | undefined {
+  if (proto === undefined) return undefined;
+  return Object.prototype.hasOwnProperty.call(KIND_FROM_PROTO, proto)
+    ? KIND_FROM_PROTO[proto]
+    : undefined;
+}
+
+/** The logical mount mode for a proto enum value, or undefined when unspecified. */
+export function mountModeFromProto(proto: string | undefined): string | undefined {
+  if (proto === undefined) return undefined;
+  return Object.prototype.hasOwnProperty.call(MODE_FROM_PROTO, proto)
+    ? MODE_FROM_PROTO[proto]
+    : undefined;
 }

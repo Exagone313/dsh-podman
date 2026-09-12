@@ -1622,7 +1622,7 @@ test("publicContainer rebuilds a safe object from an API row", () => {
     "status",
   ]);
   assert.deepEqual(out.mounts, [
-    { projectName: "team", mode: "MOUNT_MODE_READ_WRITE", kind: "MOUNT_KIND_PROJECT" },
+    { projectName: "team", mode: "read_write", kind: "project" },
   ]);
   assert.deepEqual(out.env, { PATH: "/bin", DB_PASSWORD: "hunter2" });
 });
@@ -1743,8 +1743,8 @@ test("container_mount_list returns mount objects", async () => {
     exec,
   );
   assert.deepEqual(out, [
-    { projectName: "team", mode: "MOUNT_MODE_READ_WRITE", kind: "MOUNT_KIND_PROJECT" },
-    { volume: "myvol", destination: "/data", mode: "MOUNT_MODE_READ_ONLY", kind: "MOUNT_KIND_VOLUME" },
+    { projectName: "team", mode: "read_write", kind: "project" },
+    { volume: "myvol", destination: "/data", mode: "read_only", kind: "volume" },
   ]);
 });
 

@@ -7,7 +7,9 @@ import { installContainerSettings } from "./settings-bridge.js";
 import {
   defaultMountMode,
   mountKindToProto,
+  mountKindFromProto,
   mountModeToProto,
+  mountModeFromProto,
 } from "./mount-enums.js";
 import { metadata } from "./workspace-binding.js";
 import { PassThrough } from "node:stream";
@@ -1937,14 +1939,16 @@ function outputLines(text: string): string[] {
 // Rebuild API objects so tool results never expose internal fields (see
 // AGENTS.md "Security"): only allow-listed attributes reach the model.
 export function publicMount(mount: any): Record<string, unknown> {
+  const kind = mountKindFromProto(mount?.kind);
+  const mode = mountModeFromProto(mount?.mode);
   return {
     ...(mount?.projectName ? { projectName: mount.projectName } : {}),
     ...(mount?.path ? { path: mount.path } : {}),
     ...(mount?.destination ? { destination: mount.destination } : {}),
     ...(mount?.volume ? { volume: mount.volume } : {}),
     ...(mount?.secret ? { secret: mount.secret } : {}),
-    ...(mount?.kind ? { kind: mount.kind } : {}),
-    ...(mount?.mode ? { mode: mount.mode } : {}),
+    ...(kind !== undefined ? { kind } : {}),
+    ...(mode !== undefined ? { mode } : {}),
   };
 }
 

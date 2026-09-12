@@ -8,6 +8,7 @@ import type {} from "@deepseek-ai/dsh-client-locale/client";
 import type {} from "./slot-contract.js";
 import { ContainerCard } from "./ContainerCard.js";
 import { PodmanToolRow, TOOL_VIEW_KEYS } from "./tool-views.js";
+import { installTerminalStyles } from "./terminal-styles.js";
 import {
   CONTAINER_NS,
   ContainerCardController,
@@ -22,6 +23,7 @@ export const name = "podman";
 export const inject = ["slots", "locale", "settingsScope"];
 
 export function apply(ctx: ClientContext): void {
+  installTerminalStyles(ctx);
   ctx.effect(
     () => ctx.locale.register(NS, { en, zh }),
     "podman: dictionaries",

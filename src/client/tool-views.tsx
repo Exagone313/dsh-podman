@@ -23,6 +23,7 @@ import {
   TerminalBlock,
 } from "@deepseek-ai/dsh-client-ui-primitives";
 import type { ToolCallViewProps } from "@deepseek-ai/dsh-client-ui-tool/client";
+import { TERMINAL_CLASS } from "./terminal-styles.js";
 
 // A domain-owned row for every podman tool, registered over the keyed
 // `tool.call.toolview` slot. Without it the shipped client renders each call as
@@ -236,6 +237,7 @@ export function PodmanToolRow({ toolName, block, cwd, home, inspect }: ToolCallV
           signal={terminalResult?.signal}
           running={!settled}
           maxLines={Infinity}
+          className={TERMINAL_CLASS}
         />
       ) : expandable ? (
         <pre style={bodyStyle}>{output}</pre>

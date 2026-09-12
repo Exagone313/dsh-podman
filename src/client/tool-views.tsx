@@ -72,11 +72,24 @@ const TOOL_PRESENTATION: Record<string, ToolPresentation> = {
 /** The wire tool names this package owns a row for. */
 export const TOOL_VIEW_KEYS: readonly string[] = Object.keys(TOOL_PRESENTATION);
 
+const sepStyle: CSSProperties = {
+  flex: "none",
+  width: "2px",
+  height: "2px",
+  borderRadius: "1px",
+  margin: "0 8px",
+  background: "var(--dsw-alias-label-caption)",
+};
+
 const summaryStyle: CSSProperties = {
-  color: "var(--dsw-alias-label-secondary)",
+  flex: "1 1 auto",
+  minWidth: 0,
   overflow: "hidden",
   textOverflow: "ellipsis",
   whiteSpace: "nowrap",
+  fontSize: "14px",
+  lineHeight: "24px",
+  color: "var(--dsw-alias-label-tertiary)",
 };
 
 const bodyStyle: CSSProperties = {
@@ -200,7 +213,13 @@ export function PodmanToolRow({ toolName, block, inspect }: ToolCallViewProps) {
       expandable={expandable}
       onToggle={() => setExpanded((value) => !value)}
       expandOnRowClick
-      collapsedContent={<span style={summaryStyle}>{summary}</span>}
+      keepContentWhenOpen
+      collapsedContent={
+        <>
+          <span style={sepStyle} aria-hidden />
+          <span style={summaryStyle}>{summary}</span>
+        </>
+      }
     >
       {expandable ? <pre style={bodyStyle}>{output}</pre> : null}
     </DisclosureRow>

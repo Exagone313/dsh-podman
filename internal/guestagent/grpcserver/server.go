@@ -238,6 +238,14 @@ func (s *Server) StartDaemon(_ context.Context, request *guest.StartDaemonReques
 	if len(request.GetArgv()) == 0 {
 		return nil, status.Error(codes.InvalidArgument, "argv must contain a command")
 	}
+	// Replace an existing daemon with the same name: stop it first when it is
+	// still running so the new process can take over. A stopped daemon is
+	// replaced by Start directly.
+	if existing := s.findDaemon(request.GetName()); existing != nil && existing.Running {
+		if err := s.Daemons.Stop(request.GetName(), syscall.SIGTERM); err != nil {
+			return nil, status.Error(codes.Internal, err.Error())
+		}
+	}
 	var uid, gid *uint32
 	if request.GetUid() != nil {
 		value := request.GetUid().GetValue()

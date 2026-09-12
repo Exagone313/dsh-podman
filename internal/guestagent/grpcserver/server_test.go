@@ -369,6 +369,36 @@ func TestStartDaemonAndList(t *testing.T) {
 	}
 }
 
+func TestStartDaemonReplaces(t *testing.T) {
+	server := New()
+	if _, err := server.StartDaemon(context.Background(), &guest.StartDaemonRequest{Name: "web", Argv: []string{"sleep", "30"}}); err != nil {
+		t.Fatal(err)
+	}
+	info, err := server.StartDaemon(context.Background(), &guest.StartDaemonRequest{Name: "web", Argv: []string{"sleep", "60"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.Name != "web" || !info.Running || len(info.Argv) != 2 || info.Argv[1] != "60" {
+		t.Fatalf("unexpected replaced daemon: %#v", info)
+	}
+	response, err := server.ListDaemons(context.Background(), &guest.ListDaemonsRequest{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	count := 0
+	for _, d := range response.Daemons {
+		if d.Name == "web" {
+			count++
+		}
+	}
+	if count != 1 {
+		t.Fatalf("expected exactly one web daemon, got %d", count)
+	}
+	if _, err := server.StopDaemon(context.Background(), &guest.StopDaemonRequest{Name: "web", Signal: "SIGKILL"}); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestDaemonLogs(t *testing.T) {
 	server := New()
 	if _, err := server.StartDaemon(context.Background(), &guest.StartDaemonRequest{Name: "web", Argv: []string{"sh", "-c", "echo hi"}}); err != nil {

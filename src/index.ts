@@ -1334,7 +1334,7 @@ const TOOL_DESCRIPTIONS: Record<string, string> = {
   container_secret_remove:
     "Stop injecting a named secret into a container environment variable. Requires approval: removing a secret exposure changes what the container can read.",
   daemon_start:
-    "Start a daemon inside a container of the current workspace. Optionally run it as a specific uid/gid (with optional supplementary groups). Defaults to the session working directory when it is mounted; pass cwd to override.",
+    "Start a daemon inside a container of the current workspace. Optionally run it as a specific uid/gid (with optional supplementary groups). Defaults to the session working directory when it is mounted; pass cwd to override. An existing daemon with the same name is stopped and replaced.",
   daemon_list:
     "List the daemons running inside a container of the current workspace.",
   daemon_stop: "Stop a daemon inside a container of the current workspace.",

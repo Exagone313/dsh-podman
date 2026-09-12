@@ -182,7 +182,9 @@ content (write-only) but never reads it.
 Daemons run as the container user by default. When only `uid` is set, `gid`
 defaults to the same value; when neither is set, the daemon runs without any
 uid/gid override. `daemon_list` reports the effective `uid`/`gid` of each
-daemon.
+daemon. Starting a daemon with a name that already exists stops that daemon
+first (when it is still running) and replaces it; stopped daemons stay listed so
+their logs remain readable.
 
 ## Container management UI
 

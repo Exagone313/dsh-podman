@@ -20,6 +20,7 @@ import {
   IconStopFill16,
   IconTrashOutline16,
   StateDot,
+  TerminalBlock,
 } from "@deepseek-ai/dsh-client-ui-primitives";
 import type { ToolCallViewProps } from "@deepseek-ai/dsh-client-ui-tool/client";
 
@@ -171,13 +172,17 @@ function prettyOutput(text: string | null): string | null {
 }
 
 /** Render one podman tool call as an icon-titled, expandable row. */
-export function PodmanToolRow({ toolName, block, inspect }: ToolCallViewProps) {
+export function PodmanToolRow({ toolName, block, cwd, home, inspect }: ToolCallViewProps) {
   const presentation = TOOL_PRESENTATION[toolName] ?? {
     title: toolName,
     icon: <IconSparkle16 size={14} />,
     summaryKeys: [] as readonly string[],
   };
   const settled = "kind" in block;
+  const terminalCall = block.callView?.card === "terminal" ? block.callView : null;
+  const terminalResult =
+    settled && block.resultView?.card === "terminal" ? block.resultView : null;
+  const terminal = settled ? terminalResult !== null : terminalCall !== null;
   const argsRaw =
     ((settled ? block.call?.argsRaw : block.argsRaw) ?? "");
   const args = parseArgs(argsRaw);
@@ -195,7 +200,7 @@ export function PodmanToolRow({ toolName, block, inspect }: ToolCallViewProps) {
     firstLine(argsRaw) || block.callId,
   );
   const [expanded, setExpanded] = useState(false);
-  const expandable = output !== null && output !== "";
+  const expandable = terminal || (output !== null && output !== "");
   const leading =
     state === "error" ? (
       <StateDot state="error" />
@@ -221,7 +226,20 @@ export function PodmanToolRow({ toolName, block, inspect }: ToolCallViewProps) {
         </>
       }
     >
-      {expandable ? <pre style={bodyStyle}>{output}</pre> : null}
+      {terminal ? (
+        <TerminalBlock
+          command={terminalResult?.title ?? terminalCall?.title ?? ""}
+          cwd={terminalCall?.cwd ?? cwd}
+          home={home}
+          output={terminalResult?.output}
+          exitCode={terminalResult?.exitCode}
+          signal={terminalResult?.signal}
+          running={!settled}
+          maxLines={Infinity}
+        />
+      ) : expandable ? (
+        <pre style={bodyStyle}>{output}</pre>
+      ) : null}
     </DisclosureRow>
   );
 }

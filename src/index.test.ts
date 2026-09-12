@@ -27,6 +27,8 @@ import {
   PODMAN_OPS_AGENT_CORDIS_YML,
   ensurePodmanOpsPreset,
   publicContainer,
+  toolCallView,
+  toolResultView,
 } from "./index.js";
 
 test("remoteArgv remaps ripgrep onto the guest path", () => {
@@ -2003,6 +2005,48 @@ test("container command and file tools mirror the built-in arguments", () => {
   const grep = parameters("container_grep");
   assert.equal(grep.properties.include.type, "string");
   assert.equal(grep.properties.cwd, undefined);
+});
+
+test("tool presenters label every tool and render terminal commands", () => {
+  for (const tool of TOOLS) {
+    assert.notEqual(
+      toolCallView(tool.name, {}),
+      undefined,
+      `${tool.name} has a call view`,
+    );
+  }
+  assert.deepEqual(
+    toolCallView("container_bash", { command: "ls", description: "List files" }),
+    { card: "terminal", title: "ls", description: "List files" },
+  );
+  assert.deepEqual(
+    toolCallView("container_exec", { argv: ["ls", "-la"], description: "List all" }),
+    { card: "terminal", title: "ls -la", description: "List all" },
+  );
+  assert.deepEqual(
+    toolCallView("image_list", {}),
+    { card: "generic", title: "List images", kind: "search" },
+  );
+});
+
+test("tool presenters render command results as terminal output", () => {
+  const result = (value: unknown) => ({
+    content: [{ type: "text", text: JSON.stringify(value) }],
+    isError: false,
+  });
+  assert.deepEqual(
+    toolResultView("container_bash", {}, result({ exitCode: 0, signal: null, stdout: "hi\n", stderr: "" })),
+    { card: "terminal", output: "hi\n", exitCode: 0 },
+  );
+  assert.deepEqual(
+    toolResultView("container_bash", {}, result({ exitCode: 0, signal: "SIGTERM", stdout: "", stderr: "" })),
+    { card: "terminal", output: "", signal: "SIGTERM" },
+  );
+  assert.equal(
+    toolResultView("container_bash", {}, { content: [{ type: "text", text: "boom" }], isError: true }),
+    undefined,
+  );
+  assert.equal(toolResultView("image_list", {}, result({})), undefined);
 });
 
 test("container_bash enforces timeoutMs", async () => {

@@ -1810,6 +1810,98 @@ function mountsFromInput(
   });
 }
 
+// UI title and icon category per tool, used by the host presenters so a UI can
+// label a call meaningfully instead of showing the raw tool name.
+const TOOL_UI: Record<string, { title: string; kind: string }> = {
+  image_list: { title: "List images", kind: "search" },
+  image_get: { title: "Inspect image", kind: "read" },
+  image_build: { title: "Build image", kind: "execute" },
+  image_rebuild: { title: "Rebuild image", kind: "execute" },
+  image_rebuild_all: { title: "Rebuild all images", kind: "execute" },
+  image_remove: { title: "Remove image", kind: "delete" },
+  container_list: { title: "List containers", kind: "search" },
+  container_start: { title: "Start container", kind: "execute" },
+  container_recreate: { title: "Recreate container", kind: "execute" },
+  container_remove: { title: "Remove container", kind: "delete" },
+  container_bash: { title: "Container bash", kind: "execute" },
+  container_exec: { title: "Container exec", kind: "execute" },
+  container_read: { title: "Read", kind: "read" },
+  container_write: { title: "Write", kind: "edit" },
+  container_edit: { title: "Edit", kind: "edit" },
+  container_glob: { title: "Glob", kind: "search" },
+  container_grep: { title: "Grep", kind: "search" },
+  container_mount_list: { title: "List mounts", kind: "read" },
+  container_mount_add: { title: "Add mount", kind: "edit" },
+  container_mount_remove: { title: "Remove mount", kind: "delete" },
+  volume_list: { title: "List volumes", kind: "search" },
+  volume_create: { title: "Create volume", kind: "execute" },
+  volume_remove: { title: "Remove volume", kind: "delete" },
+  secret_list: { title: "List secrets", kind: "search" },
+  secret_create: { title: "Create secret", kind: "execute" },
+  secret_remove: { title: "Remove secret", kind: "delete" },
+  container_secret_add: { title: "Attach secret", kind: "edit" },
+  container_secret_remove: { title: "Detach secret", kind: "delete" },
+  daemon_start: { title: "Start daemon", kind: "execute" },
+  daemon_list: { title: "List daemons", kind: "read" },
+  daemon_stop: { title: "Stop daemon", kind: "delete" },
+  daemon_restart: { title: "Restart daemon", kind: "execute" },
+  daemon_logs: { title: "Daemon logs", kind: "read" },
+};
+
+// The command tools render as terminal cards; every other tool gets a generic
+// card with its UI title. Views are recomputed on each delivery and never
+// persisted (see the harness tool-presentation contract).
+export function toolCallView(name: string, args: any): unknown {
+  if (name === "container_bash" || name === "container_exec") {
+    const command =
+      name === "container_bash"
+        ? String(args?.command ?? "")
+        : Array.isArray(args?.argv)
+          ? args.argv.map((item: unknown) => String(item)).join(" ")
+          : "";
+    return {
+      card: "terminal",
+      title: command,
+      ...(typeof args?.description === "string" && args.description !== ""
+        ? { description: args.description }
+        : {}),
+    };
+  }
+  const ui = TOOL_UI[name];
+  if (ui === undefined) return undefined;
+  return { card: "generic", title: ui.title, kind: ui.kind };
+}
+
+export function toolResultView(
+  name: string,
+  _args: any,
+  result: any,
+): unknown {
+  if (result?.isError) return undefined;
+  if (name !== "container_bash" && name !== "container_exec") return undefined;
+  const text = (result?.content ?? [])
+    .filter((block: any) => block?.type === "text")
+    .map((block: any) => block.text)
+    .join("");
+  let data: any;
+  try {
+    data = JSON.parse(text);
+  } catch {
+    return undefined;
+  }
+  if (data === null || typeof data !== "object") return undefined;
+  const output = [data.stdout, data.stderr]
+    .filter((value: unknown) => typeof value === "string" && value !== "")
+    .join("");
+  return {
+    card: "terminal",
+    output,
+    ...(data.signal
+      ? { signal: String(data.signal) }
+      : { exitCode: Number(data.exitCode ?? 0) }),
+  };
+}
+
 function registerTools(ctx: any, resolver: WorkspaceResolver): void {
   for (const tool of TOOLS) {
     const handler = toolHandlers[tool.name];
@@ -1819,6 +1911,9 @@ function registerTools(ctx: any, resolver: WorkspaceResolver): void {
         description: TOOL_DESCRIPTIONS[tool.name],
         parameters: tool.parameters,
         ...(tool.approval ? { approval: true } : {}),
+        presentCall: (args: any) => toolCallView(tool.name, args),
+        presentResult: (args: any, result: any) =>
+          toolResultView(tool.name, args, result),
         output: toolOutput,
         execute: async (input: any, exec: any) =>
           JSON.stringify(await handler(resolver, input, exec)),

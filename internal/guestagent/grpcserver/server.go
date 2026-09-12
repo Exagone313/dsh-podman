@@ -238,6 +238,9 @@ func (s *Server) StartDaemon(_ context.Context, request *guest.StartDaemonReques
 	if len(request.GetArgv()) == 0 {
 		return nil, status.Error(codes.InvalidArgument, "argv must contain a command")
 	}
+	if request.GetName() == "" {
+		return nil, status.Error(codes.InvalidArgument, "daemon name is required")
+	}
 	// Replace an existing daemon with the same name: stop it first when it is
 	// still running so the new process can take over. A stopped daemon is
 	// replaced by Start directly.

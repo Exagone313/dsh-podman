@@ -52,17 +52,11 @@ func TestStartRejectsEmptyArgv(t *testing.T) {
 	}
 }
 
-func TestStartGeneratesName(t *testing.T) {
+func TestStartRequiresName(t *testing.T) {
 	m := NewManager()
-	name, err := m.Start("", []string{"true"}, "", nil, StartOptions{})
-	if err != nil {
-		t.Fatal(err)
+	if _, err := m.Start("", []string{"true"}, "", nil, StartOptions{}); err == nil {
+		t.Fatal("expected an error for an empty daemon name")
 	}
-	if !strings.HasPrefix(name, "daemon-") {
-		t.Fatalf("generated name %q does not have daemon- prefix", name)
-	}
-	cleanupDaemon(t, m, name)
-	waitFor(t, m, name, false)
 }
 
 // TestStartWithholdsReservedEnv covers a daemon reading the agent's own

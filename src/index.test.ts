@@ -1270,6 +1270,11 @@ test("daemon_start accepts optional uid, gid and groups", () => {
   const tool = TOOLS.find((entry) => entry.name === "daemon_start");
   assert.ok(tool, "daemon_start registered");
   const properties = tool!.parameters.properties;
+  assert.equal(properties.name.type, "string");
+  assert.ok(
+    (tool!.parameters.required as string[]).includes("name"),
+    "daemon_start must require a name",
+  );
   assert.equal(properties.uid.type, "integer");
   assert.equal(properties.uid.minimum, 0);
   assert.equal(properties.gid.type, "integer");

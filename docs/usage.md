@@ -176,7 +176,7 @@ content (write-only) but never reads it.
 | `daemon_list`    | `container`                                                                | List the daemons (including their effective `uid`/`gid`)                        |
 | `daemon_logs`    | `container`, `name`, optional `tailBytes`                                  | Tail a daemon's stdout/stderr                                                   |
 | `daemon_restart` | `container`, `name`                                                        | Restart a daemon with the same command, environment, and user                   |
-| `daemon_start`   | `container`, `argv`, optional `name`, `cwd`, `env`, `uid`, `gid`, `groups` | Start a background daemon; optional `uid`/`gid`/`groups` run it as another user |
+| `daemon_start`   | `container`, `name`, `argv`, optional `cwd`, `env`, `uid`, `gid`, `groups` | Start a background daemon; optional `uid`/`gid`/`groups` run it as another user |
 | `daemon_stop`    | `container`, `name`, optional `signal`                                     | Stop a daemon                                                                   |
 
 Daemons run as the container user by default. When only `uid` is set, `gid`

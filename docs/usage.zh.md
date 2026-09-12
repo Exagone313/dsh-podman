@@ -154,7 +154,7 @@ UI 使用短名称。`secret_create` 的值由服务端用 `crypto/rand`
 | `daemon_list`    | `container`                                                                | 列出守护进程（包括其有效 `uid`/`gid`）                             |
 | `daemon_logs`    | `container`, `name`, optional `tailBytes`                                  | 查看守护进程 stdout/stderr 的尾部                                  |
 | `daemon_restart` | `container`, `name`                                                        | 使用相同的命令、环境、用户重启守护进程                             |
-| `daemon_start`   | `container`, `argv`, optional `name`, `cwd`, `env`, `uid`, `gid`, `groups` | 启动后台守护进程；可选的 `uid`/`gid`/`groups` 以其他用户身份运行它 |
+| `daemon_start`   | `container`, `name`, `argv`, optional `cwd`, `env`, `uid`, `gid`, `groups` | 启动后台守护进程；可选的 `uid`/`gid`/`groups` 以其他用户身份运行它 |
 | `daemon_stop`    | `container`, `name`, optional `signal`                                     | 停止守护进程                                                       |
 
 守护进程默认以容器用户身份运行。当只设置 `uid` 时，`gid`

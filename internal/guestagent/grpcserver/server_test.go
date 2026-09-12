@@ -369,6 +369,14 @@ func TestStartDaemonAndList(t *testing.T) {
 	}
 }
 
+func TestStartDaemonRejectsEmptyName(t *testing.T) {
+	server := New()
+	_, err := server.StartDaemon(context.Background(), &guest.StartDaemonRequest{Argv: []string{"true"}})
+	if status.Code(err) != codes.InvalidArgument {
+		t.Fatalf("expected InvalidArgument, got %v", err)
+	}
+}
+
 func TestStartDaemonReplaces(t *testing.T) {
 	server := New()
 	if _, err := server.StartDaemon(context.Background(), &guest.StartDaemonRequest{Name: "web", Argv: []string{"sleep", "30"}}); err != nil {

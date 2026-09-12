@@ -67,7 +67,6 @@ type daemon struct {
 type Manager struct {
 	mu      sync.Mutex
 	daemons map[string]*daemon
-	next    uint64
 }
 
 func NewManager() *Manager { return &Manager{daemons: make(map[string]*daemon)} }
@@ -132,10 +131,7 @@ func (m *Manager) Start(name string, argv []string, cwd string, env map[string]s
 	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	if name == "" {
-		m.next++
-		name = fmt.Sprintf("daemon-%d", m.next)
-	} else if !namePattern.MatchString(name) {
+	if !namePattern.MatchString(name) {
 		return "", fmt.Errorf("invalid daemon name %q", name)
 	}
 	if existing, ok := m.daemons[name]; ok && existing.info.Running {

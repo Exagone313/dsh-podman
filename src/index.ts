@@ -538,7 +538,7 @@ export const daemonStartParameters = {
   type: "object",
   properties: {
     container: containerParam,
-    name: { type: "string", description: "Optional daemon name." },
+    name: { type: "string", description: "Daemon name." },
     argv: {
       type: "array",
       items: { type: "string" },
@@ -562,7 +562,7 @@ export const daemonStartParameters = {
       description: "Supplementary group ids.",
     },
   },
-  required: ["container", "argv"],
+  required: ["container", "name", "argv"],
 };
 export const daemonListParameters = {
   type: "object",

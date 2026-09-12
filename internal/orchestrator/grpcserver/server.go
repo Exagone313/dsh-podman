@@ -472,6 +472,9 @@ func (s *Server) RecreateContainer(ctx context.Context, request *ctl.RecreateCon
 	} else {
 		record.Mounts = containerMounts(workspace, *record)
 	}
+	if container == "default" {
+		record.Mounts = ensureWorkspaceProjectMount(record.Mounts, workspace)
+	}
 	if _, err := s.podmanMounts(record.Mounts); err != nil {
 		s.log().Error("RecreateContainer project validation failed", "workspace_slug", workspace.WorkspaceSlug, "error", err)
 		return nil, err
@@ -524,13 +527,24 @@ func (s *Server) StartContainer(ctx context.Context, request *ctl.StartContainer
 	if imageID == "" {
 		imageID = defaultImageShort()
 	}
-	recordMounts := workspace.Mounts
+	recordMounts := []state.Mount(nil)
+	if container == "default" {
+		recordMounts = workspace.Mounts
+	}
+	if existing, ok := containerByLogical(&workspace, container); ok && len(request.GetMounts()) == 0 {
+		// Restarting an existing container keeps its current mounts unless
+		// the request replaces them.
+		recordMounts = containerMounts(workspace, *existing)
+	}
 	if len(request.GetMounts()) > 0 {
 		mounts, mountErr := stateMounts(request.GetMounts())
 		if mountErr != nil {
 			return nil, status.Error(codes.InvalidArgument, mountErr.Error())
 		}
 		recordMounts = mounts
+	}
+	if container == "default" {
+		recordMounts = ensureWorkspaceProjectMount(recordMounts, workspace)
 	}
 	record := state.Container{Name: container, PodmanName: podmanContainerName(workspace.WorkspaceSlug, container), ImageID: imageID, Mounts: recordMounts}
 	podmanMounts, err := s.podmanMounts(containerMounts(workspace, record))
@@ -740,6 +754,9 @@ func (s *Server) RemoveContainerMount(ctx context.Context, request *ctl.RemoveCo
 		s.log().Warn("control request failed", "method", "RemoveContainerMount", "workspace_slug", request.GetWorkspaceSlug(), "container", request.GetContainer(), "reason", "mount not found")
 		return nil, status.Error(codes.NotFound, "mount not found")
 	}
+	if record.Name == "default" && isWorkspaceProjectMount(workspace, effective[index]) {
+		return nil, status.Error(codes.FailedPrecondition, "the default container keeps the workspace project mount")
+	}
 	record.Mounts = append(append([]state.Mount(nil), effective[:index]...), effective[index+1:]...)
 	if _, err := s.podmanMounts(record.Mounts); err != nil {
 		s.log().Error("RemoveContainerMount project validation failed", "workspace_slug", workspace.WorkspaceSlug, "error", err)
@@ -824,6 +841,13 @@ func (s *Server) CreateWorkspace(ctx context.Context, request *ctl.CreateWorkspa
 	if !validWorkspaceSlug(request.GetWorkspaceSlug()) {
 		return nil, status.Error(codes.InvalidArgument, "invalid workspace slug")
 	}
+	projectName := request.GetProjectName()
+	if projectName == "" {
+		return nil, status.Error(codes.InvalidArgument, "project name is required")
+	}
+	if !validProjectName(projectName) {
+		return nil, status.Error(codes.InvalidArgument, "invalid project name")
+	}
 	imageID := request.GetImageId()
 	if imageID == "" {
 		imageID = defaultImageShort()
@@ -852,6 +876,7 @@ func (s *Server) CreateWorkspace(ctx context.Context, request *ctl.CreateWorkspa
 			}
 		}
 	}
+	defaultMounts = ensureWorkspaceProjectMount(defaultMounts, state.Workspace{ProjectName: projectName})
 	podmanMounts, mountErr := s.podmanMounts(defaultMounts)
 	if mountErr != nil {
 		s.log().Error("CreateWorkspace project validation failed", "root", s.ProjectsRoot, "error", mountErr)
@@ -889,7 +914,7 @@ func (s *Server) CreateWorkspace(ctx context.Context, request *ctl.CreateWorkspa
 	}
 	agentSocket := filepath.Join(s.SocketsRoot, name, "guest.sock")
 	createdAt := time.Now().UTC().Format(time.RFC3339)
-	workspace := state.Workspace{WorkspaceSlug: request.GetWorkspaceSlug(), ContainerName: name, ImageID: imageID, Mounts: mounts, Status: "running", AgentSocketPath: agentSocket, AgentToken: secret, CreatedAt: createdAt, Containers: []state.Container{{Name: "default", PodmanName: name, ImageID: imageID, Mounts: defaultMounts, Status: "running", CreatedAt: createdAt, AgentSocketPath: agentSocket, AgentToken: secret, Env: userEnv, SecretEnv: userSecretEnv}}}
+	workspace := state.Workspace{WorkspaceSlug: request.GetWorkspaceSlug(), ProjectName: projectName, ContainerName: name, ImageID: imageID, Mounts: defaultMounts, Status: "running", AgentSocketPath: agentSocket, AgentToken: secret, CreatedAt: createdAt, Containers: []state.Container{{Name: "default", PodmanName: name, ImageID: imageID, Mounts: defaultMounts, Status: "running", CreatedAt: createdAt, AgentSocketPath: agentSocket, AgentToken: secret, Env: userEnv, SecretEnv: userSecretEnv}}}
 	if err := s.Store.UpdateWorkspaces(func(all []state.Workspace) ([]state.Workspace, error) {
 		replaced := false
 		for i := range all {
@@ -1489,13 +1514,39 @@ func grpcError(err error) error {
 }
 
 // containerMounts returns the mounts that apply to a container: its own list
-// when present, otherwise the workspace's default mounts (read-time fallback
-// for state written before per-container mounts existed).
+// when present, otherwise the workspace's default mounts — for the default
+// container only. Named containers carry exactly the mounts they were given;
+// an empty list means no mounts.
 func containerMounts(ws state.Workspace, c state.Container) []state.Mount {
 	if len(c.Mounts) > 0 {
 		return c.Mounts
 	}
-	return ws.Mounts
+	if c.Name == "" || c.Name == "default" {
+		return ws.Mounts
+	}
+	return nil
+}
+
+// isWorkspaceProjectMount reports whether mount is the workspace's primary
+// project mount: the project-kind mount at the workspace's project directory
+// root. The default container always keeps it.
+func isWorkspaceProjectMount(ws state.Workspace, mount state.Mount) bool {
+	return ws.ProjectName != "" && mount.Kind == "" && mount.ProjectName == ws.ProjectName && mount.Path == ""
+}
+
+// ensureWorkspaceProjectMount returns mounts with the workspace's primary
+// project mount present, appending it read-write when missing. It is a no-op
+// when the workspace has no project name.
+func ensureWorkspaceProjectMount(mounts []state.Mount, ws state.Workspace) []state.Mount {
+	if ws.ProjectName == "" {
+		return mounts
+	}
+	for _, mount := range mounts {
+		if isWorkspaceProjectMount(ws, mount) {
+			return mounts
+		}
+	}
+	return append(append([]state.Mount(nil), mounts...), state.Mount{ProjectName: ws.ProjectName, Mode: "read_write"})
 }
 
 // volumeInUse reports the first container whose effective mounts include the
@@ -2418,7 +2469,7 @@ func (s *Server) RemoveContainerSecret(ctx context.Context, request *ctl.RemoveC
 }
 
 func toProto(workspace state.Workspace) *ctl.Workspace {
-	result := &ctl.Workspace{WorkspaceSlug: workspace.WorkspaceSlug, ContainerName: workspace.ContainerName, ImageId: workspace.ImageID, Status: workspace.Status, AgentSocketPath: workspace.AgentSocketPath, AgentToken: workspace.AgentToken, CreatedAt: workspace.CreatedAt}
+	result := &ctl.Workspace{WorkspaceSlug: workspace.WorkspaceSlug, ProjectName: workspace.ProjectName, ContainerName: workspace.ContainerName, ImageId: workspace.ImageID, Status: workspace.Status, AgentSocketPath: workspace.AgentSocketPath, AgentToken: workspace.AgentToken, CreatedAt: workspace.CreatedAt}
 	if defaultContainer, ok := containerByLogical(&workspace, "default"); ok {
 		result.Env = cloneMap(defaultContainer.Env)
 		result.SecretEnv = cloneMap(defaultContainer.SecretEnv)

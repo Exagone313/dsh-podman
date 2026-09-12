@@ -1065,7 +1065,7 @@ func TestImageRefsMatch(t *testing.T) {
 
 func TestCreateWorkspaceRejectsUnknownImage(t *testing.T) {
 	server := &Server{Store: newTestStore(t), Logger: silentLogger()}
-	_, err := server.CreateWorkspace(context.Background(), &ctl.CreateWorkspaceRequest{WorkspaceSlug: "proj", ImageId: "missing"})
+	_, err := server.CreateWorkspace(context.Background(), &ctl.CreateWorkspaceRequest{WorkspaceSlug: "proj", ProjectName: "proj", ImageId: "missing"})
 	if status.Code(err) != codes.NotFound {
 		t.Fatalf("expected NotFound, got %v", err)
 	}
@@ -1073,7 +1073,7 @@ func TestCreateWorkspaceRejectsUnknownImage(t *testing.T) {
 
 func TestCreateWorkspaceDefaultBase(t *testing.T) {
 	server := &Server{Store: newTestStore(t), Logger: silentLogger()}
-	_, err := server.CreateWorkspace(context.Background(), &ctl.CreateWorkspaceRequest{WorkspaceSlug: "proj"})
+	_, err := server.CreateWorkspace(context.Background(), &ctl.CreateWorkspaceRequest{WorkspaceSlug: "proj", ProjectName: "proj"})
 	if status.Code(err) != codes.FailedPrecondition {
 		t.Fatalf("empty image id must resolve the default base (archlinux) and require podman, expected FailedPrecondition, got %v", err)
 	}
@@ -1277,12 +1277,106 @@ func TestCreateWorkspaceRejectsInvalidSecretName(t *testing.T) {
 func TestContainerMountsFallback(t *testing.T) {
 	ws := state.Workspace{Mounts: []state.Mount{{ProjectName: "a", Mode: "read_only"}}}
 	if got := containerMounts(ws, state.Container{}); len(got) != 1 || got[0].ProjectName != "a" {
-		t.Fatalf("expected workspace fallback, got %#v", got)
+		t.Fatalf("expected workspace fallback for the default container, got %#v", got)
 	}
-	withOwn := state.Container{Mounts: []state.Mount{{ProjectName: "b", Mode: "read_write", Path: "src"}}}
+	if got := containerMounts(ws, state.Container{Name: "default"}); len(got) != 1 || got[0].ProjectName != "a" {
+		t.Fatalf("expected workspace fallback for the default container, got %#v", got)
+	}
+	if got := containerMounts(ws, state.Container{Name: "dev"}); got != nil {
+		t.Fatalf("named containers do not inherit the workspace mounts, got %#v", got)
+	}
+	withOwn := state.Container{Name: "dev", Mounts: []state.Mount{{ProjectName: "b", Mode: "read_write", Path: "src"}}}
 	got := containerMounts(ws, withOwn)
 	if len(got) != 1 || got[0].ProjectName != "b" || got[0].Path != "src" || got[0].Mode != "read_write" {
 		t.Fatalf("expected container's own mounts, got %#v", got)
+	}
+}
+
+func TestIsWorkspaceProjectMount(t *testing.T) {
+	ws := state.Workspace{ProjectName: "team"}
+	if !isWorkspaceProjectMount(ws, state.Mount{ProjectName: "team", Mode: "read_write"}) {
+		t.Fatal("expected the workspace project root mount to match")
+	}
+	if isWorkspaceProjectMount(ws, state.Mount{ProjectName: "team", Path: "src"}) {
+		t.Fatal("a project subpath is not the primary project mount")
+	}
+	if isWorkspaceProjectMount(ws, state.Mount{ProjectName: "other"}) {
+		t.Fatal("another project must not match")
+	}
+	if isWorkspaceProjectMount(ws, state.Mount{Kind: "volume", Volume: "v"}) {
+		t.Fatal("a non-project mount must not match")
+	}
+	if isWorkspaceProjectMount(state.Workspace{}, state.Mount{ProjectName: "team"}) {
+		t.Fatal("a workspace without a project name must not match")
+	}
+}
+
+func TestEnsureWorkspaceProjectMount(t *testing.T) {
+	ws := state.Workspace{ProjectName: "team"}
+	mounts := ensureWorkspaceProjectMount(nil, ws)
+	if len(mounts) != 1 || mounts[0].ProjectName != "team" || mounts[0].Mode != "read_write" {
+		t.Fatalf("expected the primary project mount appended read-write, got %#v", mounts)
+	}
+	present := []state.Mount{{ProjectName: "team", Mode: "read_only"}}
+	if got := ensureWorkspaceProjectMount(present, ws); len(got) != 1 || got[0].Mode != "read_only" {
+		t.Fatalf("an existing primary project mount must not be duplicated, got %#v", got)
+	}
+	if got := ensureWorkspaceProjectMount(nil, state.Workspace{}); got != nil {
+		t.Fatalf("a workspace without a project name must be a no-op, got %#v", got)
+	}
+}
+
+func TestCreateWorkspaceRequiresProjectName(t *testing.T) {
+	server := &Server{Store: newTestStore(t), Logger: silentLogger()}
+	_, err := server.CreateWorkspace(context.Background(), &ctl.CreateWorkspaceRequest{WorkspaceSlug: "proj"})
+	if status.Code(err) != codes.InvalidArgument {
+		t.Fatalf("expected InvalidArgument without a project name, got %v", err)
+	}
+	for _, name := range []string{"../x", "/abs", "a/../b"} {
+		_, err := server.CreateWorkspace(context.Background(), &ctl.CreateWorkspaceRequest{WorkspaceSlug: "proj", ProjectName: name})
+		if status.Code(err) != codes.InvalidArgument {
+			t.Errorf("project name %q: expected InvalidArgument, got %v", name, err)
+		}
+	}
+}
+
+func TestRemoveContainerMountRefusesDefaultProjectMount(t *testing.T) {
+	store := newTestStore(t)
+	if err := store.SaveWorkspaces([]state.Workspace{{
+		WorkspaceSlug: "proj",
+		ProjectName:   "team",
+		Containers: []state.Container{{
+			Name:       "default",
+			PodmanName: "dsh-workspace-proj",
+			Mounts:     []state.Mount{{ProjectName: "team", Mode: "read_write"}},
+		}},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	server := &Server{Store: store, Logger: silentLogger()}
+	_, err := server.RemoveContainerMount(context.Background(), &ctl.RemoveContainerMountRequest{WorkspaceSlug: "proj", Container: "default", Kind: ctl.MountKind_MOUNT_KIND_PROJECT, Project: "team"})
+	if status.Code(err) != codes.FailedPrecondition || !strings.Contains(err.Error(), "the default container keeps the workspace project mount") {
+		t.Fatalf("expected refusal on the default container's project mount, got %v", err)
+	}
+}
+
+func TestRemoveContainerMountAllowsNamedProjectMountRemoval(t *testing.T) {
+	store := newTestStore(t)
+	if err := store.SaveWorkspaces([]state.Workspace{{
+		WorkspaceSlug: "proj",
+		ProjectName:   "team",
+		Containers: []state.Container{{
+			Name:       "dev",
+			PodmanName: "dsh-workspace-proj-dev",
+			Mounts:     []state.Mount{{ProjectName: "team", Mode: "read_write"}},
+		}},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	server := &Server{Store: store, Logger: silentLogger()}
+	_, err := server.RemoveContainerMount(context.Background(), &ctl.RemoveContainerMountRequest{WorkspaceSlug: "proj", Container: "dev", Kind: ctl.MountKind_MOUNT_KIND_PROJECT, Project: "team"})
+	if status.Code(err) != codes.FailedPrecondition || !strings.Contains(err.Error(), "podman is not configured") {
+		t.Fatalf("named container removal must proceed past the default-mount refusal, got %v", err)
 	}
 }
 
@@ -1561,7 +1655,7 @@ func TestAddContainerMount(t *testing.T) {
 		Mounts:        []state.Mount{{ProjectName: "team", Mode: "read_write"}},
 		Containers: []state.Container{
 			{Name: "default", PodmanName: "dsh-workspace-proj", ImageID: "arch", Status: "running"},
-			{Name: "dev", PodmanName: "dsh-workspace-proj-dev", ImageID: "arch", Status: "running"},
+			{Name: "dev", PodmanName: "dsh-workspace-proj-dev", ImageID: "arch", Status: "running", Mounts: []state.Mount{{ProjectName: "team", Mode: "read_write"}}},
 		},
 	}}); err != nil {
 		t.Fatal(err)
@@ -1717,7 +1811,7 @@ func TestCreateWorkspacePreservesDefaultContainerMounts(t *testing.T) {
 		t.Fatal(err)
 	}
 	server := &Server{Store: store, ProjectsRoot: root, Logger: silentLogger()}
-	_, err := server.CreateWorkspace(context.Background(), &ctl.CreateWorkspaceRequest{WorkspaceSlug: "proj", ImageId: "devimg", Mounts: []*ctl.ProjectMount{{ProjectName: "team", Path: "nope", Mode: ctl.MountMode_MOUNT_MODE_READ_ONLY}}})
+	_, err := server.CreateWorkspace(context.Background(), &ctl.CreateWorkspaceRequest{WorkspaceSlug: "proj", ProjectName: "team", ImageId: "devimg", Mounts: []*ctl.ProjectMount{{ProjectName: "team", Path: "nope", Mode: ctl.MountMode_MOUNT_MODE_READ_ONLY}}})
 	if status.Code(err) != codes.FailedPrecondition {
 		t.Fatalf("preserved default container mounts should win over invalid request mounts, expected FailedPrecondition, got %v", err)
 	}

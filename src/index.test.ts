@@ -2196,7 +2196,7 @@ test("approval prompts name the resolved path", () => {
 });
 
 // Stubs the guest agent's streaming Exec call, recording the start message.
-function guestExecRecorder(defaultCwd?: string) {
+function guestExecRecorder(defaultCwd?: string, stdout?: string) {
   const starts: { argv: string[]; cwd?: string }[] = [];
   const guest = {
     exec: () => {
@@ -2210,6 +2210,7 @@ function guestExecRecorder(defaultCwd?: string) {
         },
         end() {
           for (const handler of handlers.data ?? []) {
+            if (stdout !== undefined) handler({ stdoutChunk: Buffer.from(stdout) });
             handler({ exit: { exitCode: 0, signaled: false } });
           }
         },
@@ -2296,6 +2297,72 @@ test("container_grep resolves its search path like a shell would", async () => {
     exec,
   );
   assert.deepEqual(none.starts[0].argv, ["/usr/bin/rg", "-n", "TODO"]);
+});
+
+test("container_glob passes the pattern as a glob and scopes the search", async () => {
+  const exec = { agent: { session: { header: { cwd: "/projects/team" } } } };
+
+  const plain = guestExecRecorder("/projects/team");
+  await toolHandlers.container_glob(
+    plain.resolver as never,
+    { container: "default", pattern: "*.ts" },
+    exec,
+  );
+  assert.deepEqual(plain.starts[0].argv, [
+    "/usr/bin/rg",
+    "--files",
+    "--glob=*.ts",
+    "--sort=modified",
+    "--no-ignore",
+    "--hidden",
+    "--glob=!**/.git",
+    "--glob=!**/.git/**",
+    "--glob=!**/.svn",
+    "--glob=!**/.svn/**",
+    "--glob=!**/.hg",
+    "--glob=!**/.hg/**",
+    "--glob=!**/.bzr",
+    "--glob=!**/.bzr/**",
+    "--glob=!**/.jj",
+    "--glob=!**/.jj/**",
+    "--glob=!**/.sl",
+    "--glob=!**/.sl/**",
+  ]);
+  assert.equal(plain.starts[0].cwd, "/projects/team");
+
+  // An explicit search path becomes the working directory.
+  const scoped = guestExecRecorder("/projects/team");
+  await toolHandlers.container_glob(
+    scoped.resolver as never,
+    { container: "default", pattern: "*", path: "/volumes/data" },
+    exec,
+  );
+  assert.equal(scoped.starts[0].cwd, "/volumes/data");
+  assert.ok(scoped.starts[0].argv.includes("--glob=*"));
+});
+
+test("container_glob caps its result at 100 files", async () => {
+  const exec = { agent: { session: { header: { cwd: "/projects/team" } } } };
+  const lines = (count: number) =>
+    Array.from({ length: count }, (_, index) => `file-${index}.ts`).join("\n") + "\n";
+
+  const small = guestExecRecorder("/projects/team", lines(3));
+  const few = (await toolHandlers.container_glob(
+    small.resolver as never,
+    { container: "default", pattern: "*" },
+    exec,
+  )) as { files: string[]; note?: string };
+  assert.equal(few.files.length, 3);
+  assert.equal(few.note, undefined);
+
+  const big = guestExecRecorder("/projects/team", lines(101));
+  const many = (await toolHandlers.container_glob(
+    big.resolver as never,
+    { container: "default", pattern: "*" },
+    exec,
+  )) as { files: string[]; note?: string };
+  assert.equal(many.files.length, 100);
+  assert.match(many.note ?? "", /showing 100 of 101 files/);
 });
 
 test("command tools default to the session directory when mounted", async () => {

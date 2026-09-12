@@ -1423,7 +1423,7 @@ const TOOL_DESCRIPTIONS: Record<string, string> = {
   container_write: "Write a file inside a container of the current workspace.",
   container_edit: "Edit a file inside a container of the current workspace.",
   container_glob:
-    "List files inside a container of the current workspace matching a pattern. Defaults to the session working directory when it is mounted; pass cwd to override.",
+    "List files inside a container of the current workspace matching a glob pattern. A pattern with no \"/\" matches basenames at any depth. Results are files only, include hidden and ignored files, and exclude VCS metadata directories. Defaults to the session working directory when it is mounted; pass path to override.",
   container_grep:
     "Search file contents inside a container of the current workspace. Defaults to the session working directory when it is mounted; pass cwd to override.",
   container_mount_list:
@@ -1457,6 +1457,14 @@ const TOOL_DESCRIPTIONS: Record<string, string> = {
   daemon_logs:
     "Read the captured logs of a daemon inside a container of the current workspace.",
 };
+
+// Cap on paths `container_glob` returns, matching the built-in glob tool's
+// default result limit; `--sort=modified` makes the retained head the newest.
+const GLOB_MAX_RESULTS = 100;
+
+// VCS metadata directories ripgrep must never descend into for a discovery
+// listing (`--no-ignore --hidden` would otherwise surface them).
+const GLOB_VCS_EXCLUDES = [".git", ".svn", ".hg", ".bzr", ".jj", ".sl"];
 
 export const toolHandlers: Record<
   string,
@@ -1618,13 +1626,32 @@ export const toolHandlers: Record<
   container_glob: async (resolver, input, exec) => {
     const sessionCwd = currentCwd(exec);
     const binding = await resolveToolBinding(resolver, sessionCwd, input.container);
+    const argv = [
+      "rg",
+      "--files",
+      `--glob=${input.pattern}`,
+      "--sort=modified",
+      "--no-ignore",
+      "--hidden",
+      ...GLOB_VCS_EXCLUDES.flatMap((name) => [
+        `--glob=!**/${name}`,
+        `--glob=!**/${name}/**`,
+      ]),
+    ];
     const result = await runExec(
       binding,
-      ["rg", "--files", input.pattern],
+      argv,
       guestCwd(input.path, sessionCwd, binding),
     );
+    const files = outputLines(result.stdout);
+    const capped = files.length > GLOB_MAX_RESULTS;
     return {
-      files: outputLines(result.stdout),
+      files: capped ? files.slice(0, GLOB_MAX_RESULTS) : files,
+      ...(capped
+        ? {
+            note: `showing ${GLOB_MAX_RESULTS} of ${files.length} files in modification-time order; narrow pattern or path to see more`,
+          }
+        : {}),
       ...(result.stderr ? { stderr: result.stderr.trim() } : {}),
     };
   },

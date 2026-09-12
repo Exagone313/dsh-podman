@@ -28,6 +28,8 @@ const EXTERNALS = [
   "@deepseek-ai/dsh-client-locale/client",
   "@deepseek-ai/dsh-client-ui-settings",
   "@deepseek-ai/dsh-client-ui-settings/client",
+  "@deepseek-ai/dsh-client-ui-tool",
+  "@deepseek-ai/dsh-client-ui-tool/client",
 ];
 
 await build({

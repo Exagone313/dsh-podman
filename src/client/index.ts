@@ -7,6 +7,7 @@ import type {} from "@deepseek-ai/dsh-client-ui-settings/client";
 import type {} from "@deepseek-ai/dsh-client-locale/client";
 import type {} from "./slot-contract.js";
 import { ContainerCard } from "./ContainerCard.js";
+import { PodmanToolRow, TOOL_VIEW_KEYS } from "./tool-views.js";
 import {
   CONTAINER_NS,
   ContainerCardController,
@@ -47,4 +48,15 @@ export function apply(ctx: ClientContext): void {
       ContainerCard,
     ),
   );
+
+  // Own the row rendering of every podman tool (instead of the generic
+  // "Tool call · <name>" fallback).
+  for (const key of TOOL_VIEW_KEYS) {
+    ctx.slots.inject("tool.call.toolview", () =>
+      ctx.slots.register(
+        { name: "tool.call.toolview", key },
+        PodmanToolRow,
+      ),
+    );
+  }
 }

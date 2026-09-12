@@ -264,7 +264,7 @@ func (s *Server) StartDaemon(_ context.Context, request *guest.StartDaemonReques
 		}
 		gid = uint32Ptr(uint32(value))
 	}
-	name, err := s.Daemons.Start(request.GetName(), request.GetArgv(), request.GetCwd(), request.GetEnv(), daemon.StartOptions{Uid: uid, Gid: gid, Groups: request.GetGroups()})
+	name, err := s.Daemons.Start(request.GetName(), request.GetArgv(), request.GetCwd(), request.GetEnv(), daemon.StartOptions{Uid: uid, Gid: gid, Groups: request.GetGroups(), IsolatedEnv: request.GetInheritEnv() != nil && !request.GetInheritEnv().GetValue()})
 	if err != nil {
 		if errors.Is(err, daemon.ErrAlreadyRunning) {
 			return nil, status.Error(codes.AlreadyExists, err.Error())

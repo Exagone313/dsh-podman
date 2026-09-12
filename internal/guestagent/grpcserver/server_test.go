@@ -422,6 +422,31 @@ func TestDaemonLogs(t *testing.T) {
 	}
 }
 
+func TestStartDaemonIsolatedEnv(t *testing.T) {
+	t.Setenv("INHERITED", "leak")
+	server := New()
+	if _, err := server.StartDaemon(context.Background(), &guest.StartDaemonRequest{
+		Name:       "iso",
+		Argv:       []string{"env"},
+		Env:        map[string]string{"FOO": "bar"},
+		InheritEnv: wrapperspb.Bool(false),
+	}); err != nil {
+		t.Fatal(err)
+	}
+	waitDaemonState(t, server, "iso", false)
+	response, err := server.DaemonLogs(context.Background(), &guest.DaemonLogsRequest{Name: "iso"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	output := string(response.Stdout)
+	if strings.Contains(output, "INHERITED") {
+		t.Errorf("container environment reached an isolated daemon: %q", output)
+	}
+	if !strings.Contains(output, "FOO=bar") {
+		t.Errorf("caller-supplied variable missing: %q", output)
+	}
+}
+
 func TestStopDaemonStops(t *testing.T) {
 	server := New()
 	if _, err := server.StartDaemon(context.Background(), &guest.StartDaemonRequest{Name: "web", Argv: []string{"sh", "-c", "sleep 30"}}); err != nil {

@@ -89,6 +89,34 @@ func TestStartWithholdsReservedEnv(t *testing.T) {
 	}
 }
 
+// TestStartIsolatedEnv covers a daemon that must not see the container's
+// environment (secrets included): it gets only the PATH/HOME baseline and its
+// own env.
+func TestStartIsolatedEnv(t *testing.T) {
+	t.Setenv("HOME", "/root")
+	t.Setenv("INHERITED", "leak")
+	m := NewManager()
+	name, err := m.Start("printenv", []string{"env"}, "", map[string]string{"FOO": "bar"}, StartOptions{IsolatedEnv: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	cleanupDaemon(t, m, name)
+	waitFor(t, m, name, false)
+	stdout, _, err := m.Logs(name, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	output := string(stdout)
+	if strings.Contains(output, "leak") || strings.Contains(output, "INHERITED") {
+		t.Errorf("container environment reached an isolated daemon: %q", output)
+	}
+	for _, want := range []string{"PATH=", "HOME=/root", "FOO=bar"} {
+		if !strings.Contains(output, want) {
+			t.Errorf("isolated daemon missing %q: %q", want, output)
+		}
+	}
+}
+
 func TestStartRejectsInvalidNames(t *testing.T) {
 	m := NewManager()
 	for _, name := range []string{"-foo", "foo bar", "a/b", "foo@bar", strings.Repeat("a", 65)} {

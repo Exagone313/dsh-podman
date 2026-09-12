@@ -53,3 +53,34 @@ func TestBuildDropsReservedExtra(t *testing.T) {
 		t.Errorf("ordinary extra dropped: %q", got)
 	}
 }
+
+func TestBuildIsolatedKeepsOnlyBaselineAndExtra(t *testing.T) {
+	t.Setenv("PATH", "/usr/bin")
+	t.Setenv("HOME", "/root")
+	t.Setenv("INHERITED", "yes")
+	t.Setenv("DSH_PODMAN_GUEST_TOKEN", "super-secret")
+
+	got := BuildIsolated(map[string]string{"FOO": "bar"})
+	for _, want := range []string{"PATH=/usr/bin", "HOME=/root", "FOO=bar"} {
+		if !slices.Contains(got, want) {
+			t.Errorf("missing %q in %q", want, got)
+		}
+	}
+	for _, entry := range got {
+		if strings.HasPrefix(entry, "INHERITED=") || strings.HasPrefix(entry, Reserved) {
+			t.Errorf("unexpected variable %q in %q", entry, got)
+		}
+	}
+}
+
+func TestBuildIsolatedExtraOverridesBaseline(t *testing.T) {
+	t.Setenv("PATH", "/usr/bin")
+	t.Setenv("HOME", "/root")
+	got := BuildIsolated(map[string]string{"PATH": "/custom"})
+	if !slices.Contains(got, "PATH=/custom") {
+		t.Fatalf("caller PATH did not override baseline: %q", got)
+	}
+	if slices.Contains(got, "PATH=/usr/bin") {
+		t.Errorf("baseline PATH survived the override: %q", got)
+	}
+}

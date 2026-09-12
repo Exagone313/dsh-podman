@@ -49,18 +49,22 @@ type Daemon struct {
 type StartOptions struct {
 	Uid, Gid *uint32
 	Groups   []uint32
+	// IsolatedEnv withholds the agent's own environment from the daemon: it
+	// receives only the childenv baseline (PATH, HOME) plus the caller's env.
+	IsolatedEnv bool
 }
 
 type daemon struct {
-	info   Daemon
-	cmd    *exec.Cmd
-	cwd    string
-	env    map[string]string
-	uid    *uint32
-	gid    *uint32
-	groups []uint32
-	stdout *ring
-	stderr *ring
+	info        Daemon
+	cmd         *exec.Cmd
+	cwd         string
+	env         map[string]string
+	isolatedEnv bool
+	uid         *uint32
+	gid         *uint32
+	groups      []uint32
+	stdout      *ring
+	stderr      *ring
 }
 
 // Manager tracks daemons spawned detached from any RPC request context.
@@ -143,7 +147,11 @@ func (m *Manager) Start(name string, argv []string, cwd string, env map[string]s
 	}
 	cmd := exec.CommandContext(context.Background(), argv[0], argv[1:]...)
 	cmd.Dir = cwd
-	cmd.Env = childenv.Build(envCopy)
+	if opts.IsolatedEnv {
+		cmd.Env = childenv.BuildIsolated(envCopy)
+	} else {
+		cmd.Env = childenv.Build(envCopy)
+	}
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	if cred := credentialFor(opts); cred != nil {
 		cmd.SysProcAttr.Credential = cred
@@ -157,14 +165,15 @@ func (m *Manager) Start(name string, argv []string, cwd string, env map[string]s
 			Uid:       effectiveUid(opts),
 			Gid:       effectiveGid(opts),
 		},
-		cmd:    cmd,
-		cwd:    cwd,
-		env:    envCopy,
-		uid:    opts.Uid,
-		gid:    opts.Gid,
-		groups: append([]uint32(nil), opts.Groups...),
-		stdout: newRing(ringCapacity),
-		stderr: newRing(ringCapacity),
+		cmd:         cmd,
+		cwd:         cwd,
+		env:         envCopy,
+		isolatedEnv: opts.IsolatedEnv,
+		uid:         opts.Uid,
+		gid:         opts.Gid,
+		groups:      append([]uint32(nil), opts.Groups...),
+		stdout:      newRing(ringCapacity),
+		stderr:      newRing(ringCapacity),
 	}
 	cmd.Stdout = registered.stdout
 	cmd.Stderr = registered.stderr
@@ -291,6 +300,7 @@ func (m *Manager) Restart(name string) error {
 	argv := append([]string(nil), d.info.Argv...)
 	cwd := d.cwd
 	env := d.env
+	isolatedEnv := d.isolatedEnv
 	uid := d.uid
 	gid := d.gid
 	groups := append([]uint32(nil), d.groups...)
@@ -301,7 +311,7 @@ func (m *Manager) Restart(name string) error {
 			return err
 		}
 	}
-	_, err := m.Start(name, argv, cwd, env, StartOptions{Uid: uid, Gid: gid, Groups: groups})
+	_, err := m.Start(name, argv, cwd, env, StartOptions{Uid: uid, Gid: gid, Groups: groups, IsolatedEnv: isolatedEnv})
 	return err
 }
 

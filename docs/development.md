@@ -61,11 +61,9 @@ The `.proto` sources live in `proto/`; the generated Go bindings in
 with Buf (`buf generate`), which must be installed separately (it has no `make`
 target). Commit the `.proto` change together with the regenerated Go bindings.
 
-`buf.gen.yaml` also emits TypeScript bindings into `src/grpc/` through
-`buf.build/bufbuild/es`, but that output is unused: the JS side loads the raw
-`.proto` files at runtime via `@grpc/proto-loader` (copied to `dist/grpc/proto/`
-at build time). Do not commit that TypeScript output. Optionally validate the
-schema with `buf lint` and `buf breaking`.
+The JS side loads the raw `.proto` files at runtime via `@grpc/proto-loader`
+(copied to `dist/grpc/proto/` at build time); no TypeScript bindings are
+generated. Optionally validate the schema with `buf lint` and `buf breaking`.
 
 ## Install development builds
 

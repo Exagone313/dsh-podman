@@ -31,6 +31,22 @@ function withTrailingSlash(value: string): string {
 
 export const name = "podman";
 export const inject = ["tools", "workspaceRegistry"];
+
+// Prompt section the harness registers to name its own on-disk checkout.
+// Mirrors @deepseek-ai/dsh-app-boot's HARNESS_SOURCE_SECTION.
+export const HARNESS_SOURCE_SECTION = "harness:source";
+
+// The checkout the section points at lives on the host and is never reachable
+// from the workspace container, so the line is false under this plugin. Drop it
+// from the assembled prompt without touching any other section.
+export function withoutHarnessSourceSection(assembly: any): any {
+  return {
+    ...assembly,
+    sections: assembly.sections.filter(
+      (section: any) => section.name !== HARNESS_SOURCE_SECTION,
+    ),
+  };
+}
 export interface PluginConfig {
   socketsRoot?: string;
   defaultImage?: string;
@@ -67,6 +83,14 @@ export function apply(ctx: any, config: PluginConfig = {}): void {
   ctx.provide("workspaceResolver", resolver);
   ctx.provide("subprocess", createSubprocessProvider(resolver));
   ctx.provide("fs", createFilesystemProvider(resolver));
+  ctx.inject(["systemPrompt"], (promptCtx: any) => {
+    promptCtx.on(
+      "system-prompt/assemble",
+      async (_assembly: any, _context: any, next: any) =>
+        withoutHarnessSourceSection(await next()),
+      { global: true, prepend: true },
+    );
+  });
   registerTools(ctx, resolver);
   installContainerSettings(ctx, resolver, ctx.workspaceRegistry);
 }

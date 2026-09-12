@@ -29,6 +29,8 @@ import {
   publicContainer,
   toolCallView,
   toolResultView,
+  HARNESS_SOURCE_SECTION,
+  withoutHarnessSourceSection,
 } from "./index.js";
 
 test("remoteArgv remaps ripgrep onto the guest path", () => {
@@ -2324,4 +2326,33 @@ test("daemon_start resolves a relative working directory", async () => {
     exec,
   );
   assert.equal(unmounted.captured()!.cwd, undefined);
+});
+
+test("withoutHarnessSourceSection drops only the harness checkout section", () => {
+  const assembly = {
+    sections: [
+      { name: "harness:identity", text: "identity" },
+      { name: HARNESS_SOURCE_SECTION, text: "checkout at /src" },
+      { name: "deployment:persona", text: "persona" },
+    ],
+    contexts: [{ name: "c", text: "t" }],
+    tools: [{ name: "t" }],
+    variables: { model: "m" },
+  };
+  const result = withoutHarnessSourceSection(assembly);
+  assert.deepEqual(
+    result.sections.map((section: { name: string }) => section.name),
+    ["harness:identity", "deployment:persona"],
+  );
+  assert.deepEqual(result.contexts, assembly.contexts);
+  assert.deepEqual(result.tools, assembly.tools);
+  assert.deepEqual(result.variables, assembly.variables);
+  // The input assembly is not mutated.
+  assert.equal(assembly.sections.length, 3);
+});
+
+test("withoutHarnessSourceSection leaves an assembly without the section intact", () => {
+  const assembly = { sections: [{ name: "harness:identity", text: "i" }] };
+  const result = withoutHarnessSourceSection(assembly);
+  assert.deepEqual(result, assembly);
 });

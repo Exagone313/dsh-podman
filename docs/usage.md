@@ -9,6 +9,13 @@ SPDX-License-Identifier: MIT
 This page documents the model-facing tools, the settings card, and the image
 model. See [Architecture](architecture.md) for how the pieces fit together.
 
+## Model context
+
+The harness adds a prompt section naming its own on-disk checkout so the model
+can inspect or extend DSH itself. That checkout lives on the host and is not
+reachable from the workspace container, so dsh-podman removes the section from
+the assembled system prompt; the model is never told a misleading path.
+
 ## Image model
 
 dsh-podman organizes the images its containers run into three tiers:

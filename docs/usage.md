@@ -86,31 +86,36 @@ guest-agent wiring.
 
 ### Containers
 
-| Tool                   | Params                                                               | Description                                                                                                                |
-| ---------------------- | -------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| `container_bash`       | `container`, `command`, optional `workdir`, `env`                    | Run a shell command                                                                                                        |
-| `container_edit`       | `container`, `path`, `oldString`, `newString`, optional `replaceAll` | Edit a file                                                                                                                |
-| `container_exec`       | `container`, `argv`, optional `cwd`, `env`                           | Run a program                                                                                                              |
-| `container_glob`       | `container`, `pattern`, optional `cwd`                               | List files matching a pattern                                                                                              |
-| `container_grep`       | `container`, `pattern`, optional `path`, `cwd`                       | Search files for a regex                                                                                                   |
-| `container_list`       | —                                                                    | List the containers of the current workspace                                                                               |
-| `container_read`       | `container`, `path`                                                  | Read a file                                                                                                                |
-| `container_recreate` ✱ | `container`, optional `image`, `mounts`, `env`, `secretEnv`          | Recreate a container, keeping its current image when `image` is omitted, optionally with new project mounts or environment |
-| `container_remove` ✱   | `container`                                                          | Remove a container (stops its daemons gracefully first)                                                                    |
-| `container_start` ✱    | `container`, optional `image`, `mounts`, `env`, `secretEnv`          | Start a container (default image when `image` is omitted); approval required only when `mounts` is passed                  |
-| `container_write`      | `container`, `path`, `content`, optional `create`, `truncate`        | Write a file                                                                                                               |
+| Tool                   | Params                                                                        | Description                                                                                                                |
+| ---------------------- | ----------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `container_bash`       | `container`, `command`, `description`, optional `workdir`, `timeoutMs`, `env` | Run a shell command                                                                                                        |
+| `container_edit`       | `container`, `file_path`, `old_string`, `new_string`, optional `replace_all`  | Edit a file                                                                                                                |
+| `container_exec`       | `container`, `argv`, `description`, optional `workdir`, `timeoutMs`, `env`    | Run a program                                                                                                              |
+| `container_glob`       | `container`, `pattern`, optional `path`                                       | List files matching a pattern                                                                                              |
+| `container_grep`       | `container`, `pattern`, optional `path`, `include`                            | Search files for a regex                                                                                                   |
+| `container_list`       | —                                                                             | List the containers of the current workspace                                                                               |
+| `container_read`       | `container`, `file_path`, optional `offset`, `limit`                          | Read a file                                                                                                                |
+| `container_recreate` ✱ | `container`, optional `image`, `mounts`, `env`, `secretEnv`                   | Recreate a container, keeping its current image when `image` is omitted, optionally with new project mounts or environment |
+| `container_remove` ✱   | `container`                                                                   | Remove a container (stops its daemons gracefully first)                                                                    |
+| `container_start` ✱    | `container`, optional `image`, `mounts`, `env`, `secretEnv`                   | Start a container (default image when `image` is omitted); approval required only when `mounts` is passed                  |
+| `container_write`      | `container`, `file_path`, `content`, optional `create`, `truncate`            | Write a file                                                                                                               |
+
+The `container_bash`, `container_exec`, `container_read`, `container_write`,
+`container_edit`, `container_glob` and `container_grep` arguments mirror the
+harness's built-in `bash`/`read`/`write`/`edit`/`glob`/`grep` tools (plus the
+`container` target), so the same vocabulary works against a chosen container.
 
 Paths and working directories may be absolute or relative. A relative value is
 resolved against the session's working directory, which is also where the
-project is mounted inside the container. A `path` on `container_read`,
+project is mounted inside the container. A `file_path` on `container_read`,
 `container_write` and `container_edit` may not contain a `..` segment; working
 directories may, since commands are not confined to the projects root.
 
-When no working directory is given, `container_bash`, `container_exec`,
-`container_glob`, `container_grep` and `daemon_start` run in the session's
-working directory (like the harness's `bash` tool). That directory must be
-mounted in the container — otherwise the guest agent's own working directory is
-used. An explicit `workdir`/`cwd` always takes precedence.
+When no working directory is given, `container_bash`, `container_exec` and
+`daemon_start` run in the session's working directory (like the harness's `bash`
+tool), and `container_glob`/`container_grep` search it by default. That
+directory must be mounted in the container — otherwise the guest agent's own
+working directory is used. An explicit `workdir` (or `path`) takes precedence.
 
 The file tools (`container_read`, `container_write`, `container_edit`) can reach
 the workspace's mounts: the project directory under the projects root, as well

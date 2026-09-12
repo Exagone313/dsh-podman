@@ -139,6 +139,10 @@ adding a mount never grants write access that was not asked for. `tmpfs` mounts
 are always `read_write`, and `secret` mounts take no mode. The workspace's own
 project mount is created `read_write`; that is unchanged.
 
+A **named container** carries exactly the mounts it was created with: the
+workspace project directory is not mounted automatically. The **default
+container** always keeps its workspace project mount, which cannot be removed.
+
 ### Secrets
 
 | Tool                        | Params                               | Description                                                                                                                             |

@@ -1344,6 +1344,7 @@ test("daemon_start accepts optional uid, gid and groups", () => {
   assert.equal(properties.groups.type, "array");
   assert.equal(properties.groups.items.type, "integer");
   assert.equal(properties.groups.items.minimum, 0);
+  assert.equal(properties.inheritEnv.type, "boolean");
 });
 
 test("daemon_start serializes uid/gid as protobuf wrapper objects", async () => {
@@ -1381,6 +1382,7 @@ test("daemon_start serializes uid/gid as protobuf wrapper objects", async () => 
   );
   assert.deepEqual(captured!.uid, { value: 1001 });
   assert.deepEqual(captured!.gid, { value: 1001 });
+  assert.deepEqual(captured!.inheritEnv, { value: true });
 
   captured = undefined;
   await toolHandlers.daemon_start(
@@ -1390,6 +1392,15 @@ test("daemon_start serializes uid/gid as protobuf wrapper objects", async () => 
   );
   assert.equal(captured!.uid, undefined);
   assert.equal(captured!.gid, undefined);
+  assert.deepEqual(captured!.inheritEnv, { value: true });
+
+  captured = undefined;
+  await toolHandlers.daemon_start(
+    resolver as never,
+    { container: "valkey-ctr", argv: ["valkey-server"], inheritEnv: false },
+    exec,
+  );
+  assert.deepEqual(captured!.inheritEnv, { value: false });
 });
 
 const DAEMON_TOOLS = [

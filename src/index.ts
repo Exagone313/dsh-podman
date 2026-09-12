@@ -661,6 +661,11 @@ export const daemonStartParameters = {
       items: { type: "integer", minimum: 0 },
       description: "Supplementary group ids.",
     },
+    inheritEnv: {
+      type: "boolean",
+      description:
+        "Inherit the container's environment (default true). When false the daemon receives only PATH and HOME plus env, so container and secret environment variables are not visible.",
+    },
   },
   required: ["container", "name", "argv"],
 };
@@ -1448,7 +1453,7 @@ const TOOL_DESCRIPTIONS: Record<string, string> = {
   container_secret_remove:
     "Stop injecting a named secret into a container environment variable. Requires approval: removing a secret exposure changes what the container can read.",
   daemon_start:
-    "Start a daemon inside a container of the current workspace. Optionally run it as a specific uid/gid (with optional supplementary groups). Defaults to the session working directory when it is mounted; pass cwd to override. An existing daemon with the same name is stopped and replaced.",
+    "Start a daemon inside a container of the current workspace. Optionally run it as a specific uid/gid (with optional supplementary groups). The daemon inherits the container's environment by default; pass inheritEnv=false to give it only PATH, HOME, and env. Defaults to the session working directory when it is mounted; pass cwd to override. An existing daemon with the same name is stopped and replaced.",
   daemon_list:
     "List the daemons running inside a container of the current workspace.",
   daemon_stop: "Stop a daemon inside a container of the current workspace.",
@@ -1791,7 +1796,10 @@ export const toolHandlers: Record<
   daemon_start: async (resolver, input, exec) => {
     const sessionCwd = currentCwd(exec);
     const binding = await resolveToolBinding(resolver, sessionCwd, input.container);
-    const request: Record<string, unknown> = { argv: input.argv };
+    const request: Record<string, unknown> = {
+      argv: input.argv,
+      inheritEnv: { value: input.inheritEnv !== false },
+    };
     if (input.name !== undefined) request.name = input.name;
     const cwd = guestCwd(input.cwd, sessionCwd, binding);
     if (cwd !== undefined) request.cwd = cwd;

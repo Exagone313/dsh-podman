@@ -2030,6 +2030,26 @@ test("tool presenters label every tool and render terminal commands", () => {
     toolCallView("image_list", {}),
     { card: "generic", title: "List images", kind: "search" },
   );
+  assert.deepEqual(
+    toolCallView("container_read", {}),
+    { card: "generic", title: "Container read", kind: "read" },
+  );
+  assert.deepEqual(
+    toolCallView("container_write", {}),
+    { card: "generic", title: "Container write", kind: "edit" },
+  );
+  assert.deepEqual(
+    toolCallView("container_edit", {}),
+    { card: "generic", title: "Container edit", kind: "edit" },
+  );
+  assert.deepEqual(
+    toolCallView("container_glob", {}),
+    { card: "generic", title: "Container glob", kind: "search" },
+  );
+  assert.deepEqual(
+    toolCallView("container_grep", {}),
+    { card: "generic", title: "Container grep", kind: "search" },
+  );
 });
 
 test("tool presenters render command results as terminal output", () => {

@@ -41,11 +41,11 @@ interface ToolPresentation {
 const TOOL_PRESENTATION: Record<string, ToolPresentation> = {
   container_bash: { title: "Container bash", icon: <IconApiOutline14 size={14} />, summaryKeys: ["description", "command"] },
   container_exec: { title: "Container exec", icon: <IconApiOutline14 size={14} />, summaryKeys: ["description", "argv"] },
-  container_read: { title: "Read", icon: <IconBrowseOutline16 size={14} />, summaryKeys: ["file_path"] },
-  container_write: { title: "Write", icon: <IconEditOutline16 size={14} />, summaryKeys: ["file_path"] },
-  container_edit: { title: "Edit", icon: <IconEditOutline16 size={14} />, summaryKeys: ["file_path"] },
-  container_glob: { title: "Glob", icon: <IconSearchOutline16 size={14} />, summaryKeys: ["pattern"] },
-  container_grep: { title: "Grep", icon: <IconSearchOutline16 size={14} />, summaryKeys: ["pattern"] },
+  container_read: { title: "Container read", icon: <IconBrowseOutline16 size={14} />, summaryKeys: ["file_path"] },
+  container_write: { title: "Container write", icon: <IconEditOutline16 size={14} />, summaryKeys: ["file_path"] },
+  container_edit: { title: "Container edit", icon: <IconEditOutline16 size={14} />, summaryKeys: ["file_path"] },
+  container_glob: { title: "Container glob", icon: <IconSearchOutline16 size={14} />, summaryKeys: ["pattern"] },
+  container_grep: { title: "Container grep", icon: <IconSearchOutline16 size={14} />, summaryKeys: ["pattern"] },
   container_list: { title: "List containers", icon: <IconDataOutline16 size={14} />, summaryKeys: [] },
   container_start: { title: "Start container", icon: <IconPlayOutline16 size={14} />, summaryKeys: ["container", "image"] },
   container_recreate: { title: "Recreate container", icon: <IconRefreshOutline16 size={14} />, summaryKeys: ["container", "image"] },
@@ -97,6 +97,11 @@ const summaryStyle: CSSProperties = {
   color: "var(--dsw-alias-label-tertiary)",
 };
 
+const errorSummaryStyle: CSSProperties = {
+  ...summaryStyle,
+  color: "var(--dsw-alias-state-error-primary)",
+};
+
 const bodyStyle: CSSProperties = {
   margin: 0,
   padding: "8px 10px",
@@ -110,6 +115,11 @@ const bodyStyle: CSSProperties = {
   background: "var(--dsw-alias-bg-layer-3)",
   border: "1px solid var(--dsw-alias-border-l2)",
   borderRadius: "8px",
+};
+
+const errorBodyStyle: CSSProperties = {
+  ...bodyStyle,
+  color: "var(--dsw-alias-state-error-primary)",
 };
 
 function firstLine(text: string): string {
@@ -228,11 +238,13 @@ export function PodmanToolRow({
         ? "error"
         : "done";
   const output = prettyOutput(resultText(block));
-  const summary = argSummary(
-    args,
-    presentation.summaryKeys,
-    firstLine(argsRaw) || block.callId,
-  );
+  const failureLine =
+    state === "error" && output !== null && output !== ""
+      ? firstLine(output)
+      : null;
+  const summary =
+    failureLine ??
+    argSummary(args, presentation.summaryKeys, firstLine(argsRaw) || block.callId);
   const [expanded, setExpanded] = useState(false);
   const expandable = terminal || (output !== null && output !== "");
   const leading =
@@ -256,7 +268,9 @@ export function PodmanToolRow({
       collapsedContent={
         <>
           <span style={sepStyle} aria-hidden />
-          <span style={summaryStyle}>{summary}</span>
+          <span style={failureLine !== null ? errorSummaryStyle : summaryStyle}>
+            {summary}
+          </span>
         </>
       }
     >
@@ -274,7 +288,7 @@ export function PodmanToolRow({
           labels={terminalLabels(t)}
         />
       ) : expandable ? (
-        <pre style={bodyStyle}>{output}</pre>
+        <pre style={state === "error" ? errorBodyStyle : bodyStyle}>{output}</pre>
       ) : null}
     </DisclosureRow>
   );

@@ -858,11 +858,6 @@ function replaceMountItem(mount: Record<string, unknown>): string {
   return item + mode;
 }
 
-// The mount kind, defaulting to "project" when the caller does not name one.
-export function mountKindOf(kind: unknown): string {
-  return typeof kind === "string" && kind !== "" ? kind : "project";
-}
-
 // The mount kind for a call: an explicit non-empty `kind` wins, otherwise it is
 // inferred from the source field the caller supplied (`secret`/`volume`), since
 // `kind` is optional in the mount schemas. Falls back to a project mount.

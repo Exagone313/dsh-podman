@@ -56,7 +56,8 @@ guest-agent 镜像，因此它也会随之进入每个工作区容器。
 
 `.proto` 源文件位于 `proto/`；生成的 Go 绑定位于
 `internal/genproto/`，会被提交。修改 `.proto` 后，需要使用单独安装的
-Buf（`buf generate`）重新生成（没有对应的 `make` 目标）。请将 `.proto`
+Buf（`buf generate`）重新生成（没有对应的 `make` 目标）——请用
+`go install github.com/bufbuild/buf/cmd/buf@v1.73.0` 固定版本。请将 `.proto`
 改动与重新生成的 Go 绑定一起提交。
 
 JS 端在运行时通过 `@grpc/proto-loader` 加载原始 `.proto` 文件（构建时复制到

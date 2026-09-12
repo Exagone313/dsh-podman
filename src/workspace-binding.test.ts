@@ -96,7 +96,7 @@ test("control and guest proto files resolve next to the runtime", () => {
   guest.close();
 });
 
-async function startControlServer(): Promise<{
+async function startControlServer(containers: any[] = []): Promise<{
   socketsRoot: string;
   received: string[];
   createRequests: any[];
@@ -122,6 +122,9 @@ async function startControlServer(): Promise<{
     },
     describeWorkspace: (_call: any, callback: any) => {
       callback({ code: grpc.status.NOT_FOUND, details: "workspace not found" });
+    },
+    listContainers: (_call: any, callback: any) => {
+      callback(null, { containers });
     },
     createWorkspace: (call: any, callback: any) => {
       createRequests.push(call.request);
@@ -224,5 +227,72 @@ test("the auto-created workspace mount stays read-write", async () => {
     assert.equal(mounts[0].mode, "MOUNT_MODE_READ_WRITE");
   } finally {
     stop();
+  }
+});
+
+test("resolve exposes the session directory as the default cwd", async () => {
+  const { socketsRoot, stop } = await startControlServer();
+  try {
+    const resolver = new WorkspaceResolver(
+      {
+        socketsRoot,
+        defaultImage: "arch",
+        projectsRoot: "/projects",
+        controlToken: "",
+      },
+      { resolveByPath: () => ({ id: "w1", path: "/projects/team" }) } as any,
+    );
+    const binding = await resolver.resolve("/projects/team");
+    assert.equal(binding.defaultCwd, "/projects/team");
+  } finally {
+    stop();
+  }
+});
+
+test("containerBinding exposes the session directory only when a project mount covers it", async () => {
+  const mounted = await startControlServer([{
+    workspaceSlug: "w1",
+    containerName: "db",
+    agentSocketPath: "/run/x.sock",
+    agentToken: "tok",
+    mounts: [{ kind: "MOUNT_KIND_PROJECT", projectName: "team", path: "" }],
+  }]);
+  try {
+    const resolver = new WorkspaceResolver(
+      {
+        socketsRoot: mounted.socketsRoot,
+        defaultImage: "arch",
+        projectsRoot: "/projects",
+        controlToken: "",
+      },
+      { resolveByPath: () => ({ id: "w1", path: "/projects/team" }) } as any,
+    );
+    const binding = await resolver.containerBinding("/projects/team", "db");
+    assert.equal(binding.defaultCwd, "/projects/team");
+  } finally {
+    mounted.stop();
+  }
+
+  const unmounted = await startControlServer([{
+    workspaceSlug: "w1",
+    containerName: "db",
+    agentSocketPath: "/run/x.sock",
+    agentToken: "tok",
+    mounts: [{ kind: "MOUNT_KIND_VOLUME", volume: "data", destination: "/data" }],
+  }]);
+  try {
+    const resolver = new WorkspaceResolver(
+      {
+        socketsRoot: unmounted.socketsRoot,
+        defaultImage: "arch",
+        projectsRoot: "/projects",
+        controlToken: "",
+      },
+      { resolveByPath: () => ({ id: "w1", path: "/projects/team" }) } as any,
+    );
+    const binding = await resolver.containerBinding("/projects/team", "db");
+    assert.equal(binding.defaultCwd, undefined);
+  } finally {
+    unmounted.stop();
   }
 });

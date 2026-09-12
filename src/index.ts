@@ -855,6 +855,18 @@ export function resolveGuestCwd(
   return resolveAgainstSession(cwd, sessionCwd);
 }
 
+// guestCwd resolves a command's working directory: an explicit value is
+// resolved against the session, otherwise the container's default (the session
+// directory when it is mounted) is used. Undefined leaves the guest agent's own
+// working directory in place.
+function guestCwd(
+  requested: unknown,
+  sessionCwd: unknown,
+  binding: { defaultCwd?: string },
+): string | undefined {
+  return resolveGuestCwd(requested, sessionCwd) ?? binding.defaultCwd;
+}
+
 // The path to show in an approval prompt: the resolved target when it can be
 // worked out, else the value as given. Never throws — a bad path is reported
 // by the handler, and the prompt must still render.
@@ -1290,16 +1302,16 @@ const TOOL_DESCRIPTIONS: Record<string, string> = {
     "Recreate a container in the current workspace, keeping its current image when no image is given, optionally with new project mounts. Requires approval: recreating replaces the running container.",
   container_remove: "Remove a container from the current workspace.",
   container_bash:
-    "Run a shell command inside a container of the current workspace.",
+    "Run a shell command inside a container of the current workspace. Defaults to the session working directory when it is mounted; pass workdir to override.",
   container_exec:
-    "Run a program inside a container of the current workspace.",
+    "Run a program inside a container of the current workspace. Defaults to the session working directory when it is mounted; pass cwd to override.",
   container_read: "Read a file inside a container of the current workspace.",
   container_write: "Write a file inside a container of the current workspace.",
   container_edit: "Edit a file inside a container of the current workspace.",
   container_glob:
-    "List files inside a container of the current workspace matching a pattern.",
+    "List files inside a container of the current workspace matching a pattern. Defaults to the session working directory when it is mounted; pass cwd to override.",
   container_grep:
-    "Search file contents inside a container of the current workspace.",
+    "Search file contents inside a container of the current workspace. Defaults to the session working directory when it is mounted; pass cwd to override.",
   container_mount_list:
     "List the project mounts of a container in the current workspace.",
   container_mount_add:
@@ -1322,7 +1334,7 @@ const TOOL_DESCRIPTIONS: Record<string, string> = {
   container_secret_remove:
     "Stop injecting a named secret into a container environment variable. Requires approval: removing a secret exposure changes what the container can read.",
   daemon_start:
-    "Start a daemon inside a container of the current workspace. Optionally run it as a specific uid/gid (with optional supplementary groups).",
+    "Start a daemon inside a container of the current workspace. Optionally run it as a specific uid/gid (with optional supplementary groups). Defaults to the session working directory when it is mounted; pass cwd to override.",
   daemon_list:
     "List the daemons running inside a container of the current workspace.",
   daemon_stop: "Stop a daemon inside a container of the current workspace.",
@@ -1430,7 +1442,7 @@ export const toolHandlers: Record<
     return runExec(
       binding,
       ["bash", "-lc", input.command],
-      resolveGuestCwd(input.workdir, sessionCwd),
+      guestCwd(input.workdir, sessionCwd, binding),
       input.env,
     );
   },
@@ -1440,7 +1452,7 @@ export const toolHandlers: Record<
     return runExec(
       binding,
       input.argv,
-      resolveGuestCwd(input.cwd, sessionCwd),
+      guestCwd(input.cwd, sessionCwd, binding),
       input.env,
     );
   },
@@ -1483,7 +1495,7 @@ export const toolHandlers: Record<
     const result = await runExec(
       binding,
       ["rg", "--files", input.pattern],
-      resolveGuestCwd(input.cwd, sessionCwd),
+      guestCwd(input.cwd, sessionCwd, binding),
     );
     return {
       files: outputLines(result.stdout),
@@ -1493,7 +1505,7 @@ export const toolHandlers: Record<
   container_grep: async (resolver, input, exec) => {
     const sessionCwd = currentCwd(exec);
     const binding = await resolveToolBinding(resolver, sessionCwd, input.container);
-    const cwd = resolveGuestCwd(input.cwd, sessionCwd);
+    const cwd = guestCwd(input.cwd, sessionCwd, binding);
     // A search path follows shell semantics: relative to the working
     // directory when one is given, else to the session's.
     const path = resolveGuestCwd(input.path, cwd ?? sessionCwd);
@@ -1627,7 +1639,7 @@ export const toolHandlers: Record<
     const binding = await resolveToolBinding(resolver, sessionCwd, input.container);
     const request: Record<string, unknown> = { argv: input.argv };
     if (input.name !== undefined) request.name = input.name;
-    const cwd = resolveGuestCwd(input.cwd, sessionCwd);
+    const cwd = guestCwd(input.cwd, sessionCwd, binding);
     if (cwd !== undefined) request.cwd = cwd;
     if (input.env !== undefined) request.env = input.env;
     if (input.uid !== undefined) {
@@ -2017,7 +2029,7 @@ async function resolveToolBinding(
   resolver: WorkspaceResolver,
   cwd: unknown,
   container: string,
-): Promise<{ guest: any; token: string; socket: string }> {
+): Promise<{ guest: any; token: string; socket: string; defaultCwd?: string }> {
   if (container === "default") return resolver.resolve(cwd);
   return resolver.containerBinding(cwd, container);
 }

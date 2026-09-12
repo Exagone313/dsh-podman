@@ -14,6 +14,9 @@ export interface WorkspaceBinding {
   guest: grpc.Client;
   token: string;
   socket: string;
+  // The session working directory to use when a command tool is not given an
+  // explicit one, or undefined when it is not mounted in the container.
+  defaultCwd?: string;
 }
 export interface BindingConfig {
   socketsRoot: string;
@@ -46,7 +49,11 @@ export class WorkspaceResolver {
       "",
     );
     const key = workspaceSlug(String(workspace.id));
-    return this.ready(key, relativePath);
+    const binding = await this.ready(key, relativePath);
+    // The default container always keeps its project mount, so the session
+    // directory is always mounted in it.
+    const session = defaultCwdOf(cwd);
+    return session === undefined ? binding : { ...binding, defaultCwd: session };
   }
   resolveSlug(key: string): Promise<WorkspaceBinding> {
     return this.ready(key, key);
@@ -68,11 +75,19 @@ export class WorkspaceResolver {
       throw new Error(`container "${container}" not found in workspace`);
     }
     const socket = row.agentSocketPath as string;
-    return {
+    const binding: WorkspaceBinding = {
       guest: guestClient(socket),
       token: row.agentToken as string,
       socket,
     };
+    const session = defaultCwdOf(cwd);
+    if (
+      session !== undefined &&
+      projectMountCovers(this.config.projectsRoot, row.mounts ?? [], session)
+    ) {
+      binding.defaultCwd = session;
+    }
+    return binding;
   }
   private async ready(
     key: string,
@@ -188,4 +203,33 @@ export function metadata(token: string): grpc.Metadata {
     result.set("authorization", `bearer ${token}`);
   }
   return result;
+}
+
+// defaultCwdOf returns the session working directory as a usable container
+// path, or undefined when it is unset.
+function defaultCwdOf(cwd: unknown): string | undefined {
+  return typeof cwd === "string" && cwd !== "" ? cwd : undefined;
+}
+
+// projectMountCovers reports whether a project mount of a container makes the
+// given container path reachable: the mount destination itself or a path below
+// it.
+function projectMountCovers(
+  projectsRoot: string,
+  mounts: readonly any[],
+  path: string,
+): boolean {
+  return mounts.some((mount) => {
+    if (!isProjectMount(mount)) return false;
+    const base = `${projectsRoot}/${mount.projectName}`;
+    const destination = mount.path ? `${base}/${mount.path}` : base;
+    return path === destination || path.startsWith(`${destination}/`);
+  });
+}
+
+// isProjectMount reports whether a proto mount is a project mount. An unset
+// kind is the project default.
+function isProjectMount(mount: any): boolean {
+  const kind = mount?.kind;
+  return kind === undefined || kind === "" || kind === "MOUNT_KIND_PROJECT";
 }

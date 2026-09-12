@@ -1940,7 +1940,7 @@ test("approval prompts name the resolved path", () => {
 });
 
 // Stubs the guest agent's streaming Exec call, recording the start message.
-function guestExecRecorder() {
+function guestExecRecorder(defaultCwd?: string) {
   const starts: { argv: string[]; cwd?: string }[] = [];
   const guest = {
     exec: () => {
@@ -1960,9 +1960,15 @@ function guestExecRecorder() {
       };
     },
   };
+  const binding = {
+    guest,
+    token: "t",
+    socket: "/run/x.sock",
+    ...(defaultCwd === undefined ? {} : { defaultCwd }),
+  };
   const resolver = {
-    resolve: async () => ({ guest, token: "t", socket: "/run/x.sock" }),
-    containerBinding: async () => ({ guest, token: "t", socket: "/run/x.sock" }),
+    resolve: async () => binding,
+    containerBinding: async () => binding,
   };
   return { starts, resolver };
 }
@@ -1970,7 +1976,7 @@ function guestExecRecorder() {
 test("command tools resolve a relative working directory", async () => {
   const exec = { agent: { session: { header: { cwd: "/projects/team" } } } };
 
-  const bash = guestExecRecorder();
+  const bash = guestExecRecorder("/projects/team");
   await toolHandlers.container_bash(
     bash.resolver as never,
     { container: "default", command: "ls", workdir: "sub" },
@@ -1978,7 +1984,7 @@ test("command tools resolve a relative working directory", async () => {
   );
   assert.equal(bash.starts[0].cwd, "/projects/team/sub");
 
-  const run = guestExecRecorder();
+  const run = guestExecRecorder("/projects/team");
   await toolHandlers.container_exec(
     run.resolver as never,
     { container: "default", argv: ["ls"], cwd: "/abs" },
@@ -1986,17 +1992,17 @@ test("command tools resolve a relative working directory", async () => {
   );
   assert.equal(run.starts[0].cwd, "/abs", "absolute working directories pass through");
 
-  // An unset working directory stays unset: the guest agent's own is used.
-  const bare = guestExecRecorder();
+  // An unset working directory defaults to the session's (when mounted).
+  const bare = guestExecRecorder("/projects/team");
   await toolHandlers.container_exec(
     bare.resolver as never,
     { container: "default", argv: ["ls"] },
     exec,
   );
-  assert.equal(bare.starts[0].cwd, undefined);
+  assert.equal(bare.starts[0].cwd, "/projects/team");
 
   // Commands are not confined to the projects root, so ".." is allowed.
-  const up = guestExecRecorder();
+  const up = guestExecRecorder("/projects/team");
   await toolHandlers.container_bash(
     up.resolver as never,
     { container: "default", command: "ls", workdir: "../sibling" },
@@ -2009,7 +2015,7 @@ test("container_grep resolves its search path like a shell would", async () => {
   const exec = { agent: { session: { header: { cwd: "/projects/team" } } } };
 
   // Without a working directory the path is relative to the session's.
-  const plain = guestExecRecorder();
+  const plain = guestExecRecorder("/projects/team");
   await toolHandlers.container_grep(
     plain.resolver as never,
     { container: "default", pattern: "TODO", path: "src" },
@@ -2018,7 +2024,7 @@ test("container_grep resolves its search path like a shell would", async () => {
   assert.deepEqual(plain.starts[0].argv, ["/usr/bin/rg", "-n", "TODO", "/projects/team/src"]);
 
   // With one, the path is relative to that working directory.
-  const nested = guestExecRecorder();
+  const nested = guestExecRecorder("/projects/team");
   await toolHandlers.container_grep(
     nested.resolver as never,
     { container: "default", pattern: "TODO", path: "src", cwd: "app" },
@@ -2027,7 +2033,7 @@ test("container_grep resolves its search path like a shell would", async () => {
   assert.deepEqual(nested.starts[0].argv, ["/usr/bin/rg", "-n", "TODO", "/projects/team/app/src"]);
   assert.equal(nested.starts[0].cwd, "/projects/team/app");
 
-  const none = guestExecRecorder();
+  const none = guestExecRecorder("/projects/team");
   await toolHandlers.container_grep(
     none.resolver as never,
     { container: "default", pattern: "TODO" },
@@ -2036,33 +2042,110 @@ test("container_grep resolves its search path like a shell would", async () => {
   assert.deepEqual(none.starts[0].argv, ["/usr/bin/rg", "-n", "TODO"]);
 });
 
+test("command tools default to the session directory when mounted", async () => {
+  const exec = { agent: { session: { header: { cwd: "/projects/team" } } } };
+
+  const bash = guestExecRecorder("/projects/team");
+  await toolHandlers.container_bash(
+    bash.resolver as never,
+    { container: "default", command: "ls" },
+    exec,
+  );
+  assert.equal(bash.starts[0].cwd, "/projects/team");
+
+  const run = guestExecRecorder("/projects/team");
+  await toolHandlers.container_exec(
+    run.resolver as never,
+    { container: "default", argv: ["ls"] },
+    exec,
+  );
+  assert.equal(run.starts[0].cwd, "/projects/team");
+
+  const glob = guestExecRecorder("/projects/team");
+  await toolHandlers.container_glob(
+    glob.resolver as never,
+    { container: "default", pattern: "*.ts" },
+    exec,
+  );
+  assert.equal(glob.starts[0].cwd, "/projects/team");
+
+  const grep = guestExecRecorder("/projects/team");
+  await toolHandlers.container_grep(
+    grep.resolver as never,
+    { container: "default", pattern: "TODO" },
+    exec,
+  );
+  assert.equal(grep.starts[0].cwd, "/projects/team");
+});
+
+test("command tools fall back to the guest cwd when the session directory is not mounted", async () => {
+  const exec = { agent: { session: { header: { cwd: "/projects/team" } } } };
+
+  const bare = guestExecRecorder();
+  await toolHandlers.container_exec(
+    bare.resolver as never,
+    { container: "db", argv: ["ls"] },
+    exec,
+  );
+  assert.equal(bare.starts[0].cwd, undefined);
+
+  // An explicit working directory still resolves without a mounted default.
+  const explicit = guestExecRecorder();
+  await toolHandlers.container_exec(
+    explicit.resolver as never,
+    { container: "db", argv: ["ls"], cwd: "/data" },
+    exec,
+  );
+  assert.equal(explicit.starts[0].cwd, "/data");
+});
+
 test("daemon_start resolves a relative working directory", async () => {
-  let captured: Record<string, unknown> | undefined;
-  const resolver = {
-    containerBinding: async () => ({
-      guest: {
-        startDaemon: (
-          request: Record<string, unknown>,
-          _metadata: unknown,
-          callback: (error: Error | null, result: unknown) => void,
-        ) => {
-          captured = request;
-          callback(null, { name: "d", running: true, argv: ["x"] });
+  const makeResolver = (defaultCwd?: string) => {
+    let captured: Record<string, unknown> | undefined;
+    const resolver = {
+      containerBinding: async () => ({
+        guest: {
+          startDaemon: (
+            request: Record<string, unknown>,
+            _metadata: unknown,
+            callback: (error: Error | null, result: unknown) => void,
+          ) => {
+            captured = request;
+            callback(null, { name: "d", running: true, argv: ["x"] });
+          },
         },
-      },
-      token: "t",
-      socket: "/run/x.sock",
-    }),
+        token: "t",
+        socket: "/run/x.sock",
+        ...(defaultCwd === undefined ? {} : { defaultCwd }),
+      }),
+    };
+    return { resolver, captured: () => captured };
   };
   const exec = { agent: { session: { header: { cwd: "/projects/team" } } } };
+
+  const relative = makeResolver("/projects/team");
   await toolHandlers.daemon_start(
-    resolver as never,
+    relative.resolver as never,
     { container: "c", argv: ["x"], cwd: "sub" },
     exec,
   );
-  assert.equal(captured!.cwd, "/projects/team/sub");
+  assert.equal(relative.captured()!.cwd, "/projects/team/sub");
 
-  captured = undefined;
-  await toolHandlers.daemon_start(resolver as never, { container: "c", argv: ["x"] }, exec);
-  assert.equal(captured!.cwd, undefined, "an unset working directory stays unset");
+  // No explicit cwd: the mounted session directory is used.
+  const defaulted = makeResolver("/projects/team");
+  await toolHandlers.daemon_start(
+    defaulted.resolver as never,
+    { container: "c", argv: ["x"] },
+    exec,
+  );
+  assert.equal(defaulted.captured()!.cwd, "/projects/team");
+
+  // Not mounted: the guest agent's own working directory stays in place.
+  const unmounted = makeResolver();
+  await toolHandlers.daemon_start(
+    unmounted.resolver as never,
+    { container: "c", argv: ["x"] },
+    exec,
+  );
+  assert.equal(unmounted.captured()!.cwd, undefined);
 });

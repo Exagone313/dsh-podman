@@ -47,6 +47,28 @@ export function withoutHarnessSourceSection(assembly: any): any {
     ),
   };
 }
+
+// Correct the model's host/container mental model: the built-in shell and
+// filesystem tools are container-backed too, so there is no host shell.
+export function podmanRuntimeSection(): {
+  name: string;
+  order: number;
+  text: string;
+} {
+  return {
+    name: "podman:runtime",
+    order: 90,
+    text:
+      "This session runs inside a Podman workspace. The shell and filesystem " +
+      "tools execute in the workspace's default container, not on the host: " +
+      "`bash`, `read`, `write`, `edit`, `glob`, and `grep` are all " +
+      "container-backed and only see the mounted project and that container's " +
+      "filesystem. There is no host shell, and host paths are unavailable. The " +
+      "`container_*` tools are the same operations against a named container " +
+      '(pass `container`; "default" selects the same default container as ' +
+      "`bash`) plus container, image, mount, volume, secret, and daemon management.",
+  };
+}
 export interface PluginConfig {
   socketsRoot?: string;
   defaultImage?: string;
@@ -84,6 +106,7 @@ export function apply(ctx: any, config: PluginConfig = {}): void {
   ctx.provide("subprocess", createSubprocessProvider(resolver));
   ctx.provide("fs", createFilesystemProvider(resolver));
   ctx.inject(["systemPrompt"], (promptCtx: any) => {
+    promptCtx.systemPrompt.section(podmanRuntimeSection());
     promptCtx.on(
       "system-prompt/assemble",
       async (_assembly: any, _context: any, next: any) =>

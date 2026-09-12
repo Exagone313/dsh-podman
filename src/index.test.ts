@@ -31,6 +31,7 @@ import {
   toolResultView,
   HARNESS_SOURCE_SECTION,
   withoutHarnessSourceSection,
+  podmanRuntimeSection,
 } from "./index.js";
 
 test("remoteArgv remaps ripgrep onto the guest path", () => {
@@ -2355,4 +2356,16 @@ test("withoutHarnessSourceSection leaves an assembly without the section intact"
   const assembly = { sections: [{ name: "harness:identity", text: "i" }] };
   const result = withoutHarnessSourceSection(assembly);
   assert.deepEqual(result, assembly);
+});
+
+test("podmanRuntimeSection clarifies that the built-in tools run in the container", () => {
+  const section = podmanRuntimeSection();
+  assert.equal(section.name, "podman:runtime");
+  assert.equal(section.order, 90);
+  for (const tool of ["bash", "read", "write", "edit", "glob", "grep"]) {
+    assert.match(section.text, new RegExp("`" + tool + "`"));
+  }
+  assert.match(section.text, /container-backed/);
+  assert.match(section.text, /There is no host shell/);
+  assert.match(section.text, /container_\*/);
 });

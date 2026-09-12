@@ -16,6 +16,11 @@ can inspect or extend DSH itself. That checkout lives on the host and is not
 reachable from the workspace container, so dsh-podman removes the section from
 the assembled system prompt; the model is never told a misleading path.
 
+dsh-podman also adds its own prompt section clarifying that the built-in shell
+and filesystem tools (`bash`, `read`, `write`, `edit`, `glob`, `grep`) run
+inside the workspace's default container rather than on the host, and how they
+relate to the `container_*` tools.
+
 ## Image model
 
 dsh-podman organizes the images its containers run into three tiers:

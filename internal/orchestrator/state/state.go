@@ -45,6 +45,7 @@ type Container struct {
 }
 type Workspace struct {
 	WorkspaceSlug   string      `toml:"workspace_slug"`
+	ProjectName     string      `toml:"project_name"`
 	ContainerName   string      `toml:"container_name"`
 	ImageID         string      `toml:"image_id"`
 	Mounts          []Mount     `toml:"mounts"`

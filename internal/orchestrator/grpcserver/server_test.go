@@ -6,6 +6,7 @@ package grpcserver
 
 import (
 	"context"
+	"errors"
 	"io"
 	"log/slog"
 	"os"
@@ -380,15 +381,12 @@ func TestContainerRows(t *testing.T) {
 			{Name: "dev", PodmanName: "dsh-workspace-proj-dev", ImageID: "devimg", Status: "running", CreatedAt: "later", AgentSocketPath: "/sock/dev", AgentToken: "tok-dev"},
 		},
 	}}
-	exists := func(podmanName string) bool {
-		return podmanName == "dsh-workspace-proj-dev"
-	}
-	rows := containerRows(workspaces, exists)
+	rows := containerRows(workspaces)
 	if len(rows) != 2 {
 		t.Fatalf("expected both containers, got %#v", rows)
 	}
 	def := rows[0]
-	if def.ContainerName != "default" || def.PodmanName != "dsh-workspace-proj" || def.WorkspaceSlug != "proj" || def.ImageId != "arch" || def.Status != "not started" || def.CreatedAt != "now" || def.AgentSocketPath != "/sock/default" || def.AgentToken != "tok-default" {
+	if def.ContainerName != "default" || def.PodmanName != "dsh-workspace-proj" || def.WorkspaceSlug != "proj" || def.ImageId != "arch" || def.Status != "running" || def.CreatedAt != "now" || def.AgentSocketPath != "/sock/default" || def.AgentToken != "tok-default" {
 		t.Fatalf("default row mismatch: %#v", def)
 	}
 	dev := rows[1]
@@ -400,14 +398,161 @@ func TestContainerRows(t *testing.T) {
 	}
 }
 
-func TestContainerRowsNilExistsKeepsStoredStatus(t *testing.T) {
+func TestContainerRowsKeepsStoredStatus(t *testing.T) {
 	workspaces := []state.Workspace{{
 		WorkspaceSlug: "proj",
 		Containers:    []state.Container{{Name: "default", PodmanName: "dsh-workspace-proj", Status: "stopped"}},
 	}}
-	rows := containerRows(workspaces, nil)
+	rows := containerRows(workspaces)
 	if len(rows) != 1 || rows[0].Status != "stopped" {
 		t.Fatalf("expected stored status kept, got %#v", rows)
+	}
+}
+
+func TestReconcileContainersDropsDeletedNamedContainer(t *testing.T) {
+	store := newTestStore(t)
+	workspaces := []state.Workspace{{
+		WorkspaceSlug: "proj",
+		Containers: []state.Container{
+			{Name: "default", PodmanName: "dsh-workspace-proj", Status: "running"},
+			{Name: "db", PodmanName: "dsh-workspace-proj-db", Status: "running"},
+		},
+	}}
+	if err := store.SaveWorkspaces(workspaces); err != nil {
+		t.Fatal(err)
+	}
+	server := &Server{Store: store, Logger: silentLogger()}
+	exists := func(podmanName string) (bool, error) {
+		return podmanName == "dsh-workspace-proj", nil
+	}
+	reconciled, err := server.reconcileContainers(workspaces, exists)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(reconciled) != 1 || len(reconciled[0].Containers) != 1 || reconciled[0].Containers[0].Name != "default" {
+		t.Fatalf("expected only the default container to survive, got %#v", reconciled)
+	}
+	stored, err := store.Workspaces()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(stored) != 1 || len(stored[0].Containers) != 1 || stored[0].Containers[0].Name != "default" {
+		t.Fatalf("deleted container not removed from state, got %#v", stored)
+	}
+}
+
+func TestReconcileContainersDropsWorkspaceWithoutContainers(t *testing.T) {
+	store := newTestStore(t)
+	workspaces := []state.Workspace{{
+		WorkspaceSlug: "proj",
+		Containers:    []state.Container{{Name: "default", PodmanName: "dsh-workspace-proj", Status: "running"}},
+	}}
+	if err := store.SaveWorkspaces(workspaces); err != nil {
+		t.Fatal(err)
+	}
+	server := &Server{Store: store, Logger: silentLogger()}
+	reconciled, err := server.reconcileContainers(workspaces, func(podmanName string) (bool, error) {
+		return false, nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(reconciled) != 0 {
+		t.Fatalf("expected the workspace to be dropped, got %#v", reconciled)
+	}
+	stored, err := store.Workspaces()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(stored) != 0 {
+		t.Fatalf("expected the workspace to be removed from state, got %#v", stored)
+	}
+}
+
+func TestReconcileContainersKeepsWorkspaceWithNamedContainers(t *testing.T) {
+	store := newTestStore(t)
+	workspaces := []state.Workspace{{
+		WorkspaceSlug: "proj",
+		Containers: []state.Container{
+			{Name: "default", PodmanName: "dsh-workspace-proj", Status: "running"},
+			{Name: "db", PodmanName: "dsh-workspace-proj-db", Status: "running"},
+		},
+	}}
+	if err := store.SaveWorkspaces(workspaces); err != nil {
+		t.Fatal(err)
+	}
+	server := &Server{Store: store, Logger: silentLogger()}
+	reconciled, err := server.reconcileContainers(workspaces, func(podmanName string) (bool, error) {
+		return podmanName == "dsh-workspace-proj-db", nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(reconciled) != 1 || len(reconciled[0].Containers) != 1 || reconciled[0].Containers[0].Name != "db" {
+		t.Fatalf("expected the named container to survive, got %#v", reconciled)
+	}
+	stored, err := store.Workspaces()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(stored) != 1 || len(stored[0].Containers) != 1 || stored[0].Containers[0].Name != "db" {
+		t.Fatalf("expected only the named container in state, got %#v", stored)
+	}
+}
+
+func TestReconcileContainersKeepsOnLookupError(t *testing.T) {
+	store := newTestStore(t)
+	workspaces := []state.Workspace{{
+		WorkspaceSlug: "proj",
+		Containers:    []state.Container{{Name: "default", PodmanName: "dsh-workspace-proj", Status: "running"}},
+	}}
+	if err := store.SaveWorkspaces(workspaces); err != nil {
+		t.Fatal(err)
+	}
+	server := &Server{Store: store, Logger: silentLogger()}
+	reconciled, err := server.reconcileContainers(workspaces, func(podmanName string) (bool, error) {
+		return false, errors.New("podman lookup failed")
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(reconciled) != 1 || len(reconciled[0].Containers) != 1 {
+		t.Fatalf("lookup errors must not drop records, got %#v", reconciled)
+	}
+	stored, err := store.Workspaces()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(stored) != 1 || len(stored[0].Containers) != 1 {
+		t.Fatalf("state must be untouched on lookup errors, got %#v", stored)
+	}
+}
+
+func TestReconcileContainersNoChangeDoesNotWrite(t *testing.T) {
+	store := newTestStore(t)
+	workspaces := []state.Workspace{{
+		WorkspaceSlug: "proj",
+		Containers:    []state.Container{{Name: "default", PodmanName: "dsh-workspace-proj", Status: "running"}},
+	}}
+	if err := store.SaveWorkspaces(workspaces); err != nil {
+		t.Fatal(err)
+	}
+	server := &Server{Store: store, Logger: silentLogger()}
+	reconciled, err := server.reconcileContainers(workspaces, func(podmanName string) (bool, error) {
+		return true, nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(reconciled) != 1 || len(reconciled[0].Containers) != 1 {
+		t.Fatalf("expected the container to survive, got %#v", reconciled)
+	}
+	stored, err := store.Workspaces()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(stored) != 1 || stored[0].Containers[0].Status != "running" {
+		t.Fatalf("state must be unchanged, got %#v", stored)
 	}
 }
 

@@ -267,18 +267,16 @@ func (s *Server) ListContainers(context.Context, *ctl.ListContainersRequest) (*c
 		s.log().Error("control request failed", "method", "ListContainers", "error", err)
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	var exists func(podmanName string) bool
+	// Drop stored containers whose podman container no longer exists (for
+	// example deleted outside dsh-podman); they must not be listed.
 	if s.Podman != nil {
-		exists = func(podmanName string) bool {
-			found, containerErr := s.Podman.ContainerExists(podmanName)
-			if containerErr != nil {
-				s.log().Warn("ListContainers podman lookup failed", "podman_name", podmanName, "error", containerErr)
-				return false
-			}
-			return found
+		workspaces, err = s.reconcileContainers(workspaces, s.Podman.ContainerExists)
+		if err != nil {
+			s.log().Error("control request failed", "method", "ListContainers", "error", err)
+			return nil, status.Error(codes.Internal, err.Error())
 		}
 	}
-	containers := containerRows(workspaces, exists)
+	containers := containerRows(workspaces)
 	sort.Slice(containers, func(i, j int) bool {
 		if containers[i].WorkspaceSlug != containers[j].WorkspaceSlug {
 			return containers[i].WorkspaceSlug < containers[j].WorkspaceSlug
@@ -306,21 +304,59 @@ func containerProto(ws state.Workspace, c state.Container) *ctl.Container {
 }
 
 // containerRows projects stored workspace containers onto the control plane's
-// Container messages. It is state-driven: every workspace container is
-// included. When exists is non-nil and reports the podman container as
-// missing, the row is flagged as "not started".
-func containerRows(workspaces []state.Workspace, exists func(podmanName string) bool) []*ctl.Container {
+// Container messages. It is state-driven: every stored container is included
+// with its stored status.
+func containerRows(workspaces []state.Workspace) []*ctl.Container {
 	result := make([]*ctl.Container, 0, len(workspaces))
 	for _, ws := range workspaces {
 		for _, container := range ws.Containers {
-			row := containerProto(ws, container)
-			if exists != nil && !exists(container.PodmanName) {
-				row.Status = "not started"
-			}
-			result = append(result, row)
+			result = append(result, containerProto(ws, container))
 		}
 	}
 	return result
+}
+
+// reconcileContainers drops stored containers whose podman container no longer
+// exists (for example deleted outside dsh-podman), persisting the
+// reconciliation. A workspace left with no containers is removed entirely and
+// will be recreated on demand. Podman lookup errors leave the record untouched
+// and are logged. When nothing changed, the input is returned unwritten.
+func (s *Server) reconcileContainers(workspaces []state.Workspace, exists func(podmanName string) (bool, error)) ([]state.Workspace, error) {
+	changed := false
+	next := make([]state.Workspace, 0, len(workspaces))
+	for _, ws := range workspaces {
+		kept := make([]state.Container, 0, len(ws.Containers))
+		for _, container := range ws.Containers {
+			found, lookupErr := exists(container.PodmanName)
+			if lookupErr != nil {
+				s.log().Warn("ListContainers podman lookup failed", "podman_name", container.PodmanName, "error", lookupErr)
+				kept = append(kept, container)
+				continue
+			}
+			if !found {
+				s.log().Info("dropping container deleted outside dsh-podman", "workspace_slug", ws.WorkspaceSlug, "container", container.Name, "podman_name", container.PodmanName)
+				changed = true
+				continue
+			}
+			kept = append(kept, container)
+		}
+		if len(kept) == 0 {
+			s.log().Info("dropping workspace with no remaining containers", "workspace_slug", ws.WorkspaceSlug)
+			changed = true
+			continue
+		}
+		ws.Containers = kept
+		next = append(next, ws)
+	}
+	if !changed {
+		return workspaces, nil
+	}
+	if err := s.Store.UpdateWorkspaces(func(all []state.Workspace) ([]state.Workspace, error) {
+		return next, nil
+	}); err != nil {
+		return nil, err
+	}
+	return next, nil
 }
 
 // stopContainerDaemons gracefully stops every daemon in the guest container by

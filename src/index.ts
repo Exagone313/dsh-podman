@@ -103,7 +103,9 @@ export function apply(ctx: any, config: PluginConfig = {}): void {
     ctx.workspaceRegistry,
   );
   ctx.provide("workspaceResolver", resolver);
-  ctx.provide("subprocess", createSubprocessProvider(resolver));
+  const subprocess = createSubprocessProvider(resolver);
+  ctx.provide("subprocess", subprocess);
+  ctx.effect(() => () => subprocess.dispose(), "podman: subprocess cleanup");
   ctx.provide("fs", createFilesystemProvider(resolver));
   ctx.inject(["systemPrompt"], (promptCtx: any) => {
     promptCtx.systemPrompt.section(podmanRuntimeSection());
@@ -122,6 +124,7 @@ export interface SubprocessProvider {
   resolveExecutable(command: string): Promise<string>;
   spawn(spec: any): any;
   spawnTerminal(spec: any): Promise<any>;
+  dispose(): void;
 }
 export interface FilesystemProvider {
   resolve(path: string, opts?: any): Promise<any>;
@@ -165,7 +168,13 @@ export interface FilesystemProvider {
 }
 
 export function createSubprocessProvider(resolver: WorkspaceResolver): SubprocessProvider {
+  // Live termination handles, so service disposal can stop every process this
+  // provider started (the harness's disposal contract).
+  const live = new Set<() => void>();
   return {
+    dispose: () => {
+      for (const terminate of [...live]) terminate();
+    },
     resolveExecutable: async (command: string) => {
       if (command.length === 0)
         throw new Error("executable name must be non-empty");
@@ -191,13 +200,30 @@ export function createSubprocessProvider(resolver: WorkspaceResolver): Subproces
       };
       let processBinding: any;
       let terminated = false;
-      const terminate = (): void => {
-        terminated = true;
+      let exited = false;
+      let killTimer: ReturnType<typeof setTimeout> | undefined;
+      const signalProcess = (signal: string): void => {
         if (processBinding !== undefined && state.pid > 0) {
           void unaryGuest({ binding: processBinding }, "signal", {
             processId: String(state.pid),
-            signal: "SIGTERM",
-          });
+            signal,
+          }).catch(() => {});
+        }
+      };
+      // The harness's termination procedure: SIGTERM, then SIGKILL once the
+      // spec's grace period elapses without an exit.
+      const terminate = (): void => {
+        terminated = true;
+        signalProcess("SIGTERM");
+        if (killTimer === undefined) {
+          const grace =
+            typeof spec.graceMs === "number" && spec.graceMs > 0
+              ? spec.graceMs
+              : 5000;
+          killTimer = setTimeout(() => {
+            if (!exited) signalProcess("SIGKILL");
+          }, grace);
+          killTimer.unref?.();
         }
       };
       const done = resolver.resolve(spec.cwd).then(
@@ -210,6 +236,7 @@ export function createSubprocessProvider(resolver: WorkspaceResolver): Subproces
                 const data = Buffer.from(output.stdoutChunk);
                 stdoutReader?.append(data);
                 state.stdout?.write(data);
+                if (spec.stdio?.stdout === "inherit") process.stdout.write(data);
               }
               if (output.processId) {
                 state.pid = Number(output.processId);
@@ -219,8 +246,11 @@ export function createSubprocessProvider(resolver: WorkspaceResolver): Subproces
                 const data = Buffer.from(output.stderrChunk);
                 stderrReader?.append(data);
                 state.stderr?.write(data);
+                if (spec.stdio?.stderr === "inherit") process.stderr.write(data);
               }
               if (output.exit) {
+                exited = true;
+                if (killTimer !== undefined) clearTimeout(killTimer);
                 state.stdout?.end();
                 state.stderr?.end();
                 resolveDone({
@@ -247,6 +277,12 @@ export function createSubprocessProvider(resolver: WorkspaceResolver): Subproces
             }
           }),
       );
+      if (spec.signal !== undefined) {
+        if (spec.signal.aborted) terminate();
+        else spec.signal.addEventListener("abort", terminate, { once: true });
+      }
+      live.add(terminate);
+      void done.finally(() => live.delete(terminate)).catch(() => {});
       return {
         ...state,
         collected: {

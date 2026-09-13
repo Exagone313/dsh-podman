@@ -2906,3 +2906,60 @@ test("filesystem provider maps absolute host paths into the execution world", ()
   );
   assert.equal(provider.processPathFromHostPath("rel/f"), undefined);
 });
+
+// A fake guest for the subprocess provider: exec emits a process id (and
+// optionally an exit), and the unary signal RPC is recorded.
+function spawnGuest(options: { emitExit?: boolean } = {}) {
+  const signals: Array<{ processId: string; signal: string }> = [];
+  const guest = {
+    exec: () => {
+      const handlers: Record<string, Function[]> = {};
+      return {
+        on(event: string, handler: Function) {
+          (handlers[event] ??= []).push(handler);
+        },
+        write(_message: unknown) {},
+        end() {
+          for (const handler of handlers.data ?? []) {
+            handler({ processId: "7" });
+            if (options.emitExit !== false) {
+              handler({ exit: { exitCode: 0, signaled: false } });
+            }
+          }
+        },
+      };
+    },
+    signal: (request: { processId: string; signal: string }, _metadata: unknown, callback: Function) => {
+      signals.push(request);
+      callback(null, {});
+    },
+  };
+  return { signals, resolver: { resolve: async () => ({ guest, token: "t" }) } };
+}
+
+const spawnSpec = (overrides: Record<string, unknown> = {}) => ({
+  argv: ["sleep", "1"],
+  cwd: "/projects/team",
+  stdio: { stdin: "ignore", stdout: { maxBytes: 10 }, stderr: { maxBytes: 10 } },
+  graceMs: 50,
+  ...overrides,
+});
+
+test("subprocess provider terminates live processes on dispose", async () => {
+  const { signals, resolver } = spawnGuest({ emitExit: false });
+  const provider = createSubprocessProvider(resolver as any);
+  provider.spawn(spawnSpec());
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  provider.dispose();
+  assert.ok(signals.some((signal) => signal.signal === "SIGTERM"));
+});
+
+test("subprocess provider terminates on the spec abort signal", async () => {
+  const { signals, resolver } = spawnGuest({ emitExit: false });
+  const provider = createSubprocessProvider(resolver as any);
+  const controller = new AbortController();
+  provider.spawn(spawnSpec({ signal: controller.signal }));
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  controller.abort();
+  assert.ok(signals.some((signal) => signal.signal === "SIGTERM"));
+});

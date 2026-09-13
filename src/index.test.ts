@@ -2660,3 +2660,116 @@ test("filesystem provider readByteRange returns the window and empty for zero le
   assert.equal(Buffer.from(window).toString(), "bcd");
   assert.deepEqual(fake.requests[0], { path: "/a", offset: 1, length: 3 });
 });
+
+// A fake guest for the text/byte provider methods: a stat result, a one-chunk
+// readFile, and a no-op writeFile.
+function editGuest(stat: Record<string, unknown>, content = Buffer.alloc(0)) {
+  return {
+    guest: {
+      stat: (_request: unknown, _metadata: unknown, callback: Function) =>
+        callback(null, {
+          exists: true,
+          isDir: false,
+          isSymlink: false,
+          size: String(content.length),
+          mode: "-rw-r--r--",
+          modifiedAt: "t",
+          ...stat,
+        }),
+      readFile: () => ({
+        async *[Symbol.asyncIterator]() {
+          yield { data: content };
+        },
+      }),
+      writeFile: (_metadata: unknown, _options: unknown, callback: Function) => {
+        callback(null, { bytesWritten: 0 });
+        return { write() {}, end() {} };
+      },
+    },
+    token: "t",
+  };
+}
+
+function editProvider(binding: unknown) {
+  return createFilesystemProvider({
+    resolveForPath: async () => binding,
+  } as any);
+}
+
+test("filesystem provider editText reports the harness error codes", async () => {
+  const binary = editProvider(editGuest({}, Buffer.from([0x68, 0x00, 0x69])));
+  const binaryTarget = await binary.resolve("/a", { cwd: "/x" });
+  await assert.rejects(
+    () => binary.editText(binaryTarget, {
+      oldString: "h",
+      newString: "H",
+      replaceAll: false,
+    }),
+    (error: unknown) => (error as { code?: string }).code === "FS_NOT_TEXT",
+  );
+
+  const notFound = editProvider(editGuest({}, Buffer.from("hello")));
+  const notFoundTarget = await notFound.resolve("/a", { cwd: "/x" });
+  await assert.rejects(
+    () => notFound.editText(notFoundTarget, {
+      oldString: "zzz",
+      newString: "x",
+      replaceAll: false,
+    }),
+    (error: unknown) => (error as { code?: string }).code === "FS_EDIT_NOT_FOUND",
+  );
+
+  const ambiguous = editProvider(editGuest({}, Buffer.from("aa")));
+  const ambiguousTarget = await ambiguous.resolve("/a", { cwd: "/x" });
+  await assert.rejects(
+    () => ambiguous.editText(ambiguousTarget, {
+      oldString: "a",
+      newString: "b",
+      replaceAll: false,
+    }),
+    (error: unknown) => (error as { code?: string }).code === "FS_AMBIGUOUS_EDIT",
+  );
+
+  const stale = editProvider(editGuest({}, Buffer.from("hello")));
+  const staleTarget = await stale.resolve("/a", { cwd: "/x" });
+  await assert.rejects(
+    () => stale.editText(
+      staleTarget,
+      { oldString: "h", newString: "H", replaceAll: false },
+      { version: "other" },
+    ),
+    (error: unknown) => (error as { code?: string }).code === "FS_STALE_VERSION",
+  );
+});
+
+test("filesystem provider writeText reports the harness error codes", async () => {
+  const existing = editProvider(editGuest({}, Buffer.from("hello")));
+  const target = await existing.resolve("/a", { cwd: "/x" });
+
+  await assert.rejects(
+    () => existing.writeText(target, "x", { kind: "createIfAbsent" }),
+    (error: unknown) => (error as { code?: string }).code === "FS_NOT_OBSERVED",
+  );
+  await assert.rejects(
+    () => existing.writeText(target, "x", { kind: "replaceIfVersion", version: "other" }),
+    (error: unknown) => (error as { code?: string }).code === "FS_STALE_VERSION",
+  );
+
+  const dir = editProvider(editGuest({ isDir: true }));
+  const dirTarget = await dir.resolve("/a", { cwd: "/x" });
+  await assert.rejects(
+    () => dir.writeText(dirTarget, "x"),
+    (error: unknown) => (error as { code?: string }).code === "FS_NOT_REGULAR_FILE",
+  );
+});
+
+test("filesystem provider rejects a pre-aborted signal with FS_ABORTED", async () => {
+  const provider = editProvider(editGuest({}, Buffer.from("hello")));
+  const target = await provider.resolve("/a", { cwd: "/x" });
+  const controller = new AbortController();
+  controller.abort();
+  await assert.rejects(
+    () => provider.readText(target, controller.signal),
+    (error: unknown) => (error as { code?: string }).code === "FS_ABORTED",
+  );
+});

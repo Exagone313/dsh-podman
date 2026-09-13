@@ -144,12 +144,22 @@ export interface FilesystemProvider {
     opts?: any,
     signal?: AbortSignal,
   ): Promise<any | undefined>;
-  writeText(target: any, content: string, expected?: any): Promise<any>;
+  writeText(
+    target: any,
+    content: string,
+    expected?: any,
+    signal?: AbortSignal,
+  ): Promise<any>;
   stat(target: any): Promise<any>;
   listDir(target: any): Promise<any>;
   mkdir(target: any, parents?: boolean): Promise<any>;
   remove(target: any, recursive?: boolean): Promise<any>;
-  editText(target: any, edit: any): Promise<any>;
+  editText(
+    target: any,
+    edit: any,
+    expected?: any,
+    signal?: AbortSignal,
+  ): Promise<any>;
 }
 
 export function createSubprocessProvider(resolver: WorkspaceResolver): SubprocessProvider {
@@ -2037,6 +2047,9 @@ function registerTools(ctx: any, resolver: WorkspaceResolver): void {
 // Binary detection samples only the head of a file, matching the harness's
 // local backend (`fs-local`).
 const BINARY_SAMPLE_BYTES = 8192;
+// Cap on the contextual-diff basis read before a write; a larger existing file
+// yields `before: null`, like `fs-local`'s bounded reader.
+const DIFF_BASIS_MAX_BYTES = 1024 * 1024;
 
 function fsError(code: string, message: string): Error {
   const error = new Error(message);
@@ -2044,11 +2057,38 @@ function fsError(code: string, message: string): Error {
   return error;
 }
 
-// Open the guest's ReadFile stream. A zero/absent length reads to EOF.
-function guestReadStream(
+// The harness's FS_ABORTED: a caller that already cancelled must fail before
+// any I/O.
+function throwIfAborted(signal: AbortSignal | undefined, verb: string): void {
+  if (signal?.aborted) throw fsError("FS_ABORTED", `${verb} aborted`);
+}
+
+// Cancel a gRPC call when the caller aborts; returns a detach function.
+function onAbortCancel(call: any, signal: AbortSignal | undefined): () => void {
+  if (signal === undefined) return () => {};
+  const cancel = (): void => {
+    try {
+      call.cancel?.();
+    } catch {
+      // A finished call cannot be cancelled; nothing to do.
+    }
+  };
+  if (signal.aborted) {
+    cancel();
+    return () => {};
+  }
+  signal.addEventListener("abort", cancel, { once: true });
+  return () => signal.removeEventListener("abort", cancel);
+}
+
+// Stream raw bytes from the guest's ReadFile. A zero/absent length reads to
+// EOF. Cancelling the signal cancels the call and reports FS_ABORTED.
+async function* guestChunks(
   target: any,
-  range?: { offset?: number; length?: number },
-): any {
+  range: { offset?: number; length?: number } | undefined,
+  signal: AbortSignal | undefined,
+): AsyncIterable<Buffer> {
+  throwIfAborted(signal, "read");
   const request: Record<string, unknown> = { path: target.targetKey };
   if (range?.offset !== undefined && range.offset > 0) {
     request.offset = range.offset;
@@ -2056,21 +2096,33 @@ function guestReadStream(
   if (range?.length !== undefined && range.length > 0) {
     request.length = range.length;
   }
-  return (target.binding.guest as any).readFile(
+  const call = (target.binding.guest as any).readFile(
     request,
     metadata(target.binding.token),
   );
+  const detach = onAbortCancel(call, signal);
+  try {
+    for await (const chunk of call) {
+      yield Buffer.from(chunk.data);
+    }
+  } catch (error) {
+    if (signal?.aborted) throw fsError("FS_ABORTED", "read aborted");
+    throw error;
+  } finally {
+    detach();
+  }
 }
 
 // Stream the guest file as decoded UTF-8 text, rejecting binary content (a NUL
 // byte in the head, or invalid UTF-8) with the harness's FS_NOT_TEXT code.
-async function* guestTextChunks(target: any): AsyncIterable<string> {
-  const call = guestReadStream(target);
+async function* guestTextChunks(
+  target: any,
+  signal: AbortSignal | undefined,
+): AsyncIterable<string> {
   const decoder = new TextDecoder("utf-8", { fatal: true });
   let sampled = 0;
   try {
-    for await (const chunk of call) {
-      const buffer = Buffer.from(chunk.data);
+    for await (const buffer of guestChunks(target, undefined, signal)) {
       if (sampled < BINARY_SAMPLE_BYTES) {
         const sample = buffer.subarray(
           0,
@@ -2091,7 +2143,7 @@ async function* guestTextChunks(target: any): AsyncIterable<string> {
     if (tail !== "") yield tail;
   } catch (error) {
     // A fatal TextDecoder failure is a TypeError; anything else (our own
-    // FS_NOT_TEXT, or a transport error) keeps its identity.
+    // FS_NOT_TEXT/FS_ABORTED, or a transport error) keeps its identity.
     if (error instanceof TypeError) {
       throw fsError(
         "FS_NOT_TEXT",
@@ -2102,9 +2154,33 @@ async function* guestTextChunks(target: any): AsyncIterable<string> {
   }
 }
 
+async function readGuestText(
+  target: any,
+  signal: AbortSignal | undefined,
+): Promise<string> {
+  let text = "";
+  for await (const chunk of guestTextChunks(target, signal)) text += chunk;
+  return text;
+}
+
+// The contextual-diff basis before a write: absent for a create, binary, or
+// unreadable prior file (presentation only, never a correctness input).
+async function readDiffBasis(
+  target: any,
+  signal: AbortSignal | undefined,
+): Promise<string | null> {
+  try {
+    return await readGuestText(target, signal);
+  } catch (error) {
+    if ((error as { code?: string }).code === "FS_NOT_TEXT") return null;
+    throw error;
+  }
+}
+
 export function createFilesystemProvider(resolver: WorkspaceResolver): FilesystemProvider {
   return {
     resolve: async (path: string, opts?: any) => {
+      throwIfAborted(opts?.signal, "resolve");
       const resolved = resolveGuestPath(path, opts?.cwd);
       return {
         targetKey: resolved,
@@ -2117,23 +2193,22 @@ export function createFilesystemProvider(resolver: WorkspaceResolver): Filesyste
     contains: (parent: any, child: any) =>
       child.targetKey === parent.targetKey ||
       child.targetKey.startsWith(`${parent.targetKey}/`),
-    readText: async (target: any, _signal?: AbortSignal) => {
-      let text = "";
-      for await (const chunk of guestTextChunks(target)) text += chunk;
-      return text;
-    },
-    streamText: (target: any, _signal?: AbortSignal) =>
-      Promise.resolve(guestTextChunks(target)),
+    readText: (target: any, signal?: AbortSignal) =>
+      readGuestText(target, signal),
+    streamText: (target: any, signal?: AbortSignal) =>
+      Promise.resolve(guestTextChunks(target, signal)),
     readBytes: async (
       target: any,
-      _signal: AbortSignal | undefined,
+      signal: AbortSignal | undefined,
       maxBytes: number,
     ) => {
-      const call = guestReadStream(target, { length: maxBytes + 1 });
       const chunks: Buffer[] = [];
       let total = 0;
-      for await (const chunk of call) {
-        const buffer = Buffer.from(chunk.data);
+      for await (const buffer of guestChunks(
+        target,
+        { length: maxBytes + 1 },
+        signal,
+      )) {
         total += buffer.length;
         if (total > maxBytes) {
           throw fsError(
@@ -2148,29 +2223,27 @@ export function createFilesystemProvider(resolver: WorkspaceResolver): Filesyste
     readByteRange: async (
       target: any,
       range: { offset: number; length: number },
-      _signal?: AbortSignal,
+      signal?: AbortSignal,
     ) => {
       if (range.length === 0) return new Uint8Array(0);
-      const call = guestReadStream(target, {
-        offset: range.offset,
-        length: range.length,
-      });
       const chunks: Buffer[] = [];
       let total = 0;
-      for await (const chunk of call) {
-        const buffer = Buffer.from(chunk.data);
+      for await (const buffer of guestChunks(target, range, signal)) {
         total += buffer.length;
         chunks.push(buffer);
       }
       return Buffer.concat(chunks, total);
     },
-    lstat: async (path: string, opts?: any, _signal?: AbortSignal) => {
+    lstat: async (path: string, opts?: any, signal?: AbortSignal) => {
+      throwIfAborted(signal, "lstat");
       const resolved = resolveGuestPath(path, opts?.cwd);
       const binding = await resolver.resolveForPath(resolved, opts?.cwd);
-      const result: any = await unaryGuest({ binding }, "stat", {
-        path: resolved,
-        noFollow: true,
-      });
+      const result: any = await unaryGuest(
+        { binding },
+        "stat",
+        { path: resolved, noFollow: true },
+        signal,
+      );
       if (!result?.exists) return undefined;
       return {
         version: guestVersion(result),
@@ -2184,68 +2257,124 @@ export function createFilesystemProvider(resolver: WorkspaceResolver): Filesyste
           : {}),
       };
     },
-    writeText: async (target: any, content: string, expected?: any) => {
-      const current = await guestStatResponse(target);
-      const currentVersion = current.exists ? guestVersion(current) : undefined;
-      if (expected?.kind === "createIfAbsent" && current.exists) {
-        throw new Error(`file already exists: ${target.displayPath}`);
-      }
-      if (
-        expected?.kind === "replaceIfVersion" &&
-        currentVersion !== expected.version
-      ) {
-        throw new Error(`file version is stale: ${target.displayPath}`);
-      }
-      const before = current.exists ? await readRemoteText(target) : null;
-      return new Promise((resolveDone, reject) => {
-        const call = (target.binding.guest as any).writeFile(
-          metadata(target.binding.token),
-          {},
-          async (error: Error | null, _result: unknown) => {
-            if (error) {
-              reject(error);
-              return;
-            }
-            try {
-              const after = await guestStatResponse(target);
-              resolveDone({
-                operation: current.exists ? "update" : "create",
-                version: guestVersion(after),
-                before,
-                after: content,
-              });
-            } catch (statError) {
-              reject(statError);
-            }
-          },
+    writeText: async (
+      target: any,
+      content: string,
+      expected?: any,
+      signal?: AbortSignal,
+    ) => {
+      throwIfAborted(signal, "write");
+      const current = await guestStatResponse(target, signal);
+      if (current.exists && current.isDir) {
+        throw fsError(
+          "FS_NOT_REGULAR_FILE",
+          `cannot write "${target.displayPath}": not a regular file`,
         );
-        call.write({
-          start: { path: target.targetKey, create: true, truncate: true },
-        });
-        call.write({ dataChunk: Buffer.from(content) });
-        call.end();
-      });
+      }
+      const currentVersion = current.exists ? guestVersion(current) : undefined;
+      if (expected?.kind === "replaceIfVersion") {
+        if (!current.exists) {
+          throw fsError(
+            "FS_STALE_VERSION",
+            `cannot write "${target.displayPath}": file no longer exists`,
+          );
+        }
+        if (currentVersion !== expected.version) {
+          throw fsError(
+            "FS_STALE_VERSION",
+            `cannot write "${target.displayPath}": file changed since it was read`,
+          );
+        }
+      } else if (expected?.kind === "createIfAbsent" && current.exists) {
+        throw fsError(
+          "FS_NOT_OBSERVED",
+          `cannot overwrite existing "${target.displayPath}" without reading it first`,
+        );
+      }
+      const before =
+        current.exists && Number(current.size ?? 0) < DIFF_BASIS_MAX_BYTES
+          ? await readDiffBasis(target, signal)
+          : null;
+      await writeGuestFile(
+        { guest: target.binding.guest, token: target.binding.token },
+        target.targetKey,
+        content,
+        { create: true, truncate: true },
+        signal,
+      );
+      const after = await guestStatResponse(target, signal);
+      return {
+        operation: current.exists ? "update" : "create",
+        version: guestVersion(after),
+        before,
+        after: content,
+      };
     },
-    stat: async (target: any) => guestStat(target),
-    listDir: async (target: any) =>
-      unaryGuest(target, "readDir", { path: target.targetKey }),
+    stat: (target: any, signal?: AbortSignal) => guestStat(target, signal),
+    listDir: async (target: any, signal?: AbortSignal) =>
+      unaryGuest(target, "readDir", { path: target.targetKey }, signal),
     mkdir: async (target: any, parents = true) =>
       unaryGuest(target, "mkdir", { path: target.targetKey, parents }),
     remove: async (target: any, recursive = false) =>
       unaryGuest(target, "delete", { path: target.targetKey, recursive }),
-    editText: async (target: any, edit: any) => {
-      const before = await readRemoteText(target);
-      if (edit.oldString.length === 0)
-        throw new Error("oldString must be non-empty");
+    editText: async (
+      target: any,
+      edit: any,
+      expected?: any,
+      signal?: AbortSignal,
+    ) => {
+      throwIfAborted(signal, "edit");
+      const current = await guestStatResponse(target, signal);
+      if (!current.exists) {
+        throw fsError(
+          "FS_STALE_VERSION",
+          `cannot edit "${target.displayPath}": file changed since it was read`,
+        );
+      }
+      if (current.isDir) {
+        throw fsError(
+          "FS_NOT_REGULAR_FILE",
+          `cannot edit "${target.displayPath}": not a regular file`,
+        );
+      }
+      if (
+        expected !== undefined &&
+        guestVersion(current) !== expected.version
+      ) {
+        throw fsError(
+          "FS_STALE_VERSION",
+          `cannot edit "${target.displayPath}": file changed since it was read`,
+        );
+      }
+      const before = await readGuestText(target, signal);
+      if (typeof edit.oldString !== "string" || edit.oldString.length === 0) {
+        throw fsError(
+          "FS_EDIT_NOT_FOUND",
+          "old_string must be a non-empty string",
+        );
+      }
+      const occurrences = before.split(edit.oldString).length - 1;
+      if (occurrences === 0) {
+        throw fsError(
+          "FS_EDIT_NOT_FOUND",
+          `old_string was not found in "${target.displayPath}"`,
+        );
+      }
+      if (!edit.replaceAll && occurrences > 1) {
+        throw fsError(
+          "FS_AMBIGUOUS_EDIT",
+          `old_string matched ${occurrences} times in "${target.displayPath}"; provide a more specific old_string or set replace_all to true`,
+        );
+      }
       const after = edit.replaceAll
         ? before.split(edit.oldString).join(edit.newString)
         : before.replace(edit.oldString, edit.newString);
-      if (after === before) throw new Error("oldString was not found");
       await writeGuestFile(
         { guest: target.binding.guest, token: target.binding.token },
         target.targetKey,
         after,
         { create: true, truncate: true },
+        signal,
       );
       return {
         version: `agent:${createHash("sha256").update(after).digest("hex")}`,
@@ -2265,14 +2394,22 @@ async function writeGuestFile(
   path: string,
   content: string,
   opts: { create: boolean; truncate: boolean },
+  signal?: AbortSignal,
 ): Promise<number> {
+  throwIfAborted(signal, "write");
   return new Promise((resolveDone, reject) => {
+    let detach: () => void = () => {};
     const call = (binding.guest as any).writeFile(
       metadata(binding.token),
       {},
-      (error: Error | null, result: any) =>
-        error ? reject(error) : resolveDone(Number(result?.bytesWritten ?? 0)),
+      (error: Error | null, result: any) => {
+        detach();
+        error
+          ? reject(signal?.aborted ? fsError("FS_ABORTED", "write aborted") : error)
+          : resolveDone(Number(result?.bytesWritten ?? 0));
+      },
     );
+    detach = onAbortCancel(call, signal);
     call.write({
       start: { path, create: opts.create, truncate: opts.truncate },
     });
@@ -2473,8 +2610,8 @@ async function resolveToolBinding(
   return resolver.containerBinding(cwd, container);
 }
 
-async function guestStat(target: any): Promise<any> {
-  const result = await guestStatResponse(target);
+async function guestStat(target: any, signal?: AbortSignal): Promise<any> {
+  const result = await guestStatResponse(target, signal);
   if (!result.exists) return undefined;
   return {
     version: guestVersion(result),
@@ -2483,41 +2620,45 @@ async function guestStat(target: any): Promise<any> {
   };
 }
 
-async function guestStatResponse(target: any): Promise<any> {
-  return new Promise<any>((resolveDone, reject) =>
-    target.binding.guest.stat(
+function guestStatResponse(target: any, signal?: AbortSignal): Promise<any> {
+  throwIfAborted(signal, "stat");
+  return new Promise<any>((resolveDone, reject) => {
+    let detach: () => void = () => {};
+    const call = target.binding.guest.stat(
       { path: target.targetKey },
       metadata(target.binding.token),
-      (error: Error | null, value: any) =>
-        error ? reject(error) : resolveDone(value),
-    ),
-  );
+      (error: Error | null, value: any) => {
+        detach();
+        error
+          ? reject(signal?.aborted ? fsError("FS_ABORTED", "stat aborted") : error)
+          : resolveDone(value);
+      },
+    );
+    detach = onAbortCancel(call, signal);
+  });
 }
 
-async function readRemoteText(target: any): Promise<string> {
-  const chunks: Buffer[] = [];
-  await new Promise<void>((resolveDone, reject) => {
-    const call = target.binding.guest.readFile(
-      { path: target.targetKey },
-      metadata(target.binding.token),
-    );
-    call.on("data", (chunk: any) => chunks.push(Buffer.from(chunk.data)));
-    call.on("error", reject);
-    call.on("end", resolveDone);
-  });
-  return Buffer.concat(chunks).toString("utf8");
-}
 async function unaryGuest(
   target: any,
   method: string,
   request: unknown,
+  signal?: AbortSignal,
 ): Promise<unknown> {
-  return new Promise((resolveDone, reject) =>
-    (target.binding.guest as any)[method](
+  throwIfAborted(signal, method);
+  return new Promise((resolveDone, reject) => {
+    let detach: () => void = () => {};
+    const call = (target.binding.guest as any)[method](
       request,
       metadata(target.binding.token),
-      (error: Error | null, result: unknown) =>
-        error ? reject(error) : resolveDone(result),
-    ),
-  );
+      (error: Error | null, result: unknown) => {
+        detach();
+        error
+          ? reject(
+              signal?.aborted ? fsError("FS_ABORTED", `${method} aborted`) : error,
+            )
+          : resolveDone(result);
+      },
+    );
+    detach = onAbortCancel(call, signal);
+  });
 }

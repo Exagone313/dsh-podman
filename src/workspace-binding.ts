@@ -106,7 +106,7 @@ export class WorkspaceResolver {
     const result = await this.control<any>("listContainers", {});
     const row = containerRowFor(result.containers ?? [], slug, container);
     if (row === undefined) {
-      throw new Error(`container "${container}" not found in workspace`);
+      throw containerNotFound(container, slug);
     }
     const socket = row.agentSocketPath as string;
     const binding: WorkspaceBinding = {
@@ -234,15 +234,44 @@ export class WorkspaceResolver {
   }
 }
 
-// The harness's missing-path code (`FsErrorCode` `'FS_NOT_FOUND'`, raised by
-// the local backend for a nonexistent path). A path outside every workspace is
-// not part of any container's filesystem, so callers must see it as absent:
-// agent-instructions' project-root walk probes ancestors above the workspace
-// and only continues when this code comes back.
+// notFoundError builds the harness's missing-path error (`FsErrorCode`
+// `'FS_NOT_FOUND'`). A path outside every workspace is not part of any
+// container's filesystem, so callers must see it as absent: agent-instructions'
+// project-root walk probes ancestors above the workspace and only continues
+// when this code comes back.
 function notFoundError(message: string): Error {
   const error = new Error(message);
   (error as { code?: string }).code = "FS_NOT_FOUND";
   return error;
+}
+
+// containerNotFound is the one not-found shape every container tool reports.
+export function containerNotFound(container: string, slug?: string): Error {
+  const error = new Error(
+    slug === undefined
+      ? `container ${JSON.stringify(container)} not found`
+      : `container ${JSON.stringify(container)} not found in workspace ${JSON.stringify(slug)}`,
+  );
+  (error as { code?: string }).code = "NOT_FOUND";
+  return error;
+}
+
+// normalizeToolError gives every tool failure one shape: a message without
+// grpc's "<code> <NAME>: " prefix, and a string `code` (the grpc status name
+// when the error carried one) so callers can branch without parsing text.
+export function normalizeToolError(error: unknown): Error {
+  const raw = error instanceof Error ? error.message : String(error);
+  const message = raw.replace(/^\d+\s+[A-Z_]+:\s*/, "");
+  const code = (error as { code?: unknown }).code;
+  const name =
+    typeof code === "number"
+      ? (grpc.status as unknown as Record<number, string>)[code]
+      : typeof code === "string"
+        ? code
+        : undefined;
+  const normalized = new Error(message);
+  if (name !== undefined) (normalized as { code?: string }).code = name;
+  return normalized;
 }
 
 function waitForReady(agent: grpc.Client, timeoutMs = 15000): Promise<void> {

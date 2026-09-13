@@ -16,6 +16,8 @@ import {
   metadata,
   WorkspaceResolver,
   containerRowFor,
+  containerNotFound,
+  normalizeToolError,
 } from "./workspace-binding.js";
 
 test("workspace slugs are stable and container-safe", () => {
@@ -67,6 +69,29 @@ test("metadata omits the header when the token is empty", () => {
   const result = metadata("");
   assert.ok(result instanceof grpc.Metadata);
   assert.equal(result.get("authorization").length, 0);
+});
+
+test("normalizeToolError strips the grpc prefix and names the code", () => {
+  const prefixed = Object.assign(new Error("5 NOT_FOUND: container not found"), { code: 5 });
+  const normalized = normalizeToolError(prefixed);
+  assert.equal(normalized.message, "container not found");
+  assert.equal((normalized as { code?: string }).code, "NOT_FOUND");
+
+  const plain = normalizeToolError(new Error("boom"));
+  assert.equal(plain.message, "boom");
+  assert.equal((plain as { code?: string }).code, undefined);
+
+  const named = Object.assign(new Error("bad input"), { code: "INVALID_ARGUMENT" });
+  assert.equal((normalizeToolError(named) as { code?: string }).code, "INVALID_ARGUMENT");
+});
+
+test("containerNotFound reports one stable shape", () => {
+  assert.equal(
+    containerNotFound("db", "w1").message,
+    'container "db" not found in workspace "w1"',
+  );
+  assert.equal((containerNotFound("db") as { code?: string }).code, "NOT_FOUND");
+  assert.equal(containerNotFound("db").message, 'container "db" not found');
 });
 
 test("containerRowFor finds rows by workspace and name", () => {

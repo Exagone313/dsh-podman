@@ -2,7 +2,13 @@
 //
 // SPDX-License-Identifier: MIT
 
-import { WorkspaceResolver, workspaceSlug } from "./workspace-binding.js";
+import {
+  WorkspaceResolver,
+  workspaceSlug,
+  containerNotFound,
+  normalizeToolError,
+} from "./workspace-binding.js";
+import { grpc } from "./grpc/runtime-client.js";
 import { installContainerSettings } from "./settings-bridge.js";
 import {
   defaultMountMode,
@@ -2073,9 +2079,7 @@ export const toolHandlers: Record<
         candidate.containerName === input.container,
     );
     if (row === undefined) {
-      throw new Error(
-        `container ${input.container} not found in workspace ${slug}`,
-      );
+      throw containerNotFound(input.container, slug);
     }
     const mounts = row.mounts ?? [];
     return mounts.map(publicMount);
@@ -2234,10 +2238,11 @@ export const toolHandlers: Record<
       currentCwd(exec),
       input.container,
     );
-    await unaryGuest(
-      { binding },
-      "stopDaemon",
-      { name: input.name, signal: input.signal },
+    await daemonCall(input.name, () =>
+      unaryGuest({ binding }, "stopDaemon", {
+        name: input.name,
+        signal: input.signal,
+      }),
     );
     return { stopped: input.name };
   },
@@ -2247,10 +2252,8 @@ export const toolHandlers: Record<
       currentCwd(exec),
       input.container,
     );
-    const info = await unaryGuest(
-      { binding },
-      "restartDaemon",
-      { name: input.name },
+    const info = await daemonCall(input.name, () =>
+      unaryGuest({ binding }, "restartDaemon", { name: input.name }),
     );
     return publicDaemon(info);
   },
@@ -2260,10 +2263,11 @@ export const toolHandlers: Record<
       currentCwd(exec),
       input.container,
     );
-    const result = (await unaryGuest(
-      { binding },
-      "daemonLogs",
-      { name: input.name, tailBytes: input.tailBytes },
+    const result = (await daemonCall(input.name, () =>
+      unaryGuest({ binding }, "daemonLogs", {
+        name: input.name,
+        tailBytes: input.tailBytes,
+      }),
     )) as { stdout?: unknown; stderr?: unknown };
     return {
       stdout: bytesText(result.stdout),
@@ -2383,6 +2387,28 @@ export function toolResultView(
   };
 }
 
+function daemonNotFound(name: string): Error {
+  const error = new Error(`daemon ${JSON.stringify(name)} not found`);
+  (error as { code?: string }).code = "NOT_FOUND";
+  return error;
+}
+
+// daemonCall maps the guest agent's generic "unknown daemon" to a message that
+// names the daemon the caller asked about.
+async function daemonCall<T>(name: string, call: () => Promise<T>): Promise<T> {
+  try {
+    return await call();
+  } catch (error) {
+    if (
+      (error as { code?: unknown }).code === grpc.status.NOT_FOUND &&
+      /unknown daemon/.test((error as Error).message)
+    ) {
+      throw daemonNotFound(name);
+    }
+    throw error;
+  }
+}
+
 function registerTools(ctx: any, resolver: WorkspaceResolver): void {
   for (const tool of TOOLS) {
     const handler = toolHandlers[tool.name];
@@ -2396,8 +2422,13 @@ function registerTools(ctx: any, resolver: WorkspaceResolver): void {
         presentResult: (args: any, result: any) =>
           toolResultView(tool.name, args, result),
         output: toolOutput,
-        execute: async (input: any, exec: any) =>
-          JSON.stringify(await handler(resolver, input, exec)),
+        execute: async (input: any, exec: any) => {
+          try {
+            return JSON.stringify(await handler(resolver, input, exec));
+          } catch (error) {
+            throw normalizeToolError(error);
+          }
+        },
       }),
     );
   }

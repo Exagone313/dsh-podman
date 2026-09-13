@@ -10,7 +10,23 @@ import (
 	"testing"
 
 	"github.com/opencontainers/runtime-spec/specs-go"
+	"go.podman.io/podman/v6/pkg/specgen"
 )
+
+func TestGuestPodSpecCarriesRestartPolicy(t *testing.T) {
+	spec := newGuestPodSpec("dsh-pod-proj")
+	if spec.PodSpecGen.Name != "dsh-pod-proj" || spec.PodSpecGen.RestartPolicy != "unless-stopped" {
+		t.Fatalf("unexpected pod spec: %#v", spec.PodSpecGen)
+	}
+}
+
+func TestGuestContainerPolicyCarriesRestartPolicy(t *testing.T) {
+	generator := specgen.NewSpecGenerator("img", false)
+	applyGuestContainerPolicy(generator)
+	if generator.RestartPolicy != "unless-stopped" {
+		t.Fatalf("unexpected restart policy: %q", generator.RestartPolicy)
+	}
+}
 
 func TestGuestAgentMountsWithoutHostBinary(t *testing.T) {
 	mounts := guestAgentMounts("/run/sockets/proj", "/run/dsh-podman", "proj", "", "/opt/dsh-podman/guest-agent/bin/dsh-podman-guest-agent")

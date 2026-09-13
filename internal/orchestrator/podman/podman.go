@@ -26,6 +26,26 @@ import (
 	"go.podman.io/podman/v6/pkg/specgen"
 )
 
+// guestRestartPolicy keeps guest pods and containers alive across podman/host
+// restarts. "unless-stopped" restarts after a crash or a podman restart but
+// respects an explicit stop, which is what the orchestrator's own stop and
+// recreate paths perform.
+const guestRestartPolicy = "unless-stopped"
+
+// newGuestPodSpec builds the pod spec for one workspace's pod, carrying the
+// restart policy so its containers come back after a podman/host restart.
+func newGuestPodSpec(name string) *entities.PodSpec {
+	return &entities.PodSpec{
+		PodSpecGen: specgen.PodSpecGenerator{Name: name, RestartPolicy: guestRestartPolicy},
+	}
+}
+
+// applyGuestContainerPolicy stamps the guest restart policy onto a container
+// spec generator.
+func applyGuestContainerPolicy(generator *specgen.SpecGenerator) {
+	generator.RestartPolicy = guestRestartPolicy
+}
+
 type Client struct {
 	ctx                                             context.Context
 	socketRoot, hostSocketRoot, projectRoot         string
@@ -70,7 +90,7 @@ func (c *Client) EnsurePod(name string) error {
 		return nil
 	}
 	c.log().Info("creating pod", "pod_name", name)
-	_, err = pods.CreatePodFromSpec(c.ctx, &entities.PodSpec{PodSpecGen: specgen.PodSpecGenerator{Name: name}})
+	_, err = pods.CreatePodFromSpec(c.ctx, newGuestPodSpec(name))
 	if err != nil {
 		c.log().Error("pod creation failed", "pod_name", name, "error", err)
 		return fmt.Errorf("create pod: %w", err)
@@ -119,6 +139,7 @@ func (c *Client) CreateWorkspace(pod, name, image, token string, mounts []specs.
 	generator.Secrets = append(generator.Secrets, secrets...)
 	generator.Init = &init
 	generator.ReadOnlyFilesystem = boolPtr(true)
+	applyGuestContainerPolicy(generator)
 	ociMounts, volumes := classifyMounts(mounts)
 	for _, volume := range volumes {
 		if err := c.ensureVolume(volume.Name); err != nil {
@@ -219,6 +240,20 @@ func (c *Client) ContainerExists(name string) (bool, error) {
 		c.log().Info("guest container lookup completed", "container_name", name, "exists", exists)
 	}
 	return exists, err
+}
+
+// ContainerRunning reports whether the named container is running. It is used
+// to bring a stopped guest container back before handing its socket to a
+// caller.
+func (c *Client) ContainerRunning(name string) (bool, error) {
+	inspect, err := containers.Inspect(c.ctx, name, nil)
+	if err != nil {
+		c.log().Error("guest container inspect failed", "container_name", name, "error", err)
+		return false, err
+	}
+	running := inspect.State != nil && inspect.State.Running
+	c.log().Info("guest container inspect completed", "container_name", name, "running", running)
+	return running, nil
 }
 
 func boolPtr(value bool) *bool {

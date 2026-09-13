@@ -212,6 +212,21 @@ func (s *Server) DescribeWorkspace(_ context.Context, request *ctl.DescribeWorks
 					s.log().Warn("DescribeWorkspace found stale state", "workspace_slug", workspace.WorkspaceSlug, "container_name", workspace.ContainerName)
 					return nil, status.Error(codes.NotFound, "guest container not found")
 				}
+				running, runningErr := s.Podman.ContainerRunning(workspace.ContainerName)
+				if runningErr != nil {
+					return nil, status.Error(codes.Internal, runningErr.Error())
+				}
+				if !running {
+					// A stopped container (podman/host restart, manual stop,
+					// crash) would otherwise leave every resolve waiting on a
+					// socket nobody listens on. Recreate it so the guest agent
+					// comes back before the socket is handed out.
+					refreshed, recreateErr := s.recreateStoppedContainer(workspace)
+					if recreateErr != nil {
+						return nil, recreateErr
+					}
+					workspace = refreshed
+				}
 			}
 			s.log().Info("control request completed", "method", "DescribeWorkspace", "workspace_slug", workspace.WorkspaceSlug, "status", workspace.Status)
 			return toProto(workspace), nil
@@ -219,6 +234,37 @@ func (s *Server) DescribeWorkspace(_ context.Context, request *ctl.DescribeWorks
 	}
 	s.log().Warn("control request failed", "method", "DescribeWorkspace", "workspace_slug", request.GetWorkspaceSlug(), "reason", "not found")
 	return nil, status.Error(codes.NotFound, "workspace not found")
+}
+
+// recreateStoppedContainer recreates a workspace's stopped default container
+// (podman/host restart, manual stop, or crash) so its guest agent comes back,
+// and returns the refreshed workspace. Only called from DescribeWorkspace,
+// which has already established that the container exists but is not running.
+func (s *Server) recreateStoppedContainer(workspace state.Workspace) (state.Workspace, error) {
+	record, ok := containerByLogical(&workspace, "default")
+	if !ok {
+		return workspace, status.Error(codes.NotFound, "guest container not found")
+	}
+	imageTag, err := s.resolveImageTag(record.ImageID)
+	if err != nil {
+		return workspace, err
+	}
+	token, err := s.ensureAgentToken(record)
+	if err != nil {
+		return workspace, status.Error(codes.Internal, err.Error())
+	}
+	if err := s.recreateContainer(workspace, record, imageTag, token, record.Env); err != nil {
+		s.log().Error("recreating stopped guest container failed", "workspace_slug", workspace.WorkspaceSlug, "container", record.Name, "error", err)
+		return workspace, status.Error(codes.Internal, err.Error())
+	}
+	record.Status = "running"
+	record.AgentToken = token
+	updated, err := s.upsertContainer(workspace, *record)
+	if err != nil {
+		return workspace, status.Error(codes.Internal, err.Error())
+	}
+	s.log().Info("recreated stopped guest container", "workspace_slug", workspace.WorkspaceSlug, "container", record.Name)
+	return updated, nil
 }
 func (s *Server) ListWorkspaces(context.Context, *ctl.ListWorkspacesRequest) (*ctl.ListWorkspacesResponse, error) {
 	s.log().Info("control request", "method", "ListWorkspaces")

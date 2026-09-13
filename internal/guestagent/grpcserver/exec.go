@@ -1,0 +1,212 @@
+// SPDX-FileCopyrightText: 2026 Elouan Martinet <exa@elou.world>
+//
+// SPDX-License-Identifier: MIT
+
+package grpcserver
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"io"
+	"log/slog"
+	"os"
+	osexec "os/exec"
+	"sync"
+	"syscall"
+
+	guest "github.com/Exagone313/dsh-podman/internal/genproto/dshguest/v1"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+)
+
+func (s *Server) Exec(stream guest.WorkspaceGuestAgent_ExecServer) error {
+	first, err := stream.Recv()
+	if err != nil {
+		return err
+	}
+	start := first.GetStart()
+	if start == nil {
+		return status.Error(codes.InvalidArgument, "first exec message must be start")
+	}
+	argv := first.GetStart().GetArgv()
+	argv0 := ""
+	if len(argv) > 0 {
+		argv0 = argv[0]
+	}
+	slog.Info("guest agent Exec started", "argv0", argv0, "argc", len(argv))
+	process, err := s.Processes.Start(stream.Context(), start.GetArgv(), start.GetCwd(), start.GetEnv(), start.GetUnsetEnv()...)
+	if err != nil {
+		return status.Error(codes.InvalidArgument, err.Error())
+	}
+	// The process is registered before it is started, so every path that
+	// gives up before Command.Start must drop it again. A leaked entry keeps
+	// a process with no os.Process in the map for the agent's lifetime, where
+	// any later Signal for that id would find it.
+	started := false
+	defer func() {
+		if !started {
+			s.Processes.Remove(process.ID)
+		}
+	}()
+	stdout, err := process.Command.StdoutPipe()
+	if err != nil {
+		return status.Error(codes.Internal, err.Error())
+	}
+	stderr, err := process.Command.StderrPipe()
+	if err != nil {
+		return status.Error(codes.Internal, err.Error())
+	}
+	stdin, err := process.Command.StdinPipe()
+	if err != nil {
+		return status.Error(codes.Internal, err.Error())
+	}
+	if err := process.Command.Start(); err != nil {
+		return status.Error(codes.InvalidArgument, err.Error())
+	}
+	started = true
+	spillStdout := s.newSpill(start.GetSpillStdout().GetPath(), start.GetSpillStdout().GetMaxBytes())
+	spillStderr := s.newSpill(start.GetSpillStderr().GetPath(), start.GetSpillStderr().GetMaxBytes())
+	var sendMu sync.Mutex
+	send := func(output *guest.ExecOutput) error {
+		output.ProcessId = process.ID
+		sendMu.Lock()
+		defer sendMu.Unlock()
+		return stream.Send(output)
+	}
+	errCh := make(chan error, 2)
+	var copies sync.WaitGroup
+	copyOutput := func(reader io.Reader, stderr bool, spill *spillWriter) {
+		defer copies.Done()
+		buffer := make([]byte, 32*1024)
+		for {
+			n, readErr := reader.Read(buffer)
+			if n > 0 {
+				data := append([]byte(nil), buffer[:n]...)
+				spill.write(data)
+				output := &guest.ExecOutput{}
+				if stderr {
+					output.Payload = &guest.ExecOutput_StderrChunk{StderrChunk: data}
+				} else {
+					output.Payload = &guest.ExecOutput_StdoutChunk{StdoutChunk: data}
+				}
+				if sendErr := send(output); sendErr != nil {
+					errCh <- sendErr
+					return
+				}
+			}
+			if readErr != nil {
+				if !errors.Is(readErr, io.EOF) {
+					errCh <- readErr
+				}
+				return
+			}
+		}
+	}
+	copies.Add(2)
+	go copyOutput(stdout, false, spillStdout)
+	go copyOutput(stderr, true, spillStderr)
+	go func() {
+		for {
+			input, recvErr := stream.Recv()
+			if errors.Is(recvErr, io.EOF) {
+				_ = stdin.Close()
+				return
+			}
+			if recvErr != nil {
+				_ = stdin.Close()
+				return
+			}
+			if chunk := input.GetStdinChunk(); len(chunk) > 0 {
+				if _, writeErr := stdin.Write(chunk); writeErr != nil {
+					_ = stdin.Close()
+					return
+				}
+			}
+		}
+	}()
+	waitErr := process.Command.Wait()
+	// Drain both pipes before sealing the spills and reporting the exit, so the
+	// spill validity and the final chunks are final when the caller sees them.
+	copies.Wait()
+	spillStdout.close()
+	spillStderr.close()
+	s.Processes.Remove(process.ID)
+	exit := int32(0)
+	signaled := false
+	signalName := ""
+	if waitErr != nil {
+		exit = 1
+		var exitErr *osexec.ExitError
+		if errors.As(waitErr, &exitErr) {
+			exit = int32(exitErr.ExitCode())
+			if waitStatus, ok := exitErr.Sys().(interface {
+				Signaled() bool
+				Signal() os.Signal
+			}); ok && waitStatus.Signaled() {
+				signaled = true
+				signalName = waitStatus.Signal().String()
+			}
+		}
+	}
+	if err := send(&guest.ExecOutput{Payload: &guest.ExecOutput_Exit{Exit: &guest.ExecExit{
+		ExitCode:         exit,
+		Signaled:         signaled,
+		Signal:           signalName,
+		StdoutSpillValid: spillStdout.valid(),
+		StderrSpillValid: spillStderr.valid(),
+	}}}); err != nil {
+		return err
+	}
+	slog.Info("guest agent Exec completed", "exit_code", exit, "signaled", signaled)
+	return nil
+}
+
+func (s *Server) Signal(_ context.Context, request *guest.SignalRequest) (*guest.SignalResponse, error) {
+	for _, process := range s.Processes.List() {
+		if process.ID != request.GetProcessId() {
+			continue
+		}
+		// Command.Process is nil until Command.Start succeeds, and Exec
+		// registers the process before starting it.
+		if process.Command == nil || process.Command.Process == nil {
+			return nil, status.Error(codes.FailedPrecondition, "process is not running")
+		}
+		signal, err := signalForName(request.GetSignal())
+		if err != nil {
+			return nil, status.Error(codes.InvalidArgument, err.Error())
+		}
+		if err := process.Command.Process.Signal(signal); err != nil {
+			return nil, status.Error(codes.Internal, err.Error())
+		}
+		return &guest.SignalResponse{}, nil
+	}
+	return nil, status.Error(codes.NotFound, "process not found")
+}
+
+// signals maps the names callers may use onto the signal actually delivered.
+// os.Interrupt is SIGINT, so SIGTERM must not be spelled with it: a process
+// that ignores SIGINT but honours SIGTERM would otherwise never stop.
+var signals = map[string]os.Signal{
+	"SIGHUP":  syscall.SIGHUP,
+	"SIGINT":  syscall.SIGINT,
+	"SIGQUIT": syscall.SIGQUIT,
+	"SIGKILL": syscall.SIGKILL,
+	"SIGTERM": syscall.SIGTERM,
+	"SIGUSR1": syscall.SIGUSR1,
+	"SIGUSR2": syscall.SIGUSR2,
+}
+
+// signalForName resolves a signal name. An empty name means SIGTERM, the
+// default for asking a process to stop; an unrecognised name is an error
+// rather than a silent substitution.
+func signalForName(name string) (os.Signal, error) {
+	if name == "" {
+		return syscall.SIGTERM, nil
+	}
+	signal, ok := signals[name]
+	if !ok {
+		return nil, fmt.Errorf("unknown signal %q", name)
+	}
+	return signal, nil
+}

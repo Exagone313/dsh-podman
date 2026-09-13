@@ -488,6 +488,79 @@ func (s *Server) recreateContainer(workspace state.Workspace, record *state.Cont
 	return s.Podman.RecreateWorkspace(podNameFor(workspace.WorkspaceSlug), record.PodmanName, imageTag, newToken, podmanMounts, secrets, envSecrets, env)
 }
 
+// validateSecretReferences checks that every secret named by a container's
+// environment bindings and secret mounts exists under the orchestrator prefix.
+// It runs before any mutation so a missing secret fails with NOT_FOUND instead
+// of surfacing podman's internal naming after the old container was removed.
+func (s *Server) validateSecretReferences(secretEnv map[string]string, mounts []state.Mount) error {
+	check := func(name string) error {
+		exists, err := s.Podman.SecretExists(s.SecretPrefix + name)
+		if err != nil {
+			return status.Error(codes.Internal, err.Error())
+		}
+		if !exists {
+			return status.Error(codes.NotFound, fmt.Sprintf("secret %q not found", name))
+		}
+		return nil
+	}
+	for _, name := range secretEnv {
+		if err := check(name); err != nil {
+			return err
+		}
+	}
+	for _, mount := range mounts {
+		if mount.Kind != "secret" {
+			continue
+		}
+		if err := check(mount.Secret); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// recreateOrRestore recreates a container and, when the recreate fails,
+// best-effort restores the pre-mutation snapshot so a failed mutation does not
+// leave the container gone. The store is untouched here; callers persist only
+// on success, and the original error is returned either way.
+func (s *Server) recreateOrRestore(workspace state.Workspace, record *state.Container, imageTag, token string, snapshot *state.Container) error {
+	err := s.recreateContainer(workspace, record, imageTag, token, record.Env)
+	if err == nil || snapshot == nil {
+		return err
+	}
+	s.restoreSnapshot(workspace, snapshot)
+	return err
+}
+
+// restoreSnapshot best-effort recreates a container from a pre-mutation
+// snapshot after a failed recreate, so a failed mutation does not leave the
+// container gone. Failures are logged, never returned.
+func (s *Server) restoreSnapshot(workspace state.Workspace, snapshot *state.Container) {
+	if snapshot == nil {
+		return
+	}
+	restore := *snapshot
+	restoreTag, err := s.resolveImageTag(restore.ImageID)
+	if err != nil {
+		s.log().Warn("cannot resolve the image for a container restore", "workspace_slug", workspace.WorkspaceSlug, "container", restore.Name, "error", err)
+		return
+	}
+	if err := s.recreateContainer(workspace, &restore, restoreTag, restore.AgentToken, restore.Env); err != nil {
+		s.log().Warn("failed to restore container after failed recreate", "workspace_slug", workspace.WorkspaceSlug, "container", restore.Name, "error", err)
+	}
+}
+
+// snapshotContainer deep-copies the fields a recreate mutation touches, so a
+// rollback restores the pre-mutation values even when a map is mutated in
+// place.
+func snapshotContainer(record state.Container) state.Container {
+	snapshot := record
+	snapshot.Mounts = append([]state.Mount(nil), record.Mounts...)
+	snapshot.Env = cloneMap(record.Env)
+	snapshot.SecretEnv = cloneMap(record.SecretEnv)
+	return snapshot
+}
+
 // StopAllContainerDaemons gracefully stops daemons in every container, in
 // parallel, honoring ctx (the caller supplies an overall deadline).
 func (s *Server) StopAllContainerDaemons(ctx context.Context) {
@@ -527,6 +600,7 @@ func (s *Server) RecreateContainer(ctx context.Context, request *ctl.RecreateCon
 		s.log().Warn("control request failed", "method", "RecreateContainer", "workspace_slug", request.GetWorkspaceSlug(), "container", container, "reason", "container not found")
 		return nil, status.Error(codes.NotFound, "container not found")
 	}
+	snapshot := snapshotContainer(*record)
 	if err := validateEnv(request.GetEnv()); err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
@@ -549,6 +623,10 @@ func (s *Server) RecreateContainer(ctx context.Context, request *ctl.RecreateCon
 		s.log().Error("RecreateContainer project validation failed", "workspace_slug", workspace.WorkspaceSlug, "error", err)
 		return nil, err
 	}
+	if _, err := s.podmanSecrets(record.Mounts); err != nil {
+		s.log().Error("RecreateContainer secret validation failed", "workspace_slug", workspace.WorkspaceSlug, "error", err)
+		return nil, err
+	}
 	imageID := request.GetImageId()
 	if imageID == "" {
 		imageID = record.ImageID
@@ -560,11 +638,14 @@ func (s *Server) RecreateContainer(ctx context.Context, request *ctl.RecreateCon
 	if s.Podman == nil {
 		return nil, status.Error(codes.FailedPrecondition, "podman is not configured")
 	}
+	if err := s.validateSecretReferences(record.SecretEnv, record.Mounts); err != nil {
+		return nil, err
+	}
 	secret, err := s.ensureAgentToken(record)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	if err := s.recreateContainer(workspace, record, imageTag, secret, record.Env); err != nil {
+	if err := s.recreateOrRestore(workspace, record, imageTag, secret, &snapshot); err != nil {
 		s.log().Error("control request failed", "method", "RecreateContainer", "workspace_slug", request.GetWorkspaceSlug(), "container", container, "error", err)
 		return nil, status.Error(codes.Internal, err.Error())
 	}
@@ -643,7 +724,13 @@ func (s *Server) StartContainer(ctx context.Context, request *ctl.StartContainer
 	if s.Podman == nil {
 		return nil, status.Error(codes.FailedPrecondition, "podman is not configured")
 	}
+	if err := s.validateSecretReferences(record.SecretEnv, recordMounts); err != nil {
+		return nil, err
+	}
+	var existingSnapshot *state.Container
 	if existing, ok := containerByLogical(&workspace, request.GetContainer()); ok {
+		snapshot := snapshotContainer(*existing)
+		existingSnapshot = &snapshot
 		s.stopContainerDaemons(context.Background(), *existing)
 		record.AgentToken = existing.AgentToken
 		if err := s.Podman.Stop(existing.PodmanName); err != nil {
@@ -676,10 +763,12 @@ func (s *Server) StartContainer(ctx context.Context, request *ctl.StartContainer
 	}
 	if err := s.Podman.CreateWorkspace(podNameFor(workspace.WorkspaceSlug), record.PodmanName, imageTag, secret, podmanMounts, secrets, envSecrets, record.Env); err != nil {
 		// A failed create may have left a container behind; remove it so a retry
-		// is not blocked by a stale name.
+		// is not blocked by a stale name, then restore the container this call
+		// replaced (when there was one).
 		if removeErr := s.Podman.Remove(record.PodmanName); removeErr != nil {
 			s.log().Warn("StartContainer cleanup after create failure failed", "workspace_slug", workspace.WorkspaceSlug, "container", request.GetContainer(), "error", removeErr)
 		}
+		s.restoreSnapshot(workspace, existingSnapshot)
 		s.log().Error("control request failed", "method", "StartContainer", "workspace_slug", request.GetWorkspaceSlug(), "container", request.GetContainer(), "error", err)
 		return nil, status.Error(codes.Internal, err.Error())
 	}
@@ -709,6 +798,7 @@ func (s *Server) AddContainerMount(ctx context.Context, request *ctl.AddContaine
 		s.log().Warn("control request failed", "method", "AddContainerMount", "workspace_slug", request.GetWorkspaceSlug(), "container", request.GetContainer(), "reason", "container not found")
 		return nil, status.Error(codes.NotFound, "container not found")
 	}
+	snapshot := snapshotContainer(*record)
 	kind, err := mountKindFromProto(request.GetKind())
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid mount kind")
@@ -774,6 +864,9 @@ func (s *Server) AddContainerMount(ctx context.Context, request *ctl.AddContaine
 	if s.Podman == nil {
 		return nil, status.Error(codes.FailedPrecondition, "podman is not configured")
 	}
+	if err := s.validateSecretReferences(nil, record.Mounts); err != nil {
+		return nil, err
+	}
 	imageTag, err := s.resolveImageTag(record.ImageID)
 	if err != nil {
 		return nil, err
@@ -782,7 +875,7 @@ func (s *Server) AddContainerMount(ctx context.Context, request *ctl.AddContaine
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	if err := s.recreateContainer(workspace, record, imageTag, secret, record.Env); err != nil {
+	if err := s.recreateOrRestore(workspace, record, imageTag, secret, &snapshot); err != nil {
 		s.log().Error("control request failed", "method", "AddContainerMount", "workspace_slug", request.GetWorkspaceSlug(), "container", request.GetContainer(), "error", err)
 		return nil, status.Error(codes.Internal, err.Error())
 	}
@@ -810,6 +903,7 @@ func (s *Server) RemoveContainerMount(ctx context.Context, request *ctl.RemoveCo
 		s.log().Warn("control request failed", "method", "RemoveContainerMount", "workspace_slug", request.GetWorkspaceSlug(), "container", request.GetContainer(), "reason", "container not found")
 		return nil, status.Error(codes.NotFound, "container not found")
 	}
+	snapshot := snapshotContainer(*record)
 	kind, err := mountKindFromProto(request.GetKind())
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid mount kind")
@@ -860,6 +954,9 @@ func (s *Server) RemoveContainerMount(ctx context.Context, request *ctl.RemoveCo
 	if s.Podman == nil {
 		return nil, status.Error(codes.FailedPrecondition, "podman is not configured")
 	}
+	if err := s.validateSecretReferences(record.SecretEnv, record.Mounts); err != nil {
+		return nil, err
+	}
 	imageTag, err := s.resolveImageTag(record.ImageID)
 	if err != nil {
 		return nil, err
@@ -868,7 +965,7 @@ func (s *Server) RemoveContainerMount(ctx context.Context, request *ctl.RemoveCo
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	if err := s.recreateContainer(workspace, record, imageTag, secret, record.Env); err != nil {
+	if err := s.recreateOrRestore(workspace, record, imageTag, secret, &snapshot); err != nil {
 		s.log().Error("control request failed", "method", "RemoveContainerMount", "workspace_slug", request.GetWorkspaceSlug(), "container", request.GetContainer(), "error", err)
 		return nil, status.Error(codes.Internal, err.Error())
 	}
@@ -989,6 +1086,9 @@ func (s *Server) CreateWorkspace(ctx context.Context, request *ctl.CreateWorkspa
 	envSecrets := s.containerEnvSecrets(userSecretEnv)
 	if s.Podman == nil {
 		return nil, status.Error(codes.FailedPrecondition, "podman is not configured")
+	}
+	if err := s.validateSecretReferences(userSecretEnv, defaultMounts); err != nil {
+		return nil, err
 	}
 	exists, imageErr := s.Podman.ImageExists(imageTag)
 	if imageErr != nil {
@@ -2489,17 +2589,27 @@ func (s *Server) AddContainerSecret(ctx context.Context, request *ctl.AddContain
 		s.log().Warn("control request failed", "method", "AddContainerSecret", "workspace_slug", request.GetWorkspaceSlug(), "container", container, "reason", "container not found")
 		return nil, status.Error(codes.NotFound, "container not found")
 	}
+	snapshot := snapshotContainer(*record)
 	if err := validateEnvKey(request.GetEnv()); err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 	if !secretName.MatchString(request.GetSecret()) {
 		return nil, status.Error(codes.InvalidArgument, "invalid secret name")
 	}
-	if record.SecretEnv == nil {
-		record.SecretEnv = map[string]string{}
-	}
 	if _, exists := record.SecretEnv[request.GetEnv()]; exists {
 		return nil, status.Error(codes.AlreadyExists, "secret already set on this env var")
+	}
+	if s.Podman == nil {
+		return nil, status.Error(codes.FailedPrecondition, "podman is not configured")
+	}
+	// Validate the new reference before mutating so a missing secret fails with
+	// NOT_FOUND instead of surfacing podman's internal naming after the old
+	// container was already removed.
+	if err := s.validateSecretReferences(map[string]string{request.GetEnv(): request.GetSecret()}, record.Mounts); err != nil {
+		return nil, err
+	}
+	if record.SecretEnv == nil {
+		record.SecretEnv = map[string]string{}
 	}
 	record.SecretEnv[request.GetEnv()] = request.GetSecret()
 	if _, err := s.podmanMounts(record.Mounts); err != nil {
@@ -2509,9 +2619,6 @@ func (s *Server) AddContainerSecret(ctx context.Context, request *ctl.AddContain
 		return nil, err
 	}
 	s.containerEnvSecrets(record.SecretEnv)
-	if s.Podman == nil {
-		return nil, status.Error(codes.FailedPrecondition, "podman is not configured")
-	}
 	imageTag, err := s.resolveImageTag(record.ImageID)
 	if err != nil {
 		return nil, err
@@ -2520,7 +2627,7 @@ func (s *Server) AddContainerSecret(ctx context.Context, request *ctl.AddContain
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	if err := s.recreateContainer(workspace, record, imageTag, secretToken, record.Env); err != nil {
+	if err := s.recreateOrRestore(workspace, record, imageTag, secretToken, &snapshot); err != nil {
 		s.log().Error("control request failed", "method", "AddContainerSecret", "workspace_slug", request.GetWorkspaceSlug(), "container", container, "error", err)
 		return nil, status.Error(codes.Internal, err.Error())
 	}
@@ -2554,6 +2661,7 @@ func (s *Server) RemoveContainerSecret(ctx context.Context, request *ctl.RemoveC
 		s.log().Warn("control request failed", "method", "RemoveContainerSecret", "workspace_slug", request.GetWorkspaceSlug(), "container", container, "reason", "container not found")
 		return nil, status.Error(codes.NotFound, "container not found")
 	}
+	snapshot := snapshotContainer(*record)
 	if err := validateEnvKey(request.GetEnv()); err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
@@ -2579,7 +2687,7 @@ func (s *Server) RemoveContainerSecret(ctx context.Context, request *ctl.RemoveC
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	if err := s.recreateContainer(workspace, record, imageTag, secretToken, record.Env); err != nil {
+	if err := s.recreateOrRestore(workspace, record, imageTag, secretToken, &snapshot); err != nil {
 		s.log().Error("control request failed", "method", "RemoveContainerSecret", "workspace_slug", request.GetWorkspaceSlug(), "container", container, "error", err)
 		return nil, status.Error(codes.Internal, err.Error())
 	}

@@ -644,15 +644,18 @@ func TestStartContainerAcceptsDefault(t *testing.T) {
 // fakePodman is a podmanAPI double for lifecycle tests. It records removals and
 // creations and serves canned existence/run state.
 type fakePodman struct {
-	exists    map[string]bool
-	running   map[string]bool
-	removed   []string
-	created   []string
-	createErr error
+	exists        map[string]bool
+	running       map[string]bool
+	secretMissing map[string]bool
+	removed       []string
+	created       []string
+	recreated     []string
+	createErr     error
+	recreateFails int
 }
 
 func newFakePodman() *fakePodman {
-	return &fakePodman{exists: map[string]bool{}, running: map[string]bool{}}
+	return &fakePodman{exists: map[string]bool{}, running: map[string]bool{}, secretMissing: map[string]bool{}}
 }
 
 func (f *fakePodman) ContainerExists(name string) (bool, error)  { return f.exists[name], nil }
@@ -669,6 +672,11 @@ func (f *fakePodman) CreateWorkspace(_pod, name, _image, _token string, _mounts 
 }
 
 func (f *fakePodman) RecreateWorkspace(pod, name, image, token string, mounts []specs.Mount, secrets []specgen.Secret, envSecrets map[string]string, env map[string]string) error {
+	f.recreated = append(f.recreated, name)
+	if f.recreateFails > 0 {
+		f.recreateFails--
+		return errors.New("recreate failed")
+	}
 	return f.CreateWorkspace(pod, name, image, token, mounts, secrets, envSecrets, env)
 }
 
@@ -688,7 +696,9 @@ func (f *fakePodman) VolumeExists(string) (bool, error) { return false, nil }
 func (f *fakePodman) VolumeCreate(string) error         { return nil }
 func (f *fakePodman) VolumeList() ([]string, error)     { return nil, nil }
 func (f *fakePodman) VolumeRemove(string) error         { return nil }
-func (f *fakePodman) SecretExists(string) (bool, error) { return true, nil }
+func (f *fakePodman) SecretExists(name string) (bool, error) {
+	return !f.secretMissing[name], nil
+}
 func (f *fakePodman) SecretCreate(string, string) error { return nil }
 func (f *fakePodman) SecretList() ([]string, error)     { return nil, nil }
 func (f *fakePodman) SecretRemove(string) error         { return nil }
@@ -2547,6 +2557,76 @@ func TestAddContainerSecretRejectsReservedEnv(t *testing.T) {
 	_, err = server.AddContainerSecret(context.Background(), &ctl.AddContainerSecretRequest{WorkspaceSlug: "proj", Container: "dev", Env: "BAR", Secret: "-bad"})
 	if status.Code(err) != codes.InvalidArgument {
 		t.Fatalf("invalid secret name: expected InvalidArgument, got %v", err)
+	}
+}
+
+func TestAddContainerSecretRejectsUnknownSecret(t *testing.T) {
+	store := newTestStore(t)
+	if err := store.SaveWorkspaces([]state.Workspace{{
+		WorkspaceSlug: "proj",
+		Containers: []state.Container{
+			{Name: "default", PodmanName: "dsh-workspace-proj", ImageID: "arch", Status: "running", SecretEnv: map[string]string{"FOO": "known"}},
+		},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.SaveImages([]state.Image{{ImageID: "arch", ImageTag: "localhost/dsh-podman/arch:latest"}}); err != nil {
+		t.Fatal(err)
+	}
+	fake := newFakePodman()
+	fake.secretMissing["dsh-podman-nope"] = true
+	server := &Server{Store: store, Podman: fake, SecretPrefix: "dsh-podman-", Logger: silentLogger()}
+	_, err := server.AddContainerSecret(context.Background(), &ctl.AddContainerSecretRequest{WorkspaceSlug: "proj", Container: "default", Env: "BAR", Secret: "nope"})
+	if status.Code(err) != codes.NotFound {
+		t.Fatalf("expected NotFound, got %v", err)
+	}
+	if len(fake.recreated) != 0 {
+		t.Fatalf("a rejected secret must not recreate the container: %v", fake.recreated)
+	}
+	stored, err := store.Workspaces()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := stored[0].Containers[0].SecretEnv; len(got) != 1 || got["FOO"] != "known" {
+		t.Fatalf("existing bindings changed: %#v", got)
+	}
+}
+
+func TestAddContainerMountRestoresOnFailedRecreate(t *testing.T) {
+	store := newTestStore(t)
+	if err := store.SaveWorkspaces([]state.Workspace{{
+		WorkspaceSlug: "proj",
+		Containers: []state.Container{
+			{Name: "dev", PodmanName: "dsh-workspace-proj-dev", ImageID: "arch", Status: "running"},
+		},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.SaveImages([]state.Image{{ImageID: "arch", ImageTag: "localhost/dsh-podman/arch:latest"}}); err != nil {
+		t.Fatal(err)
+	}
+	fake := newFakePodman()
+	fake.exists["dsh-workspace-proj-dev"] = true
+	fake.recreateFails = 1
+	server := &Server{Store: store, Podman: fake, Logger: silentLogger()}
+	_, err := server.AddContainerMount(context.Background(), &ctl.AddContainerMountRequest{
+		WorkspaceSlug: "proj", Container: "dev", Kind: ctl.MountKind_MOUNT_KIND_TMPFS, Destination: "/mnt/data", Mode: ctl.MountMode_MOUNT_MODE_READ_WRITE,
+	})
+	if status.Code(err) != codes.Internal {
+		t.Fatalf("expected Internal, got %v", err)
+	}
+	if len(fake.recreated) != 2 {
+		t.Fatalf("expected the failed recreate and a restore, got %v", fake.recreated)
+	}
+	if !fake.exists["dsh-workspace-proj-dev"] {
+		t.Fatalf("the replaced container was not restored")
+	}
+	stored, err := store.Workspaces()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(stored[0].Containers[0].Mounts) != 0 {
+		t.Fatalf("the failed mutation must not be persisted: %#v", stored[0].Containers[0].Mounts)
 	}
 }
 

@@ -921,6 +921,85 @@ func TestContainerNotFoundNamesTheContainer(t *testing.T) {
 	}
 }
 
+func TestMountLabel(t *testing.T) {
+	cases := []struct {
+		mount state.Mount
+		want  string
+	}{
+		{state.Mount{Kind: "tmpfs", Destination: "/scratch"}, `tmpfs at "/scratch"`},
+		{state.Mount{Kind: "volume", Volume: "data", Destination: "/data"}, `volume "data" at "/data"`},
+		{state.Mount{Kind: "secret", Secret: "tls", Destination: "/run/secrets/tls"}, `secret "tls" at "/run/secrets/tls"`},
+		{state.Mount{ProjectName: "team", Path: "src"}, `project "team" path "src"`},
+		{state.Mount{ProjectName: "team"}, `project "team"`},
+	}
+	for _, tc := range cases {
+		if got := mountLabel(tc.mount); got != tc.want {
+			t.Errorf("mountLabel(%#v) = %q, want %q", tc.mount, got, tc.want)
+		}
+	}
+}
+
+func TestLifecycleErrorsNameTheirResource(t *testing.T) {
+	store := newTestStore(t)
+	if err := store.SaveWorkspaces([]state.Workspace{{WorkspaceSlug: "proj"}}); err != nil {
+		t.Fatal(err)
+	}
+	fake := newFakePodman()
+	fake.secretMissing["dsh-podman-nope"] = true
+	server := &Server{Store: store, Podman: fake, SecretPrefix: "dsh-podman-", VolumePrefix: "dsh-podman-", Logger: silentLogger()}
+	cases := []struct {
+		name string
+		call func() error
+		want string
+	}{
+		{"RemoveVolume", func() error {
+			_, err := server.RemoveVolume(context.Background(), &ctl.RemoveVolumeRequest{Name: "nope"})
+			return err
+		}, `volume "nope" not found`},
+		{"RemoveSecret", func() error {
+			_, err := server.RemoveSecret(context.Background(), &ctl.RemoveSecretRequest{Name: "nope"})
+			return err
+		}, `secret "nope" not found`},
+		{"CreateVolumeInvalidName", func() error {
+			_, err := server.CreateVolume(context.Background(), &ctl.CreateVolumeRequest{Name: "bad name"})
+			return err
+		}, `invalid volume name "bad name"`},
+		{"CreateSecretInvalidName", func() error {
+			_, err := server.CreateSecret(context.Background(), &ctl.CreateSecretRequest{Name: "bad name"})
+			return err
+		}, `invalid secret name "bad name"`},
+		{"GetImage", func() error {
+			_, err := server.GetImage(context.Background(), &ctl.GetImageRequest{ImageId: "nope"})
+			return err
+		}, `image "nope" not found`},
+		{"ResolveImageTag", func() error {
+			_, err := server.resolveImageTag("nope")
+			return err
+		}, `image "nope" not found`},
+		{"WorkspaceBySlug", func() error {
+			_, err := workspaceBySlug(store, "nope")
+			return err
+		}, `workspace "nope" not found`},
+		{"MountKindFromProto", func() error {
+			_, err := mountKindFromProto(ctl.MountKind(99))
+			return err
+		}, `invalid mount kind "99"`},
+		{"MountModeFromProto", func() error {
+			_, err := mountModeFromProto(ctl.MountMode(99))
+			return err
+		}, `invalid mount mode "99"`},
+		{"NonProjectDestination", func() error {
+			return server.nonProjectDestination("relative/path")
+		}, `invalid mount destination "relative/path"`},
+	}
+	for _, tc := range cases {
+		err := tc.call()
+		if err == nil || !strings.Contains(err.Error(), tc.want) {
+			t.Errorf("%s: error = %v, want containing %q", tc.name, err, tc.want)
+		}
+	}
+}
+
 func TestGetImageMissing(t *testing.T) {
 	server := &Server{Store: newTestStore(t), Logger: silentLogger()}
 	_, err := server.GetImage(context.Background(), &ctl.GetImageRequest{ImageId: "nope"})

@@ -7,7 +7,6 @@ package grpcserver
 import (
 	"context"
 	"crypto/rand"
-	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -130,8 +129,32 @@ func containerNotFoundError(container, slug string) error {
 	return status.Error(codes.NotFound, fmt.Sprintf("container %q not found in workspace %q", container, slug))
 }
 
+// mountLabel names a stored mount for error messages: a project mount by its
+// project and optional subpath, every other kind by its destination and (when
+// present) the volume or secret it draws from.
+func mountLabel(mount state.Mount) string {
+	at := ""
+	if mount.Destination != "" {
+		at = fmt.Sprintf(" at %q", mount.Destination)
+	}
+	switch mount.Kind {
+	case "", "project":
+		label := fmt.Sprintf("project %q", mount.ProjectName)
+		if mount.Path != "" {
+			label += fmt.Sprintf(" path %q", mount.Path)
+		}
+		return label
+	case "volume":
+		return fmt.Sprintf("volume %q%s", mount.Volume, at)
+	case "secret":
+		return fmt.Sprintf("secret %q%s", mount.Secret, at)
+	default:
+		return fmt.Sprintf("tmpfs%s", at)
+	}
+}
+
 // workspaceBySlug returns the stored workspace with the given slug, or an
-// error whose message is "workspace not found" when absent.
+// error naming the missing workspace when absent.
 func workspaceBySlug(store *state.Store, slug string) (state.Workspace, error) {
 	workspaces, err := store.Workspaces()
 	if err != nil {
@@ -142,7 +165,7 @@ func workspaceBySlug(store *state.Store, slug string) (state.Workspace, error) {
 			return workspace, nil
 		}
 	}
-	return state.Workspace{}, errors.New("workspace not found")
+	return state.Workspace{}, fmt.Errorf("workspace %q not found", slug)
 }
 
 // podmanAPI is the subset of the podman client the control plane drives. It is
@@ -235,7 +258,7 @@ func (s *Server) DescribeWorkspace(_ context.Context, request *ctl.DescribeWorks
 		if workspace.WorkspaceSlug == request.GetWorkspaceSlug() {
 			if !containerNamePattern.MatchString(workspace.ContainerName) {
 				s.log().Warn("DescribeWorkspace found invalid container name", "workspace_slug", workspace.WorkspaceSlug, "container_name", workspace.ContainerName)
-				return nil, status.Error(codes.NotFound, "workspace not found")
+				return nil, status.Error(codes.NotFound, fmt.Sprintf("workspace %q not found", request.GetWorkspaceSlug()))
 			}
 			if s.Podman != nil {
 				exists, containerErr := s.Podman.ContainerExists(workspace.ContainerName)
@@ -244,7 +267,7 @@ func (s *Server) DescribeWorkspace(_ context.Context, request *ctl.DescribeWorks
 				}
 				if !exists {
 					s.log().Warn("DescribeWorkspace found stale state", "workspace_slug", workspace.WorkspaceSlug, "container_name", workspace.ContainerName)
-					return nil, status.Error(codes.NotFound, "guest container not found")
+					return nil, status.Error(codes.NotFound, fmt.Sprintf("guest container %q not found", workspace.ContainerName))
 				}
 				running, runningErr := s.Podman.ContainerRunning(workspace.ContainerName)
 				if runningErr != nil {
@@ -267,7 +290,7 @@ func (s *Server) DescribeWorkspace(_ context.Context, request *ctl.DescribeWorks
 		}
 	}
 	s.log().Warn("control request failed", "method", "DescribeWorkspace", "workspace_slug", request.GetWorkspaceSlug(), "reason", "not found")
-	return nil, status.Error(codes.NotFound, "workspace not found")
+	return nil, status.Error(codes.NotFound, fmt.Sprintf("workspace %q not found", request.GetWorkspaceSlug()))
 }
 
 // recreateStoppedContainer recreates a workspace's stopped default container
@@ -277,7 +300,7 @@ func (s *Server) DescribeWorkspace(_ context.Context, request *ctl.DescribeWorks
 func (s *Server) recreateStoppedContainer(workspace state.Workspace) (state.Workspace, error) {
 	record, ok := containerByLogical(&workspace, "default")
 	if !ok {
-		return workspace, status.Error(codes.NotFound, "guest container not found")
+		return workspace, status.Error(codes.NotFound, fmt.Sprintf("guest container %q not found", workspace.ContainerName))
 	}
 	imageTag, err := s.resolveImageTag(record.ImageID)
 	if err != nil {
@@ -617,11 +640,11 @@ func (s *Server) RecreateContainer(ctx context.Context, request *ctl.RecreateCon
 		container = "default"
 	}
 	if container != "default" && !validContainerName(container) {
-		return nil, status.Error(codes.InvalidArgument, "invalid container name")
+		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("invalid container name %q", container))
 	}
 	workspace, err := workspaceBySlug(s.Store, request.GetWorkspaceSlug())
 	if err != nil {
-		return nil, status.Error(codes.NotFound, "workspace not found")
+		return nil, status.Error(codes.NotFound, err.Error())
 	}
 	record, ok := containerByLogical(&workspace, container)
 	if !ok {
@@ -696,11 +719,11 @@ func (s *Server) StartContainer(ctx context.Context, request *ctl.StartContainer
 		container = "default"
 	}
 	if container != "default" && !validContainerName(container) {
-		return nil, status.Error(codes.InvalidArgument, "invalid container name")
+		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("invalid container name %q", container))
 	}
 	workspace, err := workspaceBySlug(s.Store, request.GetWorkspaceSlug())
 	if err != nil {
-		return nil, status.Error(codes.NotFound, "workspace not found")
+		return nil, status.Error(codes.NotFound, err.Error())
 	}
 	imageID := request.GetImageId()
 	if imageID == "" {
@@ -819,7 +842,7 @@ func (s *Server) AddContainerMount(ctx context.Context, request *ctl.AddContaine
 	s.log().Info("control request", "method", "AddContainerMount", "workspace_slug", request.GetWorkspaceSlug(), "container", request.GetContainer(), "project", request.GetProject(), "path", request.GetPath(), "kind", request.GetKind(), "volume", request.GetVolume())
 	workspace, err := workspaceBySlug(s.Store, request.GetWorkspaceSlug())
 	if err != nil {
-		return nil, status.Error(codes.NotFound, "workspace not found")
+		return nil, status.Error(codes.NotFound, err.Error())
 	}
 	record, ok := containerByLogical(&workspace, request.GetContainer())
 	if !ok {
@@ -829,13 +852,13 @@ func (s *Server) AddContainerMount(ctx context.Context, request *ctl.AddContaine
 	snapshot := snapshotContainer(*record)
 	kind, err := mountKindFromProto(request.GetKind())
 	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, "invalid mount kind")
+		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 	// Secret mounts carry no mode; every other kind requires one.
 	mode := ""
 	if kind != "secret" {
 		if mode, err = mountModeFromProto(request.GetMode()); err != nil {
-			return nil, status.Error(codes.InvalidArgument, "invalid mount mode")
+			return nil, status.Error(codes.InvalidArgument, err.Error())
 		}
 	}
 	var newMount state.Mount
@@ -855,13 +878,13 @@ func (s *Server) AddContainerMount(ctx context.Context, request *ctl.AddContaine
 		newMount = state.Mount{Kind: "volume", Volume: request.GetVolume(), Destination: request.GetDestination(), Mode: mode}
 	case "secret":
 		if !secretName.MatchString(request.GetSecret()) {
-			return nil, status.Error(codes.InvalidArgument, "invalid secret name")
+			return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("invalid secret name %q", request.GetSecret()))
 		}
 		newMount = state.Mount{Kind: "secret", Secret: request.GetSecret(), Destination: request.GetDestination()}
 	default:
 		// Unreachable while mountKindFromProto is exhaustive, and kept so a
 		// new kind cannot silently append a zero-valued mount.
-		return nil, status.Error(codes.InvalidArgument, "invalid mount kind")
+		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("invalid mount kind %q", kind))
 	}
 	effective := containerMounts(workspace, *record)
 	for _, existing := range effective {
@@ -877,7 +900,7 @@ func (s *Server) AddContainerMount(ctx context.Context, request *ctl.AddContaine
 			duplicate = existing.Kind == "secret" && existing.Destination == newMount.Destination
 		}
 		if duplicate {
-			return nil, status.Error(codes.AlreadyExists, "mount already exists")
+			return nil, status.Error(codes.AlreadyExists, fmt.Sprintf("mount already exists: %s", mountLabel(newMount)))
 		}
 	}
 	record.Mounts = append(append([]state.Mount(nil), effective...), newMount)
@@ -924,7 +947,7 @@ func (s *Server) RemoveContainerMount(ctx context.Context, request *ctl.RemoveCo
 	s.log().Info("control request", "method", "RemoveContainerMount", "workspace_slug", request.GetWorkspaceSlug(), "container", request.GetContainer(), "project", request.GetProject(), "path", request.GetPath(), "kind", request.GetKind(), "volume", request.GetVolume())
 	workspace, err := workspaceBySlug(s.Store, request.GetWorkspaceSlug())
 	if err != nil {
-		return nil, status.Error(codes.NotFound, "workspace not found")
+		return nil, status.Error(codes.NotFound, err.Error())
 	}
 	record, ok := containerByLogical(&workspace, request.GetContainer())
 	if !ok {
@@ -934,10 +957,10 @@ func (s *Server) RemoveContainerMount(ctx context.Context, request *ctl.RemoveCo
 	snapshot := snapshotContainer(*record)
 	kind, err := mountKindFromProto(request.GetKind())
 	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, "invalid mount kind")
+		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 	if !knownMountKind(kind) {
-		return nil, status.Error(codes.InvalidArgument, "invalid mount kind")
+		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("invalid mount kind %q", kind))
 	}
 	effective := containerMounts(workspace, *record)
 	index := -1
@@ -970,7 +993,7 @@ func (s *Server) RemoveContainerMount(ctx context.Context, request *ctl.RemoveCo
 	}
 	if index < 0 {
 		s.log().Warn("control request failed", "method", "RemoveContainerMount", "workspace_slug", request.GetWorkspaceSlug(), "container", request.GetContainer(), "reason", "mount not found")
-		return nil, status.Error(codes.NotFound, "mount not found")
+		return nil, status.Error(codes.NotFound, fmt.Sprintf("mount not found: %s", mountLabel(state.Mount{Kind: kind, ProjectName: request.GetProject(), Path: request.GetPath(), Volume: request.GetVolume(), Secret: request.GetSecret(), Destination: request.GetDestination()})))
 	}
 	if record.Name == "default" && isWorkspaceProjectMount(workspace, effective[index]) {
 		return nil, status.Error(codes.FailedPrecondition, "the default container keeps the workspace project mount")
@@ -1060,14 +1083,14 @@ func syncDefaultFields(ws *state.Workspace) {
 func (s *Server) CreateWorkspace(ctx context.Context, request *ctl.CreateWorkspaceRequest) (*ctl.Workspace, error) {
 	s.log().Info("control request", "method", "CreateWorkspace", "workspace_slug", request.GetWorkspaceSlug(), "image_id", request.GetImageId(), "mount_count", len(request.GetMounts()))
 	if !validWorkspaceSlug(request.GetWorkspaceSlug()) {
-		return nil, status.Error(codes.InvalidArgument, "invalid workspace slug")
+		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("invalid workspace slug %q", request.GetWorkspaceSlug()))
 	}
 	projectName := request.GetProjectName()
 	if projectName == "" {
 		return nil, status.Error(codes.InvalidArgument, "project name is required")
 	}
 	if !validProjectName(projectName) {
-		return nil, status.Error(codes.InvalidArgument, "invalid project name")
+		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("invalid project name %q", projectName))
 	}
 	imageID := request.GetImageId()
 	if imageID == "" {
@@ -1129,7 +1152,7 @@ func (s *Server) CreateWorkspace(ctx context.Context, request *ctl.CreateWorkspa
 	}
 	if !exists {
 		s.log().Warn("CreateWorkspace image state is stale", "image_id", imageID, "image_tag", imageTag)
-		return nil, status.Error(codes.NotFound, "built image not found")
+		return nil, status.Error(codes.NotFound, fmt.Sprintf("image %q not found", imageID))
 	}
 	name := "dsh-workspace-" + request.GetWorkspaceSlug()
 	if err := s.Podman.CreateWorkspace(podNameFor(request.GetWorkspaceSlug()), name, imageTag, secret, podmanMounts, secrets, envSecrets, userEnv); err != nil {
@@ -1172,10 +1195,10 @@ func (s *Server) BuildImage(_ context.Context, request *ctl.BuildImageRequest) (
 	s.log().Info("control request", "method", "BuildImage", "image_id", request.GetImageId(), "parent", request.GetParent(), "package_count", len(request.GetPackages()))
 	imageID := request.GetImageId()
 	if !shortImageName(imageID) {
-		return nil, status.Error(codes.InvalidArgument, "invalid image id")
+		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("invalid image id %q", imageID))
 	}
 	if _, ok := imagebuild.BaseImageByID(imageID); ok {
-		return nil, status.Error(codes.InvalidArgument, "image id is a reserved base image name")
+		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("image id %q is a reserved base image name", imageID))
 	}
 	if s.ImageBuilder == nil {
 		return nil, status.Error(codes.FailedPrecondition, "image builder is not configured")
@@ -1267,7 +1290,7 @@ func (s *Server) RebuildBaseImage(_ context.Context, request *ctl.RebuildBaseIma
 	s.log().Info("control request", "method", "RebuildBaseImage", "name", request.GetName())
 	base, ok := imagebuild.BaseImageByID(request.GetName())
 	if !ok {
-		return nil, status.Error(codes.NotFound, "base image not found")
+		return nil, status.Error(codes.NotFound, fmt.Sprintf("base image %q not found", request.GetName()))
 	}
 	if s.baseImagesPublic() {
 		return nil, status.Error(codes.InvalidArgument, "base images are pulled, not built, in this mode")
@@ -1291,7 +1314,7 @@ func (s *Server) PullBaseImage(_ context.Context, request *ctl.PullBaseImageRequ
 	s.log().Info("control request", "method", "PullBaseImage", "name", request.GetName())
 	base, ok := imagebuild.BaseImageByID(request.GetName())
 	if !ok {
-		return nil, status.Error(codes.NotFound, "base image not found")
+		return nil, status.Error(codes.NotFound, fmt.Sprintf("base image %q not found", request.GetName()))
 	}
 	if !s.baseImagesPublic() {
 		return nil, status.Error(codes.InvalidArgument, "base images are built, not pulled, in this mode")
@@ -1581,7 +1604,7 @@ func (s *Server) baseImagesPublic() bool {
 // or "pulled" (public mode) when the image is present, else "missing".
 func (s *Server) baseStatus(short string) (string, error) {
 	if _, ok := imagebuild.BaseImageByID(short); !ok {
-		return "", status.Error(codes.NotFound, "base image not found")
+		return "", status.Error(codes.NotFound, fmt.Sprintf("base image %q not found", short))
 	}
 	if s.Podman == nil {
 		return "", status.Error(codes.FailedPrecondition, "podman is not configured")
@@ -1605,7 +1628,7 @@ func (s *Server) baseStatus(short string) (string, error) {
 func (s *Server) ensureBase(short string) (*imagebuild.BaseImage, string, error) {
 	base, ok := imagebuild.BaseImageByID(short)
 	if !ok {
-		return nil, "", status.Error(codes.NotFound, "base image not found")
+		return nil, "", status.Error(codes.NotFound, fmt.Sprintf("base image %q not found", short))
 	}
 	if s.Podman == nil {
 		return nil, "", status.Error(codes.FailedPrecondition, "podman is not configured")
@@ -1664,7 +1687,7 @@ func (s *Server) resolveImage(short string) (resolvedImage, error) {
 			return resolvedImage{ImageID: image.ImageID, IsBase: false, PackageManager: image.PackageManager, ImageTag: image.ImageTag, Parent: image.Parent, Packages: image.Packages, BuiltAt: image.BuiltAt, Status: "built"}, nil
 		}
 	}
-	return resolvedImage{}, status.Error(codes.NotFound, "image not found")
+	return resolvedImage{}, status.Error(codes.NotFound, fmt.Sprintf("image %q not found", short))
 }
 
 // resolveImageTag returns the fully-qualified tag for a short image
@@ -1687,7 +1710,7 @@ func (s *Server) resolveImageTag(short string) (string, error) {
 			return image.ImageTag, nil
 		}
 	}
-	return "", status.Error(codes.NotFound, "built image not found")
+	return "", status.Error(codes.NotFound, fmt.Sprintf("image %q not found", short))
 }
 
 // resolveParent resolves a short parent reference to its fully-qualified tag
@@ -1934,7 +1957,7 @@ func mountKindFromProto(kind ctl.MountKind) (string, error) {
 	case ctl.MountKind_MOUNT_KIND_SECRET:
 		return "secret", nil
 	default:
-		return "", fmt.Errorf("invalid mount kind")
+		return "", fmt.Errorf("invalid mount kind %q", kind.String())
 	}
 }
 
@@ -1971,7 +1994,7 @@ func mountModeFromProto(mode ctl.MountMode) (string, error) {
 	case ctl.MountMode_MOUNT_MODE_READ_ONLY:
 		return "read_only", nil
 	default:
-		return "", fmt.Errorf("invalid mount mode")
+		return "", fmt.Errorf("invalid mount mode %q", mode.String())
 	}
 }
 
@@ -2077,11 +2100,11 @@ func pathsOverlap(a, b string) bool {
 // destination such as "/" would hide every reserved path beneath it.
 func (s *Server) nonProjectDestination(dest string) error {
 	if !filepath.IsAbs(dest) {
-		return fmt.Errorf("invalid mount destination")
+		return fmt.Errorf("invalid mount destination %q", dest)
 	}
 	cleaned := filepath.Clean(dest)
 	if cleaned != dest {
-		return fmt.Errorf("invalid mount destination")
+		return fmt.Errorf("invalid mount destination %q", dest)
 	}
 	for _, reserved := range s.reservedDestinations() {
 		if reserved == "" {
@@ -2115,10 +2138,10 @@ func (s *Server) nonProjectDestination(dest string) error {
 // while podman takes a path rather than a file descriptor.
 func resolveMount(projectsRoot, hostProjectsRoot string, mount state.Mount) (hostPath, destination string, err error) {
 	if !validProjectName(mount.ProjectName) {
-		return "", "", fmt.Errorf("invalid project name")
+		return "", "", fmt.Errorf("invalid project name %q", mount.ProjectName)
 	}
 	if !validMountSubpath(mount.Path) {
-		return "", "", fmt.Errorf("invalid mount path")
+		return "", "", fmt.Errorf("invalid mount path %q", mount.Path)
 	}
 	subpath := filepath.FromSlash(mount.Path)
 	resolvedRoot, resolved, err := resolveDirUnderRoot(projectsRoot, filepath.Join(filepath.FromSlash(mount.ProjectName), subpath))
@@ -2173,7 +2196,7 @@ func (s *Server) podmanMounts(mounts []state.Mount) ([]specs.Mount, error) {
 			podmanMounts = append(podmanMounts, specs.Mount{Type: "tmpfs", Destination: mount.Destination, Options: []string{"rw"}})
 		case "volume":
 			if !volumeName.MatchString(mount.Volume) {
-				return nil, status.Error(codes.InvalidArgument, "invalid volume name")
+				return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("invalid volume name %q", mount.Volume))
 			}
 			if err := s.nonProjectDestination(mount.Destination); err != nil {
 				return nil, status.Error(codes.InvalidArgument, err.Error())
@@ -2188,7 +2211,7 @@ func (s *Server) podmanMounts(mounts []state.Mount) ([]specs.Mount, error) {
 			// not as OCI mounts.
 			continue
 		default:
-			return nil, status.Error(codes.InvalidArgument, "invalid mount kind")
+			return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("invalid mount kind %q", mount.Kind))
 		}
 	}
 	return podmanMounts, nil
@@ -2204,10 +2227,10 @@ func (s *Server) podmanSecrets(mounts []state.Mount) ([]specgen.Secret, error) {
 			continue
 		}
 		if !secretName.MatchString(mount.Secret) {
-			return nil, status.Error(codes.InvalidArgument, "invalid secret name")
+			return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("invalid secret name %q", mount.Secret))
 		}
 		if mount.Destination == "" {
-			return nil, status.Error(codes.InvalidArgument, "secret mount needs a destination")
+			return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("secret %q mount needs a destination", mount.Secret))
 		}
 		if err := s.nonProjectDestination(mount.Destination); err != nil {
 			return nil, status.Error(codes.InvalidArgument, err.Error())
@@ -2247,14 +2270,14 @@ func randomSecret(length int, charset string) (string, error) {
 		length = 32
 	}
 	if length < 1 || length > 1024 {
-		return "", fmt.Errorf("invalid secret length")
+		return "", fmt.Errorf("invalid secret length %d", length)
 	}
 	if charset == "" {
 		charset = "alphanumeric"
 	}
 	alphabet, ok := secretAlphabets[charset]
 	if !ok {
-		return "", fmt.Errorf("invalid secret charset")
+		return "", fmt.Errorf("invalid secret charset %q", charset)
 	}
 	result := make([]byte, length)
 	modulus := len(alphabet)
@@ -2290,11 +2313,11 @@ func (s *Server) RemoveContainer(_ context.Context, request *ctl.RemoveContainer
 		container = "default"
 	}
 	if container != "default" && !validContainerName(container) {
-		return nil, status.Error(codes.InvalidArgument, "invalid container name")
+		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("invalid container name %q", container))
 	}
 	workspace, err := workspaceBySlug(s.Store, request.GetWorkspaceSlug())
 	if err != nil {
-		return nil, status.Error(codes.NotFound, "workspace not found")
+		return nil, status.Error(codes.NotFound, err.Error())
 	}
 	record, ok := containerByLogical(&workspace, container)
 	if !ok {
@@ -2416,7 +2439,7 @@ func (s *Server) ListVolumes(_ context.Context, _ *ctl.ListVolumesRequest) (*ctl
 func (s *Server) CreateVolume(_ context.Context, request *ctl.CreateVolumeRequest) (*ctl.Volume, error) {
 	s.log().Info("control request", "method", "CreateVolume", "name", request.GetName())
 	if !volumeName.MatchString(request.GetName()) {
-		return nil, status.Error(codes.InvalidArgument, "invalid volume name")
+		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("invalid volume name %q", request.GetName()))
 	}
 	if s.Podman == nil {
 		return nil, status.Error(codes.FailedPrecondition, "podman is not configured")
@@ -2428,7 +2451,7 @@ func (s *Server) CreateVolume(_ context.Context, request *ctl.CreateVolumeReques
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 	if exists {
-		return nil, status.Error(codes.AlreadyExists, "volume already exists")
+		return nil, status.Error(codes.AlreadyExists, fmt.Sprintf("volume %q already exists", request.GetName()))
 	}
 	if err := s.Podman.VolumeCreate(full); err != nil {
 		s.log().Error("control request failed", "method", "CreateVolume", "name", request.GetName(), "error", err)
@@ -2442,7 +2465,7 @@ func (s *Server) CreateVolume(_ context.Context, request *ctl.CreateVolumeReques
 func (s *Server) RemoveVolume(_ context.Context, request *ctl.RemoveVolumeRequest) (*ctl.RemoveVolumeResponse, error) {
 	s.log().Info("control request", "method", "RemoveVolume", "name", request.GetName())
 	if !volumeName.MatchString(request.GetName()) {
-		return nil, status.Error(codes.InvalidArgument, "invalid volume name")
+		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("invalid volume name %q", request.GetName()))
 	}
 	workspaces, err := s.Store.Workspaces()
 	if err != nil {
@@ -2461,7 +2484,7 @@ func (s *Server) RemoveVolume(_ context.Context, request *ctl.RemoveVolumeReques
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 	if !exists {
-		return nil, status.Error(codes.NotFound, "volume not found")
+		return nil, status.Error(codes.NotFound, fmt.Sprintf("volume %q not found", request.GetName()))
 	}
 	if err := s.Podman.VolumeRemove(full); err != nil {
 		s.log().Error("control request failed", "method", "RemoveVolume", "name", request.GetName(), "error", err)
@@ -2500,15 +2523,15 @@ func (s *Server) ListSecrets(_ context.Context, _ *ctl.ListSecretsRequest) (*ctl
 func (s *Server) CreateSecret(_ context.Context, request *ctl.CreateSecretRequest) (*ctl.Secret, error) {
 	s.log().Info("control request", "method", "CreateSecret", "name", request.GetName(), "length", request.GetLength(), "charset", request.GetCharset())
 	if !secretName.MatchString(request.GetName()) {
-		return nil, status.Error(codes.InvalidArgument, "invalid secret name")
+		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("invalid secret name %q", request.GetName()))
 	}
 	if length := int(request.GetLength()); length != 0 && (length < 1 || length > 1024) {
-		return nil, status.Error(codes.InvalidArgument, "invalid secret length")
+		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("invalid secret length %d", length))
 	}
 	switch request.GetCharset() {
 	case "", "alphanumeric", "hex", "base64url":
 	default:
-		return nil, status.Error(codes.InvalidArgument, "invalid secret charset")
+		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("invalid secret charset %q", request.GetCharset()))
 	}
 	if s.Podman == nil {
 		return nil, status.Error(codes.FailedPrecondition, "podman is not configured")
@@ -2520,7 +2543,7 @@ func (s *Server) CreateSecret(_ context.Context, request *ctl.CreateSecretReques
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 	if exists {
-		return nil, status.Error(codes.AlreadyExists, "secret already exists")
+		return nil, status.Error(codes.AlreadyExists, fmt.Sprintf("secret %q already exists", request.GetName()))
 	}
 	value, err := randomSecret(int(request.GetLength()), request.GetCharset())
 	if err != nil {
@@ -2540,7 +2563,7 @@ func (s *Server) CreateSecret(_ context.Context, request *ctl.CreateSecretReques
 func (s *Server) WriteSecretValue(_ context.Context, request *ctl.WriteSecretValueRequest) (*ctl.Secret, error) {
 	s.log().Info("control request", "method", "WriteSecretValue", "name", request.GetName())
 	if !secretName.MatchString(request.GetName()) {
-		return nil, status.Error(codes.InvalidArgument, "invalid secret name")
+		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("invalid secret name %q", request.GetName()))
 	}
 	if request.GetValue() == "" || strings.ContainsRune(request.GetValue(), '\x00') {
 		return nil, status.Error(codes.InvalidArgument, "invalid secret value")
@@ -2572,7 +2595,7 @@ func (s *Server) WriteSecretValue(_ context.Context, request *ctl.WriteSecretVal
 func (s *Server) RemoveSecret(_ context.Context, request *ctl.RemoveSecretRequest) (*ctl.RemoveSecretResponse, error) {
 	s.log().Info("control request", "method", "RemoveSecret", "name", request.GetName())
 	if !secretName.MatchString(request.GetName()) {
-		return nil, status.Error(codes.InvalidArgument, "invalid secret name")
+		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("invalid secret name %q", request.GetName()))
 	}
 	workspaces, err := s.Store.Workspaces()
 	if err != nil {
@@ -2591,7 +2614,7 @@ func (s *Server) RemoveSecret(_ context.Context, request *ctl.RemoveSecretReques
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 	if !exists {
-		return nil, status.Error(codes.NotFound, "secret not found")
+		return nil, status.Error(codes.NotFound, fmt.Sprintf("secret %q not found", request.GetName()))
 	}
 	if err := s.Podman.SecretRemove(full); err != nil {
 		s.log().Error("control request failed", "method", "RemoveSecret", "name", request.GetName(), "error", err)
@@ -2611,11 +2634,11 @@ func (s *Server) AddContainerSecret(ctx context.Context, request *ctl.AddContain
 		container = "default"
 	}
 	if container != "default" && !validContainerName(container) {
-		return nil, status.Error(codes.InvalidArgument, "invalid container name")
+		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("invalid container name %q", container))
 	}
 	workspace, err := workspaceBySlug(s.Store, request.GetWorkspaceSlug())
 	if err != nil {
-		return nil, status.Error(codes.NotFound, "workspace not found")
+		return nil, status.Error(codes.NotFound, err.Error())
 	}
 	record, ok := containerByLogical(&workspace, container)
 	if !ok {
@@ -2627,10 +2650,10 @@ func (s *Server) AddContainerSecret(ctx context.Context, request *ctl.AddContain
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 	if !secretName.MatchString(request.GetSecret()) {
-		return nil, status.Error(codes.InvalidArgument, "invalid secret name")
+		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("invalid secret name %q", request.GetSecret()))
 	}
 	if _, exists := record.SecretEnv[request.GetEnv()]; exists {
-		return nil, status.Error(codes.AlreadyExists, "secret already set on this env var")
+		return nil, status.Error(codes.AlreadyExists, fmt.Sprintf("env var %q already has a secret", request.GetEnv()))
 	}
 	if s.Podman == nil {
 		return nil, status.Error(codes.FailedPrecondition, "podman is not configured")
@@ -2683,11 +2706,11 @@ func (s *Server) RemoveContainerSecret(ctx context.Context, request *ctl.RemoveC
 		container = "default"
 	}
 	if container != "default" && !validContainerName(container) {
-		return nil, status.Error(codes.InvalidArgument, "invalid container name")
+		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("invalid container name %q", container))
 	}
 	workspace, err := workspaceBySlug(s.Store, request.GetWorkspaceSlug())
 	if err != nil {
-		return nil, status.Error(codes.NotFound, "workspace not found")
+		return nil, status.Error(codes.NotFound, err.Error())
 	}
 	record, ok := containerByLogical(&workspace, container)
 	if !ok {
@@ -2755,7 +2778,7 @@ func toProto(workspace state.Workspace) *ctl.Workspace {
 // must resolve, through any symlinks, to a path confined to root.
 func ValidateProject(root, name string) (string, error) {
 	if !validProjectName(name) {
-		return "", fmt.Errorf("invalid project name")
+		return "", fmt.Errorf("invalid project name %q", name)
 	}
 	_, resolved, err := resolveDirUnderRoot(root, filepath.FromSlash(name))
 	if err != nil {

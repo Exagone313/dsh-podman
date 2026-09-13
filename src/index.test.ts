@@ -2664,7 +2664,9 @@ test("filesystem provider readByteRange returns the window and empty for zero le
 // A fake guest for the text/byte provider methods: a stat result, a one-chunk
 // readFile, and a no-op writeFile.
 function editGuest(stat: Record<string, unknown>, content = Buffer.alloc(0)) {
+  const writes: Buffer[] = [];
   return {
+    writes,
     guest: {
       stat: (_request: unknown, _metadata: unknown, callback: Function) =>
         callback(null, {
@@ -2682,8 +2684,14 @@ function editGuest(stat: Record<string, unknown>, content = Buffer.alloc(0)) {
         },
       }),
       writeFile: (_metadata: unknown, _options: unknown, callback: Function) => {
+        const call = {
+          write(message: { dataChunk?: Uint8Array }) {
+            if (message?.dataChunk) writes.push(Buffer.from(message.dataChunk));
+          },
+          end() {},
+        };
         callback(null, { bytesWritten: 0 });
-        return { write() {}, end() {} };
+        return call;
       },
     },
     token: "t",
@@ -2772,4 +2780,28 @@ test("filesystem provider rejects a pre-aborted signal with FS_ABORTED", async (
     () => provider.readText(target, controller.signal),
     (error: unknown) => (error as { code?: string }).code === "FS_ABORTED",
   );
+});
+
+test("filesystem provider editText normalizes line endings for matching", async () => {
+  const binding = editGuest({}, Buffer.from("a\r\nb\r\n"));
+  const provider = editProvider(binding);
+  const target = await provider.resolve("/a", { cwd: "/x" });
+  const outcome = await provider.editText(target, {
+    oldString: "b",
+    newString: "B",
+    replaceAll: false,
+  });
+  // The diff basis is LF-normalized, and the file keeps its CRLF style.
+  assert.equal(outcome.before, "a\nb\n");
+  assert.equal(outcome.after, "a\nB\n");
+  assert.equal(Buffer.concat(binding.writes).toString(), "a\r\nB\r\n");
+});
+
+test("filesystem provider maps absolute host paths into the execution world", () => {
+  const provider = createFilesystemProvider({} as any);
+  assert.equal(
+    provider.processPathFromHostPath("/home/u/project/f"),
+    "/home/u/project/f",
+  );
+  assert.equal(provider.processPathFromHostPath("rel/f"), undefined);
 });

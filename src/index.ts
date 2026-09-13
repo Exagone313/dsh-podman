@@ -124,6 +124,7 @@ export interface SubprocessProvider {
 export interface FilesystemProvider {
   resolve(path: string, opts?: any): Promise<any>;
   processPath(target: any): string;
+  processPathFromHostPath(hostPath: string): string | undefined;
   fileUrl(target: any): string;
   contains(parent: any, child: any): boolean;
   readText(target: any, signal?: AbortSignal): Promise<string>;
@@ -2047,8 +2048,27 @@ function registerTools(ctx: any, resolver: WorkspaceResolver): void {
 // local backend (`fs-local`).
 const BINARY_SAMPLE_BYTES = 8192;
 // Cap on the contextual-diff basis read before a write; a larger existing file
-// yields `before: null`, like `fs-local`'s bounded reader.
-const DIFF_BASIS_MAX_BYTES = 1024 * 1024;
+// yields `before: null`, matching `fs-local`'s default (10 MiB).
+const DIFF_BASIS_MAX_BYTES = 10 * 1024 * 1024;
+
+// Line-ending handling for edits, mirroring `fs-local`: match on LF-normalized
+// text, then restore the file's original style on write-back.
+function normalizeLineEndings(content: string): string {
+  return content.replaceAll("\r\n", "\n");
+}
+
+function detectLineEndings(raw: string): "CRLF" | "LF" {
+  const sample = raw.slice(0, 4096);
+  const crlfCount = sample.split("\r\n").length - 1;
+  const lfCount = sample.split("\n").length - 1 - crlfCount;
+  return crlfCount > lfCount ? "CRLF" : "LF";
+}
+
+function restoreLineEndings(content: string, endings: "CRLF" | "LF"): string {
+  return endings === "LF"
+    ? content
+    : normalizeLineEndings(content).split("\n").join("\r\n");
+}
 
 function fsError(code: string, message: string): Error {
   const error = new Error(message);
@@ -2188,6 +2208,10 @@ export function createFilesystemProvider(resolver: WorkspaceResolver): Filesyste
       };
     },
     processPath: (target: any) => target.targetKey,
+    // The guest mounts each workspace at its mirrored path, so a host path in
+    // the execution world names the same path; anything relative has no world.
+    processPathFromHostPath: (hostPath: string) =>
+      isAbsolute(hostPath) ? resolvePath(hostPath) : undefined,
     fileUrl: (target: any) => `file://${target.targetKey}`,
     contains: (parent: any, child: any) =>
       child.targetKey === parent.targetKey ||
@@ -2345,14 +2369,22 @@ export function createFilesystemProvider(resolver: WorkspaceResolver): Filesyste
           `cannot edit "${target.displayPath}": file changed since it was read`,
         );
       }
-      const before = await readGuestText(target, signal);
-      if (typeof edit.oldString !== "string" || edit.oldString.length === 0) {
+      const raw = await readGuestText(target, signal);
+      const before = normalizeLineEndings(raw);
+      const lineEndings = detectLineEndings(raw);
+      const oldNorm = normalizeLineEndings(
+        typeof edit.oldString === "string" ? edit.oldString : "",
+      );
+      if (oldNorm.length === 0) {
         throw fsError(
           "FS_EDIT_NOT_FOUND",
           "old_string must be a non-empty string",
         );
       }
-      const occurrences = before.split(edit.oldString).length - 1;
+      const newNorm = normalizeLineEndings(
+        typeof edit.newString === "string" ? edit.newString : "",
+      );
+      const occurrences = before.split(oldNorm).length - 1;
       if (occurrences === 0) {
         throw fsError(
           "FS_EDIT_NOT_FOUND",
@@ -2365,13 +2397,11 @@ export function createFilesystemProvider(resolver: WorkspaceResolver): Filesyste
           `old_string matched ${occurrences} times in "${target.displayPath}"; provide a more specific old_string or set replace_all to true`,
         );
       }
-      const after = edit.replaceAll
-        ? before.split(edit.oldString).join(edit.newString)
-        : before.replace(edit.oldString, edit.newString);
+      const after = before.split(oldNorm).join(newNorm);
       await writeGuestFile(
         { guest: target.binding.guest, token: target.binding.token },
         target.targetKey,
-        after,
+        restoreLineEndings(after, lineEndings),
         { create: true, truncate: true },
         signal,
       );

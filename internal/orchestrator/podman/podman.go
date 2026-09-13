@@ -13,15 +13,11 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
 
 	"github.com/opencontainers/runtime-spec/specs-go"
 	"go.podman.io/podman/v6/pkg/bindings"
 	"go.podman.io/podman/v6/pkg/bindings/containers"
-	"go.podman.io/podman/v6/pkg/bindings/images"
 	"go.podman.io/podman/v6/pkg/bindings/pods"
-	"go.podman.io/podman/v6/pkg/bindings/secrets"
-	"go.podman.io/podman/v6/pkg/bindings/volumes"
 	entities "go.podman.io/podman/v6/pkg/domain/entities/types"
 	"go.podman.io/podman/v6/pkg/specgen"
 )
@@ -250,6 +246,7 @@ func (c *Client) Stop(name string) error {
 	}
 	return err
 }
+
 func (c *Client) ContainerExists(name string) (bool, error) {
 	exists, err := containers.Exists(c.ctx, name, nil)
 	if err != nil {
@@ -278,70 +275,6 @@ func boolPtr(value bool) *bool {
 	return &value
 }
 
-// ImageExists reports whether the named image is present in local storage.
-func (c *Client) ImageExists(name string) (bool, error) {
-	if err := c.connReady(); err != nil {
-		return false, err
-	}
-	exists, err := images.Exists(c.ctx, name, nil)
-	if err != nil {
-		c.log().Error("workspace image lookup failed", "image", name, "error", err)
-	} else {
-		c.log().Info("workspace image lookup completed", "image", name, "exists", exists)
-	}
-	return exists, err
-}
-
-// ImagePull pulls the named image into local storage. The name is the only
-// detail logged; pulled layers are never echoed.
-func (c *Client) ImagePull(name string) error {
-	if err := c.connReady(); err != nil {
-		return err
-	}
-	c.log().Info("pulling image", "image", name)
-	if _, err := images.Pull(c.ctx, name, nil); err != nil {
-		c.log().Error("image pull failed", "image", name, "error", err)
-		return err
-	}
-	c.log().Info("image pulled", "image", name)
-	return nil
-}
-
-// ImageCreated returns the image's creation time as an RFC3339 string, or ""
-// when the image does not exist or its creation time cannot be read.
-func (c *Client) ImageCreated(name string) string {
-	if err := c.connReady(); err != nil {
-		return ""
-	}
-	report, err := images.GetImage(c.ctx, name, nil)
-	if err != nil {
-		return ""
-	}
-	return report.Created.UTC().Format(time.RFC3339)
-}
-
-// ImageRemove deletes the named image from local storage, tolerating an
-// already-absent image via the force option. Any non-nil errors reported by
-// images.Remove are joined into a single error.
-func (c *Client) ImageRemove(name string) error {
-	if err := c.connReady(); err != nil {
-		return err
-	}
-	c.log().Info("removing image", "image", name)
-	_, errs := images.Remove(c.ctx, []string{name}, &images.RemoveOptions{Force: boolPtr(true)})
-	var joined error
-	for _, err := range errs {
-		if err != nil {
-			joined = errors.Join(joined, err)
-		}
-	}
-	if joined != nil {
-		c.log().Error("image removal failed", "image", name, "error", joined)
-		return joined
-	}
-	c.log().Info("image removed", "image", name)
-	return nil
-}
 func (c *Client) Remove(name string) error {
 	c.log().Info("removing guest container", "container_name", name)
 	_, err := containers.Remove(c.ctx, name, &containers.RemoveOptions{Force: boolPtr(true)})
@@ -422,88 +355,4 @@ func hasOption(options []string, want string) bool {
 		}
 	}
 	return false
-}
-
-func (c *Client) VolumeExists(name string) (bool, error) {
-	return volumes.Exists(c.ctx, name, nil)
-}
-
-// ensureVolume auto-creates a named volume when it does not already exist.
-func (c *Client) ensureVolume(name string) error {
-	exists, err := c.VolumeExists(name)
-	if err != nil {
-		return err
-	}
-	if exists {
-		return nil
-	}
-	return c.VolumeCreate(name)
-}
-
-func (c *Client) VolumeCreate(name string) error {
-	_, err := volumes.Create(c.ctx, entities.VolumeCreateOptions{Name: name}, nil)
-	if err != nil {
-		c.log().Error("volume creation failed", "volume_name", name, "error", err)
-		return fmt.Errorf("create volume: %w", err)
-	}
-	c.log().Info("volume created", "volume_name", name)
-	return nil
-}
-
-func (c *Client) VolumeList() ([]string, error) {
-	reports, err := volumes.List(c.ctx, nil)
-	if err != nil {
-		return nil, err
-	}
-	names := make([]string, 0, len(reports))
-	for _, report := range reports {
-		names = append(names, report.Name)
-	}
-	return names, nil
-}
-
-func (c *Client) VolumeRemove(name string) error {
-	if err := volumes.Remove(c.ctx, name, &volumes.RemoveOptions{Force: boolPtr(true)}); err != nil {
-		c.log().Error("volume removal failed", "volume_name", name, "error", err)
-		return fmt.Errorf("remove volume: %w", err)
-	}
-	c.log().Info("volume removed", "volume_name", name)
-	return nil
-}
-
-func (c *Client) SecretExists(name string) (bool, error) {
-	return secrets.Exists(c.ctx, name)
-}
-
-// SecretCreate stores a secret value under the given name. The value is never
-// logged; only the name is.
-func (c *Client) SecretCreate(name, value string) error {
-	if _, err := secrets.Create(c.ctx, strings.NewReader(value), &secrets.CreateOptions{Name: &name}); err != nil {
-		c.log().Error("secret creation failed", "secret_name", name, "error", err)
-		return fmt.Errorf("create secret: %w", err)
-	}
-	c.log().Info("secret created", "secret_name", name)
-	return nil
-}
-
-// SecretList returns the full podman names of every secret.
-func (c *Client) SecretList() ([]string, error) {
-	reports, err := secrets.List(c.ctx, nil)
-	if err != nil {
-		return nil, err
-	}
-	names := make([]string, 0, len(reports))
-	for _, report := range reports {
-		names = append(names, report.Spec.Name)
-	}
-	return names, nil
-}
-
-func (c *Client) SecretRemove(name string) error {
-	if err := secrets.Remove(c.ctx, name); err != nil {
-		c.log().Error("secret removal failed", "secret_name", name, "error", err)
-		return fmt.Errorf("remove secret: %w", err)
-	}
-	c.log().Info("secret removed", "secret_name", name)
-	return nil
 }

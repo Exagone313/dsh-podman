@@ -1768,6 +1768,694 @@ func (x *DaemonLogsResponse) GetStderr() []byte {
 	return nil
 }
 
+type TerminalInput struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Types that are valid to be assigned to Payload:
+	//
+	//	*TerminalInput_Start
+	//	*TerminalInput_StdinChunk
+	//	*TerminalInput_Resize
+	//	*TerminalInput_Signal
+	//	*TerminalInput_InspectRequestId
+	//	*TerminalInput_Close
+	Payload       isTerminalInput_Payload `protobuf_oneof:"payload"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *TerminalInput) Reset() {
+	*x = TerminalInput{}
+	mi := &file_dshguest_v1_guest_proto_msgTypes[31]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TerminalInput) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TerminalInput) ProtoMessage() {}
+
+func (x *TerminalInput) ProtoReflect() protoreflect.Message {
+	mi := &file_dshguest_v1_guest_proto_msgTypes[31]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TerminalInput.ProtoReflect.Descriptor instead.
+func (*TerminalInput) Descriptor() ([]byte, []int) {
+	return file_dshguest_v1_guest_proto_rawDescGZIP(), []int{31}
+}
+
+func (x *TerminalInput) GetPayload() isTerminalInput_Payload {
+	if x != nil {
+		return x.Payload
+	}
+	return nil
+}
+
+func (x *TerminalInput) GetStart() *TerminalStart {
+	if x != nil {
+		if x, ok := x.Payload.(*TerminalInput_Start); ok {
+			return x.Start
+		}
+	}
+	return nil
+}
+
+func (x *TerminalInput) GetStdinChunk() []byte {
+	if x != nil {
+		if x, ok := x.Payload.(*TerminalInput_StdinChunk); ok {
+			return x.StdinChunk
+		}
+	}
+	return nil
+}
+
+func (x *TerminalInput) GetResize() *TerminalResize {
+	if x != nil {
+		if x, ok := x.Payload.(*TerminalInput_Resize); ok {
+			return x.Resize
+		}
+	}
+	return nil
+}
+
+func (x *TerminalInput) GetSignal() *TerminalSignal {
+	if x != nil {
+		if x, ok := x.Payload.(*TerminalInput_Signal); ok {
+			return x.Signal
+		}
+	}
+	return nil
+}
+
+func (x *TerminalInput) GetInspectRequestId() string {
+	if x != nil {
+		if x, ok := x.Payload.(*TerminalInput_InspectRequestId); ok {
+			return x.InspectRequestId
+		}
+	}
+	return ""
+}
+
+func (x *TerminalInput) GetClose() bool {
+	if x != nil {
+		if x, ok := x.Payload.(*TerminalInput_Close); ok {
+			return x.Close
+		}
+	}
+	return false
+}
+
+type isTerminalInput_Payload interface {
+	isTerminalInput_Payload()
+}
+
+type TerminalInput_Start struct {
+	Start *TerminalStart `protobuf:"bytes,1,opt,name=start,proto3,oneof"`
+}
+
+type TerminalInput_StdinChunk struct {
+	StdinChunk []byte `protobuf:"bytes,2,opt,name=stdin_chunk,json=stdinChunk,proto3,oneof"`
+}
+
+type TerminalInput_Resize struct {
+	Resize *TerminalResize `protobuf:"bytes,3,opt,name=resize,proto3,oneof"`
+}
+
+type TerminalInput_Signal struct {
+	Signal *TerminalSignal `protobuf:"bytes,4,opt,name=signal,proto3,oneof"`
+}
+
+type TerminalInput_InspectRequestId struct {
+	InspectRequestId string `protobuf:"bytes,5,opt,name=inspect_request_id,json=inspectRequestId,proto3,oneof"`
+}
+
+type TerminalInput_Close struct {
+	Close bool `protobuf:"varint,6,opt,name=close,proto3,oneof"`
+}
+
+func (*TerminalInput_Start) isTerminalInput_Payload() {}
+
+func (*TerminalInput_StdinChunk) isTerminalInput_Payload() {}
+
+func (*TerminalInput_Resize) isTerminalInput_Payload() {}
+
+func (*TerminalInput_Signal) isTerminalInput_Payload() {}
+
+func (*TerminalInput_InspectRequestId) isTerminalInput_Payload() {}
+
+func (*TerminalInput_Close) isTerminalInput_Payload() {}
+
+type TerminalStart struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Argv          []string               `protobuf:"bytes,1,rep,name=argv,proto3" json:"argv,omitempty"`
+	Cwd           string                 `protobuf:"bytes,2,opt,name=cwd,proto3" json:"cwd,omitempty"`
+	Env           map[string]string      `protobuf:"bytes,3,rep,name=env,proto3" json:"env,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	Rows          uint32                 `protobuf:"varint,4,opt,name=rows,proto3" json:"rows,omitempty"`
+	Cols          uint32                 `protobuf:"varint,5,opt,name=cols,proto3" json:"cols,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *TerminalStart) Reset() {
+	*x = TerminalStart{}
+	mi := &file_dshguest_v1_guest_proto_msgTypes[32]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TerminalStart) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TerminalStart) ProtoMessage() {}
+
+func (x *TerminalStart) ProtoReflect() protoreflect.Message {
+	mi := &file_dshguest_v1_guest_proto_msgTypes[32]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TerminalStart.ProtoReflect.Descriptor instead.
+func (*TerminalStart) Descriptor() ([]byte, []int) {
+	return file_dshguest_v1_guest_proto_rawDescGZIP(), []int{32}
+}
+
+func (x *TerminalStart) GetArgv() []string {
+	if x != nil {
+		return x.Argv
+	}
+	return nil
+}
+
+func (x *TerminalStart) GetCwd() string {
+	if x != nil {
+		return x.Cwd
+	}
+	return ""
+}
+
+func (x *TerminalStart) GetEnv() map[string]string {
+	if x != nil {
+		return x.Env
+	}
+	return nil
+}
+
+func (x *TerminalStart) GetRows() uint32 {
+	if x != nil {
+		return x.Rows
+	}
+	return 0
+}
+
+func (x *TerminalStart) GetCols() uint32 {
+	if x != nil {
+		return x.Cols
+	}
+	return 0
+}
+
+type TerminalResize struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Rows          uint32                 `protobuf:"varint,1,opt,name=rows,proto3" json:"rows,omitempty"`
+	Cols          uint32                 `protobuf:"varint,2,opt,name=cols,proto3" json:"cols,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *TerminalResize) Reset() {
+	*x = TerminalResize{}
+	mi := &file_dshguest_v1_guest_proto_msgTypes[33]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TerminalResize) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TerminalResize) ProtoMessage() {}
+
+func (x *TerminalResize) ProtoReflect() protoreflect.Message {
+	mi := &file_dshguest_v1_guest_proto_msgTypes[33]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TerminalResize.ProtoReflect.Descriptor instead.
+func (*TerminalResize) Descriptor() ([]byte, []int) {
+	return file_dshguest_v1_guest_proto_rawDescGZIP(), []int{33}
+}
+
+func (x *TerminalResize) GetRows() uint32 {
+	if x != nil {
+		return x.Rows
+	}
+	return 0
+}
+
+func (x *TerminalResize) GetCols() uint32 {
+	if x != nil {
+		return x.Cols
+	}
+	return 0
+}
+
+type TerminalSignal struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Signal        string                 `protobuf:"bytes,1,opt,name=signal,proto3" json:"signal,omitempty"`
+	RequestId     string                 `protobuf:"bytes,2,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *TerminalSignal) Reset() {
+	*x = TerminalSignal{}
+	mi := &file_dshguest_v1_guest_proto_msgTypes[34]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TerminalSignal) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TerminalSignal) ProtoMessage() {}
+
+func (x *TerminalSignal) ProtoReflect() protoreflect.Message {
+	mi := &file_dshguest_v1_guest_proto_msgTypes[34]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TerminalSignal.ProtoReflect.Descriptor instead.
+func (*TerminalSignal) Descriptor() ([]byte, []int) {
+	return file_dshguest_v1_guest_proto_rawDescGZIP(), []int{34}
+}
+
+func (x *TerminalSignal) GetSignal() string {
+	if x != nil {
+		return x.Signal
+	}
+	return ""
+}
+
+func (x *TerminalSignal) GetRequestId() string {
+	if x != nil {
+		return x.RequestId
+	}
+	return ""
+}
+
+type TerminalOutput struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Types that are valid to be assigned to Payload:
+	//
+	//	*TerminalOutput_Started
+	//	*TerminalOutput_StdoutChunk
+	//	*TerminalOutput_Exit
+	//	*TerminalOutput_Foreground
+	//	*TerminalOutput_Signalled
+	Payload       isTerminalOutput_Payload `protobuf_oneof:"payload"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *TerminalOutput) Reset() {
+	*x = TerminalOutput{}
+	mi := &file_dshguest_v1_guest_proto_msgTypes[35]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TerminalOutput) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TerminalOutput) ProtoMessage() {}
+
+func (x *TerminalOutput) ProtoReflect() protoreflect.Message {
+	mi := &file_dshguest_v1_guest_proto_msgTypes[35]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TerminalOutput.ProtoReflect.Descriptor instead.
+func (*TerminalOutput) Descriptor() ([]byte, []int) {
+	return file_dshguest_v1_guest_proto_rawDescGZIP(), []int{35}
+}
+
+func (x *TerminalOutput) GetPayload() isTerminalOutput_Payload {
+	if x != nil {
+		return x.Payload
+	}
+	return nil
+}
+
+func (x *TerminalOutput) GetStarted() *TerminalStarted {
+	if x != nil {
+		if x, ok := x.Payload.(*TerminalOutput_Started); ok {
+			return x.Started
+		}
+	}
+	return nil
+}
+
+func (x *TerminalOutput) GetStdoutChunk() []byte {
+	if x != nil {
+		if x, ok := x.Payload.(*TerminalOutput_StdoutChunk); ok {
+			return x.StdoutChunk
+		}
+	}
+	return nil
+}
+
+func (x *TerminalOutput) GetExit() *TerminalExit {
+	if x != nil {
+		if x, ok := x.Payload.(*TerminalOutput_Exit); ok {
+			return x.Exit
+		}
+	}
+	return nil
+}
+
+func (x *TerminalOutput) GetForeground() *TerminalForeground {
+	if x != nil {
+		if x, ok := x.Payload.(*TerminalOutput_Foreground); ok {
+			return x.Foreground
+		}
+	}
+	return nil
+}
+
+func (x *TerminalOutput) GetSignalled() *TerminalSignalled {
+	if x != nil {
+		if x, ok := x.Payload.(*TerminalOutput_Signalled); ok {
+			return x.Signalled
+		}
+	}
+	return nil
+}
+
+type isTerminalOutput_Payload interface {
+	isTerminalOutput_Payload()
+}
+
+type TerminalOutput_Started struct {
+	Started *TerminalStarted `protobuf:"bytes,1,opt,name=started,proto3,oneof"`
+}
+
+type TerminalOutput_StdoutChunk struct {
+	StdoutChunk []byte `protobuf:"bytes,2,opt,name=stdout_chunk,json=stdoutChunk,proto3,oneof"`
+}
+
+type TerminalOutput_Exit struct {
+	Exit *TerminalExit `protobuf:"bytes,3,opt,name=exit,proto3,oneof"`
+}
+
+type TerminalOutput_Foreground struct {
+	Foreground *TerminalForeground `protobuf:"bytes,4,opt,name=foreground,proto3,oneof"`
+}
+
+type TerminalOutput_Signalled struct {
+	Signalled *TerminalSignalled `protobuf:"bytes,5,opt,name=signalled,proto3,oneof"`
+}
+
+func (*TerminalOutput_Started) isTerminalOutput_Payload() {}
+
+func (*TerminalOutput_StdoutChunk) isTerminalOutput_Payload() {}
+
+func (*TerminalOutput_Exit) isTerminalOutput_Payload() {}
+
+func (*TerminalOutput_Foreground) isTerminalOutput_Payload() {}
+
+func (*TerminalOutput_Signalled) isTerminalOutput_Payload() {}
+
+type TerminalStarted struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Pid           int32                  `protobuf:"varint,1,opt,name=pid,proto3" json:"pid,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *TerminalStarted) Reset() {
+	*x = TerminalStarted{}
+	mi := &file_dshguest_v1_guest_proto_msgTypes[36]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TerminalStarted) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TerminalStarted) ProtoMessage() {}
+
+func (x *TerminalStarted) ProtoReflect() protoreflect.Message {
+	mi := &file_dshguest_v1_guest_proto_msgTypes[36]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TerminalStarted.ProtoReflect.Descriptor instead.
+func (*TerminalStarted) Descriptor() ([]byte, []int) {
+	return file_dshguest_v1_guest_proto_rawDescGZIP(), []int{36}
+}
+
+func (x *TerminalStarted) GetPid() int32 {
+	if x != nil {
+		return x.Pid
+	}
+	return 0
+}
+
+type TerminalExit struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ExitCode      int32                  `protobuf:"varint,1,opt,name=exit_code,json=exitCode,proto3" json:"exit_code,omitempty"`
+	Signaled      bool                   `protobuf:"varint,2,opt,name=signaled,proto3" json:"signaled,omitempty"`
+	Signal        string                 `protobuf:"bytes,3,opt,name=signal,proto3" json:"signal,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *TerminalExit) Reset() {
+	*x = TerminalExit{}
+	mi := &file_dshguest_v1_guest_proto_msgTypes[37]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TerminalExit) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TerminalExit) ProtoMessage() {}
+
+func (x *TerminalExit) ProtoReflect() protoreflect.Message {
+	mi := &file_dshguest_v1_guest_proto_msgTypes[37]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TerminalExit.ProtoReflect.Descriptor instead.
+func (*TerminalExit) Descriptor() ([]byte, []int) {
+	return file_dshguest_v1_guest_proto_rawDescGZIP(), []int{37}
+}
+
+func (x *TerminalExit) GetExitCode() int32 {
+	if x != nil {
+		return x.ExitCode
+	}
+	return 0
+}
+
+func (x *TerminalExit) GetSignaled() bool {
+	if x != nil {
+		return x.Signaled
+	}
+	return false
+}
+
+func (x *TerminalExit) GetSignal() string {
+	if x != nil {
+		return x.Signal
+	}
+	return ""
+}
+
+type TerminalForeground struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	RequestId      string                 `protobuf:"bytes,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
+	Found          bool                   `protobuf:"varint,2,opt,name=found,proto3" json:"found,omitempty"`
+	ProcessGroupId int32                  `protobuf:"varint,3,opt,name=process_group_id,json=processGroupId,proto3" json:"process_group_id,omitempty"`
+	InputWaiting   bool                   `protobuf:"varint,4,opt,name=input_waiting,json=inputWaiting,proto3" json:"input_waiting,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *TerminalForeground) Reset() {
+	*x = TerminalForeground{}
+	mi := &file_dshguest_v1_guest_proto_msgTypes[38]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TerminalForeground) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TerminalForeground) ProtoMessage() {}
+
+func (x *TerminalForeground) ProtoReflect() protoreflect.Message {
+	mi := &file_dshguest_v1_guest_proto_msgTypes[38]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TerminalForeground.ProtoReflect.Descriptor instead.
+func (*TerminalForeground) Descriptor() ([]byte, []int) {
+	return file_dshguest_v1_guest_proto_rawDescGZIP(), []int{38}
+}
+
+func (x *TerminalForeground) GetRequestId() string {
+	if x != nil {
+		return x.RequestId
+	}
+	return ""
+}
+
+func (x *TerminalForeground) GetFound() bool {
+	if x != nil {
+		return x.Found
+	}
+	return false
+}
+
+func (x *TerminalForeground) GetProcessGroupId() int32 {
+	if x != nil {
+		return x.ProcessGroupId
+	}
+	return 0
+}
+
+func (x *TerminalForeground) GetInputWaiting() bool {
+	if x != nil {
+		return x.InputWaiting
+	}
+	return false
+}
+
+type TerminalSignalled struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	RequestId      string                 `protobuf:"bytes,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
+	Found          bool                   `protobuf:"varint,2,opt,name=found,proto3" json:"found,omitempty"`
+	ProcessGroupId int32                  `protobuf:"varint,3,opt,name=process_group_id,json=processGroupId,proto3" json:"process_group_id,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *TerminalSignalled) Reset() {
+	*x = TerminalSignalled{}
+	mi := &file_dshguest_v1_guest_proto_msgTypes[39]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TerminalSignalled) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TerminalSignalled) ProtoMessage() {}
+
+func (x *TerminalSignalled) ProtoReflect() protoreflect.Message {
+	mi := &file_dshguest_v1_guest_proto_msgTypes[39]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TerminalSignalled.ProtoReflect.Descriptor instead.
+func (*TerminalSignalled) Descriptor() ([]byte, []int) {
+	return file_dshguest_v1_guest_proto_rawDescGZIP(), []int{39}
+}
+
+func (x *TerminalSignalled) GetRequestId() string {
+	if x != nil {
+		return x.RequestId
+	}
+	return ""
+}
+
+func (x *TerminalSignalled) GetFound() bool {
+	if x != nil {
+		return x.Found
+	}
+	return false
+}
+
+func (x *TerminalSignalled) GetProcessGroupId() int32 {
+	if x != nil {
+		return x.ProcessGroupId
+	}
+	return 0
+}
+
 var File_dshguest_v1_guest_proto protoreflect.FileDescriptor
 
 const file_dshguest_v1_guest_proto_rawDesc = "" +
@@ -1890,7 +2578,58 @@ const file_dshguest_v1_guest_proto_rawDesc = "" +
 	"tail_bytes\x18\x02 \x01(\x05R\ttailBytes\"D\n" +
 	"\x12DaemonLogsResponse\x12\x16\n" +
 	"\x06stdout\x18\x01 \x01(\fR\x06stdout\x12\x16\n" +
-	"\x06stderr\x18\x02 \x01(\fR\x06stderr2\x90\b\n" +
+	"\x06stderr\x18\x02 \x01(\fR\x06stderr\"\xa7\x02\n" +
+	"\rTerminalInput\x122\n" +
+	"\x05start\x18\x01 \x01(\v2\x1a.dshguest.v1.TerminalStartH\x00R\x05start\x12!\n" +
+	"\vstdin_chunk\x18\x02 \x01(\fH\x00R\n" +
+	"stdinChunk\x125\n" +
+	"\x06resize\x18\x03 \x01(\v2\x1b.dshguest.v1.TerminalResizeH\x00R\x06resize\x125\n" +
+	"\x06signal\x18\x04 \x01(\v2\x1b.dshguest.v1.TerminalSignalH\x00R\x06signal\x12.\n" +
+	"\x12inspect_request_id\x18\x05 \x01(\tH\x00R\x10inspectRequestId\x12\x16\n" +
+	"\x05close\x18\x06 \x01(\bH\x00R\x05closeB\t\n" +
+	"\apayload\"\xcc\x01\n" +
+	"\rTerminalStart\x12\x12\n" +
+	"\x04argv\x18\x01 \x03(\tR\x04argv\x12\x10\n" +
+	"\x03cwd\x18\x02 \x01(\tR\x03cwd\x125\n" +
+	"\x03env\x18\x03 \x03(\v2#.dshguest.v1.TerminalStart.EnvEntryR\x03env\x12\x12\n" +
+	"\x04rows\x18\x04 \x01(\rR\x04rows\x12\x12\n" +
+	"\x04cols\x18\x05 \x01(\rR\x04cols\x1a6\n" +
+	"\bEnvEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"8\n" +
+	"\x0eTerminalResize\x12\x12\n" +
+	"\x04rows\x18\x01 \x01(\rR\x04rows\x12\x12\n" +
+	"\x04cols\x18\x02 \x01(\rR\x04cols\"G\n" +
+	"\x0eTerminalSignal\x12\x16\n" +
+	"\x06signal\x18\x01 \x01(\tR\x06signal\x12\x1d\n" +
+	"\n" +
+	"request_id\x18\x02 \x01(\tR\trequestId\"\xae\x02\n" +
+	"\x0eTerminalOutput\x128\n" +
+	"\astarted\x18\x01 \x01(\v2\x1c.dshguest.v1.TerminalStartedH\x00R\astarted\x12#\n" +
+	"\fstdout_chunk\x18\x02 \x01(\fH\x00R\vstdoutChunk\x12/\n" +
+	"\x04exit\x18\x03 \x01(\v2\x19.dshguest.v1.TerminalExitH\x00R\x04exit\x12A\n" +
+	"\n" +
+	"foreground\x18\x04 \x01(\v2\x1f.dshguest.v1.TerminalForegroundH\x00R\n" +
+	"foreground\x12>\n" +
+	"\tsignalled\x18\x05 \x01(\v2\x1e.dshguest.v1.TerminalSignalledH\x00R\tsignalledB\t\n" +
+	"\apayload\"#\n" +
+	"\x0fTerminalStarted\x12\x10\n" +
+	"\x03pid\x18\x01 \x01(\x05R\x03pid\"_\n" +
+	"\fTerminalExit\x12\x1b\n" +
+	"\texit_code\x18\x01 \x01(\x05R\bexitCode\x12\x1a\n" +
+	"\bsignaled\x18\x02 \x01(\bR\bsignaled\x12\x16\n" +
+	"\x06signal\x18\x03 \x01(\tR\x06signal\"\x98\x01\n" +
+	"\x12TerminalForeground\x12\x1d\n" +
+	"\n" +
+	"request_id\x18\x01 \x01(\tR\trequestId\x12\x14\n" +
+	"\x05found\x18\x02 \x01(\bR\x05found\x12(\n" +
+	"\x10process_group_id\x18\x03 \x01(\x05R\x0eprocessGroupId\x12#\n" +
+	"\rinput_waiting\x18\x04 \x01(\bR\finputWaiting\"r\n" +
+	"\x11TerminalSignalled\x12\x1d\n" +
+	"\n" +
+	"request_id\x18\x01 \x01(\tR\trequestId\x12\x14\n" +
+	"\x05found\x18\x02 \x01(\bR\x05found\x12(\n" +
+	"\x10process_group_id\x18\x03 \x01(\x05R\x0eprocessGroupId2\xd9\b\n" +
 	"\x13WorkspaceGuestAgent\x12;\n" +
 	"\x04Exec\x12\x16.dshguest.v1.ExecInput\x1a\x17.dshguest.v1.ExecOutput(\x010\x01\x12A\n" +
 	"\x06Signal\x12\x1a.dshguest.v1.SignalRequest\x1a\x1b.dshguest.v1.SignalResponse\x12F\n" +
@@ -1907,7 +2646,8 @@ const file_dshguest_v1_guest_proto_rawDesc = "" +
 	"\x0eStopAllDaemons\x12\".dshguest.v1.StopAllDaemonsRequest\x1a#.dshguest.v1.StopAllDaemonsResponse\x12K\n" +
 	"\rRestartDaemon\x12!.dshguest.v1.RestartDaemonRequest\x1a\x17.dshguest.v1.DaemonInfo\x12M\n" +
 	"\n" +
-	"DaemonLogs\x12\x1e.dshguest.v1.DaemonLogsRequest\x1a\x1f.dshguest.v1.DaemonLogsResponseBKZIgithub.com/Exagone313/dsh-podman/internal/genproto/dshguest/v1;dshguestv1b\x06proto3"
+	"DaemonLogs\x12\x1e.dshguest.v1.DaemonLogsRequest\x1a\x1f.dshguest.v1.DaemonLogsResponse\x12G\n" +
+	"\bTerminal\x12\x1a.dshguest.v1.TerminalInput\x1a\x1b.dshguest.v1.TerminalOutput(\x010\x01BKZIgithub.com/Exagone313/dsh-podman/internal/genproto/dshguest/v1;dshguestv1b\x06proto3"
 
 var (
 	file_dshguest_v1_guest_proto_rawDescOnce sync.Once
@@ -1921,7 +2661,7 @@ func file_dshguest_v1_guest_proto_rawDescGZIP() []byte {
 	return file_dshguest_v1_guest_proto_rawDescData
 }
 
-var file_dshguest_v1_guest_proto_msgTypes = make([]protoimpl.MessageInfo, 33)
+var file_dshguest_v1_guest_proto_msgTypes = make([]protoimpl.MessageInfo, 43)
 var file_dshguest_v1_guest_proto_goTypes = []any{
 	(*ExecInput)(nil),              // 0: dshguest.v1.ExecInput
 	(*ExecStart)(nil),              // 1: dshguest.v1.ExecStart
@@ -1954,55 +2694,75 @@ var file_dshguest_v1_guest_proto_goTypes = []any{
 	(*RestartDaemonRequest)(nil),   // 28: dshguest.v1.RestartDaemonRequest
 	(*DaemonLogsRequest)(nil),      // 29: dshguest.v1.DaemonLogsRequest
 	(*DaemonLogsResponse)(nil),     // 30: dshguest.v1.DaemonLogsResponse
-	nil,                            // 31: dshguest.v1.ExecStart.EnvEntry
-	nil,                            // 32: dshguest.v1.StartDaemonRequest.EnvEntry
-	(*wrapperspb.Int32Value)(nil),  // 33: google.protobuf.Int32Value
-	(*wrapperspb.BoolValue)(nil),   // 34: google.protobuf.BoolValue
+	(*TerminalInput)(nil),          // 31: dshguest.v1.TerminalInput
+	(*TerminalStart)(nil),          // 32: dshguest.v1.TerminalStart
+	(*TerminalResize)(nil),         // 33: dshguest.v1.TerminalResize
+	(*TerminalSignal)(nil),         // 34: dshguest.v1.TerminalSignal
+	(*TerminalOutput)(nil),         // 35: dshguest.v1.TerminalOutput
+	(*TerminalStarted)(nil),        // 36: dshguest.v1.TerminalStarted
+	(*TerminalExit)(nil),           // 37: dshguest.v1.TerminalExit
+	(*TerminalForeground)(nil),     // 38: dshguest.v1.TerminalForeground
+	(*TerminalSignalled)(nil),      // 39: dshguest.v1.TerminalSignalled
+	nil,                            // 40: dshguest.v1.ExecStart.EnvEntry
+	nil,                            // 41: dshguest.v1.StartDaemonRequest.EnvEntry
+	nil,                            // 42: dshguest.v1.TerminalStart.EnvEntry
+	(*wrapperspb.Int32Value)(nil),  // 43: google.protobuf.Int32Value
+	(*wrapperspb.BoolValue)(nil),   // 44: google.protobuf.BoolValue
 }
 var file_dshguest_v1_guest_proto_depIdxs = []int32{
 	1,  // 0: dshguest.v1.ExecInput.start:type_name -> dshguest.v1.ExecStart
-	31, // 1: dshguest.v1.ExecStart.env:type_name -> dshguest.v1.ExecStart.EnvEntry
+	40, // 1: dshguest.v1.ExecStart.env:type_name -> dshguest.v1.ExecStart.EnvEntry
 	3,  // 2: dshguest.v1.ExecOutput.exit:type_name -> dshguest.v1.ExecExit
 	9,  // 3: dshguest.v1.WriteFileChunk.start:type_name -> dshguest.v1.WriteFileStart
 	15, // 4: dshguest.v1.ReadDirResponse.entries:type_name -> dshguest.v1.DirEntry
-	32, // 5: dshguest.v1.StartDaemonRequest.env:type_name -> dshguest.v1.StartDaemonRequest.EnvEntry
-	33, // 6: dshguest.v1.StartDaemonRequest.uid:type_name -> google.protobuf.Int32Value
-	33, // 7: dshguest.v1.StartDaemonRequest.gid:type_name -> google.protobuf.Int32Value
-	34, // 8: dshguest.v1.StartDaemonRequest.inherit_env:type_name -> google.protobuf.BoolValue
+	41, // 5: dshguest.v1.StartDaemonRequest.env:type_name -> dshguest.v1.StartDaemonRequest.EnvEntry
+	43, // 6: dshguest.v1.StartDaemonRequest.uid:type_name -> google.protobuf.Int32Value
+	43, // 7: dshguest.v1.StartDaemonRequest.gid:type_name -> google.protobuf.Int32Value
+	44, // 8: dshguest.v1.StartDaemonRequest.inherit_env:type_name -> google.protobuf.BoolValue
 	21, // 9: dshguest.v1.ListDaemonsResponse.daemons:type_name -> dshguest.v1.DaemonInfo
-	0,  // 10: dshguest.v1.WorkspaceGuestAgent.Exec:input_type -> dshguest.v1.ExecInput
-	4,  // 11: dshguest.v1.WorkspaceGuestAgent.Signal:input_type -> dshguest.v1.SignalRequest
-	6,  // 12: dshguest.v1.WorkspaceGuestAgent.ReadFile:input_type -> dshguest.v1.ReadFileRequest
-	8,  // 13: dshguest.v1.WorkspaceGuestAgent.WriteFile:input_type -> dshguest.v1.WriteFileChunk
-	11, // 14: dshguest.v1.WorkspaceGuestAgent.Stat:input_type -> dshguest.v1.StatRequest
-	13, // 15: dshguest.v1.WorkspaceGuestAgent.ReadDir:input_type -> dshguest.v1.ReadDirRequest
-	16, // 16: dshguest.v1.WorkspaceGuestAgent.Mkdir:input_type -> dshguest.v1.MkdirRequest
-	18, // 17: dshguest.v1.WorkspaceGuestAgent.Delete:input_type -> dshguest.v1.DeleteRequest
-	20, // 18: dshguest.v1.WorkspaceGuestAgent.StartDaemon:input_type -> dshguest.v1.StartDaemonRequest
-	22, // 19: dshguest.v1.WorkspaceGuestAgent.ListDaemons:input_type -> dshguest.v1.ListDaemonsRequest
-	24, // 20: dshguest.v1.WorkspaceGuestAgent.StopDaemon:input_type -> dshguest.v1.StopDaemonRequest
-	26, // 21: dshguest.v1.WorkspaceGuestAgent.StopAllDaemons:input_type -> dshguest.v1.StopAllDaemonsRequest
-	28, // 22: dshguest.v1.WorkspaceGuestAgent.RestartDaemon:input_type -> dshguest.v1.RestartDaemonRequest
-	29, // 23: dshguest.v1.WorkspaceGuestAgent.DaemonLogs:input_type -> dshguest.v1.DaemonLogsRequest
-	2,  // 24: dshguest.v1.WorkspaceGuestAgent.Exec:output_type -> dshguest.v1.ExecOutput
-	5,  // 25: dshguest.v1.WorkspaceGuestAgent.Signal:output_type -> dshguest.v1.SignalResponse
-	7,  // 26: dshguest.v1.WorkspaceGuestAgent.ReadFile:output_type -> dshguest.v1.ReadFileChunk
-	10, // 27: dshguest.v1.WorkspaceGuestAgent.WriteFile:output_type -> dshguest.v1.WriteFileResponse
-	12, // 28: dshguest.v1.WorkspaceGuestAgent.Stat:output_type -> dshguest.v1.StatResponse
-	14, // 29: dshguest.v1.WorkspaceGuestAgent.ReadDir:output_type -> dshguest.v1.ReadDirResponse
-	17, // 30: dshguest.v1.WorkspaceGuestAgent.Mkdir:output_type -> dshguest.v1.MkdirResponse
-	19, // 31: dshguest.v1.WorkspaceGuestAgent.Delete:output_type -> dshguest.v1.DeleteResponse
-	21, // 32: dshguest.v1.WorkspaceGuestAgent.StartDaemon:output_type -> dshguest.v1.DaemonInfo
-	23, // 33: dshguest.v1.WorkspaceGuestAgent.ListDaemons:output_type -> dshguest.v1.ListDaemonsResponse
-	25, // 34: dshguest.v1.WorkspaceGuestAgent.StopDaemon:output_type -> dshguest.v1.StopDaemonResponse
-	27, // 35: dshguest.v1.WorkspaceGuestAgent.StopAllDaemons:output_type -> dshguest.v1.StopAllDaemonsResponse
-	21, // 36: dshguest.v1.WorkspaceGuestAgent.RestartDaemon:output_type -> dshguest.v1.DaemonInfo
-	30, // 37: dshguest.v1.WorkspaceGuestAgent.DaemonLogs:output_type -> dshguest.v1.DaemonLogsResponse
-	24, // [24:38] is the sub-list for method output_type
-	10, // [10:24] is the sub-list for method input_type
-	10, // [10:10] is the sub-list for extension type_name
-	10, // [10:10] is the sub-list for extension extendee
-	0,  // [0:10] is the sub-list for field type_name
+	32, // 10: dshguest.v1.TerminalInput.start:type_name -> dshguest.v1.TerminalStart
+	33, // 11: dshguest.v1.TerminalInput.resize:type_name -> dshguest.v1.TerminalResize
+	34, // 12: dshguest.v1.TerminalInput.signal:type_name -> dshguest.v1.TerminalSignal
+	42, // 13: dshguest.v1.TerminalStart.env:type_name -> dshguest.v1.TerminalStart.EnvEntry
+	36, // 14: dshguest.v1.TerminalOutput.started:type_name -> dshguest.v1.TerminalStarted
+	37, // 15: dshguest.v1.TerminalOutput.exit:type_name -> dshguest.v1.TerminalExit
+	38, // 16: dshguest.v1.TerminalOutput.foreground:type_name -> dshguest.v1.TerminalForeground
+	39, // 17: dshguest.v1.TerminalOutput.signalled:type_name -> dshguest.v1.TerminalSignalled
+	0,  // 18: dshguest.v1.WorkspaceGuestAgent.Exec:input_type -> dshguest.v1.ExecInput
+	4,  // 19: dshguest.v1.WorkspaceGuestAgent.Signal:input_type -> dshguest.v1.SignalRequest
+	6,  // 20: dshguest.v1.WorkspaceGuestAgent.ReadFile:input_type -> dshguest.v1.ReadFileRequest
+	8,  // 21: dshguest.v1.WorkspaceGuestAgent.WriteFile:input_type -> dshguest.v1.WriteFileChunk
+	11, // 22: dshguest.v1.WorkspaceGuestAgent.Stat:input_type -> dshguest.v1.StatRequest
+	13, // 23: dshguest.v1.WorkspaceGuestAgent.ReadDir:input_type -> dshguest.v1.ReadDirRequest
+	16, // 24: dshguest.v1.WorkspaceGuestAgent.Mkdir:input_type -> dshguest.v1.MkdirRequest
+	18, // 25: dshguest.v1.WorkspaceGuestAgent.Delete:input_type -> dshguest.v1.DeleteRequest
+	20, // 26: dshguest.v1.WorkspaceGuestAgent.StartDaemon:input_type -> dshguest.v1.StartDaemonRequest
+	22, // 27: dshguest.v1.WorkspaceGuestAgent.ListDaemons:input_type -> dshguest.v1.ListDaemonsRequest
+	24, // 28: dshguest.v1.WorkspaceGuestAgent.StopDaemon:input_type -> dshguest.v1.StopDaemonRequest
+	26, // 29: dshguest.v1.WorkspaceGuestAgent.StopAllDaemons:input_type -> dshguest.v1.StopAllDaemonsRequest
+	28, // 30: dshguest.v1.WorkspaceGuestAgent.RestartDaemon:input_type -> dshguest.v1.RestartDaemonRequest
+	29, // 31: dshguest.v1.WorkspaceGuestAgent.DaemonLogs:input_type -> dshguest.v1.DaemonLogsRequest
+	31, // 32: dshguest.v1.WorkspaceGuestAgent.Terminal:input_type -> dshguest.v1.TerminalInput
+	2,  // 33: dshguest.v1.WorkspaceGuestAgent.Exec:output_type -> dshguest.v1.ExecOutput
+	5,  // 34: dshguest.v1.WorkspaceGuestAgent.Signal:output_type -> dshguest.v1.SignalResponse
+	7,  // 35: dshguest.v1.WorkspaceGuestAgent.ReadFile:output_type -> dshguest.v1.ReadFileChunk
+	10, // 36: dshguest.v1.WorkspaceGuestAgent.WriteFile:output_type -> dshguest.v1.WriteFileResponse
+	12, // 37: dshguest.v1.WorkspaceGuestAgent.Stat:output_type -> dshguest.v1.StatResponse
+	14, // 38: dshguest.v1.WorkspaceGuestAgent.ReadDir:output_type -> dshguest.v1.ReadDirResponse
+	17, // 39: dshguest.v1.WorkspaceGuestAgent.Mkdir:output_type -> dshguest.v1.MkdirResponse
+	19, // 40: dshguest.v1.WorkspaceGuestAgent.Delete:output_type -> dshguest.v1.DeleteResponse
+	21, // 41: dshguest.v1.WorkspaceGuestAgent.StartDaemon:output_type -> dshguest.v1.DaemonInfo
+	23, // 42: dshguest.v1.WorkspaceGuestAgent.ListDaemons:output_type -> dshguest.v1.ListDaemonsResponse
+	25, // 43: dshguest.v1.WorkspaceGuestAgent.StopDaemon:output_type -> dshguest.v1.StopDaemonResponse
+	27, // 44: dshguest.v1.WorkspaceGuestAgent.StopAllDaemons:output_type -> dshguest.v1.StopAllDaemonsResponse
+	21, // 45: dshguest.v1.WorkspaceGuestAgent.RestartDaemon:output_type -> dshguest.v1.DaemonInfo
+	30, // 46: dshguest.v1.WorkspaceGuestAgent.DaemonLogs:output_type -> dshguest.v1.DaemonLogsResponse
+	35, // 47: dshguest.v1.WorkspaceGuestAgent.Terminal:output_type -> dshguest.v1.TerminalOutput
+	33, // [33:48] is the sub-list for method output_type
+	18, // [18:33] is the sub-list for method input_type
+	18, // [18:18] is the sub-list for extension type_name
+	18, // [18:18] is the sub-list for extension extendee
+	0,  // [0:18] is the sub-list for field type_name
 }
 
 func init() { file_dshguest_v1_guest_proto_init() }
@@ -2023,13 +2783,28 @@ func file_dshguest_v1_guest_proto_init() {
 		(*WriteFileChunk_Start)(nil),
 		(*WriteFileChunk_DataChunk)(nil),
 	}
+	file_dshguest_v1_guest_proto_msgTypes[31].OneofWrappers = []any{
+		(*TerminalInput_Start)(nil),
+		(*TerminalInput_StdinChunk)(nil),
+		(*TerminalInput_Resize)(nil),
+		(*TerminalInput_Signal)(nil),
+		(*TerminalInput_InspectRequestId)(nil),
+		(*TerminalInput_Close)(nil),
+	}
+	file_dshguest_v1_guest_proto_msgTypes[35].OneofWrappers = []any{
+		(*TerminalOutput_Started)(nil),
+		(*TerminalOutput_StdoutChunk)(nil),
+		(*TerminalOutput_Exit)(nil),
+		(*TerminalOutput_Foreground)(nil),
+		(*TerminalOutput_Signalled)(nil),
+	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_dshguest_v1_guest_proto_rawDesc), len(file_dshguest_v1_guest_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   33,
+			NumMessages:   43,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

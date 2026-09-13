@@ -23,6 +23,7 @@ service WorkspaceGuestAgent {
   rpc StopAllDaemons(StopAllDaemonsRequest) returns (StopAllDaemonsResponse);
   rpc RestartDaemon(RestartDaemonRequest) returns (DaemonInfo);
   rpc DaemonLogs(DaemonLogsRequest) returns (DaemonLogsResponse);
+  rpc Terminal(stream TerminalInput) returns (stream TerminalOutput);
 }
 message ExecInput { oneof payload { ExecStart start = 1; bytes stdin_chunk = 2; } }
 message ExecStart { repeated string argv = 1; string cwd = 2; map<string, string> env = 3; }
@@ -55,3 +56,12 @@ message StopAllDaemonsResponse { repeated string daemons = 1; }
 message RestartDaemonRequest { string name = 1; }
 message DaemonLogsRequest { string name = 1; int32 tail_bytes = 2; }
 message DaemonLogsResponse { bytes stdout = 1; bytes stderr = 2; }
+message TerminalInput { oneof payload { TerminalStart start = 1; bytes stdin_chunk = 2; TerminalResize resize = 3; TerminalSignal signal = 4; string inspect_request_id = 5; bool close = 6; } }
+message TerminalStart { repeated string argv = 1; string cwd = 2; map<string, string> env = 3; uint32 rows = 4; uint32 cols = 5; }
+message TerminalResize { uint32 rows = 1; uint32 cols = 2; }
+message TerminalSignal { string signal = 1; string request_id = 2; }
+message TerminalOutput { oneof payload { TerminalStarted started = 1; bytes stdout_chunk = 2; TerminalExit exit = 3; TerminalForeground foreground = 4; TerminalSignalled signalled = 5; } }
+message TerminalStarted { int32 pid = 1; }
+message TerminalExit { int32 exit_code = 1; bool signaled = 2; string signal = 3; }
+message TerminalForeground { string request_id = 1; bool found = 2; int32 process_group_id = 3; bool input_waiting = 4; }
+message TerminalSignalled { string request_id = 1; bool found = 2; int32 process_group_id = 3; }

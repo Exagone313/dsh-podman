@@ -7,6 +7,7 @@ module github.com/Exagone313/dsh-podman
 go 1.27
 
 require (
+	github.com/creack/pty v1.1.24
 	github.com/opencontainers/runtime-spec v1.3.0
 	github.com/pelletier/go-toml/v2 v2.4.3
 	go.podman.io/buildah v1.45.0

@@ -37,6 +37,7 @@ const (
 	WorkspaceGuestAgent_StopAllDaemons_FullMethodName = "/dshguest.v1.WorkspaceGuestAgent/StopAllDaemons"
 	WorkspaceGuestAgent_RestartDaemon_FullMethodName  = "/dshguest.v1.WorkspaceGuestAgent/RestartDaemon"
 	WorkspaceGuestAgent_DaemonLogs_FullMethodName     = "/dshguest.v1.WorkspaceGuestAgent/DaemonLogs"
+	WorkspaceGuestAgent_Terminal_FullMethodName       = "/dshguest.v1.WorkspaceGuestAgent/Terminal"
 )
 
 // WorkspaceGuestAgentClient is the client API for WorkspaceGuestAgent service.
@@ -57,6 +58,7 @@ type WorkspaceGuestAgentClient interface {
 	StopAllDaemons(ctx context.Context, in *StopAllDaemonsRequest, opts ...grpc.CallOption) (*StopAllDaemonsResponse, error)
 	RestartDaemon(ctx context.Context, in *RestartDaemonRequest, opts ...grpc.CallOption) (*DaemonInfo, error)
 	DaemonLogs(ctx context.Context, in *DaemonLogsRequest, opts ...grpc.CallOption) (*DaemonLogsResponse, error)
+	Terminal(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[TerminalInput, TerminalOutput], error)
 }
 
 type workspaceGuestAgentClient struct {
@@ -222,6 +224,19 @@ func (c *workspaceGuestAgentClient) DaemonLogs(ctx context.Context, in *DaemonLo
 	return out, nil
 }
 
+func (c *workspaceGuestAgentClient) Terminal(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[TerminalInput, TerminalOutput], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &WorkspaceGuestAgent_ServiceDesc.Streams[3], WorkspaceGuestAgent_Terminal_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[TerminalInput, TerminalOutput]{ClientStream: stream}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type WorkspaceGuestAgent_TerminalClient = grpc.BidiStreamingClient[TerminalInput, TerminalOutput]
+
 // WorkspaceGuestAgentServer is the server API for WorkspaceGuestAgent service.
 // All implementations must embed UnimplementedWorkspaceGuestAgentServer
 // for forward compatibility.
@@ -240,6 +255,7 @@ type WorkspaceGuestAgentServer interface {
 	StopAllDaemons(context.Context, *StopAllDaemonsRequest) (*StopAllDaemonsResponse, error)
 	RestartDaemon(context.Context, *RestartDaemonRequest) (*DaemonInfo, error)
 	DaemonLogs(context.Context, *DaemonLogsRequest) (*DaemonLogsResponse, error)
+	Terminal(grpc.BidiStreamingServer[TerminalInput, TerminalOutput]) error
 	mustEmbedUnimplementedWorkspaceGuestAgentServer()
 }
 
@@ -291,6 +307,9 @@ func (UnimplementedWorkspaceGuestAgentServer) RestartDaemon(context.Context, *Re
 }
 func (UnimplementedWorkspaceGuestAgentServer) DaemonLogs(context.Context, *DaemonLogsRequest) (*DaemonLogsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method DaemonLogs not implemented")
+}
+func (UnimplementedWorkspaceGuestAgentServer) Terminal(grpc.BidiStreamingServer[TerminalInput, TerminalOutput]) error {
+	return status.Error(codes.Unimplemented, "method Terminal not implemented")
 }
 func (UnimplementedWorkspaceGuestAgentServer) mustEmbedUnimplementedWorkspaceGuestAgentServer() {}
 func (UnimplementedWorkspaceGuestAgentServer) testEmbeddedByValue()                             {}
@@ -536,6 +555,13 @@ func _WorkspaceGuestAgent_DaemonLogs_Handler(srv interface{}, ctx context.Contex
 	return interceptor(ctx, in, info, handler)
 }
 
+func _WorkspaceGuestAgent_Terminal_Handler(srv interface{}, stream grpc.ServerStream) error {
+	return srv.(WorkspaceGuestAgentServer).Terminal(&grpc.GenericServerStream[TerminalInput, TerminalOutput]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type WorkspaceGuestAgent_TerminalServer = grpc.BidiStreamingServer[TerminalInput, TerminalOutput]
+
 // WorkspaceGuestAgent_ServiceDesc is the grpc.ServiceDesc for WorkspaceGuestAgent service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -603,6 +629,12 @@ var WorkspaceGuestAgent_ServiceDesc = grpc.ServiceDesc{
 		{
 			StreamName:    "WriteFile",
 			Handler:       _WorkspaceGuestAgent_WriteFile_Handler,
+			ClientStreams: true,
+		},
+		{
+			StreamName:    "Terminal",
+			Handler:       _WorkspaceGuestAgent_Terminal_Handler,
+			ServerStreams: true,
 			ClientStreams: true,
 		},
 	},

@@ -4,24 +4,24 @@ SPDX-FileCopyrightText: 2026 Elouan Martinet <exa@elou.world>
 SPDX-License-Identifier: MIT
 -->
 
-# Install DeepSeek Harness & dsh-podman with Podman rootless
+# Install DeepSeek Harness & dsh-podman with rootless Podman
 
 ## Goals
 
 The goal of this guide is to install:
 
-- [DeepSeek Harness](https://deepseek.com/harness), referred later as _dsh_
-- the dsh-podman plugin in dsh, which replaces filesystem and shell access
+- [DeepSeek Harness](https://deepseek.com/harness), referred to later as _dsh_
+- the dsh-podman plugin in dsh, which replaces host filesystem and shell access
 - the dsh-podman orchestrator, a separate Podman container that integrates with
   Podman
 
 Having the dsh plugin and the orchestrator running as separate containers is an
-important part of the security design of dsh-podman: dsh itself doesn't have a
+important part of the security design of dsh-podman: dsh itself doesn't have
 direct access to Podman, only the orchestrator does, with limitations. dsh
 shouldn't be able to escalate privileges using this path, as the capabilities
 provided to dsh are constrained:
 
-- the names of pods, containers, volumes and secrets are prefixed by
+- the names of pods, containers, volumes and secrets are prefixed with
   `dsh-podman-`
 - mounted paths are limited to bind-mounted project directories and managed
   volumes
@@ -39,18 +39,17 @@ could be added in the future.
   DeepSeek
 - **dsh-podman**: this project
 - **dsh-podman plugin**: the plugin installed in dsh, which provides tools to
-  agents, a UI for manual settings and which connects to the orchestrator;
-  referred later as _plugin_
-- **dsh-podman orchestrator**: daemon that receives connections from the
+  agents and a UI for manual settings, and connects to the orchestrator;
+  referred to later as _plugin_
+- **dsh-podman orchestrator**: the daemon that receives connections from the
   dsh-podman plugin, has access to the Podman socket and manages containers and
-  other resources; it is running in a container; referred later as
-  _orchestrator_
-- **Podman socket**: while the Podman client can be used without a deamon, it is
+  other resources; it runs in a container; referred to later as _orchestrator_
+- **Podman socket**: while the Podman client can be used without a daemon, it is
   still possible to enable management through a socket, which is required by the
-  orchestrator to work as if it was running on the host system
+  orchestrator to work as if it were running on the host system
 - **guest container**: a container created by the dsh-podman orchestrator, in
-  relation with a dsh workspace
-- **dsh workspace**: in dsh, a project uses the name _workspace_, with their
+  relation to a dsh workspace
+- **dsh workspace**: in dsh, a project uses the name _workspace_, with its own
   dedicated directory
 
 ## Requirements
@@ -108,9 +107,8 @@ which adds Podman integration into systemd.
    ```
 2. Copy the files [dsh.container](../quadlet/dsh.container) and
    [dsh-podman-orchestrator.container](../quadlet/dsh-podman-orchestrator.container)
-   in `~/.config/containers/systemd/`.
-   - Adapt the files with your wanted project directory if you wish to change
-     it.
+   to `~/.config/containers/systemd/`.
+   - Adapt the files to your desired project directory if you wish to change it.
 3. Reload systemd session configuration:
    ```bash
    systemctl --user daemon-reload
@@ -123,14 +121,14 @@ which adds Podman integration into systemd.
    ```bash
    systemctl --user start dsh dsh-podman-orchestrator
    ```
-6. Check if there are startup errors from either containers:
+6. Check if there are startup errors from either container:
    ```bash
    journalctl --user -eu dsh
    ```
    ```bash
    journalctl --user -eu dsh-podman-orchestrator
    ```
-7. View dsh container logs:
+7. View the dsh container logs:
    ```bash
    podman logs dsh
    ```

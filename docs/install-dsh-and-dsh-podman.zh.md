@@ -11,7 +11,7 @@ SPDX-License-Identifier: MIT
 本指南的目标是安装：
 
 - [DeepSeek Harness](https://deepseek.com/harness)，下文简称 _dsh_
-- dsh 中的 dsh-podman 插件，它取代了文件系统和 shell 访问
+- dsh 中的 dsh-podman 插件，它取代了宿主的文件系统和 shell 访问
 - dsh-podman 编排器，一个与 Podman 集成的独立 Podman 容器
 
 将 dsh 插件和编排器作为独立的容器运行，是 dsh-podman 安全设计的重要一环： dsh
@@ -37,7 +37,7 @@ SPDX-License-Identifier: MIT
 - **Podman 套接字**：虽然 Podman
   客户端可以在没有守护进程的情况下使用，但仍然可以通过套接字启用管理，这是编排器以仿佛在主机系统上运行的方式工作所必需的
 - **guest 容器**：由 dsh-podman 编排器创建的容器，与 dsh 工作区相关联
-- **dsh 工作区**：在 dsh 中，项目使用 _workspace_ 这一名称，并带有其专用目录
+- **dsh 工作区**：在 dsh 中，项目使用 _workspace_ 这一名称，并有自己的专用目录
 
 ## 要求
 

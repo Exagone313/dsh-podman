@@ -13,7 +13,6 @@ import {
 } from "./mount-enums.js";
 import { metadata } from "./workspace-binding.js";
 import { PassThrough } from "node:stream";
-import { createHash } from "node:crypto";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { isAbsolute, join, resolve as resolvePath } from "node:path";
@@ -2376,8 +2375,9 @@ export function createFilesystemProvider(resolver: WorkspaceResolver): Filesyste
         { create: true, truncate: true },
         signal,
       );
+      const afterInfo = await guestStatResponse(target, signal);
       return {
-        version: `agent:${createHash("sha256").update(after).digest("hex")}`,
+        version: guestVersion(afterInfo),
         before,
         after,
       };

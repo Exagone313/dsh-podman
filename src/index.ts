@@ -3040,11 +3040,14 @@ export function publicImage(image: any): Record<string, unknown> {
 }
 
 export function publicDaemon(info: any): Record<string, unknown> {
+  const running = info?.running ?? false;
   return {
     name: info?.name ?? "",
     argv: info?.argv ?? [],
-    running: info?.running ?? false,
-    ...(info?.exitCode !== undefined && info?.exitCode !== null
+    running,
+    // An exit code only means something once the daemon has exited; the proto
+    // field defaults to 0 while it runs.
+    ...(!running && info?.exitCode !== undefined && info?.exitCode !== null
       ? { exitCode: info.exitCode }
       : {}),
     ...(info?.startedAt ? { startedAt: info.startedAt } : {}),

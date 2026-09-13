@@ -28,6 +28,7 @@ import {
   PODMAN_OPS_AGENT_CORDIS_YML,
   ensurePodmanOpsPreset,
   publicContainer,
+  publicDaemon,
   toolCallView,
   toolResultView,
   HARNESS_SOURCE_SECTION,
@@ -1879,6 +1880,16 @@ test("publicContainer rebuilds a safe object from an API row", () => {
     { projectName: "team", mode: "read_write", kind: "project" },
   ]);
   assert.deepEqual(out.env, { PATH: "/bin", DB_PASSWORD: "hunter2" });
+});
+
+test("publicDaemon omits the exit code while the daemon runs", () => {
+  const running = publicDaemon({ name: "web", argv: ["sleep", "600"], running: true, exitCode: 0 });
+  assert.equal(running.running, true);
+  assert.equal("exitCode" in running, false);
+
+  const exited = publicDaemon({ name: "web", argv: ["sleep", "600"], running: false, exitCode: 3 });
+  assert.equal(exited.running, false);
+  assert.equal(exited.exitCode, 3);
 });
 
 test("container_recreate returns the logical container name", async () => {

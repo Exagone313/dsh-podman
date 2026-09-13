@@ -346,9 +346,13 @@ test("resolveForPath rejects paths it cannot map to a workspace", async () => {
     () => resolver.resolveForPath("README.md", undefined),
     /session working directory/,
   );
+  // A path outside every workspace is not in any container's filesystem: it is
+  // reported with the harness's missing-path code so callers treat it as absent
+  // (agent-instructions walks ancestors above the workspace this way).
   await assert.rejects(
     () => resolver.resolveForPath("/elsewhere/file", undefined),
-    /cannot resolve a DH workspace for path/,
+    (error: unknown) =>
+      error instanceof Error && (error as { code?: string }).code === "FS_NOT_FOUND",
   );
 });
 

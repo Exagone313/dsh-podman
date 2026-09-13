@@ -53,12 +53,15 @@ export class WorkspaceResolver {
   // Resolve the workspace binding for a filesystem path when the caller did not
   // supply a session working directory. The 0.1.5 `fs.resolve` contract allows
   // `{ signal }` alone, and the workspace that CONTAINS the path is the only
-  // sensible owner, so match it by longest canonical-path prefix.
+  // sensible owner, so match it by longest canonical-path prefix. A path
+  // outside every workspace is not in any container's filesystem, so it is
+  // reported as missing rather than failing the caller.
   async resolveForPath(path: string, cwd: unknown): Promise<WorkspaceBinding> {
     if (typeof cwd === "string" && cwd !== "") return this.resolve(cwd);
     if (isAbsolute(path)) {
       const workspace = this.containingWorkspace(path);
       if (workspace !== undefined) return this.resolve(String(workspace.path));
+      throw notFoundError(`no DH workspace contains path ${JSON.stringify(path)}`);
     }
     throw new Error(
       `cannot resolve a DH workspace for path ${JSON.stringify(path)}; pass a session working directory`,
@@ -183,6 +186,17 @@ export class WorkspaceResolver {
       metadata(this.config.controlToken),
     );
   }
+}
+
+// The harness's missing-path code (`FsErrorCode` `'FS_NOT_FOUND'`, raised by
+// the local backend for a nonexistent path). A path outside every workspace is
+// not part of any container's filesystem, so callers must see it as absent:
+// agent-instructions' project-root walk probes ancestors above the workspace
+// and only continues when this code comes back.
+function notFoundError(message: string): Error {
+  const error = new Error(message);
+  (error as { code?: string }).code = "FS_NOT_FOUND";
+  return error;
 }
 
 function waitForReady(agent: grpc.Client): Promise<void> {

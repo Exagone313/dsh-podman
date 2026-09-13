@@ -56,6 +56,39 @@ func (w *WorkspaceFS) Resolve(path string, write bool) (string, bool, error) {
 	}
 	return "", false, fmt.Errorf("path is outside configured mounts")
 }
+
+// ResolveEntry resolves a path like Resolve, but does not follow a symlink at
+// the final component: the parent is resolved for containment and the entry
+// itself is left for the caller to inspect with os.Lstat.
+func (w *WorkspaceFS) ResolveEntry(path string) (string, error) {
+	if !filepath.IsAbs(path) {
+		return "", fmt.Errorf("path must be absolute")
+	}
+	clean := filepath.Clean(path)
+	for _, mount := range w.mounts {
+		if clean != mount.Virtual && !strings.HasPrefix(clean, mount.Virtual+string(filepath.Separator)) {
+			continue
+		}
+		if clean == mount.Virtual {
+			// The mount root is its own entry; nothing to leave unfollowed.
+			return filepath.EvalSymlinks(mount.Host)
+		}
+		candidate := filepath.Join(mount.Host, strings.TrimPrefix(clean, mount.Virtual))
+		resolvedParent, err := resolveForCheck(filepath.Dir(candidate))
+		if err != nil {
+			return "", err
+		}
+		root, err := filepath.EvalSymlinks(mount.Host)
+		if err != nil {
+			return "", err
+		}
+		if resolvedParent != root && !strings.HasPrefix(resolvedParent, root+string(filepath.Separator)) {
+			return "", fmt.Errorf("path escapes mount")
+		}
+		return filepath.Join(resolvedParent, filepath.Base(candidate)), nil
+	}
+	return "", fmt.Errorf("path is outside configured mounts")
+}
 func resolveForCheck(path string) (string, error) {
 	if _, err := os.Lstat(path); err == nil {
 		return filepath.EvalSymlinks(path)

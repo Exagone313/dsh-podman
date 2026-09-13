@@ -5,6 +5,7 @@
 package grpcserver
 
 import (
+	"bytes"
 	"context"
 	"os"
 	"path/filepath"
@@ -16,6 +17,7 @@ import (
 	guest "github.com/Exagone313/dsh-podman/internal/genproto/dshguest/v1"
 	"github.com/Exagone313/dsh-podman/internal/guestagent/daemon"
 	workspacefs "github.com/Exagone313/dsh-podman/internal/guestagent/fs"
+	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/wrapperspb"
@@ -29,6 +31,21 @@ func newTestServer(t *testing.T) (*Server, string) {
 		t.Fatal(err)
 	}
 	return New().WithFS(filesystem), root
+}
+
+// readFileStream collects the chunks a ReadFile handler sends.
+type readFileStream struct {
+	grpc.ServerStream
+	chunks [][]byte
+}
+
+func (s *readFileStream) Send(chunk *guest.ReadFileChunk) error {
+	s.chunks = append(s.chunks, append([]byte(nil), chunk.GetData()...))
+	return nil
+}
+
+func (s *readFileStream) data() string {
+	return string(bytes.Join(s.chunks, nil))
 }
 
 func TestValidateProcessID(t *testing.T) {
@@ -195,6 +212,52 @@ func TestStatRejectsEscape(t *testing.T) {
 	_, err := server.Stat(context.Background(), &guest.StatRequest{Path: "/etc/passwd"})
 	if status.Code(err) != codes.PermissionDenied {
 		t.Fatalf("expected PermissionDenied, got %v", err)
+	}
+}
+
+func TestStatNoFollowSymlink(t *testing.T) {
+	server, root := newTestServer(t)
+	target := filepath.Join(root, "target")
+	if err := os.WriteFile(target, []byte("data"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(target, filepath.Join(root, "link")); err != nil {
+		t.Fatal(err)
+	}
+	followed, err := server.Stat(context.Background(), &guest.StatRequest{Path: "/workspace/link"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !followed.Exists || followed.IsSymlink {
+		t.Fatalf("expected followed symlink, got %#v", followed)
+	}
+	entry, err := server.Stat(context.Background(), &guest.StatRequest{Path: "/workspace/link", NoFollow: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !entry.Exists || !entry.IsSymlink {
+		t.Fatalf("expected symlink entry, got %#v", entry)
+	}
+}
+
+func TestReadFileOffsetAndLength(t *testing.T) {
+	server, root := newTestServer(t)
+	if err := os.WriteFile(filepath.Join(root, "file"), []byte("0123456789"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	window := &readFileStream{}
+	if err := server.ReadFile(&guest.ReadFileRequest{Path: "/workspace/file", Offset: 3, Length: 4}, window); err != nil {
+		t.Fatal(err)
+	}
+	if got := window.data(); got != "3456" {
+		t.Fatalf("ReadFile window = %q, want %q", got, "3456")
+	}
+	toEOF := &readFileStream{}
+	if err := server.ReadFile(&guest.ReadFileRequest{Path: "/workspace/file", Offset: 3}, toEOF); err != nil {
+		t.Fatal(err)
+	}
+	if got := toEOF.data(); got != "3456789" {
+		t.Fatalf("ReadFile to EOF = %q, want %q", got, "3456789")
 	}
 }
 

@@ -30,13 +30,13 @@ message ExecOutput { oneof payload { bytes stdout_chunk = 1; bytes stderr_chunk 
 message ExecExit { int32 exit_code = 1; bool signaled = 2; string signal = 3; }
 message SignalRequest { string process_id = 1; string signal = 2; }
 message SignalResponse {}
-message ReadFileRequest { string path = 1; }
+message ReadFileRequest { string path = 1; int64 offset = 2; int64 length = 3; }
 message ReadFileChunk { bytes data = 1; }
 message WriteFileChunk { oneof payload { WriteFileStart start = 1; bytes data_chunk = 2; } }
 message WriteFileStart { string path = 1; bool create = 2; bool truncate = 3; }
 message WriteFileResponse { int64 bytes_written = 1; }
-message StatRequest { string path = 1; }
-message StatResponse { bool exists = 1; bool is_dir = 2; int64 size = 3; string mode = 4; string modified_at = 5; }
+message StatRequest { string path = 1; bool no_follow = 2; }
+message StatResponse { bool exists = 1; bool is_dir = 2; int64 size = 3; string mode = 4; string modified_at = 5; bool is_symlink = 6; }
 message ReadDirRequest { string path = 1; }
 message ReadDirResponse { repeated DirEntry entries = 1; }
 message DirEntry { string name = 1; bool is_dir = 2; int64 size = 3; }

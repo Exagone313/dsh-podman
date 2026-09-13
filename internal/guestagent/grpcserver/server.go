@@ -347,6 +347,12 @@ func (s *Server) resolve(path string, write bool) (string, error) {
 	resolved, _, err := s.FS.Resolve(path, write)
 	return resolved, err
 }
+func (s *Server) resolveEntry(path string) (string, error) {
+	if s.FS == nil {
+		return "", errors.New("filesystem is not configured")
+	}
+	return s.FS.ResolveEntry(path)
+}
 func (s *Server) ReadFile(request *guest.ReadFileRequest, stream guest.WorkspaceGuestAgent_ReadFileServer) error {
 	slog.Info("guest agent ReadFile requested", "path", request.GetPath())
 	path, err := s.resolve(request.GetPath(), false)
@@ -358,12 +364,29 @@ func (s *Server) ReadFile(request *guest.ReadFileRequest, stream guest.Workspace
 		return status.Error(codes.NotFound, err.Error())
 	}
 	defer file.Close()
+	if request.GetOffset() > 0 {
+		if _, err := file.Seek(request.GetOffset(), io.SeekStart); err != nil {
+			return status.Error(codes.Internal, err.Error())
+		}
+	}
+	remaining := request.GetLength()
+	limited := remaining > 0
 	buffer := make([]byte, 32*1024)
 	for {
-		n, readErr := file.Read(buffer)
+		readSize := len(buffer)
+		if limited && int64(readSize) > remaining {
+			readSize = int(remaining)
+		}
+		n, readErr := file.Read(buffer[:readSize])
 		if n > 0 {
+			if limited {
+				remaining -= int64(n)
+			}
 			if err := stream.Send(&guest.ReadFileChunk{Data: append([]byte(nil), buffer[:n]...)}); err != nil {
 				return err
+			}
+			if limited && remaining == 0 {
+				return nil
 			}
 		}
 		if errors.Is(readErr, io.EOF) {
@@ -437,18 +460,30 @@ func (s *Server) WriteFile(stream guest.WorkspaceGuestAgent_WriteFileServer) err
 }
 func (s *Server) Stat(_ context.Context, request *guest.StatRequest) (*guest.StatResponse, error) {
 	slog.Info("guest agent Stat requested", "path", request.GetPath())
-	path, err := s.resolve(request.GetPath(), false)
+	noFollow := request.GetNoFollow()
+	var path string
+	var err error
+	if noFollow {
+		path, err = s.resolveEntry(request.GetPath())
+	} else {
+		path, err = s.resolve(request.GetPath(), false)
+	}
 	if err != nil {
 		return nil, status.Error(codes.PermissionDenied, err.Error())
 	}
-	info, err := os.Stat(path)
+	var info os.FileInfo
+	if noFollow {
+		info, err = os.Lstat(path)
+	} else {
+		info, err = os.Stat(path)
+	}
 	if err != nil {
 		if os.IsNotExist(err) {
 			return &guest.StatResponse{}, nil
 		}
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	return &guest.StatResponse{Exists: true, IsDir: info.IsDir(), Size: info.Size(), Mode: info.Mode().String(), ModifiedAt: info.ModTime().UTC().Format(time.RFC3339Nano)}, nil
+	return &guest.StatResponse{Exists: true, IsDir: info.IsDir(), Size: info.Size(), Mode: info.Mode().String(), ModifiedAt: info.ModTime().UTC().Format(time.RFC3339Nano), IsSymlink: noFollow && info.Mode()&os.ModeSymlink != 0}, nil
 }
 func (s *Server) ReadDir(_ context.Context, request *guest.ReadDirRequest) (*guest.ReadDirResponse, error) {
 	slog.Info("guest agent ReadDir requested", "path", request.GetPath())

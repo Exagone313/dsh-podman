@@ -425,6 +425,8 @@ func (*SignalResponse) Descriptor() ([]byte, []int) {
 type ReadFileRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Path          string                 `protobuf:"bytes,1,opt,name=path,proto3" json:"path,omitempty"`
+	Offset        int64                  `protobuf:"varint,2,opt,name=offset,proto3" json:"offset,omitempty"`
+	Length        int64                  `protobuf:"varint,3,opt,name=length,proto3" json:"length,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -464,6 +466,20 @@ func (x *ReadFileRequest) GetPath() string {
 		return x.Path
 	}
 	return ""
+}
+
+func (x *ReadFileRequest) GetOffset() int64 {
+	if x != nil {
+		return x.Offset
+	}
+	return 0
+}
+
+func (x *ReadFileRequest) GetLength() int64 {
+	if x != nil {
+		return x.Length
+	}
+	return 0
 }
 
 type ReadFileChunk struct {
@@ -699,6 +715,7 @@ func (x *WriteFileResponse) GetBytesWritten() int64 {
 type StatRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Path          string                 `protobuf:"bytes,1,opt,name=path,proto3" json:"path,omitempty"`
+	NoFollow      bool                   `protobuf:"varint,2,opt,name=no_follow,json=noFollow,proto3" json:"no_follow,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -740,6 +757,13 @@ func (x *StatRequest) GetPath() string {
 	return ""
 }
 
+func (x *StatRequest) GetNoFollow() bool {
+	if x != nil {
+		return x.NoFollow
+	}
+	return false
+}
+
 type StatResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Exists        bool                   `protobuf:"varint,1,opt,name=exists,proto3" json:"exists,omitempty"`
@@ -747,6 +771,7 @@ type StatResponse struct {
 	Size          int64                  `protobuf:"varint,3,opt,name=size,proto3" json:"size,omitempty"`
 	Mode          string                 `protobuf:"bytes,4,opt,name=mode,proto3" json:"mode,omitempty"`
 	ModifiedAt    string                 `protobuf:"bytes,5,opt,name=modified_at,json=modifiedAt,proto3" json:"modified_at,omitempty"`
+	IsSymlink     bool                   `protobuf:"varint,6,opt,name=is_symlink,json=isSymlink,proto3" json:"is_symlink,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -814,6 +839,13 @@ func (x *StatResponse) GetModifiedAt() string {
 		return x.ModifiedAt
 	}
 	return ""
+}
+
+func (x *StatResponse) GetIsSymlink() bool {
+	if x != nil {
+		return x.IsSymlink
+	}
+	return false
 }
 
 type ReadDirRequest struct {
@@ -1769,9 +1801,11 @@ const file_dshguest_v1_guest_proto_rawDesc = "" +
 	"\n" +
 	"process_id\x18\x01 \x01(\tR\tprocessId\x12\x16\n" +
 	"\x06signal\x18\x02 \x01(\tR\x06signal\"\x10\n" +
-	"\x0eSignalResponse\"%\n" +
+	"\x0eSignalResponse\"U\n" +
 	"\x0fReadFileRequest\x12\x12\n" +
-	"\x04path\x18\x01 \x01(\tR\x04path\"#\n" +
+	"\x04path\x18\x01 \x01(\tR\x04path\x12\x16\n" +
+	"\x06offset\x18\x02 \x01(\x03R\x06offset\x12\x16\n" +
+	"\x06length\x18\x03 \x01(\x03R\x06length\"#\n" +
 	"\rReadFileChunk\x12\x12\n" +
 	"\x04data\x18\x01 \x01(\fR\x04data\"q\n" +
 	"\x0eWriteFileChunk\x123\n" +
@@ -1784,16 +1818,19 @@ const file_dshguest_v1_guest_proto_rawDesc = "" +
 	"\x06create\x18\x02 \x01(\bR\x06create\x12\x1a\n" +
 	"\btruncate\x18\x03 \x01(\bR\btruncate\"8\n" +
 	"\x11WriteFileResponse\x12#\n" +
-	"\rbytes_written\x18\x01 \x01(\x03R\fbytesWritten\"!\n" +
+	"\rbytes_written\x18\x01 \x01(\x03R\fbytesWritten\">\n" +
 	"\vStatRequest\x12\x12\n" +
-	"\x04path\x18\x01 \x01(\tR\x04path\"\x86\x01\n" +
+	"\x04path\x18\x01 \x01(\tR\x04path\x12\x1b\n" +
+	"\tno_follow\x18\x02 \x01(\bR\bnoFollow\"\xa5\x01\n" +
 	"\fStatResponse\x12\x16\n" +
 	"\x06exists\x18\x01 \x01(\bR\x06exists\x12\x15\n" +
 	"\x06is_dir\x18\x02 \x01(\bR\x05isDir\x12\x12\n" +
 	"\x04size\x18\x03 \x01(\x03R\x04size\x12\x12\n" +
 	"\x04mode\x18\x04 \x01(\tR\x04mode\x12\x1f\n" +
 	"\vmodified_at\x18\x05 \x01(\tR\n" +
-	"modifiedAt\"$\n" +
+	"modifiedAt\x12\x1d\n" +
+	"\n" +
+	"is_symlink\x18\x06 \x01(\bR\tisSymlink\"$\n" +
 	"\x0eReadDirRequest\x12\x12\n" +
 	"\x04path\x18\x01 \x01(\tR\x04path\"B\n" +
 	"\x0fReadDirResponse\x12/\n" +

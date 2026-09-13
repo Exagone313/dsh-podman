@@ -167,3 +167,36 @@ func TestResolveDetectsSymlinkedHostRoot(t *testing.T) {
 		t.Fatalf("resolved %q is outside evaluated mount root %q", path, resolved)
 	}
 }
+
+func TestResolveEntryDoesNotFollowFinalSymlink(t *testing.T) {
+	root := tempDir(t)
+	target := filepath.Join(root, "target")
+	if err := os.WriteFile(target, []byte("data"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	link := filepath.Join(root, "link")
+	if err := os.Symlink(target, link); err != nil {
+		t.Fatal(err)
+	}
+	w, err := New([]Mount{{Virtual: "/workspace", Host: root}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resolved, _, err := w.Resolve("/workspace/link", false); err != nil {
+		t.Fatal(err)
+	} else if resolved != target {
+		t.Fatalf("Resolve followed to %q, want %q", resolved, target)
+	}
+	entry, err := w.ResolveEntry("/workspace/link")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if entry != link {
+		t.Fatalf("ResolveEntry returned %q, want %q", entry, link)
+	}
+	if info, err := os.Lstat(entry); err != nil {
+		t.Fatal(err)
+	} else if info.Mode()&os.ModeSymlink == 0 {
+		t.Fatalf("ResolveEntry returned a non-symlink entry %q", entry)
+	}
+}

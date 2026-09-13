@@ -2540,3 +2540,123 @@ test("podmanRuntimeSection clarifies that the built-in tools run in the containe
   assert.match(section.text, /There is no host shell/);
   assert.match(section.text, /container_\*/);
 });
+
+// A fake guest whose readFile honors offset/length, so the provider's byte
+// windowing and text decoding can be exercised without a container.
+function fakeGuest(source: Buffer) {
+  const requests: Record<string, unknown>[] = [];
+  return {
+    requests,
+    guest: {
+      readFile: (request: Record<string, unknown>) => {
+        requests.push(request);
+        return {
+          async *[Symbol.asyncIterator]() {
+            const offset = Number(request.offset ?? 0);
+            const length = Number(request.length ?? 0);
+            const slice =
+              length > 0
+                ? source.subarray(offset, offset + length)
+                : source.subarray(offset);
+            yield { data: slice };
+          },
+        };
+      },
+    },
+  };
+}
+
+function providerFor(guest: unknown) {
+  return createFilesystemProvider({
+    resolveForPath: async () => ({ guest, token: "t" }),
+  } as any);
+}
+
+test("filesystem provider lstat maps entry types without following links", async () => {
+  const requests: Record<string, unknown>[] = [];
+  const provider = createFilesystemProvider({
+    resolveForPath: async () => ({
+      guest: {
+        stat: (request: Record<string, unknown>, _metadata: unknown, callback: Function) => {
+          requests.push(request);
+          callback(null, {
+            exists: true,
+            isDir: false,
+            isSymlink: true,
+            size: "3",
+            mode: "Lrwxrwxrwx",
+            modifiedAt: "t",
+          });
+        },
+      },
+      token: "t",
+    }),
+  } as any);
+  const info = await provider.lstat("/projects/team/link", { cwd: "/projects/team" });
+  assert.equal(info.type, "symlink");
+  assert.equal(info.size, 3);
+  assert.deepEqual(requests, [{ path: "/projects/team/link", noFollow: true }]);
+});
+
+test("filesystem provider lstat reports an absent entry as undefined", async () => {
+  const provider = createFilesystemProvider({
+    resolveForPath: async () => ({
+      guest: {
+        stat: (_request: unknown, _metadata: unknown, callback: Function) =>
+          callback(null, { exists: false }),
+      },
+      token: "t",
+    }),
+  } as any);
+  assert.equal(await provider.lstat("/projects/team/missing", { cwd: "/x" }), undefined);
+});
+
+test("filesystem provider streamText decodes UTF-8 and rejects binary", async () => {
+  const text = providerFor(fakeGuest(Buffer.from("héllo")).guest);
+  const textTarget = await text.resolve("/a", { cwd: "/x" });
+  let decoded = "";
+  for await (const chunk of await text.streamText(textTarget)) decoded += chunk;
+  assert.equal(decoded, "héllo");
+
+  const binary = providerFor(fakeGuest(Buffer.from([0x68, 0x00, 0x69])).guest);
+  const binaryTarget = await binary.resolve("/a", { cwd: "/x" });
+  await assert.rejects(
+    async () => {
+      for await (const _chunk of await binary.streamText(binaryTarget)) {
+        // Drain the stream so the binary sample is inspected.
+      }
+    },
+    (error: unknown) =>
+      error instanceof Error && (error as { code?: string }).code === "FS_NOT_TEXT",
+  );
+});
+
+test("filesystem provider readBytes returns content and caps at maxBytes", async () => {
+  const fake = fakeGuest(Buffer.from("hello"));
+  const provider = providerFor(fake.guest);
+  const target = await provider.resolve("/a", { cwd: "/x" });
+
+  const bytes = await provider.readBytes(target, undefined, 10);
+  assert.equal(Buffer.from(bytes).toString(), "hello");
+  assert.equal(fake.requests[0].length, 11);
+
+  await assert.rejects(
+    () => provider.readBytes(target, undefined, 3),
+    (error: unknown) =>
+      error instanceof Error && (error as { code?: string }).code === "FS_TOO_LARGE",
+  );
+});
+
+test("filesystem provider readByteRange returns the window and empty for zero length", async () => {
+  const fake = fakeGuest(Buffer.from("abcdef"));
+  const provider = providerFor(fake.guest);
+  const target = await provider.resolve("/a", { cwd: "/x" });
+
+  const empty = await provider.readByteRange(target, { offset: 0, length: 0 });
+  assert.equal(empty.length, 0);
+  assert.equal(fake.requests.length, 0);
+
+  const window = await provider.readByteRange(target, { offset: 1, length: 3 });
+  assert.equal(Buffer.from(window).toString(), "bcd");
+  assert.deepEqual(fake.requests[0], { path: "/a", offset: 1, length: 3 });
+});

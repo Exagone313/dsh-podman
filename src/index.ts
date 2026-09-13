@@ -127,7 +127,23 @@ export interface FilesystemProvider {
   processPath(target: any): string;
   fileUrl(target: any): string;
   contains(parent: any, child: any): boolean;
-  readText(target: any): Promise<string>;
+  readText(target: any, signal?: AbortSignal): Promise<string>;
+  streamText(target: any, signal?: AbortSignal): Promise<AsyncIterable<string>>;
+  readBytes(
+    target: any,
+    signal: AbortSignal | undefined,
+    maxBytes: number,
+  ): Promise<Uint8Array>;
+  readByteRange(
+    target: any,
+    range: { offset: number; length: number },
+    signal?: AbortSignal,
+  ): Promise<Uint8Array>;
+  lstat(
+    path: string,
+    opts?: any,
+    signal?: AbortSignal,
+  ): Promise<any | undefined>;
   writeText(target: any, content: string, expected?: any): Promise<any>;
   stat(target: any): Promise<any>;
   listDir(target: any): Promise<any>;
@@ -2018,6 +2034,74 @@ function registerTools(ctx: any, resolver: WorkspaceResolver): void {
     );
   }
 }
+// Binary detection samples only the head of a file, matching the harness's
+// local backend (`fs-local`).
+const BINARY_SAMPLE_BYTES = 8192;
+
+function fsError(code: string, message: string): Error {
+  const error = new Error(message);
+  (error as { code?: string }).code = code;
+  return error;
+}
+
+// Open the guest's ReadFile stream. A zero/absent length reads to EOF.
+function guestReadStream(
+  target: any,
+  range?: { offset?: number; length?: number },
+): any {
+  const request: Record<string, unknown> = { path: target.targetKey };
+  if (range?.offset !== undefined && range.offset > 0) {
+    request.offset = range.offset;
+  }
+  if (range?.length !== undefined && range.length > 0) {
+    request.length = range.length;
+  }
+  return (target.binding.guest as any).readFile(
+    request,
+    metadata(target.binding.token),
+  );
+}
+
+// Stream the guest file as decoded UTF-8 text, rejecting binary content (a NUL
+// byte in the head, or invalid UTF-8) with the harness's FS_NOT_TEXT code.
+async function* guestTextChunks(target: any): AsyncIterable<string> {
+  const call = guestReadStream(target);
+  const decoder = new TextDecoder("utf-8", { fatal: true });
+  let sampled = 0;
+  try {
+    for await (const chunk of call) {
+      const buffer = Buffer.from(chunk.data);
+      if (sampled < BINARY_SAMPLE_BYTES) {
+        const sample = buffer.subarray(
+          0,
+          Math.min(buffer.length, BINARY_SAMPLE_BYTES - sampled),
+        );
+        if (sample.includes(0)) {
+          throw fsError(
+            "FS_NOT_TEXT",
+            `cannot read "${target.displayPath}": binary file`,
+          );
+        }
+        sampled += sample.length;
+      }
+      const text = decoder.decode(buffer, { stream: true });
+      if (text !== "") yield text;
+    }
+    const tail = decoder.decode();
+    if (tail !== "") yield tail;
+  } catch (error) {
+    // A fatal TextDecoder failure is a TypeError; anything else (our own
+    // FS_NOT_TEXT, or a transport error) keeps its identity.
+    if (error instanceof TypeError) {
+      throw fsError(
+        "FS_NOT_TEXT",
+        `cannot read "${target.displayPath}": invalid UTF-8 text`,
+      );
+    }
+    throw error;
+  }
+}
+
 export function createFilesystemProvider(resolver: WorkspaceResolver): FilesystemProvider {
   return {
     resolve: async (path: string, opts?: any) => {
@@ -2033,18 +2117,72 @@ export function createFilesystemProvider(resolver: WorkspaceResolver): Filesyste
     contains: (parent: any, child: any) =>
       child.targetKey === parent.targetKey ||
       child.targetKey.startsWith(`${parent.targetKey}/`),
-    readText: async (target: any) => {
+    readText: async (target: any, _signal?: AbortSignal) => {
+      let text = "";
+      for await (const chunk of guestTextChunks(target)) text += chunk;
+      return text;
+    },
+    streamText: (target: any, _signal?: AbortSignal) =>
+      Promise.resolve(guestTextChunks(target)),
+    readBytes: async (
+      target: any,
+      _signal: AbortSignal | undefined,
+      maxBytes: number,
+    ) => {
+      const call = guestReadStream(target, { length: maxBytes + 1 });
       const chunks: Buffer[] = [];
-      await new Promise<void>((resolveDone, reject) => {
-        const call = (target.binding.guest as any).readFile(
-          { path: target.targetKey },
-          metadata(target.binding.token),
-        );
-        call.on("data", (chunk: any) => chunks.push(Buffer.from(chunk.data)));
-        call.on("error", reject);
-        call.on("end", resolveDone);
+      let total = 0;
+      for await (const chunk of call) {
+        const buffer = Buffer.from(chunk.data);
+        total += buffer.length;
+        if (total > maxBytes) {
+          throw fsError(
+            "FS_TOO_LARGE",
+            `cannot read "${target.displayPath}": content exceeds the ${maxBytes}-byte limit`,
+          );
+        }
+        chunks.push(buffer);
+      }
+      return Buffer.concat(chunks, total);
+    },
+    readByteRange: async (
+      target: any,
+      range: { offset: number; length: number },
+      _signal?: AbortSignal,
+    ) => {
+      if (range.length === 0) return new Uint8Array(0);
+      const call = guestReadStream(target, {
+        offset: range.offset,
+        length: range.length,
       });
-      return Buffer.concat(chunks).toString("utf8");
+      const chunks: Buffer[] = [];
+      let total = 0;
+      for await (const chunk of call) {
+        const buffer = Buffer.from(chunk.data);
+        total += buffer.length;
+        chunks.push(buffer);
+      }
+      return Buffer.concat(chunks, total);
+    },
+    lstat: async (path: string, opts?: any, _signal?: AbortSignal) => {
+      const resolved = resolveGuestPath(path, opts?.cwd);
+      const binding = await resolver.resolveForPath(resolved, opts?.cwd);
+      const result: any = await unaryGuest({ binding }, "stat", {
+        path: resolved,
+        noFollow: true,
+      });
+      if (!result?.exists) return undefined;
+      return {
+        version: guestVersion(result),
+        type: result.isSymlink
+          ? "symlink"
+          : result.isDir
+            ? "directory"
+            : "file",
+        ...(result.size !== undefined && result.size !== null
+          ? { size: Number(result.size) }
+          : {}),
+      };
     },
     writeText: async (target: any, content: string, expected?: any) => {
       const current = await guestStatResponse(target);

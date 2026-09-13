@@ -60,7 +60,7 @@ func (s *Server) Exec(stream guest.WorkspaceGuestAgent_ExecServer) error {
 		argv0 = argv[0]
 	}
 	slog.Info("guest agent Exec started", "argv0", argv0, "argc", len(argv))
-	process, err := s.Processes.Start(stream.Context(), start.GetArgv(), start.GetCwd(), start.GetEnv())
+	process, err := s.Processes.Start(stream.Context(), start.GetArgv(), start.GetCwd(), start.GetEnv(), start.GetUnsetEnv()...)
 	if err != nil {
 		return status.Error(codes.InvalidArgument, err.Error())
 	}
@@ -90,6 +90,8 @@ func (s *Server) Exec(stream guest.WorkspaceGuestAgent_ExecServer) error {
 		return status.Error(codes.InvalidArgument, err.Error())
 	}
 	started = true
+	spillStdout := s.newSpill(start.GetSpillStdout().GetPath(), start.GetSpillStdout().GetMaxBytes())
+	spillStderr := s.newSpill(start.GetSpillStderr().GetPath(), start.GetSpillStderr().GetMaxBytes())
 	var sendMu sync.Mutex
 	send := func(output *guest.ExecOutput) error {
 		output.ProcessId = process.ID
@@ -98,12 +100,15 @@ func (s *Server) Exec(stream guest.WorkspaceGuestAgent_ExecServer) error {
 		return stream.Send(output)
 	}
 	errCh := make(chan error, 2)
-	copyOutput := func(reader io.Reader, stderr bool) {
+	var copies sync.WaitGroup
+	copyOutput := func(reader io.Reader, stderr bool, spill *spillWriter) {
+		defer copies.Done()
 		buffer := make([]byte, 32*1024)
 		for {
 			n, readErr := reader.Read(buffer)
 			if n > 0 {
 				data := append([]byte(nil), buffer[:n]...)
+				spill.write(data)
 				output := &guest.ExecOutput{}
 				if stderr {
 					output.Payload = &guest.ExecOutput_StderrChunk{StderrChunk: data}
@@ -123,8 +128,9 @@ func (s *Server) Exec(stream guest.WorkspaceGuestAgent_ExecServer) error {
 			}
 		}
 	}
-	go copyOutput(stdout, false)
-	go copyOutput(stderr, true)
+	copies.Add(2)
+	go copyOutput(stdout, false, spillStdout)
+	go copyOutput(stderr, true, spillStderr)
 	go func() {
 		for {
 			input, recvErr := stream.Recv()
@@ -145,6 +151,11 @@ func (s *Server) Exec(stream guest.WorkspaceGuestAgent_ExecServer) error {
 		}
 	}()
 	waitErr := process.Command.Wait()
+	// Drain both pipes before sealing the spills and reporting the exit, so the
+	// spill validity and the final chunks are final when the caller sees them.
+	copies.Wait()
+	spillStdout.close()
+	spillStderr.close()
 	s.Processes.Remove(process.ID)
 	exit := int32(0)
 	signaled := false
@@ -163,7 +174,13 @@ func (s *Server) Exec(stream guest.WorkspaceGuestAgent_ExecServer) error {
 			}
 		}
 	}
-	if err := send(&guest.ExecOutput{Payload: &guest.ExecOutput_Exit{Exit: &guest.ExecExit{ExitCode: exit, Signaled: signaled, Signal: signalName}}}); err != nil {
+	if err := send(&guest.ExecOutput{Payload: &guest.ExecOutput_Exit{Exit: &guest.ExecExit{
+		ExitCode:         exit,
+		Signaled:         signaled,
+		Signal:           signalName,
+		StdoutSpillValid: spillStdout.valid(),
+		StderrSpillValid: spillStderr.valid(),
+	}}}); err != nil {
 		return err
 	}
 	slog.Info("guest agent Exec completed", "exit_code", exit, "signaled", signaled)
@@ -609,11 +626,22 @@ func (s *Server) ReadDir(_ context.Context, request *guest.ReadDirRequest) (*gue
 	}
 	result := &guest.ReadDirResponse{}
 	for _, entry := range entries {
-		info, infoErr := entry.Info()
+		// Follow the entry to report the target's type, matching the harness's
+		// local backend `probe` semantics: a broken symlink or special file is
+		// `other`, and a symlink to a directory reports `directory`.
+		info, infoErr := os.Stat(filepath.Join(path, entry.Name()))
 		if infoErr != nil {
-			return nil, status.Error(codes.Internal, infoErr.Error())
+			result.Entries = append(result.Entries, &guest.DirEntry{Name: entry.Name(), Type: "other"})
+			continue
 		}
-		result.Entries = append(result.Entries, &guest.DirEntry{Name: entry.Name(), IsDir: entry.IsDir(), Size: info.Size()})
+		entryType := "other"
+		switch {
+		case info.IsDir():
+			entryType = "directory"
+		case info.Mode().IsRegular():
+			entryType = "file"
+		}
+		result.Entries = append(result.Entries, &guest.DirEntry{Name: entry.Name(), IsDir: info.IsDir(), Size: info.Size(), Type: entryType})
 	}
 	return result, nil
 }

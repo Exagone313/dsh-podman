@@ -169,6 +169,117 @@ func TestExecDropsProcessesItCannotStart(t *testing.T) {
 	}
 }
 
+// execStream is a fake Exec server stream: it replays queued inputs and records
+// every output the handler sends.
+type execStream struct {
+	grpc.ServerStream
+	inputs  []*guest.ExecInput
+	outputs []*guest.ExecOutput
+	index   int
+}
+
+func (s *execStream) Send(output *guest.ExecOutput) error {
+	s.outputs = append(s.outputs, output)
+	return nil
+}
+
+func (s *execStream) Context() context.Context {
+	return context.Background()
+}
+
+func (s *execStream) Recv() (*guest.ExecInput, error) {
+	if s.index >= len(s.inputs) {
+		return nil, io.EOF
+	}
+	input := s.inputs[s.index]
+	s.index++
+	return input, nil
+}
+
+func (s *execStream) exit() *guest.ExecExit {
+	for _, output := range s.outputs {
+		if exit := output.GetExit(); exit != nil {
+			return exit
+		}
+	}
+	return nil
+}
+
+func (s *execStream) stdout() string {
+	var builder strings.Builder
+	for _, output := range s.outputs {
+		builder.Write(output.GetStdoutChunk())
+	}
+	return builder.String()
+}
+
+func TestExecSpillsFullOutput(t *testing.T) {
+	server, root := newTestServer(t)
+	stream := &execStream{inputs: []*guest.ExecInput{{
+		Payload: &guest.ExecInput_Start{Start: &guest.ExecStart{
+			Argv:        []string{"sh", "-c", "printf hello"},
+			Cwd:         root,
+			SpillStdout: &guest.SpillTarget{Path: "/workspace/spill.log", MaxBytes: 1024},
+		}},
+	}}}
+	if err := server.Exec(stream); err != nil {
+		t.Fatal(err)
+	}
+	exit := stream.exit()
+	if exit == nil || !exit.GetStdoutSpillValid() {
+		t.Fatalf("expected a valid stdout spill, got %#v", exit)
+	}
+	if stream.stdout() != "hello" {
+		t.Fatalf("stdout = %q, want hello", stream.stdout())
+	}
+	data, err := os.ReadFile(filepath.Join(root, "spill.log"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(data) != "hello" {
+		t.Fatalf("spill = %q, want hello", string(data))
+	}
+}
+
+func TestExecDiscardsSpillPastTheCap(t *testing.T) {
+	server, root := newTestServer(t)
+	stream := &execStream{inputs: []*guest.ExecInput{{
+		Payload: &guest.ExecInput_Start{Start: &guest.ExecStart{
+			Argv:        []string{"sh", "-c", "printf 0123456789"},
+			Cwd:         root,
+			SpillStdout: &guest.SpillTarget{Path: "/workspace/spill.log", MaxBytes: 4},
+		}},
+	}}}
+	if err := server.Exec(stream); err != nil {
+		t.Fatal(err)
+	}
+	exit := stream.exit()
+	if exit == nil || exit.GetStdoutSpillValid() {
+		t.Fatalf("expected an invalid stdout spill, got %#v", exit)
+	}
+	if _, err := os.Stat(filepath.Join(root, "spill.log")); !os.IsNotExist(err) {
+		t.Fatalf("spill file should have been removed: %v", err)
+	}
+}
+
+func TestExecAppliesUnsetEnv(t *testing.T) {
+	server, root := newTestServer(t)
+	t.Setenv("DSH_TEST_UNSET", "present")
+	stream := &execStream{inputs: []*guest.ExecInput{{
+		Payload: &guest.ExecInput_Start{Start: &guest.ExecStart{
+			Argv:     []string{"sh", "-c", "printf %s \"$DSH_TEST_UNSET\""},
+			Cwd:      root,
+			UnsetEnv: []string{"DSH_TEST_UNSET"},
+		}},
+	}}}
+	if err := server.Exec(stream); err != nil {
+		t.Fatal(err)
+	}
+	if got := stream.stdout(); got != "" {
+		t.Fatalf("unset variable leaked: %q", got)
+	}
+}
+
 func TestStatExistingFile(t *testing.T) {
 	server, root := newTestServer(t)
 	if err := os.WriteFile(filepath.Join(root, "file"), []byte("hello"), 0600); err != nil {
@@ -284,8 +395,41 @@ func TestReadDirListsEntries(t *testing.T) {
 	if byName["a.txt"].IsDir || byName["a.txt"].Size != 0 {
 		t.Fatalf("unexpected file entry: name=%s isDir=%v size=%d", byName["a.txt"].Name, byName["a.txt"].IsDir, byName["a.txt"].Size)
 	}
+	if byName["a.txt"].Type != "file" {
+		t.Fatalf("a.txt type = %q, want file", byName["a.txt"].Type)
+	}
 	if !byName["sub"].IsDir {
 		t.Fatalf("unexpected dir entry: name=%s isDir=%v", byName["sub"].Name, byName["sub"].IsDir)
+	}
+	if byName["sub"].Type != "directory" {
+		t.Fatalf("sub type = %q, want directory", byName["sub"].Type)
+	}
+}
+
+func TestReadDirFollowsSymlinks(t *testing.T) {
+	server, root := newTestServer(t)
+	if err := os.Mkdir(filepath.Join(root, "target"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink("target", filepath.Join(root, "link")); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink("missing", filepath.Join(root, "broken")); err != nil {
+		t.Fatal(err)
+	}
+	response, err := server.ReadDir(context.Background(), &guest.ReadDirRequest{Path: "/workspace"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	byName := map[string]*guest.DirEntry{}
+	for _, entry := range response.Entries {
+		byName[entry.Name] = entry
+	}
+	if byName["link"].Type != "directory" || !byName["link"].IsDir {
+		t.Fatalf("symlink to directory: type=%q isDir=%v", byName["link"].Type, byName["link"].IsDir)
+	}
+	if byName["broken"].Type != "other" {
+		t.Fatalf("broken symlink type = %q, want other", byName["broken"].Type)
 	}
 }
 

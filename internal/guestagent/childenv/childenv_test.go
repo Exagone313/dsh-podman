@@ -54,6 +54,33 @@ func TestBuildDropsReservedExtra(t *testing.T) {
 	}
 }
 
+// TestBuildAppliesUnset covers the harness's `undefined` environment
+// tombstones: an ambient variable the caller named is removed from the child.
+func TestBuildAppliesUnset(t *testing.T) {
+	t.Setenv("PATH", "/usr/bin")
+	t.Setenv("DROP_ME", "1")
+	got := Build(nil, "DROP_ME")
+	if slices.Contains(got, "DROP_ME=1") {
+		t.Errorf("unset variable survived: %q", got)
+	}
+	if !slices.Contains(got, "PATH=/usr/bin") {
+		t.Errorf("unrelated variable dropped: %q", got)
+	}
+}
+
+// TestBuildExtraWinsOverUnset covers a key named in both the tombstone list
+// and the explicit map: the deliberate value must win.
+func TestBuildExtraWinsOverUnset(t *testing.T) {
+	t.Setenv("KEEP", "ambient")
+	got := Build(map[string]string{"KEEP": "explicit"}, "KEEP")
+	if !slices.Contains(got, "KEEP=explicit") {
+		t.Fatalf("explicit value did not win over the tombstone: %q", got)
+	}
+	if slices.Contains(got, "KEEP=ambient") {
+		t.Errorf("ambient value survived the tombstone: %q", got)
+	}
+}
+
 func TestBuildIsolatedKeepsOnlyBaselineAndExtra(t *testing.T) {
 	t.Setenv("PATH", "/usr/bin")
 	t.Setenv("HOME", "/root")

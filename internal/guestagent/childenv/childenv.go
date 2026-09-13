@@ -21,6 +21,10 @@ const Reserved = "DSH_PODMAN"
 // own environment with every reserved variable removed, followed by extra in a
 // stable order.
 //
+// unset names ordinary ambient variables the caller wants removed from the
+// child (the harness's `undefined` environment tombstones); they are filtered
+// from the inherited base only, so an explicit value in extra still wins.
+//
 // The agent's credential (DSH_PODMAN_GUEST_TOKEN) lives in that namespace, and
 // the agent otherwise hands its whole environment to everything it spawns.
 // Withholding the namespace keeps the credential out of processes that drop
@@ -28,12 +32,21 @@ const Reserved = "DSH_PODMAN"
 // given a copy of it, and stops a plain `env` from disclosing the credential to
 // whoever asked for the command to be run. Reserved keys in extra are dropped
 // for the same reason.
-func Build(extra map[string]string) []string {
+func Build(extra map[string]string, unset ...string) []string {
+	removed := make(map[string]struct{}, len(unset))
+	for _, key := range unset {
+		removed[key] = struct{}{}
+	}
 	parent := os.Environ()
 	result := make([]string, 0, len(parent)+len(extra))
 	for _, entry := range parent {
-		if key, _, ok := strings.Cut(entry, "="); ok && reserved(key) {
-			continue
+		if key, _, ok := strings.Cut(entry, "="); ok {
+			if reserved(key) {
+				continue
+			}
+			if _, drop := removed[key]; drop {
+				continue
+			}
 		}
 		result = append(result, entry)
 	}

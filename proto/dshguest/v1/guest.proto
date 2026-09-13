@@ -26,9 +26,13 @@ service WorkspaceGuestAgent {
   rpc Terminal(stream TerminalInput) returns (stream TerminalOutput);
 }
 message ExecInput { oneof payload { ExecStart start = 1; bytes stdin_chunk = 2; } }
-message ExecStart { repeated string argv = 1; string cwd = 2; map<string, string> env = 3; }
+message ExecStart { repeated string argv = 1; string cwd = 2; map<string, string> env = 3; repeated string unset_env = 4; SpillTarget spill_stdout = 5; SpillTarget spill_stderr = 6; }
 message ExecOutput { oneof payload { bytes stdout_chunk = 1; bytes stderr_chunk = 2; ExecExit exit = 3; } string process_id = 4; }
-message ExecExit { int32 exit_code = 1; bool signaled = 2; string signal = 3; }
+message ExecExit { int32 exit_code = 1; bool signaled = 2; string signal = 3; bool stdout_spill_valid = 4; bool stderr_spill_valid = 5; }
+// SpillTarget is a bounded full-stream copy of one output stream, written in
+// the guest's execution world so the caller can read the complete output after
+// an in-memory truncation.
+message SpillTarget { int64 max_bytes = 1; string path = 2; }
 message SignalRequest { string process_id = 1; string signal = 2; }
 message SignalResponse {}
 message ReadFileRequest { string path = 1; int64 offset = 2; int64 length = 3; }
@@ -40,7 +44,7 @@ message StatRequest { string path = 1; bool no_follow = 2; }
 message StatResponse { bool exists = 1; bool is_dir = 2; int64 size = 3; string mode = 4; string modified_at = 5; bool is_symlink = 6; }
 message ReadDirRequest { string path = 1; }
 message ReadDirResponse { repeated DirEntry entries = 1; }
-message DirEntry { string name = 1; bool is_dir = 2; int64 size = 3; }
+message DirEntry { string name = 1; bool is_dir = 2; int64 size = 3; string type = 4; }
 message MkdirRequest { string path = 1; bool parents = 2; }
 message MkdirResponse {}
 message DeleteRequest { string path = 1; bool recursive = 2; }

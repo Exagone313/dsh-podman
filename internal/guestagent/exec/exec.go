@@ -28,7 +28,7 @@ type Manager struct {
 
 func NewManager() *Manager { return &Manager{processes: make(map[string]*Process)} }
 
-func (m *Manager) Start(ctx context.Context, argv []string, cwd string, env map[string]string) (*Process, error) {
+func (m *Manager) Start(ctx context.Context, argv []string, cwd string, env map[string]string, unset ...string) (*Process, error) {
 	if len(argv) == 0 || argv[0] == "" {
 		return nil, fmt.Errorf("argv must contain a command")
 	}
@@ -36,7 +36,7 @@ func (m *Manager) Start(ctx context.Context, argv []string, cwd string, env map[
 	cmd.Dir = cwd
 	// Always set the environment explicitly: leaving cmd.Env nil would make
 	// the child inherit the agent's own, reserved variables included.
-	cmd.Env = childenv.Build(env)
+	cmd.Env = childenv.Build(env, unset...)
 	proc := &Process{Argv: append([]string(nil), argv...), Command: cmd}
 	m.mu.Lock()
 	m.nextID++

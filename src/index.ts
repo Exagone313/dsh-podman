@@ -1824,9 +1824,9 @@ const TOOL_DESCRIPTIONS: Record<string, string> = {
   container_mount_list:
     "List the project mounts of a container in the current workspace.",
   container_mount_add:
-    "Add a project mount to a container in the current workspace. Requires approval: adding a mount changes the container filesystem view.",
+    "Add a project mount to a container in the current workspace. Recreates the container, terminating its running processes; bind-mounted volume data persists. Requires approval: adding a mount changes the container filesystem view.",
   container_mount_remove:
-    "Remove a project mount from a container in the current workspace. Requires approval: removing a mount changes the container filesystem view.",
+    "Remove a project mount from a container in the current workspace. Recreates the container, terminating its running processes; bind-mounted volume data persists. Requires approval: removing a mount changes the container filesystem view.",
   volume_list:
     "List the named volumes available to the current workspace.",
   volume_create: "Create a named volume in the current workspace.",
@@ -1839,13 +1839,13 @@ const TOOL_DESCRIPTIONS: Record<string, string> = {
   secret_remove:
     "Remove a named secret from the current workspace. Refused while a container mounts it or attaches it as an environment variable; detach it first. Requires approval: removing deletes the secret.",
   container_secret_add:
-    "Inject a named secret into a container as an environment variable. Requires approval: exposing a secret to a container changes what it can read.",
+    "Inject a named secret into a container as an environment variable. Recreates the container, terminating its running processes; bind-mounted volume data persists. Requires approval: exposing a secret to a container changes what it can read.",
   container_secret_remove:
-    "Stop injecting a named secret into a container environment variable. Requires approval: removing a secret exposure changes what the container can read.",
+    "Stop injecting a named secret into a container environment variable. Recreates the container, terminating its running processes; bind-mounted volume data persists. Requires approval: removing a secret exposure changes what the container can read.",
   daemon_start:
     "Start a daemon inside a container of the current workspace. Optionally run it as a specific uid/gid (with optional supplementary groups). The daemon inherits the container's environment by default; pass inheritEnv=false to give it only PATH, HOME, and env. Defaults to the session working directory when it is mounted; pass cwd to override. An existing daemon with the same name is stopped and replaced.",
   daemon_list:
-    "List the daemons running inside a container of the current workspace.",
+    "List the daemons running inside a container of the current workspace. Daemons live in the container's guest agent and do not survive a container recreate.",
   daemon_stop: "Stop a daemon inside a container of the current workspace.",
   daemon_restart:
     "Restart a daemon inside a container of the current workspace.",

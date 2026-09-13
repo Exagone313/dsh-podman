@@ -169,6 +169,12 @@ A **named container** carries exactly the mounts it was created with: the
 workspace project directory is not mounted automatically. The **default
 container** always keeps its workspace project mount, which cannot be removed.
 
+Mutating a container's mounts (`container_mount_add`/`container_mount_remove`)
+or its secret environment variables
+(`container_secret_add`/`container_secret_remove`) **recreates** the container:
+its running processes, including daemons, are terminated. Data in bind-mounted
+volumes persists; `tmpfs` contents do not.
+
 ### Secrets
 
 | Tool                        | Params                               | Description                                                                                                                             |
@@ -189,12 +195,12 @@ variable** (`container_secret_add`; the env var name must not start with
 `DSH_PODMAN`). The settings card can **overwrite** a secret with user-typed
 content (write-only) but never reads it.
 
-A secret mounted at a path is created root-owned with permissions that deny
-everyone but root, so only the container's default (root) user can read it; a
-daemon started with a different `uid` cannot read a mounted secret. A secret
-attached as an environment variable is inherited by every process the agent
-starts unless the daemon is started with `inheritEnv=false` (see
-[Daemons](#daemons)).
+A secret mounted at a path is created as a root-owned **file** (not a directory)
+with permissions that deny everyone but root, so only the container's default
+(root) user can read it; a daemon started with a different `uid` cannot read a
+mounted secret. A secret attached as an environment variable is inherited by
+every process the agent starts unless the daemon is started with
+`inheritEnv=false` (see [Daemons](#daemons)).
 
 ### Daemons
 
@@ -211,7 +217,9 @@ defaults to the same value; when neither is set, the daemon runs without any
 uid/gid override. `daemon_list` reports the effective `uid`/`gid` of each
 daemon. Starting a daemon with a name that already exists stops that daemon
 first (when it is still running) and replaces it; stopped daemons stay listed so
-their logs remain readable.
+their logs remain readable. Daemons live in the container's guest agent and do
+not survive a container recreate (see
+[Mounts and volumes](#mounts-and-volumes)).
 
 A daemon inherits the container's environment by default — every variable the
 guest agent has, including environment secrets attached with

@@ -38,6 +38,10 @@ func silentLogger() *slog.Logger {
 	return slog.New(slog.NewTextHandler(io.Discard, nil))
 }
 
+// alwaysRunning is the podman run-state probe most reconcile tests want: every
+// existing container is treated as running.
+func alwaysRunning(string) (bool, error) { return true, nil }
+
 // tempRoot returns a temporary directory with every symlink resolved.
 //
 // Mount sources are resolved before being handed to podman, so a test that
@@ -426,7 +430,7 @@ func TestReconcileContainersDropsDeletedNamedContainer(t *testing.T) {
 	exists := func(podmanName string) (bool, error) {
 		return podmanName == "dsh-workspace-proj", nil
 	}
-	reconciled, err := server.reconcileContainers(workspaces, exists)
+	reconciled, err := server.reconcileContainers(workspaces, exists, alwaysRunning)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -454,7 +458,7 @@ func TestReconcileContainersDropsWorkspaceWithoutContainers(t *testing.T) {
 	server := &Server{Store: store, Logger: silentLogger()}
 	reconciled, err := server.reconcileContainers(workspaces, func(podmanName string) (bool, error) {
 		return false, nil
-	})
+	}, alwaysRunning)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -485,7 +489,7 @@ func TestReconcileContainersKeepsWorkspaceWithNamedContainers(t *testing.T) {
 	server := &Server{Store: store, Logger: silentLogger()}
 	reconciled, err := server.reconcileContainers(workspaces, func(podmanName string) (bool, error) {
 		return podmanName == "dsh-workspace-proj-db", nil
-	})
+	}, alwaysRunning)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -513,7 +517,7 @@ func TestReconcileContainersKeepsOnLookupError(t *testing.T) {
 	server := &Server{Store: store, Logger: silentLogger()}
 	reconciled, err := server.reconcileContainers(workspaces, func(podmanName string) (bool, error) {
 		return false, errors.New("podman lookup failed")
-	})
+	}, alwaysRunning)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -541,7 +545,7 @@ func TestReconcileContainersNoChangeDoesNotWrite(t *testing.T) {
 	server := &Server{Store: store, Logger: silentLogger()}
 	reconciled, err := server.reconcileContainers(workspaces, func(podmanName string) (bool, error) {
 		return true, nil
-	})
+	}, alwaysRunning)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -554,6 +558,36 @@ func TestReconcileContainersNoChangeDoesNotWrite(t *testing.T) {
 	}
 	if len(stored) != 1 || stored[0].Containers[0].Status != "running" {
 		t.Fatalf("state must be unchanged, got %#v", stored)
+	}
+}
+
+func TestReconcileContainersRefreshesStoppedStatus(t *testing.T) {
+	store := newTestStore(t)
+	workspaces := []state.Workspace{{
+		WorkspaceSlug: "proj",
+		Containers:    []state.Container{{Name: "default", PodmanName: "dsh-workspace-proj", Status: "running"}},
+	}}
+	if err := store.SaveWorkspaces(workspaces); err != nil {
+		t.Fatal(err)
+	}
+	server := &Server{Store: store, Logger: silentLogger()}
+	reconciled, err := server.reconcileContainers(
+		workspaces,
+		func(string) (bool, error) { return true, nil },
+		func(string) (bool, error) { return false, nil },
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if reconciled[0].Containers[0].Status != "stopped" {
+		t.Fatalf("expected stopped, got %q", reconciled[0].Containers[0].Status)
+	}
+	stored, err := store.Workspaces()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if stored[0].Containers[0].Status != "stopped" || stored[0].Status != "stopped" {
+		t.Fatalf("state not refreshed: %#v", stored)
 	}
 }
 

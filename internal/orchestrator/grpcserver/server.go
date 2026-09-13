@@ -340,7 +340,7 @@ func (s *Server) ListContainers(context.Context, *ctl.ListContainersRequest) (*c
 	// Drop stored containers whose podman container no longer exists (for
 	// example deleted outside dsh-podman); they must not be listed.
 	if s.Podman != nil {
-		workspaces, err = s.reconcileContainers(workspaces, s.Podman.ContainerExists)
+		workspaces, err = s.reconcileContainers(workspaces, s.Podman.ContainerExists, s.Podman.ContainerRunning)
 		if err != nil {
 			s.log().Error("control request failed", "method", "ListContainers", "error", err)
 			return nil, status.Error(codes.Internal, err.Error())
@@ -388,10 +388,12 @@ func containerRows(workspaces []state.Workspace) []*ctl.Container {
 
 // reconcileContainers drops stored containers whose podman container no longer
 // exists (for example deleted outside dsh-podman), persisting the
-// reconciliation. A workspace left with no containers is removed entirely and
-// will be recreated on demand. Podman lookup errors leave the record untouched
-// and are logged. When nothing changed, the input is returned unwritten.
-func (s *Server) reconcileContainers(workspaces []state.Workspace, exists func(podmanName string) (bool, error)) ([]state.Workspace, error) {
+// reconciliation, and refreshes each surviving container's status from the
+// podman run state so a stopped container is not reported as running. A
+// workspace left with no containers is removed entirely and will be recreated
+// on demand. Podman lookup errors leave the record untouched and are logged.
+// When nothing changed, the input is returned unwritten.
+func (s *Server) reconcileContainers(workspaces []state.Workspace, exists func(podmanName string) (bool, error), running func(podmanName string) (bool, error)) ([]state.Workspace, error) {
 	changed := false
 	next := make([]state.Workspace, 0, len(workspaces))
 	for _, ws := range workspaces {
@@ -408,6 +410,21 @@ func (s *Server) reconcileContainers(workspaces []state.Workspace, exists func(p
 				changed = true
 				continue
 			}
+			if running != nil {
+				isRunning, runErr := running(container.PodmanName)
+				if runErr != nil {
+					s.log().Warn("ListContainers podman inspect failed", "podman_name", container.PodmanName, "error", runErr)
+				} else {
+					status := "stopped"
+					if isRunning {
+						status = "running"
+					}
+					if container.Status != status {
+						container.Status = status
+						changed = true
+					}
+				}
+			}
 			kept = append(kept, container)
 		}
 		if len(kept) == 0 {
@@ -416,6 +433,7 @@ func (s *Server) reconcileContainers(workspaces []state.Workspace, exists func(p
 			continue
 		}
 		ws.Containers = kept
+		syncDefaultFields(&ws)
 		next = append(next, ws)
 	}
 	if !changed {

@@ -1,0 +1,185 @@
+// SPDX-FileCopyrightText: 2026 Elouan Martinet <exa@elou.world>
+//
+// SPDX-License-Identifier: MIT
+
+package grpcserver
+
+import (
+	"context"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+
+	ctl "github.com/Exagone313/dsh-podman/internal/genproto/dshctl/v1"
+	"github.com/Exagone313/dsh-podman/internal/orchestrator/state"
+	"github.com/opencontainers/runtime-spec/specs-go"
+	"go.podman.io/podman/v6/pkg/specgen"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+)
+
+func TestValidateProject(t *testing.T) {
+	root := tempRoot(t)
+	if err := os.MkdirAll(filepath.Join(root, "team"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "file"), nil, 0600); err != nil {
+		t.Fatal(err)
+	}
+	path, err := ValidateProject(root, "team")
+	if err != nil || !filepath.IsAbs(path) {
+		t.Fatalf("valid project rejected: %v %v", path, err)
+	}
+	invalid := []string{"", "..", ".", "../x", "/abs", "a/../b", "a//b", "a\x00b", "missing"}
+	for _, name := range invalid {
+		if _, err := ValidateProject(root, name); err == nil {
+			t.Errorf("accepted invalid project name %q", name)
+		}
+	}
+	if _, err := ValidateProject(root, "file"); err == nil {
+		t.Fatal("accepted non-directory project")
+	}
+}
+
+// TestValidateProjectRejectsSymlinkedProject covers a project entry that is a
+// symlink leaving the projects root: the project must not resolve, or podman
+// would bind-mount the link's target.
+func TestValidateProjectRejectsSymlinkedProject(t *testing.T) {
+	root := tempRoot(t)
+	outside := tempRoot(t)
+	if err := os.MkdirAll(filepath.Join(outside, "secrets"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(filepath.Join(outside, "secrets"), filepath.Join(root, "escape")); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink("/", filepath.Join(root, "slash")); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"escape", "slash"} {
+		if _, err := ValidateProject(root, name); err == nil {
+			t.Errorf("accepted symlinked project %q", name)
+		}
+	}
+}
+
+func TestListProjects(t *testing.T) {
+	root := tempRoot(t)
+	if err := os.MkdirAll(filepath.Join(root, "alpha"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	server := &Server{ProjectsRoot: root, Logger: silentLogger()}
+	response, err := server.ListProjects(context.Background(), &ctl.ListProjectsRequest{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(response.Projects) != 1 || response.Projects[0].Name != "alpha" {
+		t.Fatalf("unexpected projects: %#v", response.Projects)
+	}
+}
+
+func TestListProjectsMissingRoot(t *testing.T) {
+	server := &Server{ProjectsRoot: filepath.Join(t.TempDir(), "nope"), Logger: silentLogger()}
+	_, err := server.ListProjects(context.Background(), &ctl.ListProjectsRequest{})
+	if status.Code(err) != codes.Internal {
+		t.Fatalf("expected Internal, got %v", err)
+	}
+}
+
+func TestListWorkspaces(t *testing.T) {
+	store := newTestStore(t)
+	if err := store.SaveWorkspaces([]state.Workspace{{WorkspaceSlug: "a"}, {WorkspaceSlug: "b"}}); err != nil {
+		t.Fatal(err)
+	}
+	server := &Server{Store: store, Logger: silentLogger()}
+	response, err := server.ListWorkspaces(context.Background(), &ctl.ListWorkspacesRequest{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(response.Workspaces) != 2 {
+		t.Fatalf("unexpected workspaces: %#v", response.Workspaces)
+	}
+}
+
+func TestListWorkspacesEmpty(t *testing.T) {
+	server := &Server{Store: newTestStore(t), Logger: silentLogger()}
+	response, err := server.ListWorkspaces(context.Background(), &ctl.ListWorkspacesRequest{})
+	if err != nil || len(response.Workspaces) != 0 {
+		t.Fatalf("unexpected workspaces: %#v, %v", response.Workspaces, err)
+	}
+}
+
+func TestDescribeWorkspace(t *testing.T) {
+	store := newTestStore(t)
+	if err := store.SaveWorkspaces([]state.Workspace{{WorkspaceSlug: "proj", ContainerName: "dsh-workspace-proj", Status: "running"}}); err != nil {
+		t.Fatal(err)
+	}
+	server := &Server{Store: store, Logger: silentLogger()}
+	workspace, err := server.DescribeWorkspace(context.Background(), &ctl.DescribeWorkspaceRequest{WorkspaceSlug: "proj"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if workspace.WorkspaceSlug != "proj" || workspace.Status != "running" {
+		t.Fatalf("unexpected workspace: %#v", workspace)
+	}
+}
+
+func TestDescribeWorkspaceNotFound(t *testing.T) {
+	server := &Server{Store: newTestStore(t), Logger: silentLogger()}
+	_, err := server.DescribeWorkspace(context.Background(), &ctl.DescribeWorkspaceRequest{WorkspaceSlug: "nope"})
+	if status.Code(err) != codes.NotFound {
+		t.Fatalf("expected NotFound, got %v", err)
+	}
+}
+
+func TestCreateWorkspaceRejectsInvalidSlug(t *testing.T) {
+	server := &Server{Logger: silentLogger()}
+	for _, slug := range []string{"", "a/b", "../x", ".", "..", "-x", "a b", "a:b", "a\\b", "a#b", "a\nb", "x" + strings.Repeat("y", 70)} {
+		_, err := server.CreateWorkspace(context.Background(), &ctl.CreateWorkspaceRequest{WorkspaceSlug: slug, ImageId: "arch"})
+		if status.Code(err) != codes.InvalidArgument {
+			t.Errorf("slug %q: expected InvalidArgument, got %v", slug, err)
+		}
+	}
+	for _, slug := range []string{"proj", "team-app", "a_b.c", "x1", "a-b_c.9-z"} {
+		if !validWorkspaceSlug(slug) {
+			t.Errorf("rejected valid slug %q", slug)
+		}
+	}
+}
+
+func (f *fakePodman) CreateWorkspace(_pod, name, _image, _token string, _mounts []specs.Mount, _secrets []specgen.Secret, _envSecrets, _env map[string]string) error {
+	if f.createErr != nil {
+		return f.createErr
+	}
+	f.created = append(f.created, name)
+	f.exists[name] = true
+	f.running[name] = true
+	return nil
+}
+
+func TestCreateWorkspaceRejectsReservedEnv(t *testing.T) {
+	store := newTestStore(t)
+	if err := store.SaveImages([]state.Image{{ImageID: "devimg", ImageTag: "t1"}}); err != nil {
+		t.Fatal(err)
+	}
+	server := &Server{Store: store, Logger: silentLogger()}
+	_, err := server.CreateWorkspace(context.Background(), &ctl.CreateWorkspaceRequest{WorkspaceSlug: "proj", ImageId: "devimg", Env: map[string]string{"DSH_PODMAN_X": "1"}})
+	if status.Code(err) != codes.InvalidArgument {
+		t.Fatalf("expected InvalidArgument, got %v", err)
+	}
+}
+
+func TestCreateWorkspaceRequiresProjectName(t *testing.T) {
+	server := &Server{Store: newTestStore(t), Logger: silentLogger()}
+	_, err := server.CreateWorkspace(context.Background(), &ctl.CreateWorkspaceRequest{WorkspaceSlug: "proj"})
+	if status.Code(err) != codes.InvalidArgument {
+		t.Fatalf("expected InvalidArgument without a project name, got %v", err)
+	}
+	for _, name := range []string{"../x", "/abs", "a/../b"} {
+		_, err := server.CreateWorkspace(context.Background(), &ctl.CreateWorkspaceRequest{WorkspaceSlug: "proj", ProjectName: name})
+		if status.Code(err) != codes.InvalidArgument {
+			t.Errorf("project name %q: expected InvalidArgument, got %v", name, err)
+		}
+	}
+}

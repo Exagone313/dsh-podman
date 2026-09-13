@@ -11,7 +11,7 @@ require (
 	github.com/opencontainers/runtime-spec v1.3.0
 	github.com/pelletier/go-toml/v2 v2.4.3
 	go.podman.io/buildah v1.45.0
-	go.podman.io/podman/v6 v6.1.0
+	go.podman.io/podman/v6 v6.1.1
 	google.golang.org/grpc v1.83.2
 	google.golang.org/protobuf v1.36.12
 )

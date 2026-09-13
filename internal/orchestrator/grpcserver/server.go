@@ -21,7 +21,6 @@ import (
 	ctl "github.com/Exagone313/dsh-podman/internal/genproto/dshctl/v1"
 	guest "github.com/Exagone313/dsh-podman/internal/genproto/dshguest/v1"
 	imagebuild "github.com/Exagone313/dsh-podman/internal/orchestrator/images"
-	"github.com/Exagone313/dsh-podman/internal/orchestrator/podman"
 	"github.com/Exagone313/dsh-podman/internal/orchestrator/projects"
 	"github.com/Exagone313/dsh-podman/internal/orchestrator/state"
 	"github.com/Exagone313/dsh-podman/internal/orchestrator/token"
@@ -136,6 +135,31 @@ func workspaceBySlug(store *state.Store, slug string) (state.Workspace, error) {
 	return state.Workspace{}, errors.New("workspace not found")
 }
 
+// podmanAPI is the subset of the podman client the control plane drives. It is
+// a consumer-side interface so tests can substitute a fake without a podman
+// daemon; *podman.Client satisfies it.
+type podmanAPI interface {
+	ContainerExists(name string) (bool, error)
+	ContainerRunning(name string) (bool, error)
+	CreateWorkspace(pod, name, image, token string, mounts []specs.Mount, secrets []specgen.Secret, envSecrets map[string]string, env map[string]string) error
+	RecreateWorkspace(pod, name, image, token string, mounts []specs.Mount, secrets []specgen.Secret, envSecrets map[string]string, env map[string]string) error
+	Remove(name string) error
+	RemovePod(name string) error
+	Stop(name string) error
+	ImageExists(name string) (bool, error)
+	ImageCreated(name string) string
+	ImagePull(name string) error
+	ImageRemove(name string) error
+	VolumeExists(name string) (bool, error)
+	VolumeCreate(name string) error
+	VolumeList() ([]string, error)
+	VolumeRemove(name string) error
+	SecretExists(name string) (bool, error)
+	SecretCreate(name, value string) error
+	SecretList() ([]string, error)
+	SecretRemove(name string) error
+}
+
 type Server struct {
 	ctl.UnimplementedOrchestratorControlServer
 	ProjectsRoot     string
@@ -146,7 +170,7 @@ type Server struct {
 	// from below it.
 	GuestAgentMount string
 	Store           *state.Store
-	Podman          *podman.Client
+	Podman          podmanAPI
 	ImageBuilder    *imagebuild.Builder
 	BaseImagePrefix string
 	VolumePrefix    string

@@ -91,6 +91,24 @@ test("outputReader reads appended output", () => {
   assert.equal(first.lossy, false);
 });
 
+test("outputReader advertises a valid spill only for a lossy read", () => {
+  const spill = { path: "/var/tmp/dsh-podman/x.stdout", maxBytes: 64 };
+  const reader = outputReader({ maxBytes: 4 }, spill)!;
+  reader.append(Buffer.from("abcdefgh"));
+  assert.equal(reader.spillNeeded, true);
+  const lossy = reader.readFrom(0);
+  assert.equal(lossy.lossy, true);
+  assert.equal(lossy.spillPath, spill.path);
+
+  reader.setSpillValid(false);
+  assert.equal(reader.readFrom(0).spillPath, undefined);
+
+  const small = outputReader({ maxBytes: 64 }, spill)!;
+  small.append(Buffer.from("hi"));
+  assert.equal(small.spillNeeded, false);
+  assert.equal(small.readFrom(0).spillPath, undefined);
+});
+
 test("outputReader drops bytes beyond the retention window", () => {
   const reader = outputReader({ maxBytes: 5 })!;
   reader.append(Buffer.from("hello"));
@@ -2904,9 +2922,17 @@ test("filesystem provider maps absolute host paths into the execution world", ()
 });
 
 // A fake guest for the subprocess provider: exec emits a process id (and
-// optionally an exit), and the unary signal RPC is recorded.
-function spawnGuest(options: { emitExit?: boolean } = {}) {
+// optionally an exit), and the unary signal/delete RPCs are recorded.
+function spawnGuest(
+  options: {
+    emitExit?: boolean;
+    exit?: Record<string, unknown>;
+    stdout?: string;
+  } = {},
+) {
   const signals: Array<{ processId: string; signal: string }> = [];
+  const starts: Array<Record<string, any>> = [];
+  const deletes: Array<Record<string, unknown>> = [];
   const guest = {
     exec: () => {
       const handlers: Record<string, Function[]> = {};
@@ -2914,12 +2940,19 @@ function spawnGuest(options: { emitExit?: boolean } = {}) {
         on(event: string, handler: Function) {
           (handlers[event] ??= []).push(handler);
         },
-        write(_message: unknown) {},
+        write(message: any) {
+          starts.push(message);
+        },
         end() {
           for (const handler of handlers.data ?? []) {
             handler({ processId: "7" });
+            if (options.stdout !== undefined) {
+              handler({ stdoutChunk: Buffer.from(options.stdout) });
+            }
             if (options.emitExit !== false) {
-              handler({ exit: { exitCode: 0, signaled: false } });
+              handler({
+                exit: { exitCode: 0, signaled: false, ...options.exit },
+              });
             }
           }
         },
@@ -2929,8 +2962,17 @@ function spawnGuest(options: { emitExit?: boolean } = {}) {
       signals.push(request);
       callback(null, {});
     },
+    delete: (request: Record<string, unknown>, _metadata: unknown, callback: Function) => {
+      deletes.push(request);
+      callback(null, {});
+    },
   };
-  return { signals, resolver: { resolve: async () => ({ guest, token: "t" }) } };
+  return {
+    signals,
+    starts,
+    deletes,
+    resolver: { resolve: async () => ({ guest, token: "t" }) },
+  };
 }
 
 const spawnSpec = (overrides: Record<string, unknown> = {}) => ({
@@ -2986,6 +3028,54 @@ test("subprocess provider waitForExit honors an abort signal", async () => {
   const exitedProvider = createSubprocessProvider(exited.resolver as any);
   const exitedHandle = exitedProvider.spawn(spawnSpec());
   assert.equal(await exitedHandle.waitForExit(), true);
+});
+
+test("subprocess provider forwards env tombstones and spills", async () => {
+  const fake = spawnGuest({ exit: { stdoutSpillValid: true } });
+  const provider = createSubprocessProvider(fake.resolver as any);
+  const handle = provider.spawn(
+    spawnSpec({
+      env: { KEEP: "1", DROP: undefined },
+      stdio: {
+        stdin: "ignore",
+        stdout: { maxBytes: 4, spill: { maxBytes: 64 } },
+        stderr: { maxBytes: 4 },
+      },
+    }),
+  );
+  await handle.done;
+  const start = fake.starts[0].start;
+  assert.deepEqual(start.env, { KEEP: "1" });
+  assert.deepEqual(start.unsetEnv, ["DROP"]);
+  assert.equal(start.spillStdout.maxBytes, 64);
+  assert.match(start.spillStdout.path, /^\/var\/tmp\/dsh-podman\/.+\.stdout$/);
+  assert.equal(start.spillStderr, undefined);
+  // No output was emitted, so the in-memory tail covered everything and the
+  // unneeded spill is discarded.
+  assert.equal(fake.deletes.length, 1);
+  assert.equal(fake.deletes[0].path, start.spillStdout.path);
+});
+
+test("subprocess provider keeps a spill that holds dropped output", async () => {
+  const fake = spawnGuest({
+    exit: { stdoutSpillValid: true },
+    stdout: "0123456789",
+  });
+  const provider = createSubprocessProvider(fake.resolver as any);
+  const handle = provider.spawn(
+    spawnSpec({
+      stdio: {
+        stdin: "ignore",
+        stdout: { maxBytes: 4, spill: { maxBytes: 64 } },
+        stderr: { maxBytes: 4 },
+      },
+    }),
+  );
+  await handle.done;
+  assert.equal(fake.deletes.length, 0);
+  const read = handle.collected.stdout!.readFrom(0);
+  assert.equal(read.lossy, true);
+  assert.equal(read.spillPath, fake.starts[0].start.spillStdout.path);
 });
 
 test("filesystem provider listDir returns resolved child targets", async () => {

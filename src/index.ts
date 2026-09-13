@@ -186,6 +186,18 @@ export function createSubprocessProvider(resolver: WorkspaceResolver): Subproces
       );
     },
     spawn: (spec: any) => {
+      // A pre-aborted spawn is rejected synchronously with a stable Error,
+      // mirroring the local backend, rather than starting a process that would
+      // be terminated immediately.
+      if (spec.signal?.aborted) {
+        let reason = "aborted";
+        try {
+          reason = String(spec.signal.reason ?? reason);
+        } catch {
+          // Arbitrary caller-owned reasons cannot escape the stable boundary.
+        }
+        throw new Error(`aborted before spawn: ${reason}`);
+      }
       if (
         !Array.isArray(spec.argv) ||
         spec.argv.length === 0 ||
@@ -294,9 +306,29 @@ export function createSubprocessProvider(resolver: WorkspaceResolver): Subproces
         },
         done,
         terminate,
-        waitForExit: async () => {
-          await done;
-          return true;
+        // Mirror the local backend's `waitWithAbort`: a pre-aborted or
+        // aborting signal returns false instead of waiting for the managed
+        // range, while a provider failure still propagates.
+        waitForExit: (signal?: AbortSignal) => {
+          if (signal?.aborted) {
+            void done.catch(() => {});
+            return Promise.resolve(false);
+          }
+          if (signal === undefined) return done.then(() => true);
+          return new Promise<boolean>((resolve, reject) => {
+            const onAbort = (): void => resolve(false);
+            signal.addEventListener("abort", onAbort, { once: true });
+            done.then(
+              () => {
+                signal.removeEventListener("abort", onAbort);
+                resolve(true);
+              },
+              (error) => {
+                signal.removeEventListener("abort", onAbort);
+                reject(error);
+              },
+            );
+          });
         },
       };
     },
@@ -2537,10 +2569,17 @@ export function createFilesystemProvider(resolver: WorkspaceResolver): Filesyste
           `cannot overwrite existing "${target.displayPath}" without reading it first`,
         );
       }
-      const before =
-        current.exists && Number(current.size ?? 0) < DIFF_BASIS_MAX_BYTES
+      // The basis is gated on the incoming content, like the local backend:
+      // either side at/above the limit yields `before: null` and the consumer
+      // falls back to a whole-file diff. Both sides are LF-normalized so a CRLF
+      // overwrite does not read as every line changed.
+      const rawBasis =
+        current.exists &&
+        Buffer.byteLength(content, "utf8") < DIFF_BASIS_MAX_BYTES
           ? await readDiffBasis(target, signal)
           : null;
+      const before =
+        rawBasis === null ? null : normalizeLineEndings(rawBasis);
       await writeGuestFile(
         { guest: target.binding.guest, token: target.binding.token },
         target.targetKey,
@@ -2553,12 +2592,48 @@ export function createFilesystemProvider(resolver: WorkspaceResolver): Filesyste
         operation: current.exists ? "update" : "create",
         version: guestVersion(after),
         before,
-        after: content,
+        after: normalizeLineEndings(content),
       };
     },
     stat: (target: any, signal?: AbortSignal) => guestStat(target, signal),
-    listDir: async (target: any, signal?: AbortSignal) =>
-      unaryGuest(target, "readDir", { path: target.targetKey }, signal),
+    listDir: async (target: any, signal?: AbortSignal) => {
+      const response: any = await unaryGuest(
+        target,
+        "readDir",
+        { path: target.targetKey },
+        signal,
+      );
+      const entries: any[] = Array.isArray(response?.entries)
+        ? response.entries
+        : [];
+      return entries.map((entry: any) => {
+        const childKey = join(target.targetKey, entry.name);
+        // Prefer the guest-reported followed type; fall back to the directory
+        // bit for an agent that predates the field.
+        const type =
+          entry.type === "file" ||
+          entry.type === "directory" ||
+          entry.type === "other"
+            ? entry.type
+            : entry.isDir
+              ? "directory"
+              : "file";
+        return {
+          name: entry.name,
+          type,
+          target: {
+            targetKey: childKey,
+            displayPath: childKey,
+            binding: target.binding,
+          },
+          ...(type === "file" &&
+          entry.size !== undefined &&
+          entry.size !== null
+            ? { size: Number(entry.size) }
+            : {}),
+        };
+      });
+    },
     mkdir: async (target: any, parents = true) =>
       unaryGuest(target, "mkdir", { path: target.targetKey, parents }),
     remove: async (target: any, recursive = false) =>

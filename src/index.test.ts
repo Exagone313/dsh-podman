@@ -2959,3 +2959,104 @@ test("subprocess provider terminates on the spec abort signal", async () => {
   controller.abort();
   assert.ok(signals.some((signal) => signal.signal === "SIGTERM"));
 });
+
+test("subprocess provider rejects a pre-aborted spawn synchronously", () => {
+  const { resolver } = spawnGuest();
+  const provider = createSubprocessProvider(resolver as any);
+  const controller = new AbortController();
+  controller.abort(new Error("stop"));
+  assert.throws(
+    () => provider.spawn(spawnSpec({ signal: controller.signal })),
+    /aborted before spawn: Error: stop/,
+  );
+});
+
+test("subprocess provider waitForExit honors an abort signal", async () => {
+  const live = spawnGuest({ emitExit: false });
+  const liveProvider = createSubprocessProvider(live.resolver as any);
+  const handle = liveProvider.spawn(spawnSpec());
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  const controller = new AbortController();
+  const pending = handle.waitForExit(controller.signal);
+  controller.abort();
+  assert.equal(await pending, false);
+  liveProvider.dispose();
+
+  const exited = spawnGuest();
+  const exitedProvider = createSubprocessProvider(exited.resolver as any);
+  const exitedHandle = exitedProvider.spawn(spawnSpec());
+  assert.equal(await exitedHandle.waitForExit(), true);
+});
+
+test("filesystem provider listDir returns resolved child targets", async () => {
+  const requests: Record<string, unknown>[] = [];
+  const provider = createFilesystemProvider({
+    resolveForPath: async () => ({
+      guest: {
+        readDir: (
+          request: Record<string, unknown>,
+          _metadata: unknown,
+          callback: Function,
+        ) => {
+          requests.push(request);
+          callback(null, {
+            entries: [
+              { name: "src", isDir: true, size: "0", type: "directory" },
+              { name: "a.txt", isDir: false, size: "3", type: "file" },
+              { name: "link", isDir: false, size: "1", type: "other" },
+            ],
+          });
+        },
+      },
+      token: "t",
+    }),
+  } as any);
+  const target = await provider.resolve("/projects/team", { cwd: "/projects/team" });
+  const entries = await provider.listDir(target);
+  assert.deepEqual(requests, [{ path: "/projects/team" }]);
+  assert.deepEqual(
+    entries.map((entry: any) => ({
+      name: entry.name,
+      type: entry.type,
+      path: entry.target.displayPath,
+      binding: entry.target.binding.token,
+    })),
+    [
+      { name: "src", type: "directory", path: "/projects/team/src", binding: "t" },
+      { name: "a.txt", type: "file", path: "/projects/team/a.txt", binding: "t" },
+      { name: "link", type: "other", path: "/projects/team/link", binding: "t" },
+    ],
+  );
+  assert.equal(entries[1].size, 3);
+  assert.equal(entries[0].size, undefined);
+});
+
+test("filesystem provider listDir falls back to the directory bit", async () => {
+  const provider = createFilesystemProvider({
+    resolveForPath: async () => ({
+      guest: {
+        readDir: (_request: unknown, _metadata: unknown, callback: Function) =>
+          callback(null, {
+            entries: [
+              { name: "d", isDir: true, size: "0" },
+              { name: "f", isDir: false, size: "1" },
+            ],
+          }),
+      },
+      token: "t",
+    }),
+  } as any);
+  const target = await provider.resolve("/w", { cwd: "/w" });
+  const entries = await provider.listDir(target);
+  assert.deepEqual(entries.map((entry: any) => entry.type), ["directory", "file"]);
+});
+
+test("filesystem provider writeText normalizes the diff basis", async () => {
+  const binding = editGuest({}, Buffer.from("a\r\nb\r\n"));
+  const provider = editProvider(binding);
+  const target = await provider.resolve("/a", { cwd: "/x" });
+  const outcome = await provider.writeText(target, "c\r\nd\r\n");
+  assert.equal(outcome.before, "a\nb\n");
+  assert.equal(outcome.after, "c\nd\n");
+  assert.equal(Buffer.concat(binding.writes).toString(), "c\r\nd\r\n");
+});

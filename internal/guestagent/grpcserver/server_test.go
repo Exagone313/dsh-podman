@@ -7,6 +7,7 @@ package grpcserver
 import (
 	"bytes"
 	"context"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -650,5 +651,55 @@ func TestStartDaemonNoUidGidDefaultsZero(t *testing.T) {
 	})
 	if info.Uid != 0 || info.Gid != 0 {
 		t.Fatalf("uid=%d gid=%d, want 0 0", info.Uid, info.Gid)
+	}
+}
+
+// writeFileStream feeds a WriteFile handler a fixed chunk list and captures the
+// final response.
+type writeFileStream struct {
+	grpc.ServerStream
+	chunks []*guest.WriteFileChunk
+	index  int
+	result *guest.WriteFileResponse
+}
+
+func (s *writeFileStream) Recv() (*guest.WriteFileChunk, error) {
+	if s.index >= len(s.chunks) {
+		return nil, io.EOF
+	}
+	chunk := s.chunks[s.index]
+	s.index++
+	return chunk, nil
+}
+
+func (s *writeFileStream) SendAndClose(response *guest.WriteFileResponse) error {
+	s.result = response
+	return nil
+}
+
+func TestWriteFilePreservesMode(t *testing.T) {
+	server, root := newTestServer(t)
+	target := filepath.Join(root, "script")
+	if err := os.WriteFile(target, []byte("old"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	stream := &writeFileStream{chunks: []*guest.WriteFileChunk{
+		{Payload: &guest.WriteFileChunk_Start{Start: &guest.WriteFileStart{Path: "/workspace/script", Create: true, Truncate: true}}},
+		{Payload: &guest.WriteFileChunk_DataChunk{DataChunk: []byte("new")}},
+	}}
+	if err := server.WriteFile(stream); err != nil {
+		t.Fatal(err)
+	}
+	info, err := os.Stat(target)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.Mode().Perm() != 0755 {
+		t.Fatalf("mode = %v, want 0755", info.Mode().Perm())
+	}
+	if data, err := os.ReadFile(target); err != nil {
+		t.Fatal(err)
+	} else if string(data) != "new" {
+		t.Fatalf("content = %q, want %q", data, "new")
 	}
 }

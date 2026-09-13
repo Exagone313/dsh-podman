@@ -429,7 +429,13 @@ func (s *Server) WriteFile(stream guest.WorkspaceGuestAgent_WriteFileServer) err
 	}
 	temporaryName := temporary.Name()
 	defer os.Remove(temporaryName)
-	if err := temporary.Chmod(0600); err != nil {
+	// Preserve the target's permission bits (a new file gets the usual 0644)
+	// so a write does not silently drop an executable bit.
+	mode := os.FileMode(0644)
+	if info, statErr := os.Stat(path); statErr == nil {
+		mode = info.Mode().Perm()
+	}
+	if err := temporary.Chmod(mode); err != nil {
 		temporary.Close()
 		return status.Error(codes.Internal, err.Error())
 	}

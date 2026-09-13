@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: MIT
 
-import type { ClientContext } from "@deepseek-ai/dsh-client-runtime/client";
+import type { Context as ClientContext } from "@deepseek-ai/cordis";
 
 // The class passed to TerminalBlock for podman command results.
 export const TERMINAL_CLASS = "dsh-podman-terminal";

@@ -187,11 +187,75 @@ function prettyOutput(text: string | null): string | null {
 
 export type PodmanToolRowProps = ToolCallViewProps & PropsLocale<typeof NS>;
 
+// The terminal card the shipped client no longer derives for our command tools
+// (0.1.5-rc.2 dropped the host `callView`/`resultView` from the block and only
+// recognises the built-in shell tools). Our command results are JSON
+// `{exitCode, signal, stdout, stderr}`, so the card is rebuilt from the raw
+// arguments and result here.
+interface TerminalCard {
+  command: string;
+  cwd?: string;
+  output?: string;
+  exitCode?: number;
+  signal?: string;
+  running: boolean;
+}
+
+function terminalCard(
+  toolName: string,
+  args: Record<string, unknown>,
+  block: ToolCallViewProps["block"],
+  cwd: string | undefined,
+): TerminalCard | null {
+  if (toolName !== "container_bash" && toolName !== "container_exec") return null;
+  const command =
+    toolName === "container_bash"
+      ? typeof args.command === "string"
+        ? args.command
+        : ""
+      : Array.isArray(args.argv)
+        ? args.argv.map((word) => String(word)).join(" ")
+        : "";
+  const workdir =
+    typeof args.workdir === "string" && args.workdir !== ""
+      ? args.workdir
+      : undefined;
+  const base: TerminalCard = {
+    command,
+    cwd: workdir ?? cwd,
+    running: !("kind" in block),
+  };
+  if (!("kind" in block)) return base;
+  // A failed call keeps the generic error path (red summary + red body).
+  if (block.isError) return null;
+  const text = resultText(block);
+  if (text === null) return null;
+  try {
+    const data: unknown = JSON.parse(text);
+    if (typeof data !== "object" || data === null) return null;
+    const record = data as Record<string, unknown>;
+    const output = [record.stdout, record.stderr]
+      .filter((value): value is string => typeof value === "string" && value !== "")
+      .join("");
+    const signal =
+      typeof record.signal === "string" && record.signal !== ""
+        ? record.signal
+        : undefined;
+    return {
+      ...base,
+      output,
+      ...(signal !== undefined
+        ? { signal }
+        : { exitCode: typeof record.exitCode === "number" ? record.exitCode : 0 }),
+    };
+  } catch {
+    return null;
+  }
+}
+
 // Terminal card copy, mirroring ui-tool's terminalBlockLabels; `copy`, `copied`
 // and `collapse` resolve from the shared common vocabulary.
-function terminalLabels(
-  t: TranslateNS<typeof NS>,
-): Partial<TerminalBlockLabels> {
+function terminalLabels(t: TranslateNS<typeof NS>): TerminalBlockLabels {
   return {
     signal: (signal) => t("terminalSignal", { signal }),
     exitCode: (code) => t("terminalExitCode", { code }),
@@ -223,13 +287,10 @@ export function PodmanToolRow({
     summaryKeys: [] as readonly string[],
   };
   const settled = "kind" in block;
-  const terminalCall = block.callView?.card === "terminal" ? block.callView : null;
-  const terminalResult =
-    settled && block.resultView?.card === "terminal" ? block.resultView : null;
-  const terminal = settled ? terminalResult !== null : terminalCall !== null;
   const argsRaw =
     ((settled ? block.call?.argsRaw : block.argsRaw) ?? "");
   const args = parseArgs(argsRaw);
+  const terminal = terminalCard(toolName, args, block, cwd);
   const state = !settled
     ? "running"
     : block.error?.code === "interrupted"
@@ -246,7 +307,7 @@ export function PodmanToolRow({
     failureLine ??
     argSummary(args, presentation.summaryKeys, firstLine(argsRaw) || block.callId);
   const [expanded, setExpanded] = useState(false);
-  const expandable = terminal || (output !== null && output !== "");
+  const expandable = terminal !== null || (output !== null && output !== "");
   const leading =
     state === "error" ? (
       <StateDot state="error" />
@@ -274,15 +335,15 @@ export function PodmanToolRow({
         </>
       }
     >
-      {terminal ? (
+      {terminal !== null ? (
         <TerminalBlock
-          command={terminalResult?.title ?? terminalCall?.title ?? ""}
-          cwd={terminalCall?.cwd ?? cwd}
+          command={terminal.command}
+          cwd={terminal.cwd}
           home={home}
-          output={terminalResult?.output}
-          exitCode={terminalResult?.exitCode}
-          signal={terminalResult?.signal}
-          running={!settled}
+          output={terminal.output}
+          exitCode={terminal.exitCode}
+          signal={terminal.signal}
+          running={terminal.running}
           maxLines={Infinity}
           className={TERMINAL_CLASS}
           labels={terminalLabels(t)}

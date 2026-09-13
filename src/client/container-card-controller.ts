@@ -2,12 +2,11 @@
 //
 // SPDX-License-Identifier: MIT
 
+import { createSnapshotStore, type SnapshotStore } from "@deepseek-ai/dsh-client-store";
 import type {
   SettingsScope,
   SettingsScopeSnapshot,
-  SnapshotStore,
-} from "@deepseek-ai/dsh-client-runtime/client";
-import { createSnapshotStore } from "@deepseek-ai/dsh-client-runtime/client";
+} from "@deepseek-ai/dsh-client-ui-settings/client";
 
 export const CONTAINER_NS = "podman";
 

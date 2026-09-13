@@ -3,8 +3,6 @@
 // SPDX-License-Identifier: MIT
 
 import { PODMAN_OPS_APPROVAL_TOOLS, PODMAN_OPS_PRESET } from "./approval.js";
-import { name } from "./index.js";
-import { metadata } from "./workspace-binding.js";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";

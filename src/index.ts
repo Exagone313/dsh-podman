@@ -113,7 +113,7 @@ export {
   summarizeArgs,
 } from "./approval.js";
 export { FilesystemProvider, createFilesystemProvider } from "./fs-provider.js";
-export { resolveGuestCwd, resolveGuestPath } from "./guest-rpc.js";
+export { resolveGuestCwd, resolveGuestPath, remoteArgv } from "./guest-rpc.js";
 export {
   inferMountKind,
   projectMountDestinationReason,
@@ -134,7 +134,6 @@ export {
   SubprocessProvider,
   createSubprocessProvider,
   outputReader,
-  remoteArgv,
 } from "./subprocess.js";
 export { toolHandlers } from "./tool-handlers.js";
 export {

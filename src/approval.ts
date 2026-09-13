@@ -3,7 +3,6 @@
 // SPDX-License-Identifier: MIT
 
 import { approvalPath, currentCwd } from "./guest-rpc.js";
-import { name } from "./index.js";
 import { inferMountKind, projectMountDestinationReason } from "./mount-input.js";
 import { TOOLS } from "./tool-schemas.js";
 

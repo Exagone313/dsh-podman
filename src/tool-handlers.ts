@@ -17,7 +17,6 @@ import {
   unaryGuest,
   writeGuestFile,
 } from "./guest-rpc.js";
-import { name } from "./index.js";
 import { inferMountKind, mountsFromInput, projectMountDestinationReason } from "./mount-input.js";
 import { publicContainer, publicDaemon, publicImage, publicMount } from "./public.js";
 import { grpc } from "./grpc/runtime-client.js";

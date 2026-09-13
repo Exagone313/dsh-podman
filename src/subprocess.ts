@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: MIT
 
-import { unaryGuest } from "./guest-rpc.js";
+import { remoteArgv, unaryGuest } from "./guest-rpc.js";
 import { WorkspaceResolver, metadata } from "./workspace-binding.js";
 import { randomUUID } from "node:crypto";
 import { PassThrough } from "node:stream";
@@ -498,16 +498,4 @@ function discardUnneededSpill(
     "delete",
     { path: reader.spillPath, recursive: false },
   ).catch(() => {});
-}
-
-export function remoteArgv(argv: readonly string[]): readonly string[] {
-  const runner = argv[0];
-  if (runner !== undefined && /(?:^|\/)rg(?:\.exe)?$/.test(runner)) {
-    return ["/usr/bin/rg", ...argv.slice(1)];
-  }
-  if (runner !== undefined && /(?:^|\/)landlock-run(?:$|\/)/.test(runner)) {
-    const separator = argv.indexOf("--");
-    if (separator >= 0) return remoteArgv(argv.slice(separator + 1));
-  }
-  return argv;
 }

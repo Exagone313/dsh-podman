@@ -2,7 +2,6 @@
 //
 // SPDX-License-Identifier: MIT
 
-import { part } from "./approval.js";
 import { defaultMountMode, mountKindToProto, mountModeToProto } from "./mount-enums.js";
 
 // The mount kind for a call: an explicit non-empty `kind` wins, otherwise it is

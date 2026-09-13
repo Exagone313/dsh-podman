@@ -2,7 +2,6 @@
 //
 // SPDX-License-Identifier: MIT
 
-import { name } from "./index.js";
 import { mountKindFromProto, mountModeFromProto } from "./mount-enums.js";
 
 // Rebuild API objects so tool results never expose internal fields (see

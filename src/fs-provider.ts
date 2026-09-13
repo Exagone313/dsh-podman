@@ -20,7 +20,6 @@ import {
   unaryGuest,
   writeGuestFile,
 } from "./guest-rpc.js";
-import { name } from "./index.js";
 import { WorkspaceResolver } from "./workspace-binding.js";
 import { isAbsolute, join, resolve as resolvePath } from "node:path";
 

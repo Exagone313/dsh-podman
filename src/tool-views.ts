@@ -2,7 +2,6 @@
 //
 // SPDX-License-Identifier: MIT
 
-import { name } from "./index.js";
 import { TOOL_UI } from "./tool-schemas.js";
 
 // The command tools render as terminal cards; every other tool gets a generic

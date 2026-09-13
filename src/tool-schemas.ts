@@ -2,8 +2,6 @@
 //
 // SPDX-License-Identifier: MIT
 
-import { apply, inject, name } from "./index.js";
-import { metadata } from "./workspace-binding.js";
 
 export function defineTool<T>(definition: T): T {
   return definition;

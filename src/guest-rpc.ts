@@ -2,7 +2,6 @@
 //
 // SPDX-License-Identifier: MIT
 
-import { remoteArgv } from "./subprocess.js";
 import { WorkspaceResolver, metadata, workspaceSlug } from "./workspace-binding.js";
 import { isAbsolute, resolve as resolvePath } from "node:path";
 
@@ -445,4 +444,19 @@ export async function unaryGuest(
     );
     detach = onAbortCancel(call, signal);
   });
+}
+
+// remoteArgv rewrites an argv for the guest's execution world: the harness's
+// bundled ripgrep becomes the guest's /usr/bin/rg, and a landlock-run sandbox
+// wrapper is unwrapped to the command it guards.
+export function remoteArgv(argv: readonly string[]): readonly string[] {
+  const runner = argv[0];
+  if (runner !== undefined && /(?:^|\/)rg(?:\.exe)?$/.test(runner)) {
+    return ["/usr/bin/rg", ...argv.slice(1)];
+  }
+  if (runner !== undefined && /(?:^|\/)landlock-run(?:$|\/)/.test(runner)) {
+    const separator = argv.indexOf("--");
+    if (separator >= 0) return remoteArgv(argv.slice(separator + 1));
+  }
+  return argv;
 }

@@ -1304,8 +1304,8 @@ export function projectMountDestinationReason(
           args.path,
         );
   return mirror === ""
-    ? "project mounts do not accept a destination"
-    : `project mounts do not accept a destination; the directory will be mounted at ${mirror}`;
+    ? "destination is not supported for project mounts"
+    : `destination is not supported for project mounts; the directory always mounts at ${mirror}`;
 }
 
 // Resolve a container-side path against the session working directory.
@@ -1920,7 +1920,7 @@ export const toolHandlers: Record<
     ];
   },
   container_start: async (resolver, input, exec) => {
-    const mounts = mountsFromInput(input.mounts);
+    const mounts = mountsFromInput(input.mounts, resolver.getConfig().projectsRoot);
     const row = await resolver.control("startContainer", {
       workspaceSlug: await sessionWorkspaceSlug(resolver, currentCwd(exec)),
       container: input.container,
@@ -1932,7 +1932,7 @@ export const toolHandlers: Record<
     return publicContainer(row);
   },
   container_recreate: async (resolver, input, exec) => {
-    const mounts = mountsFromInput(input.mounts);
+    const mounts = mountsFromInput(input.mounts, resolver.getConfig().projectsRoot);
     const row = await resolver.control("recreateContainer", {
       workspaceSlug: await sessionWorkspaceSlug(resolver, currentCwd(exec)),
       container: input.container,
@@ -2089,6 +2089,11 @@ export const toolHandlers: Record<
     const projectsRoot = resolver.getConfig().projectsRoot;
     const destinationReason = projectMountDestinationReason(projectsRoot, input);
     if (destinationReason !== undefined) throw new Error(destinationReason);
+    if (kind === "secret" && input.mode === "read_write") {
+      throw new Error(
+        "secret mounts are read-only; omit mode or use read_only",
+      );
+    }
     const protoKind = mountKindToProto(kind);
     const mode = mountModeToProto(input.mode ?? defaultMountMode(kind));
     const request: Record<string, unknown> = {
@@ -2278,10 +2283,16 @@ export const toolHandlers: Record<
 
 function mountsFromInput(
   mounts: unknown,
+  projectsRoot: string | undefined,
 ): Record<string, unknown>[] | undefined {
   if (!Array.isArray(mounts) || mounts.length === 0) return undefined;
   return mounts.map((mount: any) => {
     const inferredKind = inferMountKind(mount);
+    const destinationReason = projectMountDestinationReason(projectsRoot, mount);
+    if (destinationReason !== undefined) throw new Error(destinationReason);
+    if (inferredKind === "secret" && mount.mode === "read_write") {
+      throw new Error("secret mounts are read-only; omit mode or use read_only");
+    }
     const kind = mountKindToProto(inferredKind);
     const mode = mountModeToProto(mount.mode ?? defaultMountMode(inferredKind));
     const result: Record<string, unknown> = { projectName: mount.project ?? "", kind, mode };

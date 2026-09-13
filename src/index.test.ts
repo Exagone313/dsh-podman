@@ -664,7 +664,7 @@ test("preExecutePolicy denies project mounts that carry a destination", async ()
   assert.equal(deny.kind, "deny", "must deny instead of asking");
   assert.equal(
     deny.reason,
-    "project mounts do not accept a destination; the directory will be mounted at /projects/team/src",
+    "destination is not supported for project mounts; the directory always mounts at /projects/team/src",
   );
 
   const startDeny = (await preExecutePolicy(
@@ -1216,7 +1216,7 @@ test("container_mount_add rejects a destination on a project mount", async () =>
         { container: "web", kind: "project", project: "team", path: "src", destination: "/custom" },
         MOUNT_EXEC,
       ),
-    /project mounts do not accept a destination; the directory will be mounted at \/projects\/team\/src/,
+    /destination is not supported for project mounts; the directory always mounts at \/projects\/team\/src/,
   );
   await assert.rejects(
     () =>
@@ -1225,7 +1225,7 @@ test("container_mount_add rejects a destination on a project mount", async () =>
         { container: "web", project: "team", destination: "/custom" },
         MOUNT_EXEC,
       ),
-    /project mounts do not accept a destination/,
+    /destination is not supported for project mounts/,
   );
   assert.deepEqual(requests, [], "a rejected mount must not reach the orchestrator");
 
@@ -1235,6 +1235,51 @@ test("container_mount_add rejects a destination on a project mount", async () =>
     MOUNT_EXEC,
   );
   assert.equal(requests.length, 1, "a volume mount with a destination is still accepted");
+});
+
+test("mount tools reject a read-write secret mount", async () => {
+  const { requests, resolver } = mountRequestRecorder();
+  await assert.rejects(
+    () =>
+      toolHandlers.container_mount_add(
+        resolver as never,
+        { container: "web", kind: "secret", secret: "tls", destination: "/run/secrets/tls", mode: "read_write" },
+        MOUNT_EXEC,
+      ),
+    /secret mounts are read-only/,
+  );
+  await assert.rejects(
+    () =>
+      toolHandlers.container_start(
+        resolver as never,
+        {
+          container: "web",
+          image: "img1",
+          mounts: [{ kind: "secret", secret: "tls", destination: "/run/secrets/tls", mode: "read_write" }],
+        },
+        MOUNT_EXEC,
+      ),
+    /secret mounts are read-only/,
+  );
+  assert.deepEqual(requests, [], "a rejected mount must not reach the orchestrator");
+});
+
+test("container_start rejects a destination on a project mount", async () => {
+  const { requests, resolver } = mountRequestRecorder();
+  await assert.rejects(
+    () =>
+      toolHandlers.container_start(
+        resolver as never,
+        {
+          container: "web",
+          image: "img1",
+          mounts: [{ project: "team", destination: "/custom" }],
+        },
+        MOUNT_EXEC,
+      ),
+    /destination is not supported for project mounts/,
+  );
+  assert.deepEqual(requests, [], "a rejected mount must not reach the orchestrator");
 });
 
 test("container_mount_remove rejects unknown mount kinds", async () => {
@@ -1351,7 +1396,7 @@ test("container start maps valid mounts and defaults the mode to read_only", asy
       image: "img1",
       mounts: [
         { project: "team", path: "src", mode: "read_only" },
-        { project: "team", destination: "/custom", mode: "read_write" },
+        { project: "team", mode: "read_write" },
         { kind: "volume", volume: "valkey-data", destination: "/data" },
         { kind: "secret", secret: "valkey-tls", destination: "/run/secrets/tls" },
         { kind: "tmpfs", destination: "/scratch" },

@@ -844,7 +844,7 @@ func (s *Server) AddContainerMount(ctx context.Context, request *ctl.AddContaine
 		case "tmpfs":
 			duplicate = existing.Kind == "tmpfs" && existing.Destination == newMount.Destination
 		case "volume":
-			duplicate = existing.Kind == "volume" && existing.Volume == newMount.Volume
+			duplicate = existing.Kind == "volume" && existing.Volume == newMount.Volume && existing.Destination == newMount.Destination
 		case "secret":
 			duplicate = existing.Kind == "secret" && existing.Destination == newMount.Destination
 		}
@@ -921,7 +921,12 @@ func (s *Server) RemoveContainerMount(ctx context.Context, request *ctl.RemoveCo
 		case "tmpfs":
 			matched = existing.Kind == "tmpfs" && existing.Destination == request.GetDestination()
 		case "volume":
+			// The volume names the mount; a supplied destination must agree, so
+			// the same volume at two destinations stays distinguishable.
 			matched = existing.Kind == "volume" && existing.Volume == request.GetVolume()
+			if matched && request.GetDestination() != "" {
+				matched = existing.Destination == request.GetDestination()
+			}
 		case "secret":
 			// The destination identifies the mount; the secret name, when
 			// given, must agree.

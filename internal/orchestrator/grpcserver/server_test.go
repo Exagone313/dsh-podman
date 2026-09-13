@@ -2188,7 +2188,7 @@ func TestAddContainerMountDuplicateTmpfsAndVolume(t *testing.T) {
 		t.Fatal(err)
 	}
 	server := &Server{Store: store, ProjectsRoot: root, VolumePrefix: "dsh-podman-", Logger: silentLogger()}
-	_, err := server.AddContainerMount(context.Background(), &ctl.AddContainerMountRequest{WorkspaceSlug: "proj", Container: "dev", Kind: ctl.MountKind_MOUNT_KIND_VOLUME, Volume: "data", Destination: "/other", Mode: ctl.MountMode_MOUNT_MODE_READ_WRITE})
+	_, err := server.AddContainerMount(context.Background(), &ctl.AddContainerMountRequest{WorkspaceSlug: "proj", Container: "dev", Kind: ctl.MountKind_MOUNT_KIND_VOLUME, Volume: "data", Destination: "/data", Mode: ctl.MountMode_MOUNT_MODE_READ_WRITE})
 	if status.Code(err) != codes.AlreadyExists {
 		t.Fatalf("duplicate volume: expected AlreadyExists, got %v", err)
 	}
@@ -2627,6 +2627,60 @@ func TestAddContainerMountRestoresOnFailedRecreate(t *testing.T) {
 	}
 	if len(stored[0].Containers[0].Mounts) != 0 {
 		t.Fatalf("the failed mutation must not be persisted: %#v", stored[0].Containers[0].Mounts)
+	}
+}
+
+func TestAddContainerMountAllowsSameVolumeAtDifferentDestination(t *testing.T) {
+	store := newTestStore(t)
+	if err := store.SaveWorkspaces([]state.Workspace{{
+		WorkspaceSlug: "proj",
+		Containers: []state.Container{
+			{Name: "dev", PodmanName: "dsh-workspace-proj-dev", ImageID: "arch", Status: "running", Mounts: []state.Mount{{Kind: "volume", Volume: "vol", Destination: "/mnt/a", Mode: "read_write"}}},
+		},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.SaveImages([]state.Image{{ImageID: "arch", ImageTag: "localhost/dsh-podman/arch:latest"}}); err != nil {
+		t.Fatal(err)
+	}
+	fake := newFakePodman()
+	fake.exists["dsh-workspace-proj-dev"] = true
+	server := &Server{Store: store, Podman: fake, Logger: silentLogger()}
+	if _, err := server.AddContainerMount(context.Background(), &ctl.AddContainerMountRequest{
+		WorkspaceSlug: "proj", Container: "dev", Kind: ctl.MountKind_MOUNT_KIND_VOLUME, Volume: "vol", Destination: "/mnt/b", Mode: ctl.MountMode_MOUNT_MODE_READ_ONLY,
+	}); err != nil {
+		t.Fatalf("a distinct destination must be accepted: %v", err)
+	}
+	stored, err := store.Workspaces()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(stored[0].Containers[0].Mounts) != 2 {
+		t.Fatalf("expected two mounts, got %#v", stored[0].Containers[0].Mounts)
+	}
+}
+
+func TestAddContainerMountRejectsSameVolumeAtSameDestination(t *testing.T) {
+	store := newTestStore(t)
+	if err := store.SaveWorkspaces([]state.Workspace{{
+		WorkspaceSlug: "proj",
+		Containers: []state.Container{
+			{Name: "dev", PodmanName: "dsh-workspace-proj-dev", ImageID: "arch", Status: "running", Mounts: []state.Mount{{Kind: "volume", Volume: "vol", Destination: "/mnt/a", Mode: "read_write"}}},
+		},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.SaveImages([]state.Image{{ImageID: "arch", ImageTag: "localhost/dsh-podman/arch:latest"}}); err != nil {
+		t.Fatal(err)
+	}
+	fake := newFakePodman()
+	fake.exists["dsh-workspace-proj-dev"] = true
+	server := &Server{Store: store, Podman: fake, Logger: silentLogger()}
+	_, err := server.AddContainerMount(context.Background(), &ctl.AddContainerMountRequest{
+		WorkspaceSlug: "proj", Container: "dev", Kind: ctl.MountKind_MOUNT_KIND_VOLUME, Volume: "vol", Destination: "/mnt/a", Mode: ctl.MountMode_MOUNT_MODE_READ_ONLY,
+	})
+	if status.Code(err) != codes.AlreadyExists {
+		t.Fatalf("expected AlreadyExists, got %v", err)
 	}
 }
 

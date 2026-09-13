@@ -110,7 +110,13 @@ SPDX-License-Identifier: MIT
    ```bash
    journalctl --user -eu dsh-podman-orchestrator
    ```
-7. 访问 [http://127.0.0.1:3080/](http://127.0.0.1:3080/) 以使用 dsh。
+7. 查看 dsh 容器日志：
+   ```bash
+   podman logs dsh
+   ```
+8. 访问形如 `http://127.0.0.1:3080/?token=xxx` 的给定 URL 以使用 dsh。
+9. 浏览器保存该令牌后，即可通过 [http://127.0.0.1:3080/](http://127.0.0.1:3080/)
+   访问 dsh。
 
 ### dsh-podman 插件安装
 

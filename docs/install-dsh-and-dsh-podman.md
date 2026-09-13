@@ -130,7 +130,14 @@ which adds Podman integration into systemd.
    ```bash
    journalctl --user -eu dsh-podman-orchestrator
    ```
-7. Visit [http://127.0.0.1:3080/](http://127.0.0.1:3080/) to access dsh.
+7. View dsh container logs:
+   ```bash
+   podman logs dsh
+   ```
+8. Visit the given URL in the form `http://127.0.0.1:3080/?token=xxx` to access
+   dsh.
+9. Once your web browser has saved this token, you'll be able to access dsh with
+   the URL [http://127.0.0.1:3080/](http://127.0.0.1:3080/).
 
 ### dsh-podman plugin installation
 

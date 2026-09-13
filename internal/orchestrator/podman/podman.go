@@ -134,13 +134,14 @@ func (c *Client) CreateWorkspace(pod, name, image, token string, mounts []specs.
 	generator.Name = name
 	generator.Pod = pod
 	generator.Command = []string{binaryDest}
-	generator.Env = containerEnv(c.socketRoot, name, c.projectRoot, token, env, mounts)
+	containerMounts := append(append([]specs.Mount(nil), mounts...), spillMount())
+	generator.Env = containerEnv(c.socketRoot, name, c.projectRoot, token, env, containerMounts)
 	generator.EnvSecrets = envSecrets
 	generator.Secrets = append(generator.Secrets, secrets...)
 	generator.Init = &init
 	generator.ReadOnlyFilesystem = boolPtr(true)
 	applyGuestContainerPolicy(generator)
-	ociMounts, volumes := classifyMounts(mounts)
+	ociMounts, volumes := classifyMounts(containerMounts)
 	for _, volume := range volumes {
 		if err := c.ensureVolume(volume.Name); err != nil {
 			return err
@@ -179,6 +180,18 @@ func classifyMounts(mounts []specs.Mount) (oci []specs.Mount, volumes []*specgen
 		oci = append(oci, mount)
 	}
 	return oci, volumes
+}
+
+// spillRoot is the container-local tmpfs where the guest agent writes bounded
+// command-output spill files. It is mounted read-write into every guest
+// container and exposed to the guest file API so a caller can read a spill
+// after the in-memory tail truncates. The plugin must use the same path.
+const spillRoot = "/var/tmp/dsh-podman"
+
+// spillMount is the container-local tmpfs backing spillRoot. The mode keeps it
+// writable by the agent regardless of the container user.
+func spillMount() specs.Mount {
+	return specs.Mount{Type: "tmpfs", Destination: spillRoot, Options: []string{"rw", "mode=1777"}}
 }
 
 // guestAgentMounts returns the socket bind mount and, when a host guest-agent

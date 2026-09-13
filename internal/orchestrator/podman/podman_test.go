@@ -201,6 +201,20 @@ func TestContainerEnvGuestMounts(t *testing.T) {
 	}
 }
 
+func TestSpillMountIsWritableTmpfs(t *testing.T) {
+	mount := spillMount()
+	if mount.Type != "tmpfs" || mount.Destination != spillRoot {
+		t.Fatalf("unexpected spill mount: %#v", mount)
+	}
+	if !hasOption(mount.Options, "rw") {
+		t.Fatalf("spill mount must be read-write: %#v", mount.Options)
+	}
+	encoded := guestMountsEnv([]specs.Mount{mount})
+	if encoded != `[{"path":"/var/tmp/dsh-podman","read_only":false}]` {
+		t.Fatalf("spill mount must reach the guest file API: %q", encoded)
+	}
+}
+
 func TestGuestAgentMountsSourceCopied(t *testing.T) {
 	original := []specs.Mount{{Type: "bind", Source: "/proj", Destination: "/projects/proj"}}
 	generated := guestAgentMounts("/run/sockets/proj", "/run/dsh-podman", "proj", "", "/opt/dsh-podman/guest-agent/bin/dsh-podman-guest-agent")

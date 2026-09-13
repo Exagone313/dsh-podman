@@ -2716,6 +2716,26 @@ func TestRemoveContainerSecret(t *testing.T) {
 	}
 }
 
+func TestRemoveContainerSecretMissingBindingMessage(t *testing.T) {
+	store := newTestStore(t)
+	if err := store.SaveWorkspaces([]state.Workspace{{
+		WorkspaceSlug: "proj",
+		Containers: []state.Container{
+			{Name: "default", PodmanName: "dsh-workspace-proj", ImageID: "arch", Status: "running"},
+		},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	server := &Server{Store: store, Logger: silentLogger()}
+	_, err := server.RemoveContainerSecret(context.Background(), &ctl.RemoveContainerSecretRequest{WorkspaceSlug: "proj", Container: "default", Env: "PROBE_ENV"})
+	if status.Code(err) != codes.NotFound {
+		t.Fatalf("expected NotFound, got %v", err)
+	}
+	if !strings.Contains(err.Error(), "not bound to any secret") {
+		t.Fatalf("misleading message: %v", err)
+	}
+}
+
 func TestSecretKindMapping(t *testing.T) {
 	if kind, err := mountKindFromProto(ctl.MountKind_MOUNT_KIND_SECRET); err != nil || kind != "secret" {
 		t.Fatalf("secret kind: got %q %v", kind, err)

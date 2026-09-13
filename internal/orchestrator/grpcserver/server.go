@@ -2671,7 +2671,7 @@ func (s *Server) RemoveContainerSecret(ctx context.Context, request *ctl.RemoveC
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 	if _, ok := record.SecretEnv[request.GetEnv()]; !ok {
-		return nil, status.Error(codes.NotFound, "secret not found")
+		return nil, status.Error(codes.NotFound, fmt.Sprintf("env var %q is not bound to any secret", request.GetEnv()))
 	}
 	delete(record.SecretEnv, request.GetEnv())
 	if _, err := s.podmanMounts(record.Mounts); err != nil {

@@ -187,7 +187,7 @@ export class WorkspaceResolver {
 
 function waitForReady(agent: grpc.Client): Promise<void> {
   return new Promise((resolve, reject) => {
-    agent.waitForReady(Date.now() + 5000, (error) =>
+    agent.waitForReady(Date.now() + 15000, (error) =>
       error ? reject(error) : resolve(),
     );
   });

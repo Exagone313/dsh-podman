@@ -96,10 +96,14 @@ test("control and guest proto files resolve next to the runtime", () => {
   guest.close();
 });
 
-async function startControlServer(containers: any[] = []): Promise<{
+async function startControlServer(
+  containers: any[] = [],
+  options: { rewriteContainerSocket?: boolean } = {},
+): Promise<{
   socketsRoot: string;
   received: string[];
   createRequests: any[];
+  recreateRequests: any[];
   stop: () => void;
 }> {
   const protoPath = resolve(
@@ -115,6 +119,7 @@ async function startControlServer(containers: any[] = []): Promise<{
   const server = new grpc.Server();
   const received: string[] = [];
   const createRequests: any[] = [];
+  const recreateRequests: any[] = [];
   server.addService(loaded.dshctl.v1.OrchestratorControl.service, {
     listWorkspaces: (call: any, callback: any) => {
       received.push(call.metadata.get("authorization")[0]);
@@ -133,6 +138,10 @@ async function startControlServer(containers: any[] = []): Promise<{
         agentSocketPath: resolve(socketsRoot, "guest.sock"),
         agentToken: "tok",
       });
+    },
+    recreateContainer: (call: any, callback: any) => {
+      recreateRequests.push(call.request);
+      callback(null, { workspaceSlug: call.request.workspaceSlug });
     },
   });
   const socketsRoot = resolve(
@@ -158,10 +167,18 @@ async function startControlServer(containers: any[] = []): Promise<{
       (error: any) => (error ? fail(error) : ok()),
     ),
   );
+  // Point the fake container rows at the same guest socket, so a named
+  // container binding becomes ready immediately too.
+  if (options.rewriteContainerSocket !== false) {
+    for (const row of containers) {
+      row.agentSocketPath = resolve(socketsRoot, "guest.sock");
+    }
+  }
   return {
     socketsRoot,
     received,
     createRequests,
+    recreateRequests,
     stop: () => server.forceShutdown(),
   };
 }
@@ -294,6 +311,36 @@ test("containerBinding exposes the session directory only when a project mount c
     assert.equal(binding.defaultCwd, undefined);
   } finally {
     unmounted.stop();
+  }
+});
+
+test("containerBinding recreates a container whose agent never answers", async () => {
+  const control = await startControlServer(
+    [{
+      workspaceSlug: "w1",
+      containerName: "db",
+      agentSocketPath: "/nonexistent/guest.sock",
+      agentToken: "tok",
+      mounts: [],
+    }],
+    { rewriteContainerSocket: false },
+  );
+  try {
+    const resolver = new WorkspaceResolver(
+      {
+        socketsRoot: control.socketsRoot,
+        defaultImage: "arch",
+        projectsRoot: "/projects",
+        controlToken: "",
+        readyTimeoutMs: 50,
+      },
+      { resolveByPath: () => ({ id: "w1", path: "/projects/team" }) } as any,
+    );
+    await assert.rejects(() => resolver.containerBinding("/projects/team", "db"));
+    assert.equal(control.recreateRequests.length, 1);
+    assert.equal(control.recreateRequests[0].container, "db");
+  } finally {
+    control.stop();
   }
 });
 

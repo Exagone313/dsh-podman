@@ -23,6 +23,8 @@ export interface BindingConfig {
   defaultImage: string;
   projectsRoot: string;
   controlToken: string;
+  // Bound on the guest-agent readiness wait, in milliseconds. Defaults to 15s.
+  readyTimeoutMs?: number;
 }
 
 export class WorkspaceResolver {
@@ -119,21 +121,65 @@ export class WorkspaceResolver {
     ) {
       binding.defaultCwd = session;
     }
+    await this.ensureReady(binding, slug, container);
     return binding;
   }
+  // ready resolves a workspace's default container and waits for its guest
+  // agent, recreating the container once when it is reported running but its
+  // agent never answers (a crashed agent or a lost socket).
   private async ready(
     key: string,
     projectName: string,
   ): Promise<WorkspaceBinding> {
     let binding = await this.resolveBinding(key, projectName);
     try {
-      await waitForReady(binding.guest);
+      await waitForReady(binding.guest, this.readyTimeoutMs());
     } catch {
       this.bindings.delete(key);
       binding = await this.resolveBinding(key, projectName);
-      await waitForReady(binding.guest);
+      try {
+        await waitForReady(binding.guest, this.readyTimeoutMs());
+      } catch {
+        await this.recoverContainer(key, "default");
+        this.bindings.delete(key);
+        binding = await this.resolveBinding(key, projectName);
+        await waitForReady(binding.guest, this.readyTimeoutMs());
+      }
     }
     return binding;
+  }
+  private readyTimeoutMs(): number {
+    const configured = Number(this.config.readyTimeoutMs);
+    return Number.isFinite(configured) && configured > 0 ? configured : 15000;
+  }
+  // ensureReady waits for one binding's guest agent and recovers the container
+  // once when the wait fails.
+  private async ensureReady(
+    binding: WorkspaceBinding,
+    slug: string,
+    container: string,
+  ): Promise<void> {
+    try {
+      await waitForReady(binding.guest, this.readyTimeoutMs());
+      return;
+    } catch {
+      // Recover below.
+    }
+    await this.recoverContainer(slug, container);
+    await waitForReady(binding.guest, this.readyTimeoutMs());
+  }
+  // recoverContainer best-effort recreates a container whose agent is
+  // unreachable. A failure here is not fatal: the caller's retry surfaces the
+  // real readiness failure.
+  private async recoverContainer(slug: string, container: string): Promise<void> {
+    try {
+      await this.control("recreateContainer", {
+        workspaceSlug: slug,
+        container,
+      });
+    } catch {
+      // Best-effort.
+    }
   }
   private resolveBinding(
     key: string,
@@ -199,9 +245,9 @@ function notFoundError(message: string): Error {
   return error;
 }
 
-function waitForReady(agent: grpc.Client): Promise<void> {
+function waitForReady(agent: grpc.Client, timeoutMs = 15000): Promise<void> {
   return new Promise((resolve, reject) => {
-    agent.waitForReady(Date.now() + 15000, (error) =>
+    agent.waitForReady(Date.now() + timeoutMs, (error) =>
       error ? reject(error) : resolve(),
     );
   });

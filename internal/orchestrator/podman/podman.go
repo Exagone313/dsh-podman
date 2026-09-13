@@ -160,7 +160,12 @@ func (c *Client) CreateWorkspace(pod, name, image, token string, mounts []specs.
 		return fmt.Errorf("create container: %w", err)
 	}
 	if err := containers.Start(c.ctx, name, nil); err != nil {
-		c.log().Error("guest container start failed", "pod_name", pod, "container_name", name, "error", err)
+		c.log().Error("guest container start failed", "container_name", name, "error", err)
+		// The container was created but never came up. Remove it so its name is
+		// not left in use by an untracked container.
+		if removeErr := c.Remove(name); removeErr != nil {
+			c.log().Warn("failed to remove container after start failure", "container_name", name, "error", removeErr)
+		}
 		return err
 	}
 	c.log().Info("guest container started", "pod_name", pod, "container_name", name)

@@ -653,12 +653,33 @@ func (s *Server) StartContainer(ctx context.Context, request *ctl.StartContainer
 			s.log().Error("control request failed", "method", "StartContainer", "workspace_slug", workspace.WorkspaceSlug, "container", request.GetContainer(), "error", err)
 			return nil, status.Error(codes.Internal, err.Error())
 		}
+	} else {
+		// No stored record owns the derived name, but a podman container may
+		// still exist (an earlier create failed after making it, or it was
+		// removed outside dsh-podman). Drop it so the create below is not
+		// blocked by an untracked container.
+		untracked, existsErr := s.Podman.ContainerExists(record.PodmanName)
+		if existsErr != nil {
+			return nil, status.Error(codes.Internal, existsErr.Error())
+		}
+		if untracked {
+			s.log().Warn("StartContainer removing untracked container", "workspace_slug", workspace.WorkspaceSlug, "container", request.GetContainer(), "podman_name", record.PodmanName)
+			if err := s.Podman.Remove(record.PodmanName); err != nil {
+				s.log().Error("control request failed", "method", "StartContainer", "workspace_slug", workspace.WorkspaceSlug, "container", request.GetContainer(), "error", err)
+				return nil, status.Error(codes.Internal, err.Error())
+			}
+		}
 	}
 	secret, err := s.ensureAgentToken(&record)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 	if err := s.Podman.CreateWorkspace(podNameFor(workspace.WorkspaceSlug), record.PodmanName, imageTag, secret, podmanMounts, secrets, envSecrets, record.Env); err != nil {
+		// A failed create may have left a container behind; remove it so a retry
+		// is not blocked by a stale name.
+		if removeErr := s.Podman.Remove(record.PodmanName); removeErr != nil {
+			s.log().Warn("StartContainer cleanup after create failure failed", "workspace_slug", workspace.WorkspaceSlug, "container", request.GetContainer(), "error", removeErr)
+		}
 		s.log().Error("control request failed", "method", "StartContainer", "workspace_slug", request.GetWorkspaceSlug(), "container", request.GetContainer(), "error", err)
 		return nil, status.Error(codes.Internal, err.Error())
 	}
@@ -2144,8 +2165,31 @@ func (s *Server) RemoveContainer(_ context.Context, request *ctl.RemoveContainer
 	}
 	record, ok := containerByLogical(&workspace, container)
 	if !ok {
-		s.log().Warn("control request failed", "method", "RemoveContainer", "workspace_slug", request.GetWorkspaceSlug(), "container", container, "reason", "container not found")
-		return nil, status.Error(codes.NotFound, "container not found")
+		// The stored record may already be gone (reconciled after a failed
+		// create) while an untracked podman container survives. Remove it so an
+		// orphan is cleanable; otherwise report not found.
+		if s.Podman == nil {
+			return nil, status.Error(codes.NotFound, "container not found")
+		}
+		podmanName := podmanContainerName(workspace.WorkspaceSlug, container)
+		orphan, existsErr := s.Podman.ContainerExists(podmanName)
+		if existsErr != nil {
+			return nil, status.Error(codes.Internal, existsErr.Error())
+		}
+		if !orphan {
+			s.log().Warn("control request failed", "method", "RemoveContainer", "workspace_slug", request.GetWorkspaceSlug(), "container", container, "reason", "container not found")
+			return nil, status.Error(codes.NotFound, "container not found")
+		}
+		s.log().Warn("RemoveContainer removing untracked container", "workspace_slug", workspace.WorkspaceSlug, "container", container, "podman_name", podmanName)
+		if err := s.Podman.Stop(podmanName); err != nil {
+			s.log().Warn("RemoveContainer stop failed", "workspace_slug", request.GetWorkspaceSlug(), "container", container, "error", err)
+		}
+		if err := s.Podman.Remove(podmanName); err != nil {
+			s.log().Error("control request failed", "method", "RemoveContainer", "workspace_slug", request.GetWorkspaceSlug(), "container", container, "error", err)
+			return nil, status.Error(codes.Internal, err.Error())
+		}
+		s.removePodIfEmpty(workspace.WorkspaceSlug)
+		return &ctl.RemoveContainerResponse{}, nil
 	}
 	if s.Podman == nil {
 		return nil, status.Error(codes.FailedPrecondition, "podman is not configured")
@@ -2183,22 +2227,33 @@ func (s *Server) RemoveContainer(_ context.Context, request *ctl.RemoveContainer
 	}); err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	remaining, err := s.Store.Workspaces()
-	if err != nil {
-		s.log().Warn("RemoveContainer workspace re-read failed", "workspace_slug", request.GetWorkspaceSlug(), "error", err)
-	}
-	for _, ws := range remaining {
-		if ws.WorkspaceSlug == workspace.WorkspaceSlug {
-			if len(ws.Containers) == 0 {
-				if podErr := s.Podman.RemovePod(podNameFor(ws.WorkspaceSlug)); podErr != nil {
-					s.log().Warn("RemoveContainer pod cleanup failed", "workspace_slug", ws.WorkspaceSlug, "error", podErr)
-				}
-			}
-			break
-		}
-	}
+	s.removePodIfEmpty(workspace.WorkspaceSlug)
 	s.log().Info("control request completed", "method", "RemoveContainer", "workspace_slug", request.GetWorkspaceSlug(), "container", container)
 	return &ctl.RemoveContainerResponse{}, nil
+}
+
+// removePodIfEmpty deletes a workspace's pod when the store no longer holds any
+// container for it, so an orphan cleanup does not leave an empty pod behind.
+func (s *Server) removePodIfEmpty(slug string) {
+	if s.Podman == nil {
+		return
+	}
+	workspaces, err := s.Store.Workspaces()
+	if err != nil {
+		s.log().Warn("pod cleanup workspace read failed", "workspace_slug", slug, "error", err)
+		return
+	}
+	for _, ws := range workspaces {
+		if ws.WorkspaceSlug != slug {
+			continue
+		}
+		if len(ws.Containers) == 0 {
+			if podErr := s.Podman.RemovePod(podNameFor(slug)); podErr != nil {
+				s.log().Warn("pod cleanup failed", "workspace_slug", slug, "error", podErr)
+			}
+		}
+		return
+	}
 }
 
 // ListVolumes lists the orchestrator-managed named volumes, exposing only

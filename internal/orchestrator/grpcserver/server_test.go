@@ -18,6 +18,7 @@ import (
 	imagebuild "github.com/Exagone313/dsh-podman/internal/orchestrator/images"
 	"github.com/Exagone313/dsh-podman/internal/orchestrator/podman"
 	"github.com/Exagone313/dsh-podman/internal/orchestrator/state"
+	"github.com/opencontainers/runtime-spec/specs-go"
 	"go.podman.io/podman/v6/pkg/specgen"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -640,6 +641,58 @@ func TestStartContainerAcceptsDefault(t *testing.T) {
 	}
 }
 
+// fakePodman is a podmanAPI double for lifecycle tests. It records removals and
+// creations and serves canned existence/run state.
+type fakePodman struct {
+	exists    map[string]bool
+	running   map[string]bool
+	removed   []string
+	created   []string
+	createErr error
+}
+
+func newFakePodman() *fakePodman {
+	return &fakePodman{exists: map[string]bool{}, running: map[string]bool{}}
+}
+
+func (f *fakePodman) ContainerExists(name string) (bool, error)  { return f.exists[name], nil }
+func (f *fakePodman) ContainerRunning(name string) (bool, error) { return f.running[name], nil }
+
+func (f *fakePodman) CreateWorkspace(_pod, name, _image, _token string, _mounts []specs.Mount, _secrets []specgen.Secret, _envSecrets, _env map[string]string) error {
+	if f.createErr != nil {
+		return f.createErr
+	}
+	f.created = append(f.created, name)
+	f.exists[name] = true
+	f.running[name] = true
+	return nil
+}
+
+func (f *fakePodman) RecreateWorkspace(pod, name, image, token string, mounts []specs.Mount, secrets []specgen.Secret, envSecrets map[string]string, env map[string]string) error {
+	return f.CreateWorkspace(pod, name, image, token, mounts, secrets, envSecrets, env)
+}
+
+func (f *fakePodman) Remove(name string) error {
+	f.removed = append(f.removed, name)
+	delete(f.exists, name)
+	delete(f.running, name)
+	return nil
+}
+func (f *fakePodman) RemovePod(string) error            { return nil }
+func (f *fakePodman) Stop(name string) error            { f.running[name] = false; return nil }
+func (f *fakePodman) ImageExists(string) (bool, error)  { return true, nil }
+func (f *fakePodman) ImageCreated(string) string        { return "" }
+func (f *fakePodman) ImagePull(string) error            { return nil }
+func (f *fakePodman) ImageRemove(string) error          { return nil }
+func (f *fakePodman) VolumeExists(string) (bool, error) { return false, nil }
+func (f *fakePodman) VolumeCreate(string) error         { return nil }
+func (f *fakePodman) VolumeList() ([]string, error)     { return nil, nil }
+func (f *fakePodman) VolumeRemove(string) error         { return nil }
+func (f *fakePodman) SecretExists(string) (bool, error) { return true, nil }
+func (f *fakePodman) SecretCreate(string, string) error { return nil }
+func (f *fakePodman) SecretList() ([]string, error)     { return nil, nil }
+func (f *fakePodman) SecretRemove(string) error         { return nil }
+
 func TestStartContainerRequiresPodman(t *testing.T) {
 	store := newTestStore(t)
 	if err := store.SaveWorkspaces([]state.Workspace{{WorkspaceSlug: "proj", ContainerName: "dsh-workspace-proj"}}); err != nil {
@@ -670,6 +723,76 @@ func TestStartContainerRejectsUnknownImage(t *testing.T) {
 		if status.Code(err) != codes.NotFound {
 			t.Errorf("image %q: expected NotFound (arbitrary image rejected), got %v", image, err)
 		}
+	}
+}
+
+func TestStartContainerRemovesUntrackedContainer(t *testing.T) {
+	store := newTestStore(t)
+	if err := store.SaveWorkspaces([]state.Workspace{{WorkspaceSlug: "proj"}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.SaveImages([]state.Image{{ImageID: "arch", ImageTag: "localhost/dsh-podman/arch:latest"}}); err != nil {
+		t.Fatal(err)
+	}
+	fake := newFakePodman()
+	fake.exists["dsh-workspace-proj-dev"] = true
+	server := &Server{Store: store, Podman: fake, Logger: silentLogger()}
+	if _, err := server.StartContainer(context.Background(), &ctl.StartContainerRequest{WorkspaceSlug: "proj", Container: "dev", ImageId: "arch"}); err != nil {
+		t.Fatal(err)
+	}
+	if len(fake.removed) != 1 || fake.removed[0] != "dsh-workspace-proj-dev" {
+		t.Fatalf("expected the untracked container to be removed, got %v", fake.removed)
+	}
+	if len(fake.created) != 1 || fake.created[0] != "dsh-workspace-proj-dev" {
+		t.Fatalf("expected the container to be created, got %v", fake.created)
+	}
+}
+
+func TestStartContainerCleansUpFailedCreate(t *testing.T) {
+	store := newTestStore(t)
+	if err := store.SaveWorkspaces([]state.Workspace{{WorkspaceSlug: "proj"}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.SaveImages([]state.Image{{ImageID: "arch", ImageTag: "localhost/dsh-podman/arch:latest"}}); err != nil {
+		t.Fatal(err)
+	}
+	fake := newFakePodman()
+	fake.createErr = errors.New("boom")
+	server := &Server{Store: store, Podman: fake, Logger: silentLogger()}
+	_, err := server.StartContainer(context.Background(), &ctl.StartContainerRequest{WorkspaceSlug: "proj", Container: "dev", ImageId: "arch"})
+	if status.Code(err) != codes.Internal {
+		t.Fatalf("expected Internal, got %v", err)
+	}
+	if len(fake.removed) == 0 || fake.removed[len(fake.removed)-1] != "dsh-workspace-proj-dev" {
+		t.Fatalf("expected cleanup removal after failed create, got %v", fake.removed)
+	}
+}
+
+func TestRemoveContainerRemovesOrphan(t *testing.T) {
+	store := newTestStore(t)
+	if err := store.SaveWorkspaces([]state.Workspace{{WorkspaceSlug: "proj"}}); err != nil {
+		t.Fatal(err)
+	}
+	fake := newFakePodman()
+	fake.exists["dsh-workspace-proj-dev"] = true
+	server := &Server{Store: store, Podman: fake, Logger: silentLogger()}
+	if _, err := server.RemoveContainer(context.Background(), &ctl.RemoveContainerRequest{WorkspaceSlug: "proj", Container: "dev"}); err != nil {
+		t.Fatal(err)
+	}
+	if len(fake.removed) != 1 || fake.removed[0] != "dsh-workspace-proj-dev" {
+		t.Fatalf("expected the orphan to be removed, got %v", fake.removed)
+	}
+}
+
+func TestRemoveContainerOrphanNotFound(t *testing.T) {
+	store := newTestStore(t)
+	if err := store.SaveWorkspaces([]state.Workspace{{WorkspaceSlug: "proj"}}); err != nil {
+		t.Fatal(err)
+	}
+	server := &Server{Store: store, Podman: newFakePodman(), Logger: silentLogger()}
+	_, err := server.RemoveContainer(context.Background(), &ctl.RemoveContainerRequest{WorkspaceSlug: "proj", Container: "dev"})
+	if status.Code(err) != codes.NotFound {
+		t.Fatalf("expected NotFound, got %v", err)
 	}
 }
 

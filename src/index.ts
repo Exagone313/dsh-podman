@@ -13,6 +13,7 @@ import {
 } from "./mount-enums.js";
 import { metadata } from "./workspace-binding.js";
 import { PassThrough } from "node:stream";
+import { randomUUID } from "node:crypto";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { isAbsolute, join, resolve as resolvePath } from "node:path";
@@ -120,6 +121,7 @@ export function apply(ctx: any, config: PluginConfig = {}): void {
 export interface SubprocessProvider {
   resolveExecutable(command: string): Promise<string>;
   spawn(spec: any): any;
+  spawnTerminal(spec: any): Promise<any>;
 }
 export interface FilesystemProvider {
   resolve(path: string, opts?: any): Promise<any>;
@@ -258,6 +260,188 @@ export function createSubprocessProvider(resolver: WorkspaceResolver): Subproces
           return true;
         },
       };
+    },
+
+    spawnTerminal: async (spec: any) => {
+      if (
+        !Array.isArray(spec.argv) ||
+        spec.argv.length === 0 ||
+        typeof spec.argv[0] !== "string" ||
+        spec.argv[0] === ""
+      )
+        throw new Error("argv must contain a program");
+      spec.signal?.throwIfAborted();
+      const binding = await resolver.resolveForPath(spec.cwd, spec.cwd);
+      const call = (binding.guest as any).terminal(metadata(binding.token));
+
+      const output = new PassThrough();
+      let exited = false;
+      let terminated = false;
+      let resolveExit!: (outcome: {
+        exitCode: number | null;
+        signal: string | null;
+      }) => void;
+      let rejectExit!: (error: unknown) => void;
+      const done = new Promise<{
+        exitCode: number | null;
+        signal: string | null;
+      }>((resolveDone, rejectDone) => {
+        resolveExit = resolveDone;
+        rejectExit = rejectDone;
+      });
+      // A caller that never receives the handle (startup failure) must not
+      // leave `done` as an unhandled rejection.
+      done.catch(() => {});
+
+      let resolveStarted!: (pid: number) => void;
+      let rejectStarted!: (error: unknown) => void;
+      const started = new Promise<number>((resolvePid, rejectPid) => {
+        resolveStarted = resolvePid;
+        rejectStarted = rejectPid;
+      });
+
+      const pending = new Map<
+        string,
+        { resolve: (message: any) => void; reject: (error: unknown) => void }
+      >();
+      const failPending = (error: unknown): void => {
+        for (const waiter of pending.values()) waiter.reject(error);
+        pending.clear();
+      };
+
+      call.on("data", (message: any) => {
+        if (message.started) {
+          resolveStarted(Number(message.started.pid));
+          return;
+        }
+        if (message.stdoutChunk) {
+          output.write(Buffer.from(message.stdoutChunk));
+          return;
+        }
+        if (message.exit) {
+          exited = true;
+          output.end();
+          resolveExit({
+            exitCode: message.exit.exitCode,
+            signal: message.exit.signaled ? message.exit.signal : null,
+          });
+          return;
+        }
+        if (message.foreground) {
+          const waiter = pending.get(message.foreground.requestId);
+          if (waiter !== undefined) {
+            pending.delete(message.foreground.requestId);
+            waiter.resolve(message.foreground);
+          }
+          return;
+        }
+        if (message.signalled) {
+          const waiter = pending.get(message.signalled.requestId);
+          if (waiter !== undefined) {
+            pending.delete(message.signalled.requestId);
+            waiter.resolve(message.signalled);
+          }
+        }
+      });
+      call.on("error", (error: unknown) => {
+        rejectStarted(error);
+        if (!exited) {
+          exited = true;
+          output.end();
+          rejectExit(error);
+        }
+        failPending(error);
+      });
+      call.on("end", () => {
+        if (exited) return;
+        const error = new Error("terminal stream ended before the process exited");
+        rejectStarted(error);
+        exited = true;
+        output.end();
+        rejectExit(error);
+        failPending(error);
+      });
+
+      call.write({
+        start: {
+          argv: remoteArgv(spec.argv),
+          cwd: spec.cwd,
+          env: spec.env ?? {},
+          rows: spec.rows,
+          cols: spec.cols,
+        },
+      });
+      const pid = await started;
+
+      const request = (message: (requestId: string) => any): Promise<any> => {
+        const requestId = randomUUID();
+        return new Promise<any>((resolveWaiter, rejectWaiter) => {
+          pending.set(requestId, { resolve: resolveWaiter, reject: rejectWaiter });
+          try {
+            call.write(message(requestId));
+          } catch (error) {
+            pending.delete(requestId);
+            rejectWaiter(error);
+          }
+        });
+      };
+
+      const handle = {
+        pid,
+        output,
+        done,
+        write: async (data: string) => {
+          if (exited) throw new Error("terminal has exited");
+          call.write({ stdinChunk: Buffer.from(data) });
+        },
+        inspectForeground: async () => {
+          if (exited) return undefined;
+          const response = await request((requestId) => ({
+            inspectRequestId: requestId,
+          }));
+          return response.found
+            ? {
+                processGroupId: response.processGroupId,
+                inputWaiting: response.inputWaiting,
+              }
+            : undefined;
+        },
+        signalForeground: async (signal: string) => {
+          if (exited) throw new Error("terminal has exited");
+          const response = await request((requestId) => ({
+            signal: { signal, requestId },
+          }));
+          if (!response.found)
+            throw new Error(`no foreground process group to signal ${signal}`);
+          return response.processGroupId;
+        },
+        terminate: async () => {
+          if (terminated) return;
+          terminated = true;
+          try {
+            call.write({ close: true });
+            call.end();
+          } catch {
+            // A finished call cannot be closed again; nothing to do.
+          }
+          try {
+            await done;
+          } catch {
+            // Termination is idempotent and never rejects.
+          }
+          if (!output.writableEnded) output.end();
+        },
+      };
+
+      const onAbort = (): void => {
+        void handle.terminate();
+      };
+      if (spec.signal !== undefined) {
+        if (spec.signal.aborted) onAbort();
+        else spec.signal.addEventListener("abort", onAbort, { once: true });
+      }
+
+      return handle;
     },
   };
 }

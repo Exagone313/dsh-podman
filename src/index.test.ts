@@ -4,6 +4,7 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
+import { EventEmitter } from "node:events";
 import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -121,6 +122,106 @@ test("resolveExecutable rejects invalid names", async () => {
   const provider = createSubprocessProvider({} as any);
   await assert.rejects(() => provider.resolveExecutable(""));
   await assert.rejects(() => provider.resolveExecutable("bin/tool"));
+});
+
+class FakeTerminalCall extends EventEmitter {
+  readonly stdinChunks: Buffer[] = [];
+
+  write(message: any): void {
+    if (message.start) {
+      queueMicrotask(() => this.emit("data", { started: { pid: 42 } }));
+      return;
+    }
+    if (message.stdinChunk) {
+      this.stdinChunks.push(Buffer.from(message.stdinChunk));
+      return;
+    }
+    if (message.inspectRequestId !== undefined) {
+      const requestId = message.inspectRequestId;
+      queueMicrotask(() =>
+        this.emit("data", {
+          foreground: { requestId, found: true, processGroupId: 7, inputWaiting: true },
+        }),
+      );
+      return;
+    }
+    if (message.signal) {
+      const requestId = message.signal.requestId;
+      queueMicrotask(() =>
+        this.emit("data", {
+          signalled: { requestId, found: true, processGroupId: 7 },
+        }),
+      );
+    }
+  }
+
+  end(): void {}
+
+  cancel(): void {}
+
+  emitStdout(data: Buffer): void {
+    this.emit("data", { stdoutChunk: data });
+  }
+
+  emitExit(exitCode = 0, signaled = false): void {
+    this.emit("data", { exit: { exitCode, signaled, signal: "" } });
+    this.emit("end");
+  }
+}
+
+const fakeTerminalResolver = (fake: FakeTerminalCall): any => ({
+  resolveForPath: async () => ({
+    guest: { terminal: () => fake },
+    token: "t",
+  }),
+});
+
+test("spawnTerminal drives the guest terminal stream", async () => {
+  const fake = new FakeTerminalCall();
+  const provider = createSubprocessProvider(fakeTerminalResolver(fake));
+  const handle = await provider.spawnTerminal({
+    argv: ["bash"],
+    cwd: "/projects/team",
+    rows: 24,
+    cols: 80,
+    graceMs: 1000,
+  });
+  assert.equal(handle.pid, 42);
+
+  const chunks: Buffer[] = [];
+  handle.output.on("data", (chunk: Buffer) => chunks.push(Buffer.from(chunk)));
+  const outputEnded = new Promise<void>((resolve) =>
+    handle.output.on("end", resolve),
+  );
+
+  fake.emitStdout(Buffer.from("hello"));
+  await handle.write("ls\n");
+  assert.deepEqual(
+    fake.stdinChunks.map((chunk) => chunk.toString("utf8")),
+    ["ls\n"],
+  );
+
+  assert.deepEqual(await handle.inspectForeground(), {
+    processGroupId: 7,
+    inputWaiting: true,
+  });
+  assert.equal(await handle.signalForeground("SIGINT"), 7);
+
+  fake.emitExit(0, false);
+  assert.deepEqual(await handle.done, { exitCode: 0, signal: null });
+  await outputEnded;
+  assert.equal(Buffer.concat(chunks).toString("utf8"), "hello");
+
+  await handle.terminate();
+});
+
+test("spawnTerminal rejects an empty argv", async () => {
+  const provider = createSubprocessProvider(fakeTerminalResolver(new FakeTerminalCall()));
+  await assert.rejects(
+    () =>
+      provider.spawnTerminal({ argv: [], cwd: "/projects/team", rows: 24, cols: 80 }),
+    /argv must contain a program/,
+  );
 });
 
 const stubResolver = {

@@ -112,16 +112,12 @@ test("outputReader honors in-window offsets", () => {
   assert.equal(pastEnd.lossy, false);
 });
 
-test("resolveExecutable resolves guest binaries", async () => {
-  const provider = createSubprocessProvider({} as any);
-  assert.equal(await provider.resolveExecutable("/abs/path"), "/abs/path");
-  assert.equal(await provider.resolveExecutable("git"), "/usr/bin/git");
-});
-
-test("resolveExecutable rejects invalid names", async () => {
+test("resolveExecutable rejects every request without a workspace context", async () => {
   const provider = createSubprocessProvider({} as any);
   await assert.rejects(() => provider.resolveExecutable(""));
   await assert.rejects(() => provider.resolveExecutable("bin/tool"));
+  await assert.rejects(() => provider.resolveExecutable("ls"));
+  await assert.rejects(() => provider.resolveExecutable("/usr/bin/ls"));
 });
 
 class FakeTerminalCall extends EventEmitter {

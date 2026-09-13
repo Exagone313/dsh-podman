@@ -175,14 +175,17 @@ export function createSubprocessProvider(resolver: WorkspaceResolver): Subproces
     dispose: () => {
       for (const terminate of [...live]) terminate();
     },
-    resolveExecutable: async (command: string) => {
-      if (command.length === 0)
-        throw new Error("executable name must be non-empty");
-      if (command.startsWith("/")) return command;
-      if (command.includes("/"))
-        throw new Error("relative executable paths are not supported");
-      return `/usr/bin/${command}`;
-    },    spawn: (spec: any) => {
+    // The harness's resolveExecutable carries no cwd, and this provider's
+    // execution world is per-workspace (each workspace is its own container),
+    // so there is no context in which an executable can be verified or looked
+    // up. Report every request as unresolvable instead of returning an
+    // unverified path.
+    resolveExecutable: async (command: string): Promise<string> => {
+      throw new Error(
+        `cannot resolve executable ${JSON.stringify(command)}: no workspace context is available`,
+      );
+    },
+    spawn: (spec: any) => {
       if (
         !Array.isArray(spec.argv) ||
         spec.argv.length === 0 ||

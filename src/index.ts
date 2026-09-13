@@ -2025,7 +2025,7 @@ export function createFilesystemProvider(resolver: WorkspaceResolver): Filesyste
       return {
         targetKey: resolved,
         displayPath: resolved,
-        binding: await resolver.resolve(opts?.cwd),
+        binding: await resolver.resolveForPath(resolved, opts?.cwd),
       };
     },
     processPath: (target: any) => target.targetKey,

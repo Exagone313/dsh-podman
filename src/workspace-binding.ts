@@ -8,7 +8,7 @@ import {
   grpc,
   unary,
 } from "./grpc/runtime-client.js";
-import { join } from "node:path";
+import { isAbsolute, join } from "node:path";
 
 export interface WorkspaceBinding {
   guest: grpc.Client;
@@ -38,12 +38,7 @@ export class WorkspaceResolver {
     return this.config;
   }
   async resolve(cwd: unknown): Promise<WorkspaceBinding> {
-    const workspace = await this.registry?.resolveByPath?.(String(cwd));
-    if (workspace === undefined) {
-      throw new Error(
-        `no DH workspace owns session cwd ${JSON.stringify(cwd)}`,
-      );
-    }
+    const workspace = await this.workspaceForCwd(cwd);
     const relativePath = String(workspace.path).replace(
       `${this.config.projectsRoot}/`,
       "",
@@ -55,6 +50,45 @@ export class WorkspaceResolver {
     const session = defaultCwdOf(cwd);
     return session === undefined ? binding : { ...binding, defaultCwd: session };
   }
+  // Resolve the workspace binding for a filesystem path when the caller did not
+  // supply a session working directory. The 0.1.5 `fs.resolve` contract allows
+  // `{ signal }` alone, and the workspace that CONTAINS the path is the only
+  // sensible owner, so match it by longest canonical-path prefix.
+  async resolveForPath(path: string, cwd: unknown): Promise<WorkspaceBinding> {
+    if (typeof cwd === "string" && cwd !== "") return this.resolve(cwd);
+    if (isAbsolute(path)) {
+      const workspace = this.containingWorkspace(path);
+      if (workspace !== undefined) return this.resolve(String(workspace.path));
+    }
+    throw new Error(
+      `cannot resolve a DH workspace for path ${JSON.stringify(path)}; pass a session working directory`,
+    );
+  }
+  private containingWorkspace(path: string): any | undefined {
+    const entries: any[] = this.registry?.list?.() ?? [];
+    let match: any | undefined;
+    for (const workspace of entries) {
+      const root = workspace?.path;
+      if (typeof root !== "string" || root === "") continue;
+      if (path !== root && !path.startsWith(`${root}/`)) continue;
+      if (match === undefined || root.length > String(match.path).length) {
+        match = workspace;
+      }
+    }
+    return match;
+  }
+  private async workspaceForCwd(cwd: unknown): Promise<any> {
+    if (typeof cwd !== "string" || cwd === "") {
+      throw new Error(
+        `cannot resolve a DH workspace without a session working directory (got ${JSON.stringify(cwd)})`,
+      );
+    }
+    const workspace = await this.registry?.resolveByPath?.(cwd);
+    if (workspace === undefined) {
+      throw new Error(`no DH workspace owns session cwd ${JSON.stringify(cwd)}`);
+    }
+    return workspace;
+  }
   resolveSlug(key: string): Promise<WorkspaceBinding> {
     return this.ready(key, key);
   }
@@ -62,12 +96,7 @@ export class WorkspaceResolver {
     cwd: unknown,
     container: string,
   ): Promise<WorkspaceBinding> {
-    const workspace = await this.registry?.resolveByPath?.(String(cwd));
-    if (workspace === undefined) {
-      throw new Error(
-        `no DH workspace owns session cwd ${JSON.stringify(cwd)}`,
-      );
-    }
+    const workspace = await this.workspaceForCwd(cwd);
     const slug = workspaceSlug(String(workspace.id));
     const result = await this.control<any>("listContainers", {});
     const row = containerRowFor(result.containers ?? [], slug, container);

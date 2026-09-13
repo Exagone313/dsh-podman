@@ -296,3 +296,78 @@ test("containerBinding exposes the session directory only when a project mount c
     unmounted.stop();
   }
 });
+
+test("resolveForPath derives the workspace from an absolute path without a cwd", async () => {
+  const { socketsRoot, createRequests, stop } = await startControlServer();
+  try {
+    const resolver = new WorkspaceResolver(
+      {
+        socketsRoot,
+        defaultImage: "arch",
+        projectsRoot: "/projects",
+        controlToken: "",
+      },
+      {
+        list: () => [
+          { id: "w1", path: "/projects/team" },
+          { id: "w2", path: "/projects/team/sub" },
+        ],
+        resolveByPath: (path: string) =>
+          path === "/projects/team/sub"
+            ? { id: "w2", path: "/projects/team/sub" }
+            : { id: "w1", path: "/projects/team" },
+      } as any,
+    );
+    const binding = await resolver.resolveForPath(
+      "/projects/team/sub/AGENTS.md",
+      undefined,
+    );
+    assert.equal(binding.defaultCwd, "/projects/team/sub");
+    assert.equal(createRequests[0].projectName, "team/sub");
+  } finally {
+    stop();
+  }
+});
+
+test("resolveForPath rejects paths it cannot map to a workspace", async () => {
+  const resolver = new WorkspaceResolver(
+    {
+      socketsRoot: "/run/dsh",
+      defaultImage: "arch",
+      projectsRoot: "/projects",
+      controlToken: "",
+    },
+    {
+      list: () => [{ id: "w1", path: "/projects/team" }],
+      resolveByPath: () => undefined,
+    } as any,
+  );
+  await assert.rejects(
+    () => resolver.resolveForPath("README.md", undefined),
+    /session working directory/,
+  );
+  await assert.rejects(
+    () => resolver.resolveForPath("/elsewhere/file", undefined),
+    /cannot resolve a DH workspace for path/,
+  );
+});
+
+test("resolve rejects a missing cwd without stringifying it", async () => {
+  const resolver = new WorkspaceResolver(
+    {
+      socketsRoot: "/run/dsh",
+      defaultImage: "arch",
+      projectsRoot: "/projects",
+      controlToken: "",
+    },
+    {
+      resolveByPath: () => {
+        throw new Error("resolveByPath must not be called with a missing cwd");
+      },
+    } as any,
+  );
+  await assert.rejects(
+    () => resolver.resolve(undefined),
+    /session working directory/,
+  );
+});

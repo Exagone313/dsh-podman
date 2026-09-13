@@ -125,6 +125,7 @@ test("resolveExecutable rejects invalid names", async () => {
 
 const stubResolver = {
   resolve: async () => ({ kind: "binding" }),
+  resolveForPath: async () => ({ kind: "binding" }),
 } as any;
 
 test("filesystem provider resolves absolute safe paths", async () => {
@@ -133,6 +134,21 @@ test("filesystem provider resolves absolute safe paths", async () => {
   assert.equal(target.targetKey, "/projects/team/app");
   assert.equal(target.displayPath, "/projects/team/app");
   assert.deepEqual(target.binding, { kind: "binding" });
+});
+
+test("filesystem provider resolves absolute paths without a cwd", async () => {
+  const seen: Array<[string, unknown]> = [];
+  const provider = createFilesystemProvider({
+    resolve: async () => ({ kind: "binding" }),
+    resolveForPath: async (path: string, cwd: unknown) => {
+      seen.push([path, cwd]);
+      return { kind: "binding" };
+    },
+  } as any);
+  const target = await provider.resolve("/projects/team/app");
+  assert.equal(target.targetKey, "/projects/team/app");
+  assert.deepEqual(target.binding, { kind: "binding" });
+  assert.deepEqual(seen, [["/projects/team/app", undefined]]);
 });
 
 test("filesystem provider resolves relative paths against the cwd", async () => {

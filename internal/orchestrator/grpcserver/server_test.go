@@ -874,6 +874,53 @@ func TestRemoveContainerUnknownContainer(t *testing.T) {
 	}
 }
 
+func TestContainerNotFoundNamesTheContainer(t *testing.T) {
+	store := newTestStore(t)
+	if err := store.SaveWorkspaces([]state.Workspace{{WorkspaceSlug: "proj"}}); err != nil {
+		t.Fatal(err)
+	}
+	server := &Server{Store: store, Logger: silentLogger()}
+	cases := []struct {
+		name string
+		call func() error
+	}{
+		{"AddContainerMount", func() error {
+			_, err := server.AddContainerMount(context.Background(), &ctl.AddContainerMountRequest{WorkspaceSlug: "proj", Container: "nope", Kind: ctl.MountKind_MOUNT_KIND_TMPFS, Destination: "/tmp/x", Mode: ctl.MountMode_MOUNT_MODE_READ_WRITE})
+			return err
+		}},
+		{"RemoveContainerMount", func() error {
+			_, err := server.RemoveContainerMount(context.Background(), &ctl.RemoveContainerMountRequest{WorkspaceSlug: "proj", Container: "nope", Kind: ctl.MountKind_MOUNT_KIND_TMPFS, Destination: "/tmp/x"})
+			return err
+		}},
+		{"AddContainerSecret", func() error {
+			_, err := server.AddContainerSecret(context.Background(), &ctl.AddContainerSecretRequest{WorkspaceSlug: "proj", Container: "nope", Env: "FOO", Secret: "data"})
+			return err
+		}},
+		{"RemoveContainerSecret", func() error {
+			_, err := server.RemoveContainerSecret(context.Background(), &ctl.RemoveContainerSecretRequest{WorkspaceSlug: "proj", Container: "nope", Env: "FOO"})
+			return err
+		}},
+		{"RemoveContainer", func() error {
+			_, err := server.RemoveContainer(context.Background(), &ctl.RemoveContainerRequest{WorkspaceSlug: "proj", Container: "nope"})
+			return err
+		}},
+		{"RecreateContainer", func() error {
+			_, err := server.RecreateContainer(context.Background(), &ctl.RecreateContainerRequest{WorkspaceSlug: "proj", Container: "nope"})
+			return err
+		}},
+	}
+	for _, tc := range cases {
+		err := tc.call()
+		if status.Code(err) != codes.NotFound {
+			t.Errorf("%s: expected NotFound, got %v", tc.name, err)
+			continue
+		}
+		if !strings.Contains(err.Error(), `container "nope" not found in workspace "proj"`) {
+			t.Errorf("%s: message = %q", tc.name, err.Error())
+		}
+	}
+}
+
 func TestGetImageMissing(t *testing.T) {
 	server := &Server{Store: newTestStore(t), Logger: silentLogger()}
 	_, err := server.GetImage(context.Background(), &ctl.GetImageRequest{ImageId: "nope"})

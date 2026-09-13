@@ -120,6 +120,16 @@ func containerByLogical(ws *state.Workspace, name string) (*state.Container, boo
 	return nil, false
 }
 
+// containerNotFoundError is the one not-found shape every container control
+// call reports, matching the plugin's read tools. An empty name is normalized
+// to "default" so the message always names a container.
+func containerNotFoundError(container, slug string) error {
+	if container == "" {
+		container = "default"
+	}
+	return status.Error(codes.NotFound, fmt.Sprintf("container %q not found in workspace %q", container, slug))
+}
+
 // workspaceBySlug returns the stored workspace with the given slug, or an
 // error whose message is "workspace not found" when absent.
 func workspaceBySlug(store *state.Store, slug string) (state.Workspace, error) {
@@ -616,7 +626,7 @@ func (s *Server) RecreateContainer(ctx context.Context, request *ctl.RecreateCon
 	record, ok := containerByLogical(&workspace, container)
 	if !ok {
 		s.log().Warn("control request failed", "method", "RecreateContainer", "workspace_slug", request.GetWorkspaceSlug(), "container", container, "reason", "container not found")
-		return nil, status.Error(codes.NotFound, "container not found")
+		return nil, containerNotFoundError(container, request.GetWorkspaceSlug())
 	}
 	snapshot := snapshotContainer(*record)
 	if err := validateEnv(request.GetEnv()); err != nil {
@@ -814,7 +824,7 @@ func (s *Server) AddContainerMount(ctx context.Context, request *ctl.AddContaine
 	record, ok := containerByLogical(&workspace, request.GetContainer())
 	if !ok {
 		s.log().Warn("control request failed", "method", "AddContainerMount", "workspace_slug", request.GetWorkspaceSlug(), "container", request.GetContainer(), "reason", "container not found")
-		return nil, status.Error(codes.NotFound, "container not found")
+		return nil, containerNotFoundError(request.GetContainer(), request.GetWorkspaceSlug())
 	}
 	snapshot := snapshotContainer(*record)
 	kind, err := mountKindFromProto(request.GetKind())
@@ -919,7 +929,7 @@ func (s *Server) RemoveContainerMount(ctx context.Context, request *ctl.RemoveCo
 	record, ok := containerByLogical(&workspace, request.GetContainer())
 	if !ok {
 		s.log().Warn("control request failed", "method", "RemoveContainerMount", "workspace_slug", request.GetWorkspaceSlug(), "container", request.GetContainer(), "reason", "container not found")
-		return nil, status.Error(codes.NotFound, "container not found")
+		return nil, containerNotFoundError(request.GetContainer(), request.GetWorkspaceSlug())
 	}
 	snapshot := snapshotContainer(*record)
 	kind, err := mountKindFromProto(request.GetKind())
@@ -2292,7 +2302,7 @@ func (s *Server) RemoveContainer(_ context.Context, request *ctl.RemoveContainer
 		// create) while an untracked podman container survives. Remove it so an
 		// orphan is cleanable; otherwise report not found.
 		if s.Podman == nil {
-			return nil, status.Error(codes.NotFound, "container not found")
+			return nil, containerNotFoundError(container, request.GetWorkspaceSlug())
 		}
 		podmanName := podmanContainerName(workspace.WorkspaceSlug, container)
 		orphan, existsErr := s.Podman.ContainerExists(podmanName)
@@ -2301,7 +2311,7 @@ func (s *Server) RemoveContainer(_ context.Context, request *ctl.RemoveContainer
 		}
 		if !orphan {
 			s.log().Warn("control request failed", "method", "RemoveContainer", "workspace_slug", request.GetWorkspaceSlug(), "container", container, "reason", "container not found")
-			return nil, status.Error(codes.NotFound, "container not found")
+			return nil, containerNotFoundError(container, request.GetWorkspaceSlug())
 		}
 		s.log().Warn("RemoveContainer removing untracked container", "workspace_slug", workspace.WorkspaceSlug, "container", container, "podman_name", podmanName)
 		if err := s.Podman.Stop(podmanName); err != nil {
@@ -2610,7 +2620,7 @@ func (s *Server) AddContainerSecret(ctx context.Context, request *ctl.AddContain
 	record, ok := containerByLogical(&workspace, container)
 	if !ok {
 		s.log().Warn("control request failed", "method", "AddContainerSecret", "workspace_slug", request.GetWorkspaceSlug(), "container", container, "reason", "container not found")
-		return nil, status.Error(codes.NotFound, "container not found")
+		return nil, containerNotFoundError(container, request.GetWorkspaceSlug())
 	}
 	snapshot := snapshotContainer(*record)
 	if err := validateEnvKey(request.GetEnv()); err != nil {
@@ -2682,7 +2692,7 @@ func (s *Server) RemoveContainerSecret(ctx context.Context, request *ctl.RemoveC
 	record, ok := containerByLogical(&workspace, container)
 	if !ok {
 		s.log().Warn("control request failed", "method", "RemoveContainerSecret", "workspace_slug", request.GetWorkspaceSlug(), "container", container, "reason", "container not found")
-		return nil, status.Error(codes.NotFound, "container not found")
+		return nil, containerNotFoundError(container, request.GetWorkspaceSlug())
 	}
 	snapshot := snapshotContainer(*record)
 	if err := validateEnvKey(request.GetEnv()); err != nil {

@@ -29,7 +29,10 @@ export function withoutHarnessSourceSection(assembly: any): any {
 // descriptions it explains, and it states the two facts that otherwise invite a
 // "bash runs on the host" hallucination: `bash` and `container_bash` use the
 // same container, and a container shares the host kernel (so `uname` matches
-// the host even though the container's identity does not).
+// the host even though the container's identity does not). It names the
+// execution environment a Podman container, not a "Podman workspace", and says
+// that containers are scoped to a dsh workspace, so the two vocabularies stay
+// apart.
 export function podmanRuntimeSection(): {
   name: string;
   order: number;
@@ -39,19 +42,21 @@ export function podmanRuntimeSection(): {
     name: "podman:runtime",
     order: 950,
     text:
-      "This session runs inside a Podman workspace. `bash`, `read`, `write`, " +
-      "`edit`, `glob`, and `grep` are container-backed: they execute inside " +
-      "this workspace's default container, the same container the `container_*` " +
-      'tools target with `container: "default"`. There is no host shell — never ' +
-      "describe their output as the host's — and host paths do not exist. " +
-      "Because `bash` and `container_bash` use that one container, the same " +
-      "command returns identical output by construction, and matching output is " +
-      "never evidence of a host shell. Containers share the host kernel, so " +
-      "`uname -a`, `uname -r`, and `/proc/version` do report the host kernel; " +
-      "the container's own identity shows in `hostname`, `/etc/os-release`, and " +
-      "`/proc/1/cmdline`. The `container_*` tools are those same operations " +
-      "against a named container, plus container, image, mount, volume, secret, " +
-      "and daemon management.",
+      "This dsh session's `bash`, `read`, `write`, `edit`, `glob`, and `grep` " +
+      "are container-backed: they run in a Podman container, the default " +
+      "container of the current dsh workspace — the same one `container_bash` " +
+      "and the other container-scoped tools (`container_*` and `daemon_*`) " +
+      'target with `container: "default"`. Containers are scoped to a dsh ' +
+      "workspace: each workspace has its own default container and any named " +
+      "ones, and the container-scoped tools address them by logical name within " +
+      "the current workspace. There is no host shell — never describe their " +
+      "output as the host's — and host paths do not exist. Because `bash` and " +
+      "`container_bash` use that one container, the same command returns " +
+      "identical output by construction, and matching output is never evidence " +
+      "of a host shell. Containers share the host kernel, so `uname -a`, " +
+      "`uname -r`, and `/proc/version` do report the host kernel; the " +
+      "container's own identity shows in `hostname`, `/etc/os-release`, and " +
+      "`/proc/1/cmdline`.",
   };
 }
 

@@ -418,8 +418,8 @@ test("podmanRuntimeSection clarifies that the built-in tools run in the containe
     assert.match(section.text, new RegExp("`" + tool + "`"));
   }
   assert.match(section.text, /container-backed/);
+  assert.match(section.text, /run in a Podman container/);
   assert.match(section.text, /There is no host shell/);
-  assert.match(section.text, /container_\*/);
   // The facts that pre-empt the "bash runs on the host" hallucination: the
   // built-in shell and container_bash use one container, and identical uname
   // output is the shared kernel, not a host shell.
@@ -428,4 +428,13 @@ test("podmanRuntimeSection clarifies that the built-in tools run in the containe
   assert.match(section.text, /share the host kernel/);
   assert.match(section.text, /hostname/);
   assert.match(section.text, /\/etc\/os-release/);
+  // Containers belong to a dsh workspace, and the daemon tools are
+  // container-scoped too (they do not start with `container_`).
+  assert.match(section.text, /scoped to a dsh workspace/);
+  assert.match(section.text, /container_\*/);
+  assert.match(section.text, /daemon_\*/);
+  // Neither the old vocabulary nor plugin lore belongs in the section.
+  assert.doesNotMatch(section.text, /Podman workspace/);
+  assert.doesNotMatch(section.text, /those same operations/);
+  assert.doesNotMatch(section.text, /plugin/i);
 });

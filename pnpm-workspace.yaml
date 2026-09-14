@@ -1,0 +1,11 @@
+# SPDX-FileCopyrightText: 2026 Elouan Martinet <exa@elou.world>
+#
+# SPDX-License-Identifier: MIT
+
+# Build scripts pnpm may run. pnpm >= 11 denies every dependency's build scripts
+# by default and fails the install when one is denied, so the two packages that
+# need theirs (esbuild's binary check, protobufjs's postinstall) are approved
+# here.
+allowBuilds:
+  esbuild: true
+  protobufjs: true

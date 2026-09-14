@@ -126,7 +126,12 @@ func Containerfile(spec BuildSpec) (string, error) {
 		}
 		lines = append(lines, line)
 	case "apt":
-		line := "RUN DEBIAN_FRONTEND=noninteractive apt-get update && DEBIAN_FRONTEND=noninteractive apt-get dist-upgrade -y && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends"
+		// The official Debian/Ubuntu images ship docker-clean, whose
+		// Post-Invoke hooks delete /var/cache/apt/archives/*.deb after every
+		// apt/dpkg run — exactly the directory a build mounts as the package
+		// cache. Drop those two hooks (keeping the pkgcache suppression, so the
+		// built image stays lean) and state the retention explicitly.
+		line := "RUN sed -i '/Post-Invoke/d' /etc/apt/apt.conf.d/docker-clean && printf 'APT::Keep-Downloaded-Packages \"true\";\\n' > /etc/apt/apt.conf.d/99dsh-podman-keep && DEBIAN_FRONTEND=noninteractive apt-get update && DEBIAN_FRONTEND=noninteractive apt-get dist-upgrade -y && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends"
 		if len(spec.Packages) > 0 {
 			line += " " + strings.Join(spec.Packages, " ")
 		}

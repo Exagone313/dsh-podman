@@ -257,7 +257,7 @@ func TestContainerfileBaseDistros(t *testing.T) {
 		{
 			name: "ubuntu", wantFrom: "FROM docker.io/library/ubuntu:latest\n",
 			spec:        BuildSpec{ImageID: "ubuntu", From: "docker.io/library/ubuntu:latest", PackageManager: "apt", Packages: []string{"build-essential", "ca-certificates", "curl", "diffutils", "fd-find", "git", "jq", "less", "netcat-openbsd", "openssh-client", "patch", "procps", "python3", "ripgrep", "tree", "unzip", "wget", "zstd"}, IsBase: true, PostInstall: []string{"ln -s /usr/bin/fd-find /usr/local/bin/fd"}},
-			wantInstall: "RUN DEBIAN_FRONTEND=noninteractive apt-get update && DEBIAN_FRONTEND=noninteractive apt-get dist-upgrade -y && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends build-essential ca-certificates curl diffutils fd-find git jq less netcat-openbsd openssh-client patch procps python3 ripgrep tree unzip wget zstd && rm -rf /var/lib/apt/lists/*\n",
+			wantInstall: "RUN sed -i '/Post-Invoke/d' /etc/apt/apt.conf.d/docker-clean && printf 'APT::Keep-Downloaded-Packages \"true\";\\n' > /etc/apt/apt.conf.d/99dsh-podman-keep && DEBIAN_FRONTEND=noninteractive apt-get update && DEBIAN_FRONTEND=noninteractive apt-get dist-upgrade -y && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends build-essential ca-certificates curl diffutils fd-find git jq less netcat-openbsd openssh-client patch procps python3 ripgrep tree unzip wget zstd && rm -rf /var/lib/apt/lists/*\n",
 			wantPost:    "RUN ln -s /usr/bin/fd-find /usr/local/bin/fd\n",
 		},
 		{

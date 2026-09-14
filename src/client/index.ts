@@ -39,15 +39,18 @@ export function apply(ctx: ClientContext): void {
   });
 
   // Record the active locale (including the browser default, which the host
-  // cannot observe) so approval text renders in the session language.
+  // cannot observe) so approval text renders in the session language. The
+  // namespace may still be loading when this plugin mounts, so the write also
+  // runs on every scope change; the value check keeps it a one-time write.
   const syncLocale = (): void => {
     const snapshot = scope.getSnapshot();
-    if (!snapshot.writable) return;
+    if (snapshot.status !== "ready" || !snapshot.writable) return;
     const active = ctx.locale.getSnapshot().active;
     if (snapshot.value?.uiLocale === active) return;
     void scope.set("uiLocale", active);
   };
   syncLocale();
+  scope.subscribe(syncLocale);
   ctx.effect(() => ctx.on("locale/change", syncLocale), "podman: locale sync");
 
   const controller = new ContainerCardController(scope);

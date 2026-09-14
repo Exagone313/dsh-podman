@@ -384,6 +384,7 @@ func (s *Server) RemoveContainer(_ context.Context, request *ctl.RemoveContainer
 			s.log().Error("control request failed", "method", "RemoveContainer", "workspace_slug", request.GetWorkspaceSlug(), "container", container, "error", err)
 			return nil, status.Error(codes.Internal, err.Error())
 		}
+		s.removeSocketDir(podmanName)
 		s.removePodIfEmpty(workspace.WorkspaceSlug)
 		return &ctl.RemoveContainerResponse{}, nil
 	}
@@ -405,6 +406,7 @@ func (s *Server) RemoveContainer(_ context.Context, request *ctl.RemoveContainer
 			return nil, status.Error(codes.Internal, err.Error())
 		}
 	}
+	s.removeSocketDir(record.PodmanName)
 	if err := s.Store.UpdateWorkspaces(func(all []state.Workspace) ([]state.Workspace, error) {
 		for i := range all {
 			if all[i].WorkspaceSlug == workspace.WorkspaceSlug {

@@ -58,14 +58,16 @@ func tempRoot(t *testing.T) string {
 // fakePodman is a podmanAPI double for lifecycle tests. It records removals and
 // creations and serves canned existence/run state.
 type fakePodman struct {
-	exists        map[string]bool
-	running       map[string]bool
-	secretMissing map[string]bool
-	removed       []string
-	created       []string
-	recreated     []string
-	createErr     error
-	recreateFails int
+	exists            map[string]bool
+	running           map[string]bool
+	secretMissing     map[string]bool
+	removed           []string
+	removedPods       []string
+	removedSocketDirs []string
+	created           []string
+	recreated         []string
+	createErr         error
+	recreateFails     int
 }
 
 func newFakePodman() *fakePodman {

@@ -659,3 +659,45 @@ func TestRecreateContainerStopsDaemons(t *testing.T) {
 		t.Fatalf("nil Podman: expected FailedPrecondition, got %v", err)
 	}
 }
+
+// TestRemoveContainerRemovesLastContainerAndPod is the regression test for the
+// phantom default container: removing a workspace's last container must clear
+// the legacy fields (so the state store cannot re-materialize a container) and
+// therefore remove the pod.
+func TestRemoveContainerRemovesLastContainerAndPod(t *testing.T) {
+	store := newTestStore(t)
+	if err := store.SaveWorkspaces([]state.Workspace{{
+		WorkspaceSlug: testWorkspaceSlug,
+		ContainerName: testDefaultContainer,
+		ImageID:       "arch",
+		Status:        "running",
+		Containers: []state.Container{{
+			Name: "default", PodmanName: testDefaultContainer, ImageID: "arch", Status: "running",
+		}},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	fake := newFakePodman()
+	fake.exists[testDefaultContainer] = true
+	server := &Server{Store: store, Podman: fake, SocketsRoot: t.TempDir(), Logger: silentLogger()}
+
+	if _, err := server.RemoveContainer(context.Background(), &ctl.RemoveContainerRequest{WorkspaceSlug: testWorkspaceSlug}); err != nil {
+		t.Fatal(err)
+	}
+	if !sameStrings(fake.removedPods, []string{podNameFor(testWorkspaceSlug)}) {
+		t.Fatalf("pod not removed after the last container: %#v", fake.removedPods)
+	}
+	if !sameStrings(fake.removedSocketDirs, []string{testDefaultContainer}) {
+		t.Fatalf("socket dir not removed: %#v", fake.removedSocketDirs)
+	}
+	workspaces, err := store.Workspaces()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(workspaces) != 1 {
+		t.Fatalf("workspace count changed: %#v", workspaces)
+	}
+	if len(workspaces[0].Containers) != 0 || workspaces[0].ContainerName != "" {
+		t.Fatalf("legacy fields kept a phantom container: %#v", workspaces[0])
+	}
+}

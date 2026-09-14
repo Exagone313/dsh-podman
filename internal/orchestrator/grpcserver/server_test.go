@@ -46,7 +46,15 @@ func (f *fakePodman) Remove(name string) error {
 	return nil
 }
 
-func (f *fakePodman) RemovePod(string) error { return nil }
+func (f *fakePodman) RemovePod(name string) error {
+	f.removedPods = append(f.removedPods, name)
+	return nil
+}
+
+func (f *fakePodman) RemoveSocketDir(name string) error {
+	f.removedSocketDirs = append(f.removedSocketDirs, name)
+	return nil
+}
 
 func TestLifecycleErrorsNameTheirResource(t *testing.T) {
 	store := newTestStore(t)

@@ -29,6 +29,7 @@ type podmanAPI interface {
 	RecreateWorkspace(pod, name, image, token string, mounts []specs.Mount, secrets []specgen.Secret, envSecrets map[string]string, env map[string]string) error
 	Remove(name string) error
 	RemovePod(name string) error
+	RemoveSocketDir(name string) error
 	Stop(name string) error
 	ImageExists(name string) (bool, error)
 	ImageCreated(name string) string

@@ -153,7 +153,10 @@ func (s *Server) upsertContainer(workspace state.Workspace, record state.Contain
 }
 
 // syncDefaultFields projects the default container record onto the workspace's
-// legacy single-container fields so existing consumers stay consistent.
+// legacy single-container fields so existing consumers stay consistent. With no
+// default container left the fields are cleared, so the state store's legacy
+// migration cannot re-materialize a phantom container (which would keep the
+// workspace's pod alive after its last container is removed).
 func syncDefaultFields(ws *state.Workspace) {
 	for i := range ws.Containers {
 		if ws.Containers[i].Name == "default" {
@@ -166,6 +169,12 @@ func syncDefaultFields(ws *state.Workspace) {
 			return
 		}
 	}
+	ws.ContainerName = ""
+	ws.ImageID = ""
+	ws.Status = ""
+	ws.AgentSocketPath = ""
+	ws.AgentToken = ""
+	ws.CreatedAt = ""
 }
 
 func (s *Server) CreateWorkspace(ctx context.Context, request *ctl.CreateWorkspaceRequest) (*ctl.Workspace, error) {
@@ -290,6 +299,17 @@ func (s *Server) removePodIfEmpty(slug string) {
 			}
 		}
 		return
+	}
+}
+
+// removeSocketDir deletes a removed container's socket directory, best-effort:
+// a failure must not fail the control call that already removed the container.
+func (s *Server) removeSocketDir(podmanName string) {
+	if s.Podman == nil {
+		return
+	}
+	if err := s.Podman.RemoveSocketDir(podmanName); err != nil {
+		s.log().Warn("socket dir cleanup failed", "container_name", podmanName, "error", err)
 	}
 }
 

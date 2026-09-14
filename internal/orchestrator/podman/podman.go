@@ -286,6 +286,19 @@ func (c *Client) Remove(name string) error {
 	return err
 }
 
+// RemoveSocketDir deletes a container's socket directory, tolerating an
+// already-absent one. It mirrors the directory CreateWorkspace makes for the
+// guest agent's socket.
+func (c *Client) RemoveSocketDir(name string) error {
+	dir := filepath.Join(c.socketRoot, name)
+	if err := os.RemoveAll(dir); err != nil {
+		c.log().Error("guest socket dir removal failed", "container_name", name, "dir", dir, "error", err)
+		return err
+	}
+	c.log().Info("guest socket dir removed", "container_name", name, "dir", dir)
+	return nil
+}
+
 func (c *Client) RecreateWorkspace(pod, name, image, token string, mounts []specs.Mount, secrets []specgen.Secret, envSecrets map[string]string, env map[string]string) error {
 	c.log().Info("recreating guest container", "pod_name", pod, "container_name", name, "image", image, "mount_count", len(mounts))
 	exists, err := c.ContainerExists(name)

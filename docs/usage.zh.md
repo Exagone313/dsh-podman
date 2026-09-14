@@ -47,11 +47,13 @@ dsh-podman 将容器运行的镜像组织为三个层级：
 ### 审批
 
 审批由插件自身通过 `tools/pre-execute`
-策略执行，该策略读取会话的权限旋钮（沙箱模式 + 审批策略，从会话日志折叠而来）：
+策略执行，该策略读取会话生效的权限旋钮（沙箱模式 + 审批策略）：
 
 - **Read Only** — 只有 get/list
-  类工具可以运行（`image_list`、`image_get`、`container_list`、`container_read`、`container_glob`、`container_grep`、`container_mount_list`、`volume_list`、`secret_list`、`daemon_list`、`daemon_logs`）；其他所有插件工具都被拒绝。DSH
-  原生工具保持各自的沙箱行为。
+  类工具可以运行（`image_list`、`image_get`、`container_list`、`container_read`、`container_glob`、`container_grep`、`container_mount_list`、`volume_list`、`secret_list`、`daemon_list`、`daemon_logs`）；其他所有插件工具都被拒绝。内置的文件与
+  shell 工具（`write`、`edit`、`bash`，以及 Windows 上的
+  `pwsh`）也会被拒绝，因为本应约束它们的 harness
+  沙箱在容器内被绕过；`read`、`glob` 和 `grep` 仍可运行。
 - **Workspace Write** — 带 `✱` 的工具通过 DSH
   的审批服务询问（调用会显示标准审批提示，当没有可用的审批通道时被拒绝）；`container_start`
   仅在传入 `mounts` 时询问。

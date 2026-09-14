@@ -56,14 +56,16 @@ tools operate on a **logical container name** of the current workspace
 ### Approval
 
 Approval is enforced by the plugin itself through a `tools/pre-execute` policy
-that reads the session's permission knobs (sandbox mode + approval policy,
-folded from the session log):
+that reads the session's effective permission knobs (sandbox mode + approval
+policy):
 
 - **Read Only** — only the get/list tools run (`image_list`, `image_get`,
   `container_list`, `container_read`, `container_glob`, `container_grep`,
   `container_mount_list`, `volume_list`, `secret_list`, `daemon_list`,
-  `daemon_logs`); every other plugin tool is denied. DSH-native tools keep their
-  own sandbox behavior.
+  `daemon_logs`); every other plugin tool is denied. The built-in file and shell
+  tools (`write`, `edit`, `bash`, and `pwsh` on Windows) are denied too, because
+  the harness sandbox that would confine them is bypassed inside the container;
+  `read`, `glob`, and `grep` still run.
 - **Workspace Write** — the `✱` tools ask through DSH's approval service (the
   call shows the standard approval prompt and is denied when no approval channel
   is available); `container_start` asks only when `mounts` is passed.

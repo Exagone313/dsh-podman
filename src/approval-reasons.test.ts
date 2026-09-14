@@ -122,3 +122,15 @@ test("preExecutePolicy renders a localized deny reason", async () => {
   assert.equal(denied.kind, "deny");
   assert.equal(denied.reason, "已拒绝：当前会话为只读，而 “container_start” 需要写入权限。");
 });
+
+test("preExecutePolicy renders a localized deny reason for a built-in tool", async () => {
+  const denied = (await preExecutePolicy(
+    { name: "bash", agent: { session: { facts: { mode: "read-only" } } } },
+    () => Promise.resolve({ kind: "allow" }),
+    undefined,
+    () => "zh",
+    testReadSession,
+  )) as { kind: string; reason: string };
+  assert.equal(denied.kind, "deny");
+  assert.equal(denied.reason, "已拒绝：当前会话为只读，而 “bash” 可能修改文件。");
+});

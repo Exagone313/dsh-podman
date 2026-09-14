@@ -58,6 +58,7 @@ export type ReasonFact =
 // in the session's language alongside the reason.
 export type DenialFact =
   | { kind: "read_only"; tool: string }
+  | { kind: "read_only_builtin"; tool: string }
   | { kind: "project_destination"; source?: string; mirror?: string };
 
 // Settings namespace owned by the browser locale plugin; only read here.
@@ -316,6 +317,12 @@ export function renderDenial(locale: ReasonLocale, fact: DenialFact): string {
         locale,
         `Denied: the session is read-only, but ${quoted(locale, fact.tool)} needs write access.`,
         `已拒绝：当前会话为只读，而 ${quoted(locale, fact.tool)} 需要写入权限。`,
+      );
+    case "read_only_builtin":
+      return pick(
+        locale,
+        `Denied: the session is read-only, but ${quoted(locale, fact.tool)} can modify files.`,
+        `已拒绝：当前会话为只读，而 ${quoted(locale, fact.tool)} 可能修改文件。`,
       );
     case "project_destination": {
       if (fact.mirror === undefined || fact.mirror === "") {

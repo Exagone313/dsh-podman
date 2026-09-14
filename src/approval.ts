@@ -298,9 +298,18 @@ export const PODMAN_OPS_APPROVAL_TOOLS: ReadonlySet<string> = new Set([
   "daemon_start",
 ]);
 
-// Every tool this plugin registers, so the permission policy only gates its
-// own tools and delegates DSH-native ones (bash, write, ...) to the harness.
+// Every tool this plugin registers.
 const OUR_TOOL_NAMES = new Set(TOOLS.map((tool) => tool.name));
+
+// The harness's built-in tools that touch the container's filesystem or spawn
+// processes in it. The harness fences these with its fs sandbox and its
+// bash/pwsh sandbox executors, but this plugin replaces ctx.fs/ctx.subprocess
+// and unwraps the landlock-run fence, so nothing else enforces read-only for
+// them. Deny them here instead. `pwsh` exists only on Windows; the other
+// built-ins that can reach the container (`subagent`, `workflow`, `ralph`)
+// delegate to child agents that inherit the session's mode, so this policy
+// already covers them.
+const BUILTIN_FILE_TOOLS = new Set(["write", "edit", "bash", "pwsh"]);
 
 // The session facts the policy needs. A session exposes no raw event array and
 // its header only names the preset it STARTED with, so the caller reads these
@@ -316,9 +325,9 @@ export interface SessionFacts {
 }
 
 // The `tools/pre-execute` policy, driven by the session's permission knobs:
-// - read-only sandbox: only READ_ONLY_TOOLS run; every other plugin tool is
-//   denied with a reason. DSH-native tools are delegated so their own sandbox
-//   policy applies.
+// - read-only sandbox: only READ_ONLY_TOOLS run among the plugin's tools, and
+//   the built-in file/shell tools (write, edit, bash, pwsh) are denied too,
+//   since their harness sandbox is bypassed. Every denial carries a reason.
 // - approval policy "never" (Full access): run without asking.
 // - otherwise (Workspace Write): ask for the approval-gated tools, including
 //   the tools the Podman operator-mode preset gates per preset.
@@ -334,10 +343,16 @@ export async function preExecutePolicy(
   readSession?: (session: unknown) => SessionFacts,
 ): Promise<unknown> {
   const name = exec.name;
-  if (!OUR_TOOL_NAMES.has(name)) return next();
   const locale = getLocale?.() ?? "en";
   const session = exec.agent?.session;
   const facts = session === undefined ? {} : readSession?.(session) ?? {};
+  if (facts.mode === "read-only" && BUILTIN_FILE_TOOLS.has(name)) {
+    return {
+      kind: "deny",
+      reason: renderDenial(locale, { kind: "read_only_builtin", tool: name }),
+    };
+  }
+  if (!OUR_TOOL_NAMES.has(name)) return next();
   if (facts.mode === "read-only") {
     if (READ_ONLY_TOOLS.has(name)) return next();
     return {

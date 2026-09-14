@@ -283,13 +283,53 @@ test("read-only permission allows get/list tools and denies the rest", async () 
     assert.ok(result.reason.includes("read-only"), `${name} deny reason`);
   }
 
-  let delegated = false;
-  const foreign = (await preExecutePolicy(sessionExec("write"), () => {
-    delegated = true;
-    return Promise.resolve({ kind: "allow" });
-  }, undefined, undefined, testReadSession)) as { kind: string };
-  assert.equal(delegated, true, "DSH-native tools must delegate under read-only");
-  assert.equal(foreign.kind, "allow");
+  for (const name of ["read", "glob", "grep", "job_output"]) {
+    let delegated = false;
+    const result = (await preExecutePolicy(sessionExec(name), () => {
+      delegated = true;
+      return Promise.resolve({ kind: "allow" });
+    }, undefined, undefined, testReadSession)) as { kind: string };
+    assert.equal(delegated, true, `${name} must delegate under read-only`);
+    assert.equal(result.kind, "allow");
+  }
+});
+
+test("read-only denies the built-in file and shell tools", async () => {
+  for (const name of ["write", "edit", "bash", "pwsh"]) {
+    const result = (await preExecutePolicy(sessionExec(name), () =>
+      Promise.resolve({ kind: "allow" }), undefined, undefined, testReadSession,
+    )) as { kind: string; reason: string };
+    assert.equal(result.kind, "deny", `${name} must be denied under read-only`);
+    assert.equal(
+      result.reason,
+      `Denied: the session is read-only, but "${name}" can modify files.`,
+    );
+  }
+});
+
+test("workspace-write and full access delegate the built-in file and shell tools", async () => {
+  for (const facts of [{ mode: "workspace-write", policy: "ask" }, { policy: "never" }]) {
+    for (const name of ["write", "edit", "bash", "pwsh"]) {
+      let delegated = false;
+      const result = (await preExecutePolicy(sessionExec(name, facts), () => {
+        delegated = true;
+        return Promise.resolve({ kind: "allow" });
+      }, undefined, undefined, testReadSession)) as { kind: string };
+      assert.equal(delegated, true, `${name} must delegate`);
+      assert.equal(result.kind, "allow");
+    }
+  }
+});
+
+test("the built-in file and shell tools delegate without a session", async () => {
+  for (const name of ["write", "edit", "bash", "pwsh"]) {
+    let delegated = false;
+    await preExecutePolicy({ name }, () => {
+      delegated = true;
+      return Promise.resolve({ kind: "allow" });
+    }, undefined, undefined, testReadSession);
+    assert.equal(delegated, true, `${name} must delegate without a session`);
+  }
 });
 
 test("full-access (approval never) runs tools without asking", async () => {

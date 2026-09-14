@@ -152,6 +152,7 @@ by processes running inside the container.
 | `container_mount_add` ✱    | `container`, optional `kind`, `project`, `path`, `destination`, `mode`, `volume`, `secret` | Add a mount; `kind` is `project` (default), `tmpfs`, `volume`, or `secret` |
 | `container_mount_list`     | `container`                                                                                | List the container's mounts                                                |
 | `container_mount_remove` ✱ | `container`, optional `kind`, `project`, `path`, `volume`, `destination`, `secret`         | Remove a mount; identify it by `kind` plus its handle (see below)          |
+| `container_mount_update` ✱ | `container`, `mode`, optional `kind`, `project`, `path`, `volume`, `destination`           | Change a project or volume mount's mode; identify it like removal (below)  |
 | `volume_create`            | `name`                                                                                     | Create a managed named volume                                              |
 | `volume_list`              | —                                                                                          | List the managed named volumes (short names)                               |
 | `volume_remove` ✱          | `name`                                                                                     | Remove a managed named volume; refused while a container still mounts it   |
@@ -179,17 +180,27 @@ from and must be named explicitly.
 `mode` is `read_only` or `read_write`, and defaults to `read_only` so that
 adding a mount never grants write access that was not asked for. `tmpfs` mounts
 are always `read_write`, and `secret` mounts take no mode. The workspace's own
-project mount is created `read_write`; that is unchanged.
+project mount is created `read_write`; remount it `read_only` with
+`container_mount_update` when a session should not modify the project.
+
+Changing a mount's mode is `container_mount_update`, not `container_mount_add`:
+re-adding a mount that already exists is rejected rather than silently changing
+it. It identifies the mount exactly like `container_mount_remove` (a handle that
+matches more than one mount is rejected), requires `mode`, and applies only to
+`project` and `volume` mounts — `tmpfs` is always `read_write` and `secret`
+mounts carry no mode. A mode change to the mode the mount already has is
+rejected.
 
 A **named container** carries exactly the mounts it was created with: the
 workspace project directory is not mounted automatically. The **default
-container** always keeps its workspace project mount, which cannot be removed.
+container** always keeps its workspace project mount, which cannot be removed —
+but it can be remounted `read_only` with `container_mount_update`.
 
-Mutating a container's mounts (`container_mount_add`/`container_mount_remove`)
-or its secret environment variables
-(`container_secret_add`/`container_secret_remove`) **recreates** the container:
-its running processes, including daemons, are terminated. Data in bind-mounted
-volumes persists; `tmpfs` contents do not.
+Mutating a container's mounts
+(`container_mount_add`/`container_mount_remove`/`container_mount_update`) or its
+secret environment variables (`container_secret_add`/`container_secret_remove`)
+**recreates** the container: its running processes, including daemons, are
+terminated. Data in bind-mounted volumes persists; `tmpfs` contents do not.
 
 ### Secrets
 
@@ -299,8 +310,9 @@ are global and all remain available, split as:
   `daemon_restart`, `container_start` (asks only when `mounts` is passed).
 - **Approval-gated** (the usual `✱` tools): `image_build`, `image_rebuild`,
   `image_rebuild_all`, `image_remove`, `container_recreate`, `container_remove`,
-  `container_mount_add`, `container_mount_remove`, `volume_remove`,
-  `secret_remove`, `container_secret_add`, `container_secret_remove`.
+  `container_mount_add`, `container_mount_remove`, `container_mount_update`,
+  `volume_remove`, `secret_remove`, `container_secret_add`,
+  `container_secret_remove`.
 - **Approval-gated only in this preset:** `container_bash`, `container_exec`,
   `container_write`, `container_edit`, `daemon_start` — so the agent can run
   commands, edit container files, or start daemons once the user approves,

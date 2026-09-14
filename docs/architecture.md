@@ -15,7 +15,8 @@ dsh-podman has three components:
 | `dsh-podman-orchestrator` | A container with access to the Podman API | Owns the control socket and persisted state; creates/removes guest containers; builds workspace images |
 
 The plugin auto-creates a missing workspace using its configured default image
-and a single read-write project mount. It never falls back to host execution.
+and a single read-write project mount; `container_mount_update` can remount that
+mount read-only. It never falls back to host execution.
 
 ## Control plane
 

@@ -126,6 +126,7 @@ bash 进程）的 `env` 映射；`container_exec` 和 `daemon_start` 已经接�
 | `container_mount_add` ✱    | `container`, optional `kind`, `project`, `path`, `destination`, `mode`, `volume`, `secret` | 添加挂载；`kind` 为 `project`（默认）、`tmpfs`、`volume` 或 `secret` |
 | `container_mount_list`     | `container`                                                                                | 列出容器的挂载                                                       |
 | `container_mount_remove` ✱ | `container`, optional `kind`, `project`, `path`, `volume`, `destination`, `secret`         | 移除挂载；通过 `kind` 及其标识字段指定（见下文）                     |
+| `container_mount_update` ✱ | `container`, `mode`, optional `kind`, `project`, `path`, `volume`, `destination`           | 更改项目或卷挂载的模式；标识方式同移除（见下文）                     |
 | `volume_create`            | `name`                                                                                     | 创建受管理的命名卷                                                   |
 | `volume_list`              | —                                                                                          | 列出受管理的命名卷（短名称）                                         |
 | `volume_remove` ✱          | `name`                                                                                     | 移除受管理的命名卷；当容器仍在挂载它时拒绝                           |
@@ -151,12 +152,21 @@ bash 进程）的 `env` 映射；`container_exec` 和 `daemon_start` 已经接�
 `mode` 为 `read_only` 或 `read_write`，默认为
 `read_only`，这样添加挂载永远不会授予未被请求的写权限。`tmpfs` 挂载始终为
 `read_write`，`secret` 挂载不带 mode。工作区自身的项目挂载以 `read_write`
-创建；这保持不变。
+创建；当会话不应修改项目时，用 `container_mount_update` 将其重新挂载为
+`read_only`。
+
+更改挂载的模式应使用 `container_mount_update`，而不是
+`container_mount_add`：重新添加已存在的挂载会被拒绝，而不会静默更改它。它的标识方式与
+`container_mount_remove`
+完全相同（若某个标识字段匹配到多个挂载，请求会被拒绝），必须提供
+`mode`，且仅适用于 `project` 和 `volume` 挂载——`tmpfs` 始终为
+`read_write`，`secret` 挂载不带 mode。将模式更改为挂载已有的模式会被拒绝。
 
 **命名容器**只携带创建它时指定的挂载：项目目录不会被自动挂载。**默认容器**
-始终保留其工作区项目挂载，并且无法移除。
+始终保留其工作区项目挂载，并且无法移除——但可以用 `container_mount_update`
+将其重新挂载为 `read_only`。
 
-修改容器的挂载（`container_mount_add`/`container_mount_remove`）或其机密环境变量（`container_secret_add`/`container_secret_remove`）会**重建**容器：其正在运行的进程（包括守护进程）会被终止。绑定挂载的卷中的数据会保留；`tmpfs`
+修改容器的挂载（`container_mount_add`/`container_mount_remove`/`container_mount_update`）或其机密环境变量（`container_secret_add`/`container_secret_remove`）会**重建**容器：其正在运行的进程（包括守护进程）会被终止。绑定挂载的卷中的数据会保留；`tmpfs`
 的内容不会。
 
 ### 机密
@@ -245,7 +255,7 @@ mode、jobs）。插件自身的工具是全局的，全部保持可用，分为
   `image_list`、`image_get`、`container_list`、`container_read`、`container_glob`、`container_grep`、`container_mount_list`、`volume_list`、`secret_list`、`secret_create`、`daemon_list`、`daemon_logs`、`daemon_stop`、`daemon_restart`、`container_start`（仅在传入
   `mounts` 时询问）。
 - **需审批**（通常的 `✱`
-  工具）：`image_build`、`image_rebuild`、`image_rebuild_all`、`image_remove`、`container_recreate`、`container_remove`、`container_mount_add`、`container_mount_remove`、`volume_remove`、`secret_remove`、`container_secret_add`、`container_secret_remove`。
+  工具）：`image_build`、`image_rebuild`、`image_rebuild_all`、`image_remove`、`container_recreate`、`container_remove`、`container_mount_add`、`container_mount_remove`、`container_mount_update`、`volume_remove`、`secret_remove`、`container_secret_add`、`container_secret_remove`。
 - **仅在此预设中需审批：**
   `container_bash`、`container_exec`、`container_write`、`container_edit`、`daemon_start`——因此一旦用户批准，agent
   就可以运行命令、编辑容器文件或启动守护进程，而无需这些工具在其他预设中询问。

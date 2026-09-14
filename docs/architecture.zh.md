@@ -14,7 +14,8 @@ dsh-podman 由三个组件组成：
 | `dsh-podman-guest-agent`  | 每个 guest 容器内部          | 为一个工作区提供 exec/filesystem gRPC API                              |
 | `dsh-podman-orchestrator` | 一个可访问 Podman API 的容器 | 持有 control socket 和持久化状态；创建/删除 guest 容器；构建工作区镜像 |
 
-该插件会自动使用其配置的默认镜像和单个读写项目挂载来创建缺失的工作区。它绝不会回退到主机执行。
+该插件会自动使用其配置的默认镜像和单个读写项目挂载来创建缺失的工作区；`container_mount_update`
+可将该挂载重新挂载为只读。它绝不会回退到主机执行。
 
 ## 控制平面
 

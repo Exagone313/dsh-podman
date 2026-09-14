@@ -818,3 +818,128 @@ func TestAddContainerMountRejectsExistingPrimaryWithDifferentMode(t *testing.T) 
 		t.Fatalf("the rejected add must not change the stored mode, got %#v", container)
 	}
 }
+
+// updateMountFixture stores a workspace whose default container carries mounts,
+// returning a server with podman available.
+func updateMountFixture(t *testing.T, root string, mounts []state.Mount) (*Server, *fakePodman, *state.Store) {
+	t.Helper()
+	store := newTestStore(t)
+	if err := store.SaveImages([]state.Image{{ImageID: "arch", ImageTag: "localhost/dsh-podman/arch:latest"}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.SaveWorkspaces([]state.Workspace{{
+		WorkspaceSlug: "proj",
+		ProjectName:   "team",
+		Mounts:        mounts,
+		Containers: []state.Container{{
+			Name: "default", PodmanName: "dsh-podman-proj-default", ImageID: "arch", Status: "running",
+			Mounts: mounts,
+		}},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	fake := newFakePodman()
+	fake.exists["dsh-podman-proj-default"] = true
+	return &Server{Store: store, Podman: fake, ProjectsRoot: root, Logger: silentLogger()}, fake, store
+}
+
+func TestUpdateContainerMountChangesMode(t *testing.T) {
+	root := tempRoot(t)
+	if err := os.MkdirAll(filepath.Join(root, "team"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	server, fake, store := updateMountFixture(t, root, []state.Mount{{ProjectName: "team", Mode: "read_write"}})
+	container, err := server.UpdateContainerMount(context.Background(), &ctl.UpdateContainerMountRequest{
+		WorkspaceSlug: "proj", Container: "default", Kind: ctl.MountKind_MOUNT_KIND_PROJECT, Project: "team", Mode: ctl.MountMode_MOUNT_MODE_READ_ONLY,
+	})
+	if err != nil {
+		t.Fatalf("update failed: %v", err)
+	}
+	if len(container.GetMounts()) != 1 || container.GetMounts()[0].GetMode() != ctl.MountMode_MOUNT_MODE_READ_ONLY {
+		t.Fatalf("the returned container must be read-only, got %v", container.GetMounts())
+	}
+	if len(fake.recreated) != 1 {
+		t.Fatalf("expected one recreate, got %v", fake.recreated)
+	}
+	stored, err := store.Workspaces()
+	if err != nil {
+		t.Fatal(err)
+	}
+	record, ok := containerByLogical(&stored[0], "default")
+	if !ok || len(record.Mounts) != 1 || record.Mounts[0].Mode != "read_only" {
+		t.Fatalf("the stored default container must be read-only, got %#v", record)
+	}
+}
+
+func TestUpdateContainerMountRejectsModeLessKinds(t *testing.T) {
+	server, _, _ := updateMountFixture(t, tempRoot(t), []state.Mount{{ProjectName: "team", Mode: "read_write"}})
+	for _, kind := range []ctl.MountKind{ctl.MountKind_MOUNT_KIND_TMPFS, ctl.MountKind_MOUNT_KIND_SECRET} {
+		_, err := server.UpdateContainerMount(context.Background(), &ctl.UpdateContainerMountRequest{WorkspaceSlug: "proj", Container: "default", Kind: kind, Mode: ctl.MountMode_MOUNT_MODE_READ_ONLY})
+		if status.Code(err) != codes.InvalidArgument {
+			t.Fatalf("kind %v: expected InvalidArgument, got %v", kind, err)
+		}
+	}
+	_, err := server.UpdateContainerMount(context.Background(), &ctl.UpdateContainerMountRequest{WorkspaceSlug: "proj", Container: "default", Kind: ctl.MountKind_MOUNT_KIND_PROJECT, Project: "team"})
+	if status.Code(err) != codes.InvalidArgument {
+		t.Fatalf("missing mode: expected InvalidArgument, got %v", err)
+	}
+}
+
+func TestUpdateContainerMountRejectsUnchangedMode(t *testing.T) {
+	server, fake, _ := updateMountFixture(t, tempRoot(t), []state.Mount{{ProjectName: "team", Mode: "read_only"}})
+	_, err := server.UpdateContainerMount(context.Background(), &ctl.UpdateContainerMountRequest{
+		WorkspaceSlug: "proj", Container: "default", Kind: ctl.MountKind_MOUNT_KIND_PROJECT, Project: "team", Mode: ctl.MountMode_MOUNT_MODE_READ_ONLY,
+	})
+	if status.Code(err) != codes.AlreadyExists {
+		t.Fatalf("unchanged mode: expected AlreadyExists, got %v", err)
+	}
+	if len(fake.recreated) != 0 {
+		t.Fatalf("an unchanged mode must not recreate, got %v", fake.recreated)
+	}
+}
+
+func TestUpdateContainerMountSelectorErrors(t *testing.T) {
+	server, _, _ := updateMountFixture(t, tempRoot(t), []state.Mount{
+		{ProjectName: "team", Mode: "read_write"},
+		{Kind: "volume", Volume: "data", Destination: "/a", Mode: "read_write"},
+		{Kind: "volume", Volume: "data", Destination: "/b", Mode: "read_write"},
+	})
+	_, err := server.UpdateContainerMount(context.Background(), &ctl.UpdateContainerMountRequest{WorkspaceSlug: "proj", Container: "default", Kind: ctl.MountKind_MOUNT_KIND_PROJECT, Mode: ctl.MountMode_MOUNT_MODE_READ_ONLY})
+	if status.Code(err) != codes.InvalidArgument {
+		t.Fatalf("handle-free project: expected InvalidArgument, got %v", err)
+	}
+	_, err = server.UpdateContainerMount(context.Background(), &ctl.UpdateContainerMountRequest{WorkspaceSlug: "proj", Container: "default", Kind: ctl.MountKind_MOUNT_KIND_PROJECT, Project: "nope", Mode: ctl.MountMode_MOUNT_MODE_READ_ONLY})
+	if status.Code(err) != codes.NotFound {
+		t.Fatalf("unknown project: expected NotFound, got %v", err)
+	}
+	_, err = server.UpdateContainerMount(context.Background(), &ctl.UpdateContainerMountRequest{WorkspaceSlug: "proj", Container: "default", Kind: ctl.MountKind_MOUNT_KIND_VOLUME, Volume: "data", Mode: ctl.MountMode_MOUNT_MODE_READ_ONLY})
+	if status.Code(err) != codes.InvalidArgument {
+		t.Fatalf("ambiguous volume: expected InvalidArgument, got %v", err)
+	}
+}
+
+func TestUpdateContainerMountRestoresOnFailedRecreate(t *testing.T) {
+	root := tempRoot(t)
+	if err := os.MkdirAll(filepath.Join(root, "team"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	server, fake, store := updateMountFixture(t, root, []state.Mount{{ProjectName: "team", Mode: "read_write"}})
+	fake.recreateFails = 1
+	_, err := server.UpdateContainerMount(context.Background(), &ctl.UpdateContainerMountRequest{
+		WorkspaceSlug: "proj", Container: "default", Kind: ctl.MountKind_MOUNT_KIND_PROJECT, Project: "team", Mode: ctl.MountMode_MOUNT_MODE_READ_ONLY,
+	})
+	if status.Code(err) != codes.Internal {
+		t.Fatalf("expected Internal, got %v", err)
+	}
+	if len(fake.recreated) != 2 {
+		t.Fatalf("expected the failed recreate and a restore, got %v", fake.recreated)
+	}
+	stored, err := store.Workspaces()
+	if err != nil {
+		t.Fatal(err)
+	}
+	record, ok := containerByLogical(&stored[0], "default")
+	if !ok || len(record.Mounts) != 1 || record.Mounts[0].Mode != "read_write" {
+		t.Fatalf("the failed update must not be persisted, got %#v", record)
+	}
+}

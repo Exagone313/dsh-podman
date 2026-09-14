@@ -202,12 +202,114 @@ func (s *Server) RemoveContainerMount(ctx context.Context, request *ctl.RemoveCo
 	return containerProto(updated, *record), nil
 }
 
+// UpdateContainerMount changes the mode of one existing mount and recreates the
+// podman container so the change takes effect. Only kinds that carry a mode can
+// be updated: project and volume mounts. tmpfs is always read-write and secret
+// mounts carry no mode, so both are rejected. The default container's primary
+// project mount is updateable — that is how a workspace's project is remounted
+// read-only.
+func (s *Server) UpdateContainerMount(ctx context.Context, request *ctl.UpdateContainerMountRequest) (*ctl.Container, error) {
+	s.log().Info("control request", "method", "UpdateContainerMount", "workspace_slug", request.GetWorkspaceSlug(), "container", request.GetContainer(), "project", request.GetProject(), "path", request.GetPath(), "kind", request.GetKind(), "volume", request.GetVolume())
+	workspace, err := workspaceBySlug(s.Store, request.GetWorkspaceSlug())
+	if err != nil {
+		return nil, status.Error(codes.NotFound, err.Error())
+	}
+	record, ok := containerByLogical(&workspace, request.GetContainer())
+	if !ok {
+		s.log().Warn("control request failed", "method", "UpdateContainerMount", "workspace_slug", request.GetWorkspaceSlug(), "container", request.GetContainer(), "reason", "container not found")
+		return nil, containerNotFoundError(request.GetContainer(), request.GetWorkspaceSlug())
+	}
+	snapshot := snapshotContainer(*record)
+	kind, err := mountKindFromProto(request.GetKind())
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+	switch kind {
+	case "", "volume":
+	default:
+		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("%s mounts have no mode to update", mountKindName(kind)))
+	}
+	mode, err := mountModeFromProto(request.GetMode())
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+	effective := containerMounts(workspace, *record)
+	requested := state.Mount{Kind: kind, ProjectName: request.GetProject(), Path: request.GetPath(), Volume: request.GetVolume(), Secret: request.GetSecret(), Destination: request.GetDestination()}
+	if !mountSelectorIdentifies(kind, request) {
+		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("a %s mount is identified by %s", mountKindName(kind), mountSelectorHandles(kind)))
+	}
+	matches := make([]int, 0, 1)
+	for i, existing := range effective {
+		if mountSelectorMatches(kind, existing, request) {
+			matches = append(matches, i)
+		}
+	}
+	switch {
+	case len(matches) == 0:
+		s.log().Warn("control request failed", "method", "UpdateContainerMount", "workspace_slug", request.GetWorkspaceSlug(), "container", request.GetContainer(), "reason", "mount not found")
+		return nil, status.Error(codes.NotFound, mountNotFoundMessage(kind, requested, effective))
+	case len(matches) > 1:
+		s.log().Warn("control request failed", "method", "UpdateContainerMount", "workspace_slug", request.GetWorkspaceSlug(), "container", request.GetContainer(), "reason", "ambiguous mount")
+		return nil, status.Error(codes.InvalidArgument, ambiguousMountMessage(kind, requested, effective, matches))
+	}
+	if effective[matches[0]].Mode == mode {
+		return nil, status.Error(codes.AlreadyExists, fmt.Sprintf("mount already has mode %q", mode))
+	}
+	record.Mounts = append([]state.Mount(nil), effective...)
+	record.Mounts[matches[0]].Mode = mode
+	if _, err := s.podmanMounts(record.Mounts); err != nil {
+		s.log().Error("UpdateContainerMount project validation failed", "workspace_slug", workspace.WorkspaceSlug, "error", err)
+		return nil, err
+	}
+	if _, err := s.podmanSecrets(record.Mounts); err != nil {
+		s.log().Error("UpdateContainerMount secret validation failed", "workspace_slug", workspace.WorkspaceSlug, "error", err)
+		return nil, err
+	}
+	if s.Podman == nil {
+		return nil, status.Error(codes.FailedPrecondition, "podman is not configured")
+	}
+	if err := s.validateSecretReferences(record.SecretEnv, record.Mounts); err != nil {
+		return nil, err
+	}
+	imageTag, err := s.resolveImageTag(record.ImageID)
+	if err != nil {
+		return nil, err
+	}
+	secret, err := s.ensureAgentToken(record)
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	if err := s.recreateOrRestore(workspace, record, imageTag, secret, &snapshot); err != nil {
+		s.log().Error("control request failed", "method", "UpdateContainerMount", "workspace_slug", request.GetWorkspaceSlug(), "container", request.GetContainer(), "error", err)
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	record.Status = "running"
+	record.AgentToken = secret
+	updated, err := s.upsertContainer(workspace, *record)
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	s.log().Info("control request completed", "method", "UpdateContainerMount", "workspace_slug", request.GetWorkspaceSlug(), "container", request.GetContainer(), "project", request.GetProject(), "path", request.GetPath())
+	return containerProto(updated, *record), nil
+}
+
+// mountSelectorRequest is the shared selector surface of the mount mutations
+// that identify exactly one mount (remove and update). Both generated request
+// types carry the same handles.
+type mountSelectorRequest interface {
+	GetProject() string
+	GetPath() string
+	GetVolume() string
+	GetSecret() string
+	GetDestination() string
+}
+
 // mountSelectorMatches reports whether a stored mount is identified by the
 // removal request: the kind must agree and every handle the caller supplied
 // must agree too. A handle the caller omitted matches any value, so a name
 // alone selects the mount whenever it is unambiguous (the caller then gets
 // every match and RemoveContainerMount rejects an ambiguous selection).
-func mountSelectorMatches(kind string, existing state.Mount, request *ctl.RemoveContainerMountRequest) bool {
+func mountSelectorMatches(kind string, existing state.Mount, request mountSelectorRequest) bool {
 	switch kind {
 	case "":
 		return existing.Kind == "" && existing.ProjectName == request.GetProject() && existing.Path == request.GetPath()
@@ -235,7 +337,7 @@ func mountSelectorMatches(kind string, existing state.Mount, request *ctl.Remove
 
 // mountSelectorIdentifies reports whether the request carries a handle for its
 // kind, so a handle-free request cannot match (and remove) an arbitrary mount.
-func mountSelectorIdentifies(kind string, request *ctl.RemoveContainerMountRequest) bool {
+func mountSelectorIdentifies(kind string, request mountSelectorRequest) bool {
 	switch kind {
 	case "":
 		return request.GetProject() != ""

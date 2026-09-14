@@ -28,6 +28,7 @@ service OrchestratorControl {
   rpc RemoveContainer(RemoveContainerRequest) returns (RemoveContainerResponse);
   rpc AddContainerMount(AddContainerMountRequest) returns (Container);
   rpc RemoveContainerMount(RemoveContainerMountRequest) returns (Container);
+  rpc UpdateContainerMount(UpdateContainerMountRequest) returns (Container);
   rpc ListVolumes(ListVolumesRequest) returns (ListVolumesResponse);
   rpc CreateVolume(CreateVolumeRequest) returns (Volume);
   rpc RemoveVolume(RemoveVolumeRequest) returns (RemoveVolumeResponse);
@@ -111,6 +112,7 @@ message RemoveContainerRequest { string workspace_slug = 1; string container = 2
 message RemoveContainerResponse {}
 message AddContainerMountRequest { string workspace_slug = 1; string container = 2; string project = 3; string path = 4; string destination = 5; MountMode mode = 6; MountKind kind = 7; string volume = 8; string secret = 9; }
 message RemoveContainerMountRequest { string workspace_slug = 1; string container = 2; string project = 3; string path = 4; MountKind kind = 5; string volume = 6; string destination = 7; string secret = 8; }
+message UpdateContainerMountRequest { string workspace_slug = 1; string container = 2; string project = 3; string path = 4; MountKind kind = 5; string volume = 6; string destination = 7; string secret = 8; MountMode mode = 9; }
 message ListVolumesRequest {}
 message ListVolumesResponse { repeated Volume volumes = 1; }
 message Volume { string name = 1; }

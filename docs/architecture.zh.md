@@ -29,7 +29,7 @@ orchestrator 服务公开以下 gRPC 方法（同时支撑 UI
 pod 中创建或替换容器；空的 `container`
 指向默认容器，其他名称会被校验）、`RecreateContainer{workspace_slug, container, image_id, mounts, env, secret_env}`（停止、删除并重新创建容器，可选择使用新镜像、项目挂载、环境或机密环境；空的
 `image_id`
-保留工作区当前的镜像）、`RemoveContainer`、`AddContainerMount`、`RemoveContainerMount`、`AddContainerSecret`
+保留工作区当前的镜像）、`RemoveContainer`、`AddContainerMount`、`RemoveContainerMount`、`SetContainerPaths`、`AddContainerSecret`
 和 `RemoveContainerSecret`。
 
 ## 工作区与 pod
@@ -69,6 +69,14 @@ API，运行并监督后台**守护进程**，并读取和写入文件。每个 
 命令和守护进程继承 guest agent 的环境，减去保留的 `DSH_PODMAN` 命名空间：agent
 自身的 token 保留在 agent 中，而不会被复制到它所启动的每个东西中。以
 `inheritEnv=false` 启动的守护进程则只接收 `PATH`/`HOME` 基线以及自身的 `env`。
+
+每个容器还携带有序的 **PATH 附加项**。orchestrator
+会持久化它们（`SetContainerPaths`），并在每次创建或重建时以
+`DSH_PODMAN_GUEST_PATHS` 交给 guest agent；agent 将它们保存在内存中（通过其 gRPC
+API 的 `SetPaths`/`GetPaths`），并添加到它启动的每个进程的 PATH 之前，包括插件的
+`ctx.subprocess` 提供者，因此内置的 shell
+和文件系统工具也能看到它们。更改列表不会重建容器，因此先前启动的守护进程仍使用旧的
+PATH。
 
 重新创建容器或关闭 orchestrator 时，会先要求容器的 guest agent
 优雅地停止其守护进程（SIGTERM，约 10 秒宽限期），然后 podman 才会拆除该容器。

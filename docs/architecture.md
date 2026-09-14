@@ -35,7 +35,8 @@ secret_env}`
 (stops, removes, and recreates a container, optionally with a new image, project
 mounts, environment, or secret environment; an empty `image_id` keeps the
 workspace's current image), `RemoveContainer`, `AddContainerMount`,
-`RemoveContainerMount`, `AddContainerSecret`, and `RemoveContainerSecret`.
+`RemoveContainerMount`, `SetContainerPaths`, `AddContainerSecret`, and
+`RemoveContainerSecret`.
 
 ## Workspaces and pods
 
@@ -83,6 +84,14 @@ Commands and daemons inherit the guest agent's environment, minus the reserved
 `DSH_PODMAN` namespace: the agent's own token stays with the agent instead of
 being copied into everything it starts. A daemon started with `inheritEnv=false`
 instead receives only the `PATH`/`HOME` baseline plus its own `env`.
+
+Each container also carries ordered **PATH additions**. The orchestrator
+persists them (`SetContainerPaths`) and hands them to the guest agent as
+`DSH_PODMAN_GUEST_PATHS` on every create or recreate; the agent holds them in
+memory (`SetPaths`/`GetPaths` over its gRPC API) and prepends them to the PATH
+of every process it starts, including the plugin's `ctx.subprocess` provider, so
+the built-in shell and filesystem tools see them too. Changing the list does not
+recreate the container, so daemons started earlier keep their old PATH.
 
 Recreating a container or shutting down the orchestrator first asks the
 container's guest agent to gracefully stop its daemons (SIGTERM, ~10s grace)

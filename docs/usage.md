@@ -201,6 +201,22 @@ secret environment variables (`container_secret_add`/`container_secret_remove`)
 **recreates** the container: its running processes, including daemons, are
 terminated. Data in bind-mounted volumes persists; `tmpfs` contents do not.
 
+### PATH additions
+
+| Tool                      | Params               | Description                                                                     |
+| ------------------------- | -------------------- | ------------------------------------------------------------------------------- |
+| `container_path_set` ✱    | `container`, `paths` | Replace the whole ordered list, first entry highest priority; empty clears it   |
+| `container_path_add` ✱    | `container`, `path`  | Prepend one directory; an existing entry moves to the front                     |
+| `container_path_remove` ✱ | `container`, `path`  | Remove one added directory; a directory of the container's default PATH is kept |
+
+Every entry must be an absolute, lexically clean directory with no `:` or
+newline. The list is prepended to the container's own `PATH` (the image's, as
+the running guest agent sees it) for every command the agent starts: the
+built-in `bash`/`read`/`write`/`edit` tools, `container_bash`, `container_exec`,
+the terminal, and daemons started afterwards. Nothing is recreated — the running
+guest agent receives the new list immediately, so daemons already running keep
+their old `PATH`. A recreated container restores the persisted list.
+
 ### Secrets
 
 | Tool                        | Params                               | Description                                                                                                                             |
@@ -310,6 +326,7 @@ are global and all remain available, split as:
 - **Approval-gated** (the usual `✱` tools): `image_build`, `image_rebuild`,
   `image_rebuild_all`, `image_remove`, `container_recreate`, `container_remove`,
   `container_mount_add`, `container_mount_remove`, `container_mount_update`,
+  `container_path_set`, `container_path_add`, `container_path_remove`,
   `volume_remove`, `secret_remove`, `container_secret_add`,
   `container_secret_remove`.
 - **Approval-gated only in this preset:** `container_bash`, `container_exec`,

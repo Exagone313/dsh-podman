@@ -168,6 +168,21 @@ bash 进程）的 `env` 映射；`container_exec` 和 `daemon_start` 已经接�
 修改容器的挂载（`container_mount_add`/`container_mount_remove`/`container_mount_update`）或其机密环境变量（`container_secret_add`/`container_secret_remove`）会**重建**容器：其正在运行的进程（包括守护进程）会被终止。绑定挂载的卷中的数据会保留；`tmpfs`
 的内容不会。
 
+### PATH 附加项
+
+| 工具                      | 参数                 | 描述                                                     |
+| ------------------------- | -------------------- | -------------------------------------------------------- |
+| `container_path_set` ✱    | `container`, `paths` | 替换整个有序列表，第一项优先级最高；空列表表示清除       |
+| `container_path_add` ✱    | `container`, `path`  | 在最前面添加一个目录；已存在的条目会被移到最前           |
+| `container_path_remove` ✱ | `container`, `path`  | 移除一个已添加的目录；属于容器默认 PATH 的目录不会被移除 |
+
+每个条目都必须是绝对、词法干净的目录，且不含 `:`
+或换行符。该列表会被添加到容器自身 `PATH`（镜像的 `PATH`，即运行中的 guest agent
+所见）之前，作用于 agent 启动的每个命令：内置的 `bash`/`read`/`write`/`edit`
+工具、`container_bash`、`container_exec`、终端，以及之后启动的守护进程。容器不会被重建——运行中的
+guest agent 会立即收到新列表，因此已在运行的守护进程仍使用旧的
+`PATH`。容器被重建后会恢复持久化的列表。
+
 ### 机密
 
 | 工具                        | 参数                                 | 描述                                                                                                          |
@@ -254,7 +269,7 @@ mode、jobs）。插件自身的工具是全局的，全部保持可用，分为
   `image_list`、`image_get`、`container_list`、`container_read`、`container_glob`、`container_grep`、`container_mount_list`、`volume_list`、`secret_list`、`secret_create`、`daemon_list`、`daemon_logs`、`daemon_stop`、`daemon_restart`、`container_start`（仅在传入
   `mounts` 时询问）。
 - **需审批**（通常的 `✱`
-  工具）：`image_build`、`image_rebuild`、`image_rebuild_all`、`image_remove`、`container_recreate`、`container_remove`、`container_mount_add`、`container_mount_remove`、`container_mount_update`、`volume_remove`、`secret_remove`、`container_secret_add`、`container_secret_remove`。
+  工具）：`image_build`、`image_rebuild`、`image_rebuild_all`、`image_remove`、`container_recreate`、`container_remove`、`container_mount_add`、`container_mount_remove`、`container_mount_update`、`container_path_set`、`container_path_add`、`container_path_remove`、`volume_remove`、`secret_remove`、`container_secret_add`、`container_secret_remove`。
 - **仅在此预设中需审批：**
   `container_bash`、`container_exec`、`container_write`、`container_edit`、`daemon_start`——因此一旦用户批准，agent
   就可以运行命令、编辑容器文件或启动守护进程，而无需这些工具在其他预设中询问。

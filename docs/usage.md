@@ -73,13 +73,13 @@ policy):
 
 The prompt's reason is a full sentence naming the action and the objects it
 touches, quoting every identifier — for example
-`Add mount to container "web": volume "data"`. It covers the container image,
-each mount's kind and destination, the environment variable keys, and the
-resolved file path. It follows the UI language: the browser client records the
-active locale in the plugin settings, with the durable locale preference as the
-fallback (English when neither is set). A policy denial — a read-only sandbox,
-or a destination on a project mount — is reported in the same language. The
-settings-card actions are direct control calls and are not gated.
+`Add mount to container "web": volume "data" (read-only)`. It covers the
+container image, each mount's kind and destination, the environment variable
+keys, and the resolved file path. It follows the UI language: the browser client
+records the active locale in the plugin settings, with the durable locale
+preference as the fallback (English when neither is set). A policy denial — a
+read-only sandbox, or a destination on a project mount — is reported in the same
+language. The settings-card actions are direct control calls and are not gated.
 
 `container_start`, `container_recreate`, and `container_bash` accept an `env`
 map applied to the container (or the bash process); `container_exec` and

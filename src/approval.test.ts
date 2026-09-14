@@ -141,7 +141,7 @@ test("summarizeArgs renders the approval reason for each gated tool", () => {
         { project: "team", destination: "/workspace/team", mode: "read_write" },
       ],
     }),
-    'Start container "web" from image "localhost/dsh-podman/nginx:latest" with mounts: directory "team/src" (read-only), directory "team" at "/workspace/team".',
+    'Start container "web" from image "localhost/dsh-podman/nginx:latest" with mounts: directory "team/src" (read-only), directory "team" at "/workspace/team" (read-write).',
   );
   assert.equal(
     summarizeArgs("container_recreate", {
@@ -152,7 +152,7 @@ test("summarizeArgs renders the approval reason for each gated tool", () => {
         { project: "team", destination: "/workspace/team", mode: "read_write" },
       ],
     }),
-    'Recreate container "valkey-ctr" from image "localhost/dsh-podman/nginx:latest" with mounts: directory "team/src" (read-only), directory "team" at "/workspace/team".',
+    'Recreate container "valkey-ctr" from image "localhost/dsh-podman/nginx:latest" with mounts: directory "team/src" (read-only), directory "team" at "/workspace/team" (read-write).',
   );
   assert.equal(
     summarizeArgs("container_mount_add", {
@@ -162,7 +162,17 @@ test("summarizeArgs renders the approval reason for each gated tool", () => {
       destination: "/data",
       mode: "read_write",
     }),
-    'Add mount to container "valkey-ctr": volume "valkey-data" at "/data".',
+    'Add mount to container "valkey-ctr": volume "valkey-data" at "/data" (read-write).',
+  );
+  assert.equal(
+    summarizeArgs("container_mount_update", {
+      container: "valkey-ctr",
+      kind: "volume",
+      volume: "valkey-data",
+      destination: "/data",
+      mode: "read_write",
+    }),
+    'Change the mount mode in container "valkey-ctr": volume "valkey-data" at "/data" (read-write).',
   );
   assert.equal(
     summarizeArgs("container_mount_add", {

@@ -4,6 +4,7 @@
 
 import { approvalPath, currentCwd } from "./guest-rpc.js";
 import { inferMountKind, projectMountDestinationReason } from "./mount-input.js";
+import { defaultMountMode } from "./mount-enums.js";
 import { TOOLS } from "./tool-schemas.js";
 import {
   renderDenial,
@@ -20,10 +21,11 @@ function projectPath(project: string, path?: string): string {
 }
 
 // Build the mount fact for one mount object, or undefined when it names no
-// source. `readOnly` is only meaningful where the caller tracks a mode.
+// source. `readOnly` is the mount's mode when the call carries one; omit it
+// when the call does not (removal), so the reason names no mode.
 function mountFact(
   mount: Record<string, unknown>,
-  readOnly: boolean,
+  readOnly?: boolean,
 ): MountFact | undefined {
   const inferred = inferMountKind(mount);
   const kind: MountFact["kind"] =
@@ -49,7 +51,7 @@ function mountFact(
     kind,
     source,
     ...(destination === undefined ? {} : { destination }),
-    readOnly,
+    ...(readOnly === undefined ? {} : { readOnly }),
   };
 }
 
@@ -72,14 +74,15 @@ export function reasonFact(
     const value = args.mounts;
     if (!Array.isArray(value) || value.length === 0) return undefined;
     const items = value
-      .map((item) =>
-        typeof item === "object" && item !== null
-          ? mountFact(
-              item as Record<string, unknown>,
-              (item as Record<string, unknown>).mode === "read_only",
-            )
-          : undefined,
-      )
+      .map((item) => {
+        if (typeof item !== "object" || item === null) return undefined;
+        const mount = item as Record<string, unknown>;
+        const mode =
+          typeof mount.mode === "string" && mount.mode !== ""
+            ? mount.mode
+            : defaultMountMode(inferMountKind(mount));
+        return mountFact(mount, mode !== "read_write");
+      })
       .filter((item): item is MountFact => item !== undefined);
     return items.length === 0 ? undefined : items;
   };
@@ -162,7 +165,15 @@ export function reasonFact(
     case "container_mount_update": {
       const container = str("container");
       if (container === undefined) return undefined;
-      const mount = mountFact(args, args.mode === "read_only");
+      // Removal carries no mode, so its reason names none; add and update name
+      // the mode the call asks for (add defaults it like the mount schema).
+      const readOnly =
+        name === "container_mount_remove"
+          ? undefined
+          : (typeof args.mode === "string" && args.mode !== ""
+              ? args.mode
+              : defaultMountMode(inferMountKind(args))) !== "read_write";
+      const mount = mountFact(args, readOnly);
       if (mount === undefined) return undefined;
       return { kind: name, container, mount };
     }

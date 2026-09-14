@@ -17,7 +17,9 @@ export interface MountFact {
   // Project path (`team/src`), volume name, secret name, or empty for tmpfs.
   source: string;
   destination?: string;
-  readOnly: boolean;
+  // The mount's mode when the call carries one; undefined when it does not
+  // (removal has no mode, and the mount's current mode is not known here).
+  readOnly?: boolean;
 }
 
 // The locale-independent shape of one gated call's reason. summarizeArgs builds
@@ -119,7 +121,9 @@ function joinList(locale: ReasonLocale, items: readonly string[]): string {
     : shown;
 }
 
-// Render one mount as `volume "data" at "/data" (read-only)`.
+// Render one mount as `volume "data" at "/data" (read-only)`. The mode is
+// named only when the call carries one and the kind has a mode (tmpfs is
+// always read-write and secrets take none).
 function mountText(locale: ReasonLocale, mount: MountFact): string {
   const name = quoted(locale, mount.source);
   const source =
@@ -138,7 +142,14 @@ function mountText(locale: ReasonLocale, mount: MountFact): string {
           ` at ${quoted(locale, mount.destination)}`,
           ` 挂载到 ${quoted(locale, mount.destination)}`,
         );
-  const mode = mount.readOnly ? pick(locale, " (read-only)", "（只读）") : "";
+  const mode =
+    mount.readOnly === undefined ||
+    mount.kind === "tmpfs" ||
+    mount.kind === "secret"
+      ? ""
+      : mount.readOnly
+        ? pick(locale, " (read-only)", "（只读）")
+        : pick(locale, " (read-write)", "（读写）");
   return `${source}${destination}${mode}`;
 }
 
@@ -238,7 +249,7 @@ export function renderReason(locale: ReasonLocale, fact: ReasonFact): string {
     case "container_mount_update":
       return pick(
         locale,
-        `Change the mode of mount in container ${quoted(locale, fact.container)}: ${mountText(locale, fact.mount)}.`,
+        `Change the mount mode in container ${quoted(locale, fact.container)}: ${mountText(locale, fact.mount)}.`,
         `更改容器 ${quoted(locale, fact.container)} 中挂载的模式：${mountText(locale, fact.mount)}。`,
       );
     case "volume_remove":

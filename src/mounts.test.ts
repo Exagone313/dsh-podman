@@ -42,7 +42,7 @@ test("container_start approval depends on mounts being passed", () => {
   assert.equal(decision!.kind, "ask");
   assert.equal(
     decision!.reason,
-    'Start container "web" from image "localhost/dsh-podman/nginx:latest" with mounts: directory "team/src" (read-only), directory "team" at "/workspace/team".',
+    'Start container "web" from image "localhost/dsh-podman/nginx:latest" with mounts: directory "team/src" (read-only), directory "team" at "/workspace/team" (read-write).',
   );
 });
 
@@ -59,7 +59,7 @@ test("summarizeArgs infers the mount target when kind is omitted", () => {
       container: "valkey-ctr",
       volume: "valkey-data",
     }),
-    'Add mount to container "valkey-ctr": volume "valkey-data".',
+    'Add mount to container "valkey-ctr": volume "valkey-data" (read-only).',
   );
 });
 
@@ -294,7 +294,7 @@ test("summarizeArgs renders the remount reason", () => {
       project: "team",
       mode: "read_only",
     }),
-    'Change the mode of mount in container "valkey-ctr": directory "team" (read-only).',
+    'Change the mount mode in container "valkey-ctr": directory "team" (read-only).',
   );
   assert.equal(
     summarizeArgs("container_mount_update", {
@@ -303,7 +303,7 @@ test("summarizeArgs renders the remount reason", () => {
       destination: "/data",
       mode: "read_write",
     }),
-    'Change the mode of mount in container "valkey-ctr": volume "data" at "/data".',
+    'Change the mount mode in container "valkey-ctr": volume "data" at "/data" (read-write).',
   );
 });
 

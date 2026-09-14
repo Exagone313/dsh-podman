@@ -141,6 +141,7 @@ export type ContainerPluginKey =
   | "toolTitle_container_mount_list"
   | "toolTitle_container_mount_add"
   | "toolTitle_container_mount_remove"
+  | "toolTitle_container_mount_update"
   | "toolTitle_container_secret_add"
   | "toolTitle_container_secret_remove"
   | "toolTitle_image_list"
@@ -306,6 +307,7 @@ export const en: Record<ContainerPluginKey, string> = {
   toolTitle_container_mount_list: "List mounts",
   toolTitle_container_mount_add: "Add mount",
   toolTitle_container_mount_remove: "Remove mount",
+  toolTitle_container_mount_update: "Change mount mode",
   toolTitle_container_secret_add: "Attach secret",
   toolTitle_container_secret_remove: "Detach secret",
   toolTitle_image_list: "List images",
@@ -462,6 +464,7 @@ export const zh: Record<ContainerPluginKey, string> = {
   toolTitle_container_mount_list: "列出挂载",
   toolTitle_container_mount_add: "添加挂载",
   toolTitle_container_mount_remove: "移除挂载",
+  toolTitle_container_mount_update: "更改挂载模式",
   toolTitle_container_secret_add: "注入机密",
   toolTitle_container_secret_remove: "移除机密注入",
   toolTitle_image_list: "列出镜像",

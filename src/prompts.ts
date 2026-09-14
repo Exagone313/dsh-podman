@@ -107,7 +107,8 @@ export const PODMAN_OPS_AGENT_CORDIS_YML = `- id: persona
       (image_list, image_get, image_build, image_rebuild, image_rebuild_all,
       image_remove), containers (container_list, container_start,
       container_recreate, container_remove), mounts (container_mount_list,
-      container_mount_add, container_mount_remove), volumes (volume_list,
+      container_mount_add, container_mount_remove, container_mount_update),
+      volumes (volume_list,
       volume_create, volume_remove), secrets (secret_list, secret_create,
       secret_remove, container_secret_add, container_secret_remove), daemons
       (daemon_list, daemon_start, daemon_stop, daemon_restart, daemon_logs),

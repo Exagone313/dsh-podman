@@ -87,6 +87,7 @@ export const EXPECTED_TOOLS = [
   "container_mount_list",
   "container_mount_add",
   "container_mount_remove",
+  "container_mount_update",
   "volume_list",
   "volume_create",
   "volume_remove",
@@ -132,6 +133,7 @@ export const MOUNT_TOOLS = [
   "container_mount_list",
   "container_mount_add",
   "container_mount_remove",
+  "container_mount_update",
 ];
 
 export const VOLUME_TOOLS = ["volume_list", "volume_create", "volume_remove"];

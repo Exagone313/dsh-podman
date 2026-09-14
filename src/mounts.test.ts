@@ -173,6 +173,24 @@ test("mount tools are registered with the expected schemas", () => {
     "object",
     "container_mount_remove accepts a destination",
   );
+
+  const updateTool = TOOLS.find((entry) => entry.name === "container_mount_update");
+  assert.ok(updateTool, "container_mount_update registered");
+  assert.equal(updateTool!.approval, true, "container_mount_update must require approval");
+  assert.deepEqual(updateTool!.parameters.required, ["container", "mode"]);
+  assert.deepEqual(updateTool!.parameters.properties.kind.enum, [
+    "project",
+    "volume",
+  ]);
+  assert.deepEqual(updateTool!.parameters.properties.mode.enum, [
+    "read_only",
+    "read_write",
+  ]);
+  assert.equal(
+    typeof updateTool!.parameters.properties.destination,
+    "object",
+    "container_mount_update accepts a destination",
+  );
 });
 
 test("an omitted mount kind is inferred from the source field", async () => {
@@ -207,6 +225,86 @@ test("an omitted mount kind is inferred from the source field", async () => {
       mode: "MOUNT_MODE_READ_ONLY",
     },
   ]);
+});
+
+test("container_mount_update maps the selector and mode", async () => {
+  const { requests, resolver } = mountRequestRecorder();
+  await toolHandlers.container_mount_update(
+    resolver as never,
+    { container: "valkey-ctr", kind: "project", project: "team", path: "src", mode: "read_only" },
+    MOUNT_EXEC,
+  );
+  await toolHandlers.container_mount_update(
+    resolver as never,
+    { container: "valkey-ctr", volume: "valkey-data", destination: "/data", mode: "read_write" },
+    MOUNT_EXEC,
+  );
+  assert.deepEqual(requests[0], [
+    "updateContainerMount",
+    {
+      workspaceSlug: WORKSPACE_ID,
+      container: "valkey-ctr",
+      kind: "MOUNT_KIND_PROJECT",
+      project: "team",
+      path: "src",
+      mode: "MOUNT_MODE_READ_ONLY",
+    },
+  ]);
+  assert.deepEqual(requests[1], [
+    "updateContainerMount",
+    {
+      workspaceSlug: WORKSPACE_ID,
+      container: "valkey-ctr",
+      kind: "MOUNT_KIND_VOLUME",
+      volume: "valkey-data",
+      destination: "/data",
+      mode: "MOUNT_MODE_READ_WRITE",
+    },
+  ]);
+});
+
+test("container_mount_update rejects kinds without a mode", async () => {
+  const { requests, resolver } = mountRequestRecorder();
+  await assert.rejects(
+    () =>
+      toolHandlers.container_mount_update(
+        resolver as never,
+        { container: "web", kind: "tmpfs", destination: "/mnt", mode: "read_only" },
+        MOUNT_EXEC,
+      ),
+    /only project and volume mounts carry a mode; tmpfs mounts cannot be remounted/,
+  );
+  await assert.rejects(
+    () =>
+      toolHandlers.container_mount_update(
+        resolver as never,
+        { container: "web", project: "team", mode: "rw" },
+        MOUNT_EXEC,
+      ),
+    /unknown mount mode: rw/,
+  );
+  assert.deepEqual(requests, [], "a rejected update must not reach the orchestrator");
+});
+
+test("summarizeArgs renders the remount reason", () => {
+  assert.equal(
+    summarizeArgs("container_mount_update", {
+      container: "valkey-ctr",
+      kind: "project",
+      project: "team",
+      mode: "read_only",
+    }),
+    'Change the mode of mount in container "valkey-ctr": directory "team" (read-only).',
+  );
+  assert.equal(
+    summarizeArgs("container_mount_update", {
+      container: "valkey-ctr",
+      volume: "data",
+      destination: "/data",
+      mode: "read_write",
+    }),
+    'Change the mode of mount in container "valkey-ctr": volume "data" at "/data".',
+  );
 });
 
 test("container_mount_add rejects unknown mount kinds and modes", async () => {

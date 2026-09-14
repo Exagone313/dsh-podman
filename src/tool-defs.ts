@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: MIT
 
-import { containerBashParameters, containerEditParameters, containerExecParameters, containerGlobParameters, containerGrepParameters, containerListParameters, containerMountAddParameters, containerMountListParameters, containerMountRemoveParameters, containerReadParameters, containerRecreateParameters, containerRemoveParameters, containerSecretAddParameters, containerSecretRemoveParameters, containerStartParameters, containerWriteParameters, daemonListParameters, daemonLogsParameters, daemonRestartParameters, daemonStartParameters, daemonStopParameters, imageBuildParameters, imageGetParameters, imageListParameters, imageRebuildAllParameters, imageRebuildParameters, imageRemoveParameters, secretCreateParameters, secretListParameters, secretRemoveParameters, volumeCreateParameters, volumeListParameters, volumeRemoveParameters } from "./tool-params.js";
+import { containerBashParameters, containerEditParameters, containerExecParameters, containerGlobParameters, containerGrepParameters, containerListParameters, containerMountAddParameters, containerMountListParameters, containerMountRemoveParameters, containerMountUpdateParameters, containerReadParameters, containerRecreateParameters, containerRemoveParameters, containerSecretAddParameters, containerSecretRemoveParameters, containerStartParameters, containerWriteParameters, daemonListParameters, daemonLogsParameters, daemonRestartParameters, daemonStartParameters, daemonStopParameters, imageBuildParameters, imageGetParameters, imageListParameters, imageRebuildAllParameters, imageRebuildParameters, imageRemoveParameters, secretCreateParameters, secretListParameters, secretRemoveParameters, volumeCreateParameters, volumeListParameters, volumeRemoveParameters } from "./tool-params.js";
 
 export function defineTool<T>(definition: T): T {
   return definition;
@@ -73,6 +73,11 @@ export const TOOLS: ToolDefinition[] = [
     parameters: containerMountRemoveParameters,
     approval: true,
   },
+  {
+    name: "container_mount_update",
+    parameters: containerMountUpdateParameters,
+    approval: true,
+  },
   { name: "volume_list", parameters: volumeListParameters },
   { name: "volume_create", parameters: volumeCreateParameters },
   { name: "volume_remove", parameters: volumeRemoveParameters, approval: true },
@@ -139,6 +144,8 @@ export const TOOL_DESCRIPTIONS: Record<string, string> = {
     "Add a mount to a container in the current workspace: a project bind (project, optional path), a tmpfs, a named volume, or a secret, selected by kind (default project). Recreates the container, terminating its running processes; bind-mounted volume data persists. Requires approval: adding a mount changes the container filesystem view.",
   container_mount_remove:
     "Remove a mount from a container in the current workspace. Identify it by kind plus its own handle: project/path for a project mount, volume for a named volume, secret for a secret, and destination for tmpfs. A handle that matches more than one mount is rejected, so pass destination as well when a volume or secret is mounted more than once; copy the exact values from container_mount_list. Recreates the container, terminating its running processes; bind-mounted volume data persists. Requires approval: removing a mount changes the container filesystem view.",
+  container_mount_update:
+    "Change the mode of an existing project or volume mount in the current workspace (read_only or read_write). Identify it by kind plus its own handle, exactly like container_mount_remove; a handle that matches more than one mount is rejected. The default container's workspace project mount can be remounted read-only. Recreates the container, terminating its running processes; bind-mounted volume data persists. Requires approval: changing a mount's mode changes the container filesystem view.",
   volume_list:
     "List the named volumes available to the current workspace.",
   volume_create: "Create a named volume in the current workspace.",
@@ -188,6 +195,7 @@ export const TOOL_UI: Record<string, { title: string; kind: string }> = {
   container_mount_list: { title: "List mounts", kind: "read" },
   container_mount_add: { title: "Add mount", kind: "edit" },
   container_mount_remove: { title: "Remove mount", kind: "delete" },
+  container_mount_update: { title: "Change mount mode", kind: "edit" },
   volume_list: { title: "List volumes", kind: "search" },
   volume_create: { title: "Create volume", kind: "execute" },
   volume_remove: { title: "Remove volume", kind: "delete" },

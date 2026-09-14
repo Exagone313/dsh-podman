@@ -37,6 +37,7 @@ export type ReasonFact =
   | { kind: "container_remove"; container: string }
   | { kind: "container_mount_add"; container: string; mount: MountFact }
   | { kind: "container_mount_remove"; container: string; mount: MountFact }
+  | { kind: "container_mount_update"; container: string; mount: MountFact }
   | { kind: "volume_remove"; name: string }
   | { kind: "secret_remove"; name: string }
   | { kind: "container_secret_add"; container: string; secret: string; env: string }
@@ -233,6 +234,12 @@ export function renderReason(locale: ReasonLocale, fact: ReasonFact): string {
         locale,
         `Remove mount from container ${quoted(locale, fact.container)}: ${mountText(locale, fact.mount)}.`,
         `从容器 ${quoted(locale, fact.container)} 中移除挂载：${mountText(locale, fact.mount)}。`,
+      );
+    case "container_mount_update":
+      return pick(
+        locale,
+        `Change the mode of mount in container ${quoted(locale, fact.container)}: ${mountText(locale, fact.mount)}.`,
+        `更改容器 ${quoted(locale, fact.container)} 中挂载的模式：${mountText(locale, fact.mount)}。`,
       );
     case "volume_remove":
       return pick(locale, `Remove volume ${quoted(locale, fact.name)}.`, `移除卷 ${quoted(locale, fact.name)}。`);

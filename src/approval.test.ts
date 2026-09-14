@@ -26,6 +26,7 @@ test("the destructive mutations require approval", () => {
   assert.deepEqual(approval, [
     "container_mount_add",
     "container_mount_remove",
+    "container_mount_update",
     "container_recreate",
     "container_remove",
     "container_secret_add",
@@ -67,6 +68,13 @@ test("approvalDecision gates exactly the approval-flagged tools", () => {
       kind: "volume",
       volume: "valkey-data",
       destination: "/data",
+    },
+    container_mount_update: {
+      container: "valkey-ctr",
+      kind: "volume",
+      volume: "valkey-data",
+      destination: "/data",
+      mode: "read_only",
     },
     secret_remove: { name: "valkey-pass" },
     container_secret_add: {

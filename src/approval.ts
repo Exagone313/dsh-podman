@@ -158,10 +158,11 @@ export function reasonFact(
       return { kind: "container_secret_remove", container, env };
     }
     case "container_mount_add":
-    case "container_mount_remove": {
+    case "container_mount_remove":
+    case "container_mount_update": {
       const container = str("container");
       if (container === undefined) return undefined;
-      const mount = mountFact(args, name === "container_mount_add" && args.mode === "read_only");
+      const mount = mountFact(args, args.mode === "read_only");
       if (mount === undefined) return undefined;
       return { kind: name, container, mount };
     }
@@ -387,7 +388,7 @@ export function mountDestinationsReason(
   locale: ReasonLocale = "en",
 ): string | undefined {
   if (args === undefined) return undefined;
-  if (name === "container_mount_add" || name === "container_mount_remove") {
+  if (name === "container_mount_add" || name === "container_mount_remove" || name === "container_mount_update") {
     return projectMountDestinationReason(projectsRoot, args, locale);
   }
   if (name === "container_start" || name === "container_recreate") {

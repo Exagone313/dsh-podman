@@ -218,6 +218,40 @@ export const containerMountRemoveParameters = {
   required: ["container"],
 };
 
+export const containerMountUpdateParameters = {
+  type: "object",
+  properties: {
+    container: containerParam,
+    kind: {
+      type: "string",
+      enum: ["project", "volume"],
+      description:
+        "Kind of mount to update; inferred from volume when omitted, otherwise project. Only project and volume mounts carry a mode.",
+    },
+    project: {
+      type: "string",
+      description: "Project name of the project mount to update.",
+    },
+    path: {
+      type: "string",
+      description:
+        "Path within the project of the project mount to update; omit it for the project root.",
+    },
+    volume: {
+      type: "string",
+      description:
+        "Named volume to update; identifies the mount, so pass destination as well when the volume is mounted more than once.",
+    },
+    destination: {
+      type: "string",
+      description:
+        "Destination path inside the container; for a volume it identifies the mount (and disambiguates one mounted more than once); not applicable to project mounts.",
+    },
+    mode: mountModeParam,
+  },
+  required: ["container", "mode"],
+};
+
 export const containerRemoveParameters = {
   type: "object",
   properties: { container: containerParam },

@@ -53,6 +53,7 @@ const TOOL_PRESENTATION: Record<string, ToolPresentation> = {
   container_mount_list: { titleKey: "toolTitle_container_mount_list", icon: <IconFolderOpenOutline16 size={14} />, summaryKeys: ["container"] },
   container_mount_add: { titleKey: "toolTitle_container_mount_add", icon: <IconFolderOpenOutline16 size={14} />, summaryKeys: ["container", "kind"] },
   container_mount_remove: { titleKey: "toolTitle_container_mount_remove", icon: <IconTrashOutline16 size={14} />, summaryKeys: ["container"] },
+  container_mount_update: { titleKey: "toolTitle_container_mount_update", icon: <IconRefreshOutline16 size={14} />, summaryKeys: ["container", "mode"] },
   container_secret_add: { titleKey: "toolTitle_container_secret_add", icon: <IconLinkOutline16 size={14} />, summaryKeys: ["container", "env"] },
   container_secret_remove: { titleKey: "toolTitle_container_secret_remove", icon: <IconLinkOutline16 size={14} />, summaryKeys: ["container", "env"] },
   image_list: { titleKey: "toolTitle_image_list", icon: <IconArchiveOutline20 size={14} />, summaryKeys: [] },

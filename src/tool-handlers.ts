@@ -316,6 +316,34 @@ export const toolHandlers: Record<
     const row = await resolver.control("removeContainerMount", request);
     return publicContainer(row);
   },
+  container_mount_update: async (resolver, input, exec) => {
+    const kind = inferMountKind(input);
+    if (kind !== "project" && kind !== "volume") {
+      throw new Error(
+        `only project and volume mounts carry a mode; ${kind} mounts cannot be remounted`,
+      );
+    }
+    const projectsRoot = resolver.getConfig().projectsRoot;
+    const destinationReason = projectMountDestinationReason(projectsRoot, input);
+    if (destinationReason !== undefined) throw new Error(destinationReason);
+    const request: Record<string, unknown> = {
+      workspaceSlug: await sessionWorkspaceSlug(resolver, currentCwd(exec)),
+      container: input.container,
+      kind: mountKindToProto(kind),
+      mode: mountModeToProto(input.mode),
+    };
+    if (kind === "project") {
+      request.project = input.project;
+      if (input.path !== undefined) request.path = input.path;
+    } else {
+      if (input.volume !== undefined) request.volume = input.volume;
+      if (input.destination !== undefined) {
+        request.destination = input.destination;
+      }
+    }
+    const row = await resolver.control("updateContainerMount", request);
+    return publicContainer(row);
+  },
   volume_list: async (resolver) => {
     const result = await resolver.control<{ volumes?: any[] }>("listVolumes", {});
     return (result.volumes ?? []).map((volume: any) => ({ name: volume.name }));

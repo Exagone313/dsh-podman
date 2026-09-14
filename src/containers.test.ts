@@ -114,6 +114,7 @@ test("container tools never expose internal fields in their results", async () =
     [toolHandlers.container_recreate, { container: "default" }],
     [toolHandlers.container_mount_add, { container: "default", kind: "volume", volume: "v", destination: "/data" }],
     [toolHandlers.container_mount_remove, { container: "default", kind: "volume", volume: "v", destination: "/data" }],
+    [toolHandlers.container_mount_update, { container: "default", kind: "volume", volume: "v", destination: "/data", mode: "read_only" }],
     [toolHandlers.container_secret_add, { container: "default", env: "DB_PASS", secret: "db-pass" }],
     [toolHandlers.container_secret_remove, { container: "default", env: "DB_PASS" }],
   ];

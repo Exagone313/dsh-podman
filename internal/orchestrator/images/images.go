@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"sync"
 
 	"go.podman.io/buildah/define"
 	"go.podman.io/podman/v6/pkg/bindings/images"
@@ -164,13 +165,18 @@ type Builder struct {
 	ImagePrefix     string
 	BaseImagePrefix string
 	Logger          *slog.Logger
+
+	// mu guards the shared package caches: builds take it for reading (they
+	// still run concurrently) and a cache cleanup takes it for writing, so a
+	// cleanup never deletes a package out from under a running build.
+	mu sync.RWMutex
 }
 
 // cacheMount returns the host cache directory and its container mount target
 // for the given package manager, along with whether a host cache is
 // configured. Caches are opt-in: an unset host cache disables caching for that
 // package manager entirely.
-func (b Builder) cacheMount(packageManager string) (host, container string, configured bool) {
+func (b *Builder) cacheMount(packageManager string) (host, container string, configured bool) {
 	switch packageManager {
 	case "pacman":
 		if b.HostPacmanCache == "" {
@@ -192,7 +198,9 @@ func (b Builder) cacheMount(packageManager string) (host, container string, conf
 	}
 }
 
-func (b Builder) Build(spec BuildSpec) (string, error) {
+func (b *Builder) Build(spec BuildSpec) (string, error) {
+	b.mu.RLock()
+	defer b.mu.RUnlock()
 	if b.Context == nil {
 		return "", fmt.Errorf("podman build context is not configured")
 	}
@@ -240,7 +248,7 @@ func (b Builder) Build(spec BuildSpec) (string, error) {
 	return tag, nil
 }
 
-func (b Builder) imagePrefix() string {
+func (b *Builder) imagePrefix() string {
 	prefix := b.ImagePrefix
 	if prefix == "" {
 		prefix = "localhost/dsh-podman/"
@@ -251,7 +259,7 @@ func (b Builder) imagePrefix() string {
 	return prefix
 }
 
-func (b Builder) baseImagePrefix() string {
+func (b *Builder) baseImagePrefix() string {
 	prefix := b.BaseImagePrefix
 	if prefix == "" {
 		prefix = "localhost/dsh-podman/base/"
@@ -264,7 +272,7 @@ func (b Builder) baseImagePrefix() string {
 
 // tagFor computes the fully-qualified tag for an image short name. Base
 // images live under BaseImagePrefix; custom images under ImagePrefix.
-func (b Builder) tagFor(imageID string, isBase bool) string {
+func (b *Builder) tagFor(imageID string, isBase bool) string {
 	if isBase {
 		return b.baseImagePrefix() + imageID + ":latest"
 	}

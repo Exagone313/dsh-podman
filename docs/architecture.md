@@ -103,6 +103,13 @@ stored custom images **in dependency order** — each parent before the images
 derived from it. An image whose rebuild fails, and every image that depends on
 it, is reported in `skipped` while the rest continue.
 
+When a host cache is configured (`DSH_PODMAN_HOST_*_CACHE`, mounted into both
+the build container and the orchestrator), builds reuse downloaded packages. The
+settings card reports each cache's size and can clean it — keep the newest
+version of every package, or empty the cache. The builder serializes a cleanup
+against builds with a read/write lock, so a cleanup never deletes a package out
+from under a running build.
+
 ## Settings card transport
 
 The settings card and the orchestrator talk over the settings transport:

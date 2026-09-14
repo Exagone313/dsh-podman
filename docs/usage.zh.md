@@ -225,6 +225,8 @@ chips）。卷和机密以独立的可展开行列出，每行都有自己的操
 **Create secret**
 打开弹窗表单（机密表单接受可选的长度；机密的值可以被覆盖，但绝不读取）。卡片操作是直接的控制调用，不受审批门控。
 
+**软件包缓存**区段会报告每个已配置构建缓存（`DSH_PODMAN_HOST_PACMAN_CACHE`、`DSH_PODMAN_HOST_APT_CACHE`、`DSH_PODMAN_HOST_APK_CACHE`）的大小，并提供两个清理操作：**保留最新版本**会移除每个软件包除最新版本之外的所有缓存文件（连同其签名），**全部移除**会清空缓存。两者都是安全的——缓存的软件包只会被重新下载——且都不会在镜像构建进行时运行。
+
 ## Podman 操作员模式
 
 插件附带一个名为 _Podman operator mode_（id `podman-ops`）的 **agent

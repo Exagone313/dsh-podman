@@ -269,6 +269,14 @@ individual expandable rows, each with its own actions, and **Create volume** /
 secret's value can be overwritten, never read). Card actions are direct control
 calls and are not approval-gated.
 
+A **Package caches** section reports the size of every configured build cache
+(`DSH_PODMAN_HOST_PACMAN_CACHE`, `DSH_PODMAN_HOST_APT_CACHE`,
+`DSH_PODMAN_HOST_APK_CACHE`) and offers two cleanup actions: **Keep latest
+versions** removes every cached package file except the newest of each package
+(and the signature it carried), and **Remove all** empties the caches. Both are
+safe — a cached package is only ever re-downloaded — and neither runs while an
+image build is in progress.
+
 ## Podman operator mode
 
 The plugin ships an **agent preset** named _Podman operator mode_ (id

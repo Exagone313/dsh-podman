@@ -172,7 +172,7 @@ test("summarizeArgs renders the approval reason for each gated tool", () => {
       destination: "/data",
       mode: "read_write",
     }),
-    'Change the mount mode in container "valkey-ctr": volume "valkey-data" at "/data" (read-write).',
+    'Update mount in container "valkey-ctr": remount volume "valkey-data" at "/data" to read-write.',
   );
   assert.equal(
     summarizeArgs("container_mount_add", {

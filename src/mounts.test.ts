@@ -294,7 +294,7 @@ test("summarizeArgs renders the remount reason", () => {
       project: "team",
       mode: "read_only",
     }),
-    'Change the mount mode in container "valkey-ctr": project "team" (read-only).',
+    'Update mount in container "valkey-ctr": remount project "team" to read-only.',
   );
   assert.equal(
     summarizeArgs("container_mount_update", {
@@ -303,7 +303,7 @@ test("summarizeArgs renders the remount reason", () => {
       destination: "/data",
       mode: "read_write",
     }),
-    'Change the mount mode in container "valkey-ctr": volume "data" at "/data" (read-write).',
+    'Update mount in container "valkey-ctr": remount volume "data" at "/data" to read-write.',
   );
 });
 

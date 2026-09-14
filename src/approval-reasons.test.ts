@@ -111,6 +111,22 @@ test("renderReason covers the remaining reason kinds in both languages", () => {
     renderReason("zh", { kind: "container_secret_add", container: "c", secret: "s", env: "E" }),
     "将机密 “s” 作为 “E” 注入容器 “c”。",
   );
+  assert.equal(
+    renderReason("zh", {
+      kind: "container_mount_update",
+      container: "valkey-ctr",
+      mount: { kind: "volume", source: "valkey-data", destination: "/data", readOnly: false },
+    }),
+    "更新容器 “valkey-ctr” 中的挂载：将卷 “valkey-data”（挂载到 “/data”）重新挂载为读写。",
+  );
+  assert.equal(
+    renderReason("zh", {
+      kind: "container_mount_update",
+      container: "web",
+      mount: { kind: "project", source: "team", readOnly: true },
+    }),
+    "更新容器 “web” 中的挂载：将项目 “team” 重新挂载为只读。",
+  );
 });
 
 test("renderCacheCleanNotice reports the removed file count", () => {

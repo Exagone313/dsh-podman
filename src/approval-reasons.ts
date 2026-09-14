@@ -121,36 +121,70 @@ function joinList(locale: ReasonLocale, items: readonly string[]): string {
     : shown;
 }
 
-// Render one mount as `volume "data" at "/data" (read-only)`. The mode is
-// named only when the call carries one and the kind has a mode (tmpfs is
-// always read-write and secrets take none).
-function mountText(locale: ReasonLocale, mount: MountFact): string {
+// Render a mount's source name: `volume "data"`, `project "team/src"`,
+// `secret "valkey-tls"`, or `tmpfs`.
+function mountLabel(locale: ReasonLocale, mount: MountFact): string {
   const name = quoted(locale, mount.source);
-  const source =
-    mount.kind === "tmpfs"
-      ? "tmpfs"
-      : mount.kind === "volume"
-        ? pick(locale, `volume ${name}`, `卷 ${name}`)
-        : mount.kind === "secret"
-          ? pick(locale, `secret ${name}`, `机密 ${name}`)
-          : pick(locale, `project ${name}`, `项目 ${name}`);
-  const destination =
-    mount.destination === undefined
-      ? ""
-      : pick(
-          locale,
-          ` at ${quoted(locale, mount.destination)}`,
-          ` 挂载到 ${quoted(locale, mount.destination)}`,
-        );
-  const mode =
+  switch (mount.kind) {
+    case "tmpfs":
+      return "tmpfs";
+    case "volume":
+      return pick(locale, `volume ${name}`, `卷 ${name}`);
+    case "secret":
+      return pick(locale, `secret ${name}`, `机密 ${name}`);
+    default:
+      return pick(locale, `project ${name}`, `项目 ${name}`);
+  }
+}
+
+// Render a mount's destination clause (`at "/data"` / `挂载到 “/data”`), or
+// undefined when it has none. The caller supplies the surrounding punctuation,
+// since the locales wrap it differently.
+function mountDestinationText(
+  locale: ReasonLocale,
+  mount: MountFact,
+): string | undefined {
+  return mount.destination === undefined
+    ? undefined
+    : pick(
+        locale,
+        `at ${quoted(locale, mount.destination)}`,
+        `挂载到 ${quoted(locale, mount.destination)}`,
+      );
+}
+
+// Render a mount's source and destination: `volume "data" at "/data"`.
+function mountSourceText(locale: ReasonLocale, mount: MountFact): string {
+  const destination = mountDestinationText(locale, mount);
+  const label = mountLabel(locale, mount);
+  return destination === undefined ? label : `${label} ${destination}`;
+}
+
+// A mount's mode as a bare word (`read-only` / `read-write`), or undefined when
+// the call carries no mode or the kind has none (tmpfs is always read-write and
+// secrets take none).
+function mountModeName(
+  locale: ReasonLocale,
+  mount: MountFact,
+): string | undefined {
+  if (
     mount.readOnly === undefined ||
     mount.kind === "tmpfs" ||
     mount.kind === "secret"
-      ? ""
-      : mount.readOnly
-        ? pick(locale, " (read-only)", "（只读）")
-        : pick(locale, " (read-write)", "（读写）");
-  return `${source}${destination}${mode}`;
+  ) {
+    return undefined;
+  }
+  return mount.readOnly
+    ? pick(locale, "read-only", "只读")
+    : pick(locale, "read-write", "读写");
+}
+
+// Render one mount as `volume "data" at "/data" (read-only)`.
+function mountText(locale: ReasonLocale, mount: MountFact): string {
+  const mode = mountModeName(locale, mount);
+  const suffix =
+    mode === undefined ? "" : pick(locale, ` (${mode})`, `（${mode}）`);
+  return `${mountSourceText(locale, mount)}${suffix}`;
 }
 
 // Render a command word list, capped at 8 words with an ellipsis tail.
@@ -246,12 +280,21 @@ export function renderReason(locale: ReasonLocale, fact: ReasonFact): string {
         `Remove mount from container ${quoted(locale, fact.container)}: ${mountText(locale, fact.mount)}.`,
         `从容器 ${quoted(locale, fact.container)} 中移除挂载：${mountText(locale, fact.mount)}。`,
       );
-    case "container_mount_update":
+    case "container_mount_update": {
+      const destination = mountDestinationText(locale, fact.mount);
+      const mode = mountModeName(locale, fact.mount) ?? "";
+      // The zh sentence separates the mount from the verb with a space after a
+      // quoted name, but a full-width parenthetical needs none.
+      const target =
+        destination === undefined
+          ? `${mountLabel(locale, fact.mount)} `
+          : `${mountLabel(locale, fact.mount)}（${destination}）`;
       return pick(
         locale,
-        `Change the mount mode in container ${quoted(locale, fact.container)}: ${mountText(locale, fact.mount)}.`,
-        `更改容器 ${quoted(locale, fact.container)} 中挂载的模式：${mountText(locale, fact.mount)}。`,
+        `Update mount in container ${quoted(locale, fact.container)}: remount ${mountSourceText(locale, fact.mount)} to ${mode}.`,
+        `更新容器 ${quoted(locale, fact.container)} 中的挂载：将${target}重新挂载为${mode}。`,
       );
+    }
     case "volume_remove":
       return pick(locale, `Remove volume ${quoted(locale, fact.name)}.`, `移除卷 ${quoted(locale, fact.name)}。`);
     case "secret_remove":

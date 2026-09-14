@@ -410,31 +410,50 @@ test("container_glob caps its result at 100 files", async () => {
   assert.match(many.note ?? "", /showing 100 of 101 files/);
 });
 
-test("podmanRuntimeSection clarifies that the built-in tools run in the container", () => {
-  const section = podmanRuntimeSection();
-  assert.equal(section.name, "podman:runtime");
-  assert.equal(section.order, 950);
+test("podmanRuntimeSection names only the tools the agent has", () => {
+  // The harness's shell/filesystem tools are mounted for this agent.
+  const withBuiltins = podmanRuntimeSection({ tools: { get: () => ({}) } });
+  assert.equal(withBuiltins.name, "podman:runtime");
+  assert.equal(withBuiltins.order, 950);
+  const full = withBuiltins.text({ scope: "agent" });
   for (const tool of ["bash", "read", "write", "edit", "glob", "grep"]) {
-    assert.match(section.text, new RegExp("`" + tool + "`"));
+    assert.match(full, new RegExp("`" + tool + "`"));
   }
-  assert.match(section.text, /container-backed/);
-  assert.match(section.text, /run in a Podman container/);
-  assert.match(section.text, /There is no host shell/);
+  assert.match(full, /container-backed/);
+  assert.match(full, /run in a Podman container/);
+  assert.match(full, /There is no host shell/);
   // The facts that pre-empt the "bash runs on the host" hallucination: the
   // built-in shell and container_bash use one container, and identical uname
   // output is the shared kernel, not a host shell.
-  assert.match(section.text, /container: "default"/);
-  assert.match(section.text, /identical output by construction/);
-  assert.match(section.text, /share the host kernel/);
-  assert.match(section.text, /hostname/);
-  assert.match(section.text, /\/etc\/os-release/);
+  assert.match(full, /container: "default"/);
+  assert.match(full, /identical output by construction/);
+  assert.match(full, /share the host kernel/);
+  assert.match(full, /hostname/);
+  assert.match(full, /\/etc\/os-release/);
   // Containers belong to a dsh workspace, and the daemon tools are
   // container-scoped too (they do not start with `container_`).
-  assert.match(section.text, /scoped to a dsh workspace/);
-  assert.match(section.text, /container_\*/);
-  assert.match(section.text, /daemon_\*/);
+  assert.match(full, /scoped to a dsh workspace/);
+  assert.match(full, /container_\*/);
+  assert.match(full, /daemon_\*/);
   // Neither the old vocabulary nor plugin lore belongs in the section.
-  assert.doesNotMatch(section.text, /Podman workspace/);
-  assert.doesNotMatch(section.text, /those same operations/);
-  assert.doesNotMatch(section.text, /plugin/i);
+  assert.doesNotMatch(full, /Podman workspace/);
+  assert.doesNotMatch(full, /those same operations/);
+  assert.doesNotMatch(full, /plugin/i);
+
+  // The Podman operator preset mounts none of them, so the wording must not
+  // name a tool the agent cannot call.
+  const containerOnly = podmanRuntimeSection({ tools: { get: () => undefined } });
+  const short = containerOnly.text({ scope: "agent" });
+  for (const tool of ["bash", "read", "write", "edit", "glob", "grep"]) {
+    assert.doesNotMatch(short, new RegExp("`" + tool + "`"));
+  }
+  assert.doesNotMatch(short, /container-backed/);
+  assert.doesNotMatch(short, /identical output by construction/);
+  assert.match(short, /run in a Podman container/);
+  assert.match(short, /There is no host shell/);
+  assert.match(short, /container: "default"/);
+  assert.match(short, /scoped to a dsh workspace/);
+  assert.match(short, /container_\*/);
+  assert.match(short, /daemon_\*/);
+  assert.match(short, /share the host kernel/);
 });

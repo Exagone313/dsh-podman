@@ -23,6 +23,43 @@ export function withoutHarnessSourceSection(assembly: any): any {
   };
 }
 
+// The built-in shell and filesystem tools whose presence decides which runtime
+// wording applies.
+const BUILTIN_TOOLS = ["bash", "read", "write", "edit", "glob", "grep"];
+
+// Wording for an agent that has the built-in shell and filesystem tools.
+const RUNTIME_WITH_BUILTINS =
+  "This dsh session's `bash`, `read`, `write`, `edit`, `glob`, and `grep` " +
+  "are container-backed: they run in a Podman container, the default " +
+  "container of the current dsh workspace — the same one `container_bash` " +
+  "and the other container-scoped tools (`container_*` and `daemon_*`) " +
+  'target with `container: "default"`. Containers are scoped to a dsh ' +
+  "workspace: each workspace has its own default container and any named " +
+  "ones, and the container-scoped tools address them by logical name within " +
+  "the current workspace. There is no host shell — never describe their " +
+  "output as the host's — and host paths do not exist. Because `bash` and " +
+  "`container_bash` use that one container, the same command returns " +
+  "identical output by construction, and matching output is never evidence " +
+  "of a host shell. Containers share the host kernel, so `uname -a`, " +
+  "`uname -r`, and `/proc/version` do report the host kernel; the " +
+  "container's own identity shows in `hostname`, `/etc/os-release`, and " +
+  "`/proc/1/cmdline`.";
+
+// Wording for an agent that has only the container tools (the Podman operator
+// preset mounts none of the built-in shell or filesystem rows), so it never
+// names a tool the agent does not have.
+const RUNTIME_CONTAINER_ONLY =
+  "This dsh session's container tools run in a Podman container: the default " +
+  "container of the current dsh workspace — the same one the container-scoped " +
+  'tools (`container_*` and `daemon_*`) target with `container: "default"`. ' +
+  "Containers are scoped to a dsh workspace: each workspace has its own " +
+  "default container and any named ones, and the container-scoped tools " +
+  "address them by logical name within the current workspace. There is no " +
+  "host shell — never describe their output as the host's — and host paths do " +
+  "not exist. Containers share the host kernel, so `uname -a`, `uname -r`, " +
+  "and `/proc/version` do report the host kernel; the container's own identity " +
+  "shows in `hostname`, `/etc/os-release`, and `/proc/1/cmdline`.";
+
 // Correct the model's host/container mental model: the built-in shell and
 // filesystem tools are container-backed too, so there is no host shell. It sits
 // just before the tool sections so the correction lands next to the tool
@@ -32,31 +69,19 @@ export function withoutHarnessSourceSection(assembly: any): any {
 // the host even though the container's identity does not). It names the
 // execution environment a Podman container, not a "Podman workspace", and says
 // that containers are scoped to a dsh workspace, so the two vocabularies stay
-// apart.
-export function podmanRuntimeSection(): {
+// apart. An agent without the built-in tools gets the container-only wording.
+export function podmanRuntimeSection(ctx: any): {
   name: string;
   order: number;
-  text: string;
+  text: (context?: { scope?: unknown }) => string;
 } {
   return {
     name: "podman:runtime",
     order: 950,
-    text:
-      "This dsh session's `bash`, `read`, `write`, `edit`, `glob`, and `grep` " +
-      "are container-backed: they run in a Podman container, the default " +
-      "container of the current dsh workspace — the same one `container_bash` " +
-      "and the other container-scoped tools (`container_*` and `daemon_*`) " +
-      'target with `container: "default"`. Containers are scoped to a dsh ' +
-      "workspace: each workspace has its own default container and any named " +
-      "ones, and the container-scoped tools address them by logical name within " +
-      "the current workspace. There is no host shell — never describe their " +
-      "output as the host's — and host paths do not exist. Because `bash` and " +
-      "`container_bash` use that one container, the same command returns " +
-      "identical output by construction, and matching output is never evidence " +
-      "of a host shell. Containers share the host kernel, so `uname -a`, " +
-      "`uname -r`, and `/proc/version` do report the host kernel; the " +
-      "container's own identity shows in `hostname`, `/etc/os-release`, and " +
-      "`/proc/1/cmdline`.",
+    text: ({ scope }: { scope?: unknown } = {}) =>
+      BUILTIN_TOOLS.some((name) => ctx.tools.get(name, scope) !== undefined)
+        ? RUNTIME_WITH_BUILTINS
+        : RUNTIME_CONTAINER_ONLY,
   };
 }
 

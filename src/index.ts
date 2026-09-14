@@ -92,7 +92,7 @@ export function apply(ctx: any, config: PluginConfig = {}): void {
   ctx.effect(() => () => subprocess.dispose(), "podman: subprocess cleanup");
   ctx.provide("fs", createFilesystemProvider(resolver));
   ctx.inject(["systemPrompt"], (promptCtx: any) => {
-    promptCtx.systemPrompt.section(podmanRuntimeSection());
+    promptCtx.systemPrompt.section(podmanRuntimeSection(promptCtx));
     promptCtx.on(
       "system-prompt/assemble",
       async (_assembly: any, _context: any, next: any) =>

@@ -120,7 +120,6 @@ export function MountsEditor(props: {
   const [draft, setDraft] = useState<MountInput>(emptyMount());
   const mountKindId = useId();
   const mountProjectId = useId();
-  const mountPathId = useId();
   const mountDestinationId = useId();
   const mountModeId = useId();
   const mountVolumeId = useId();
@@ -227,28 +226,12 @@ export function MountsEditor(props: {
       </>
     ) : (
       <>
-        <Field label={t("mountProject")} htmlFor={mountProjectId}>
+        <Field label={t("mountProjectPath")} htmlFor={mountProjectId}>
           <Input
             id={mountProjectId}
             value={draft.project}
             disabled={busy}
             onChange={(event) => updateDraft({ project: event.target.value })}
-          />
-        </Field>
-        <Field label={t("mountPath")} htmlFor={mountPathId}>
-          <Input
-            id={mountPathId}
-            value={draft.path}
-            disabled={busy}
-            onChange={(event) => updateDraft({ path: event.target.value })}
-          />
-        </Field>
-        <Field label={t("mountDestination")} htmlFor={mountDestinationId}>
-          <Input
-            id={mountDestinationId}
-            value={draft.destination}
-            disabled={busy}
-            onChange={(event) => updateDraft({ destination: event.target.value })}
           />
         </Field>
         <Field label={t("mountMode")} htmlFor={mountModeId}>
@@ -273,8 +256,7 @@ export function MountsEditor(props: {
         const removable =
           mount.kind !== "project" ||
           primaryProject === "" ||
-          mount.project !== primaryProject ||
-          mount.path !== "";
+          mount.project !== primaryProject;
         return (
           <div
             key={mountLabel(t, mount)}

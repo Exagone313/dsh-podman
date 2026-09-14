@@ -35,7 +35,7 @@ test("create command drives createWorkspace with mounts and image", async () => 
       projectName: "team",
       image: "img1",
       at: 1,
-      mounts: [{ kind: "project", project: "team", mode: "read_write", path: "", destination: "", volume: "", secret: "" }],
+      mounts: [{ kind: "project", project: "team", mode: "read_write", destination: "", volume: "", secret: "" }],
       env: {},
       container: "",
       secretEnvMap: {},
@@ -77,8 +77,7 @@ test("container_mount_add command drives addContainerMount for each kind", async
       at: 1,
       mount: {
         kind: "project",
-        project: "team",
-        path: "src",
+        project: "team/src",
         destination: "/workspace/team",
         mode: "read_only",
         volume: "",
@@ -97,7 +96,6 @@ test("container_mount_add command drives addContainerMount for each kind", async
       mount: {
         kind: "volume",
         project: "",
-        path: "",
         destination: "/data",
         mode: "read_write",
         volume: "valkey-data",
@@ -116,7 +114,6 @@ test("container_mount_add command drives addContainerMount for each kind", async
       mount: {
         kind: "tmpfs",
         project: "",
-        path: "",
         destination: "/dev/shm",
         mode: "read_write",
         volume: "",
@@ -135,7 +132,6 @@ test("container_mount_add command drives addContainerMount for each kind", async
       mount: {
         kind: "secret",
         project: "",
-        path: "",
         destination: "/run/secrets/tls",
         mode: "read_write",
         volume: "",
@@ -150,8 +146,7 @@ test("container_mount_add command drives addContainerMount for each kind", async
       workspaceSlug: "w1",
       container: "web",
       kind: "MOUNT_KIND_PROJECT",
-      project: "team",
-      path: "src",
+      project: "team/src",
       mode: "MOUNT_MODE_READ_ONLY",
     },
     {
@@ -204,8 +199,7 @@ test("container_mount_remove command drives removeContainerMount for each kind",
       at: 1,
       mount: {
         kind: "project",
-        project: "team",
-        path: "src",
+        project: "team/src",
         destination: "/workspace/team",
         mode: "read_write",
         volume: "",
@@ -224,7 +218,6 @@ test("container_mount_remove command drives removeContainerMount for each kind",
       mount: {
         kind: "volume",
         project: "",
-        path: "",
         destination: "",
         mode: "read_write",
         volume: "valkey-data",
@@ -243,7 +236,6 @@ test("container_mount_remove command drives removeContainerMount for each kind",
       mount: {
         kind: "tmpfs",
         project: "",
-        path: "",
         destination: "/dev/shm",
         mode: "read_write",
         volume: "",
@@ -262,7 +254,6 @@ test("container_mount_remove command drives removeContainerMount for each kind",
       mount: {
         kind: "secret",
         project: "",
-        path: "",
         destination: "/run/secrets/tls",
         mode: "read_write",
         volume: "",
@@ -277,8 +268,7 @@ test("container_mount_remove command drives removeContainerMount for each kind",
       workspaceSlug: "w1",
       container: "web",
       kind: "MOUNT_KIND_PROJECT",
-      project: "team",
-      path: "src",
+      project: "team/src",
     },
     {
       workspaceSlug: "w1",
@@ -410,7 +400,6 @@ test("create command reports an unknown mount kind as a notice", async () => {
       mounts: [{
         kind: "bind",
         project: "team",
-        path: "",
         destination: "",
         mode: "read_write",
         volume: "",
@@ -443,7 +432,6 @@ test("create command reports an unknown mount mode as a notice", async () => {
       mounts: [{
         kind: "project",
         project: "team",
-        path: "",
         destination: "",
         mode: "rw",
         volume: "",
@@ -477,8 +465,7 @@ test("listContainers container mounts carry the raw proto fields", async () => {
             containerName: "c1",
             workspaceSlug: "w1",
             mounts: [{
-              projectName: "team",
-              path: "src",
+              projectName: "team/src",
               destination: "/x",
               kind: "MOUNT_KIND_PROJECT",
               mode: "MOUNT_MODE_READ_WRITE",
@@ -496,8 +483,7 @@ test("listContainers container mounts carry the raw proto fields", async () => {
   installContainerSettings(fakeContext(scope), resolver);
   await scope.update({});
   assert.deepEqual((scope.value.containers as any[])[0].mounts[0], {
-    projectName: "team",
-    path: "src",
+    projectName: "team/src",
     destination: "/x",
     kind: "MOUNT_KIND_PROJECT",
     mode: "MOUNT_MODE_READ_WRITE",

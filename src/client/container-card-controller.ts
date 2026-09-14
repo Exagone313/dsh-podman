@@ -12,7 +12,6 @@ export const CONTAINER_NS = "podman";
 
 export interface ProjectMountView {
   projectName: string;
-  path: string;
   destination: string;
   kind: string; // "MOUNT_KIND_PROJECT" | "MOUNT_KIND_TMPFS" | "MOUNT_KIND_VOLUME" | "MOUNT_KIND_SECRET"
   mode: string; // "MOUNT_MODE_READ_ONLY" | "MOUNT_MODE_READ_WRITE"
@@ -21,8 +20,7 @@ export interface ProjectMountView {
 }
 export interface MountInput {
   kind: string;      // "project" | "tmpfs" | "volume" | "secret"
-  project: string;   // project short name (kind=project)
-  path: string;      // path within the project (kind=project)
+  project: string;   // project path under the projects root (kind=project)
   destination: string; // destination path inside the container
   mode: string;      // "read_only" | "read_write"
   volume: string;    // volume short name (kind=volume)

@@ -29,11 +29,10 @@ function cacheCleanModeToProto(mode: string): string {
   return proto;
 }
 
-function mountInputToProto(mount: { kind: string; project: string; path: string; destination: string; mode: string; volume: string; secret: string }): Record<string, unknown> {
+function mountInputToProto(mount: { kind: string; project: string; destination: string; mode: string; volume: string; secret: string }): Record<string, unknown> {
   const kind = mountKindToProto(mount.kind || undefined);
   const mode = mountModeToProto(mount.mode || defaultMountMode(mount.kind || undefined));
   const result: Record<string, unknown> = { projectName: mount.project ?? "", kind, mode };
-  if (mount.path) result.path = mount.path;
   if (kind !== "MOUNT_KIND_PROJECT" && mount.destination) result.destination = mount.destination;
   if (mount.volume) result.volume = mount.volume;
   if (mount.secret) result.secret = mount.secret;
@@ -192,7 +191,7 @@ export function installContainerSettings(
             if (kind === "MOUNT_KIND_VOLUME") { request.volume = m.volume; request.destination = m.destination; request.mode = mode; }
             else if (kind === "MOUNT_KIND_TMPFS") { request.destination = m.destination; request.mode = mode; }
             else if (kind === "MOUNT_KIND_SECRET") { request.secret = m.secret; request.destination = m.destination; }
-            else { request.project = m.project; if (m.path) request.path = m.path; request.mode = mode; }
+            else { request.project = m.project; request.mode = mode; }
             await resolver.control("addContainerMount", request);
             break;
           }
@@ -201,7 +200,7 @@ export function installContainerSettings(
             if (m === null) break;
             const kind = mountKindToProto(m.kind || undefined);
             const request: Record<string, unknown> = { workspaceSlug: command.workspace, container: command.container || "default", kind };
-            if (kind === "MOUNT_KIND_PROJECT") { request.project = m.project; if (m.path) request.path = m.path; }
+            if (kind === "MOUNT_KIND_PROJECT") { request.project = m.project; }
             else if (kind === "MOUNT_KIND_VOLUME") { if (m.volume) request.volume = m.volume; }
             else if (kind === "MOUNT_KIND_SECRET") { if (m.secret) request.secret = m.secret; }
             if (kind !== "MOUNT_KIND_PROJECT" && m.destination) request.destination = m.destination;
@@ -218,7 +217,7 @@ export function installContainerSettings(
               kind,
               mode: mountModeToProto(m.mode),
             };
-            if (kind === "MOUNT_KIND_PROJECT") { request.project = m.project; if (m.path) request.path = m.path; }
+            if (kind === "MOUNT_KIND_PROJECT") { request.project = m.project; }
             else if (kind === "MOUNT_KIND_VOLUME") { if (m.volume) request.volume = m.volume; if (m.destination) request.destination = m.destination; }
             await resolver.control("updateContainerMount", request);
             break;

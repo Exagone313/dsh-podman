@@ -97,7 +97,7 @@ export type ContainerPluginKey =
   | "addMount"
   | "mountKind"
   | "mountProject"
-  | "mountPath"
+  | "mountProjectPath"
   | "mountDestination"
   | "mountVolume"
   | "mountSecret"
@@ -263,7 +263,7 @@ export const en: Record<ContainerPluginKey, string> = {
   addMount: "Add mount",
   mountKind: "Kind",
   mountProject: "Project",
-  mountPath: "Path",
+  mountProjectPath: "Project path",
   mountDestination: "Destination",
   mountVolume: "Volume",
   mountSecret: "Secret",
@@ -430,7 +430,7 @@ export const zh: Record<ContainerPluginKey, string> = {
   addMount: "添加挂载",
   mountKind: "类型",
   mountProject: "项目",
-  mountPath: "路径",
+  mountProjectPath: "项目路径",
   mountDestination: "目标路径",
   mountVolume: "卷",
   mountSecret: "机密",

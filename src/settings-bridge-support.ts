@@ -107,7 +107,6 @@ export function mountCommand(
     mount: {
       kind: "",
       project: "",
-      path: "",
       destination: "",
       mode: "",
       volume: "",

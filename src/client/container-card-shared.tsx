@@ -132,7 +132,6 @@ export const mountModeShort = (mode: string): string =>
 export const mountViewToInput = (mount: ProjectMountView): MountInput => ({
   kind: mountKindShort(mount.kind),
   project: mount.projectName,
-  path: mount.path,
   destination: mount.destination,
   mode: mountModeShort(mount.mode),
   volume: mount.volume,
@@ -152,7 +151,7 @@ export const mountLabel = (
   if (mount.kind === "secret") {
     return `secret ${mount.secret}${mount.destination !== "" ? ` → ${mount.destination}` : ""}`;
   }
-  return `${mount.project}${mount.path !== "" ? `/${mount.path}` : ""}${mount.destination !== "" ? ` → ${mount.destination}` : ""}${mount.mode === "read_only" ? " (ro)" : " (rw)"}`;
+  return `${mount.project}${mount.destination !== "" ? ` → ${mount.destination}` : ""}${mount.mode === "read_only" ? " (ro)" : " (rw)"}`;
 };
 
 // Adding a mount defaults to read-only, so granting write access is always a
@@ -160,7 +159,6 @@ export const mountLabel = (
 export const emptyMount = (kind = "project"): MountInput => ({
   kind,
   project: "",
-  path: "",
   destination: "",
   mode: kind === "tmpfs" ? "read_write" : "read_only",
   volume: "",

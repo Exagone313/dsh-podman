@@ -148,11 +148,12 @@ func TestCreateWorkspaceRejectsInvalidSlug(t *testing.T) {
 	}
 }
 
-func (f *fakePodman) CreateWorkspace(_pod, name, _image, _token string, _mounts []specs.Mount, _secrets []specgen.Secret, _envSecrets, _env map[string]string) error {
+func (f *fakePodman) CreateWorkspace(_pod, name, _image, _token string, _mounts []specs.Mount, _secrets []specgen.Secret, _envSecrets, _env map[string]string, paths []string) error {
 	if f.createErr != nil {
 		return f.createErr
 	}
 	f.created = append(f.created, name)
+	f.createdPaths = append([]string(nil), paths...)
 	f.exists[name] = true
 	f.running[name] = true
 	return nil

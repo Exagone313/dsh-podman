@@ -78,7 +78,7 @@ func (s *Server) recreateContainer(workspace state.Workspace, record *state.Cont
 		return err
 	}
 	envSecrets := s.containerEnvSecrets(record.SecretEnv)
-	return s.Podman.RecreateWorkspace(podNameFor(workspace.WorkspaceSlug), record.PodmanName, imageTag, newToken, podmanMounts, secrets, envSecrets, env)
+	return s.Podman.RecreateWorkspace(podNameFor(workspace.WorkspaceSlug), record.PodmanName, imageTag, newToken, podmanMounts, secrets, envSecrets, env, record.Paths)
 }
 
 // recreateOrRestore recreates a container and, when the recreate fails,
@@ -118,6 +118,7 @@ func (s *Server) restoreSnapshot(workspace state.Workspace, snapshot *state.Cont
 func snapshotContainer(record state.Container) state.Container {
 	snapshot := record
 	snapshot.Mounts = append([]state.Mount(nil), record.Mounts...)
+	snapshot.Paths = append([]string(nil), record.Paths...)
 	snapshot.Env = cloneMap(record.Env)
 	snapshot.SecretEnv = cloneMap(record.SecretEnv)
 	return snapshot
@@ -260,6 +261,10 @@ func (s *Server) StartContainer(ctx context.Context, request *ctl.StartContainer
 		recordMounts = ensureWorkspaceProjectMount(recordMounts, workspace)
 	}
 	record := state.Container{Name: container, PodmanName: podmanContainerName(workspace.WorkspaceSlug, container), ImageID: imageID, Mounts: recordMounts}
+	if existing, ok := containerByLogical(&workspace, container); ok {
+		// Replacing a container keeps its PATH additions.
+		record.Paths = append([]string(nil), existing.Paths...)
+	}
 	podmanMounts, err := s.podmanMounts(containerMounts(workspace, record))
 	if err != nil {
 		s.log().Error("StartContainer project validation failed", "workspace_slug", workspace.WorkspaceSlug, "error", err)
@@ -323,7 +328,7 @@ func (s *Server) StartContainer(ctx context.Context, request *ctl.StartContainer
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	if err := s.Podman.CreateWorkspace(podNameFor(workspace.WorkspaceSlug), record.PodmanName, imageTag, secret, podmanMounts, secrets, envSecrets, record.Env); err != nil {
+	if err := s.Podman.CreateWorkspace(podNameFor(workspace.WorkspaceSlug), record.PodmanName, imageTag, secret, podmanMounts, secrets, envSecrets, record.Env, record.Paths); err != nil {
 		// A failed create may have left a container behind; remove it so a retry
 		// is not blocked by a stale name, then restore the container this call
 		// replaced (when there was one).

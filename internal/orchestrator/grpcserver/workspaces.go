@@ -212,11 +212,15 @@ func (s *Server) CreateWorkspace(ctx context.Context, request *ctl.CreateWorkspa
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 	defaultMounts := mounts
+	var defaultPaths []string
 	if existing, storeErr := s.Store.Workspaces(); storeErr == nil {
 		for _, workspace := range existing {
 			if workspace.WorkspaceSlug == request.GetWorkspaceSlug() {
-				if record, ok := containerByLogical(&workspace, "default"); ok && len(record.Mounts) > 0 {
-					defaultMounts = record.Mounts
+				if record, ok := containerByLogical(&workspace, "default"); ok {
+					if len(record.Mounts) > 0 {
+						defaultMounts = record.Mounts
+					}
+					defaultPaths = append([]string(nil), record.Paths...)
 				}
 				break
 			}
@@ -257,13 +261,13 @@ func (s *Server) CreateWorkspace(ctx context.Context, request *ctl.CreateWorkspa
 		return nil, status.Error(codes.NotFound, fmt.Sprintf("image %q not found", imageID))
 	}
 	name := podmanContainerName(request.GetWorkspaceSlug(), "default")
-	if err := s.Podman.CreateWorkspace(podNameFor(request.GetWorkspaceSlug()), name, imageTag, secret, podmanMounts, secrets, envSecrets, userEnv); err != nil {
+	if err := s.Podman.CreateWorkspace(podNameFor(request.GetWorkspaceSlug()), name, imageTag, secret, podmanMounts, secrets, envSecrets, userEnv, defaultPaths); err != nil {
 		s.log().Error("control request failed", "method", "CreateWorkspace", "workspace_slug", request.GetWorkspaceSlug(), "error", err)
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 	agentSocket := filepath.Join(s.SocketsRoot, name, "guest.sock")
 	createdAt := time.Now().UTC().Format(time.RFC3339)
-	workspace := state.Workspace{WorkspaceSlug: request.GetWorkspaceSlug(), ProjectName: projectName, ContainerName: name, ImageID: imageID, Mounts: defaultMounts, Status: "running", AgentSocketPath: agentSocket, AgentToken: secret, CreatedAt: createdAt, Containers: []state.Container{{Name: "default", PodmanName: name, ImageID: imageID, Mounts: defaultMounts, Status: "running", CreatedAt: createdAt, AgentSocketPath: agentSocket, AgentToken: secret, Env: userEnv, SecretEnv: userSecretEnv}}}
+	workspace := state.Workspace{WorkspaceSlug: request.GetWorkspaceSlug(), ProjectName: projectName, ContainerName: name, ImageID: imageID, Mounts: defaultMounts, Status: "running", AgentSocketPath: agentSocket, AgentToken: secret, CreatedAt: createdAt, Containers: []state.Container{{Name: "default", PodmanName: name, ImageID: imageID, Mounts: defaultMounts, Paths: defaultPaths, Status: "running", CreatedAt: createdAt, AgentSocketPath: agentSocket, AgentToken: secret, Env: userEnv, SecretEnv: userSecretEnv}}}
 	if err := s.Store.UpdateWorkspaces(func(all []state.Workspace) ([]state.Workspace, error) {
 		replaced := false
 		for i := range all {

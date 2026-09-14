@@ -373,13 +373,13 @@ func (f *fakePodman) ContainerExists(name string) (bool, error) { return f.exist
 
 func (f *fakePodman) ContainerRunning(name string) (bool, error) { return f.running[name], nil }
 
-func (f *fakePodman) RecreateWorkspace(pod, name, image, token string, mounts []specs.Mount, secrets []specgen.Secret, envSecrets map[string]string, env map[string]string) error {
+func (f *fakePodman) RecreateWorkspace(pod, name, image, token string, mounts []specs.Mount, secrets []specgen.Secret, envSecrets map[string]string, env map[string]string, paths []string) error {
 	f.recreated = append(f.recreated, name)
 	if f.recreateFails > 0 {
 		f.recreateFails--
 		return errors.New("recreate failed")
 	}
-	return f.CreateWorkspace(pod, name, image, token, mounts, secrets, envSecrets, env)
+	return f.CreateWorkspace(pod, name, image, token, mounts, secrets, envSecrets, env, paths)
 }
 
 func (f *fakePodman) Stop(name string) error { f.running[name] = false; return nil }

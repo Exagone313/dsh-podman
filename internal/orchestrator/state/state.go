@@ -39,6 +39,7 @@ type Container struct {
 	AgentSocketPath string            `toml:"agent_socket_path"`
 	AgentToken      string            `toml:"agent_token"`
 	Mounts          []Mount           `toml:"mounts"`
+	Paths           []string          `toml:"paths,omitempty"`
 	Env             map[string]string `toml:"env,omitempty"`
 	SecretEnv       map[string]string `toml:"secret_env,omitempty"`
 }

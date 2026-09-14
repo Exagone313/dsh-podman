@@ -111,7 +111,7 @@ func (c *Client) RemovePod(name string) error {
 	return nil
 }
 
-func (c *Client) CreateWorkspace(pod, name, image, token string, mounts []specs.Mount, secrets []specgen.Secret, envSecrets map[string]string, env map[string]string) error {
+func (c *Client) CreateWorkspace(pod, name, image, token string, mounts []specs.Mount, secrets []specgen.Secret, envSecrets map[string]string, env map[string]string, paths []string) error {
 	c.log().Info("creating guest container", "pod_name", pod, "container_name", name, "image", image, "mount_count", len(mounts))
 	socketDir := filepath.Join(c.socketRoot, name)
 	hostSocketDir := filepath.Join(c.hostSocketRoot, name)
@@ -131,7 +131,7 @@ func (c *Client) CreateWorkspace(pod, name, image, token string, mounts []specs.
 	generator.Pod = pod
 	generator.Command = []string{binaryDest}
 	containerMounts := append(append([]specs.Mount(nil), mounts...), spillMount())
-	generator.Env = containerEnv(c.socketRoot, name, c.projectRoot, token, env, containerMounts)
+	generator.Env = containerEnv(c.socketRoot, name, c.projectRoot, token, env, containerMounts, paths)
 	generator.EnvSecrets = envSecrets
 	generator.Secrets = append(generator.Secrets, secrets...)
 	generator.Init = &init
@@ -299,7 +299,7 @@ func (c *Client) RemoveSocketDir(name string) error {
 	return nil
 }
 
-func (c *Client) RecreateWorkspace(pod, name, image, token string, mounts []specs.Mount, secrets []specgen.Secret, envSecrets map[string]string, env map[string]string) error {
+func (c *Client) RecreateWorkspace(pod, name, image, token string, mounts []specs.Mount, secrets []specgen.Secret, envSecrets map[string]string, env map[string]string, paths []string) error {
 	c.log().Info("recreating guest container", "pod_name", pod, "container_name", name, "image", image, "mount_count", len(mounts))
 	exists, err := c.ContainerExists(name)
 	if err != nil {
@@ -313,14 +313,14 @@ func (c *Client) RecreateWorkspace(pod, name, image, token string, mounts []spec
 			return err
 		}
 	}
-	return c.CreateWorkspace(pod, name, image, token, mounts, secrets, envSecrets, env)
+	return c.CreateWorkspace(pod, name, image, token, mounts, secrets, envSecrets, env, paths)
 }
 
 // containerEnv builds the guest container environment: the reserved
 // orchestrator agent variables, then every user variable. User keys that
 // collide with the reserved DSH_PODMAN namespace are skipped defensively (the
 // caller has already validated them).
-func containerEnv(socketRoot, name, projectRoot, token string, user map[string]string, mounts []specs.Mount) map[string]string {
+func containerEnv(socketRoot, name, projectRoot, token string, user map[string]string, mounts []specs.Mount, paths []string) map[string]string {
 	env := map[string]string{
 		"DSH_PODMAN_GUEST_TOKEN":   token,
 		"DSH_PODMAN_GUEST_SOCKET":  filepath.Join(socketRoot, name, "guest.sock"),
@@ -329,6 +329,9 @@ func containerEnv(socketRoot, name, projectRoot, token string, user map[string]s
 	if encoded := guestMountsEnv(mounts); encoded != "" {
 		env["DSH_PODMAN_GUEST_MOUNTS"] = encoded
 	}
+	if encoded := guestPathsEnv(paths); encoded != "" {
+		env["DSH_PODMAN_GUEST_PATHS"] = encoded
+	}
 	for key, value := range user {
 		if strings.HasPrefix(key, "DSH_PODMAN") {
 			continue
@@ -336,6 +339,19 @@ func containerEnv(socketRoot, name, projectRoot, token string, user map[string]s
 		env[key] = value
 	}
 	return env
+}
+
+// guestPathsEnv serializes the container's PATH additions for the guest agent,
+// which prepends them to every process it starts. Empty means no additions.
+func guestPathsEnv(paths []string) string {
+	if len(paths) == 0 {
+		return ""
+	}
+	encoded, err := json.Marshal(paths)
+	if err != nil {
+		return ""
+	}
+	return string(encoded)
 }
 
 // guestMountsEnv serializes the container's user mounts for the guest agent.

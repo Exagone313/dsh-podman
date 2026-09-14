@@ -46,7 +46,7 @@ func (s *Server) ListContainers(context.Context, *ctl.ListContainersRequest) (*c
 // Container message, including the container's effective project mounts
 // (its own list when present, else the workspace's default mounts).
 func containerProto(ws state.Workspace, c state.Container) *ctl.Container {
-	row := &ctl.Container{ContainerName: c.Name, PodmanName: c.PodmanName, WorkspaceSlug: ws.WorkspaceSlug, ImageId: c.ImageID, Status: c.Status, CreatedAt: c.CreatedAt, AgentSocketPath: c.AgentSocketPath, AgentToken: c.AgentToken, Env: cloneMap(c.Env), SecretEnv: cloneMap(c.SecretEnv)}
+	row := &ctl.Container{ContainerName: c.Name, PodmanName: c.PodmanName, WorkspaceSlug: ws.WorkspaceSlug, ImageId: c.ImageID, Status: c.Status, CreatedAt: c.CreatedAt, AgentSocketPath: c.AgentSocketPath, AgentToken: c.AgentToken, Env: cloneMap(c.Env), SecretEnv: cloneMap(c.SecretEnv), Paths: append([]string(nil), c.Paths...)}
 	for _, mount := range containerMounts(ws, c) {
 		mode := ctl.MountMode_MOUNT_MODE_READ_ONLY
 		if mount.Mode == "read_write" {

@@ -45,6 +45,7 @@ const (
 	OrchestratorControl_AddContainerMount_FullMethodName     = "/dshctl.v1.OrchestratorControl/AddContainerMount"
 	OrchestratorControl_RemoveContainerMount_FullMethodName  = "/dshctl.v1.OrchestratorControl/RemoveContainerMount"
 	OrchestratorControl_UpdateContainerMount_FullMethodName  = "/dshctl.v1.OrchestratorControl/UpdateContainerMount"
+	OrchestratorControl_SetContainerPaths_FullMethodName     = "/dshctl.v1.OrchestratorControl/SetContainerPaths"
 	OrchestratorControl_ListVolumes_FullMethodName           = "/dshctl.v1.OrchestratorControl/ListVolumes"
 	OrchestratorControl_CreateVolume_FullMethodName          = "/dshctl.v1.OrchestratorControl/CreateVolume"
 	OrchestratorControl_RemoveVolume_FullMethodName          = "/dshctl.v1.OrchestratorControl/RemoveVolume"
@@ -82,6 +83,7 @@ type OrchestratorControlClient interface {
 	AddContainerMount(ctx context.Context, in *AddContainerMountRequest, opts ...grpc.CallOption) (*Container, error)
 	RemoveContainerMount(ctx context.Context, in *RemoveContainerMountRequest, opts ...grpc.CallOption) (*Container, error)
 	UpdateContainerMount(ctx context.Context, in *UpdateContainerMountRequest, opts ...grpc.CallOption) (*Container, error)
+	SetContainerPaths(ctx context.Context, in *SetContainerPathsRequest, opts ...grpc.CallOption) (*Container, error)
 	ListVolumes(ctx context.Context, in *ListVolumesRequest, opts ...grpc.CallOption) (*ListVolumesResponse, error)
 	CreateVolume(ctx context.Context, in *CreateVolumeRequest, opts ...grpc.CallOption) (*Volume, error)
 	RemoveVolume(ctx context.Context, in *RemoveVolumeRequest, opts ...grpc.CallOption) (*RemoveVolumeResponse, error)
@@ -321,6 +323,16 @@ func (c *orchestratorControlClient) UpdateContainerMount(ctx context.Context, in
 	return out, nil
 }
 
+func (c *orchestratorControlClient) SetContainerPaths(ctx context.Context, in *SetContainerPathsRequest, opts ...grpc.CallOption) (*Container, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(Container)
+	err := c.cc.Invoke(ctx, OrchestratorControl_SetContainerPaths_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *orchestratorControlClient) ListVolumes(ctx context.Context, in *ListVolumesRequest, opts ...grpc.CallOption) (*ListVolumesResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(ListVolumesResponse)
@@ -437,6 +449,7 @@ type OrchestratorControlServer interface {
 	AddContainerMount(context.Context, *AddContainerMountRequest) (*Container, error)
 	RemoveContainerMount(context.Context, *RemoveContainerMountRequest) (*Container, error)
 	UpdateContainerMount(context.Context, *UpdateContainerMountRequest) (*Container, error)
+	SetContainerPaths(context.Context, *SetContainerPathsRequest) (*Container, error)
 	ListVolumes(context.Context, *ListVolumesRequest) (*ListVolumesResponse, error)
 	CreateVolume(context.Context, *CreateVolumeRequest) (*Volume, error)
 	RemoveVolume(context.Context, *RemoveVolumeRequest) (*RemoveVolumeResponse, error)
@@ -521,6 +534,9 @@ func (UnimplementedOrchestratorControlServer) RemoveContainerMount(context.Conte
 }
 func (UnimplementedOrchestratorControlServer) UpdateContainerMount(context.Context, *UpdateContainerMountRequest) (*Container, error) {
 	return nil, status.Error(codes.Unimplemented, "method UpdateContainerMount not implemented")
+}
+func (UnimplementedOrchestratorControlServer) SetContainerPaths(context.Context, *SetContainerPathsRequest) (*Container, error) {
+	return nil, status.Error(codes.Unimplemented, "method SetContainerPaths not implemented")
 }
 func (UnimplementedOrchestratorControlServer) ListVolumes(context.Context, *ListVolumesRequest) (*ListVolumesResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListVolumes not implemented")
@@ -966,6 +982,24 @@ func _OrchestratorControl_UpdateContainerMount_Handler(srv interface{}, ctx cont
 	return interceptor(ctx, in, info, handler)
 }
 
+func _OrchestratorControl_SetContainerPaths_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SetContainerPathsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(OrchestratorControlServer).SetContainerPaths(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: OrchestratorControl_SetContainerPaths_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(OrchestratorControlServer).SetContainerPaths(ctx, req.(*SetContainerPathsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _OrchestratorControl_ListVolumes_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(ListVolumesRequest)
 	if err := dec(in); err != nil {
@@ -1222,6 +1256,10 @@ var OrchestratorControl_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "UpdateContainerMount",
 			Handler:    _OrchestratorControl_UpdateContainerMount_Handler,
+		},
+		{
+			MethodName: "SetContainerPaths",
+			Handler:    _OrchestratorControl_SetContainerPaths_Handler,
 		},
 		{
 			MethodName: "ListVolumes",

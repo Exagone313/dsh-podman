@@ -20,6 +20,8 @@ service OrchestratorControl {
   rpc RemoveImage(RemoveImageRequest) returns (RemoveImageResponse);
   rpc RebuildBaseImage(RebuildBaseImageRequest) returns (Image);
   rpc PullBaseImage(PullBaseImageRequest) returns (Image);
+  rpc ListCaches(ListCachesRequest) returns (ListCachesResponse);
+  rpc CleanCaches(CleanCachesRequest) returns (CleanCachesResponse);
   rpc ListContainers(ListContainersRequest) returns (ListContainersResponse);
   rpc StartContainer(StartContainerRequest) returns (Container);
   rpc RecreateContainer(RecreateContainerRequest) returns (Workspace);
@@ -82,6 +84,12 @@ message RebuildBaseImageRequest { string name = 1; }
 message PullBaseImageRequest { string name = 1; }
 message GetImageRequest { string image_id = 1; }
 message BuildImageRequest { string image_id = 1; string parent = 2; repeated string packages = 3; }
+message ListCachesRequest {}
+message ListCachesResponse { repeated Cache caches = 1; }
+message Cache { string manager = 1; string path = 2; int32 files = 3; int64 bytes = 4; }
+enum CacheCleanMode { CACHE_CLEAN_MODE_UNSPECIFIED = 0; CACHE_CLEAN_MODE_KEEP_LATEST = 1; CACHE_CLEAN_MODE_ALL = 2; }
+message CleanCachesRequest { CacheCleanMode mode = 1; }
+message CleanCachesResponse { CacheCleanMode mode = 1; int32 removed_files = 2; int64 removed_bytes = 3; repeated Cache caches = 4; }
 message ListContainersRequest {}
 message ListContainersResponse { repeated Container containers = 1; }
 message Container {

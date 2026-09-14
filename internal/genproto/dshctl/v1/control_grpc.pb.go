@@ -36,6 +36,8 @@ const (
 	OrchestratorControl_RemoveImage_FullMethodName           = "/dshctl.v1.OrchestratorControl/RemoveImage"
 	OrchestratorControl_RebuildBaseImage_FullMethodName      = "/dshctl.v1.OrchestratorControl/RebuildBaseImage"
 	OrchestratorControl_PullBaseImage_FullMethodName         = "/dshctl.v1.OrchestratorControl/PullBaseImage"
+	OrchestratorControl_ListCaches_FullMethodName            = "/dshctl.v1.OrchestratorControl/ListCaches"
+	OrchestratorControl_CleanCaches_FullMethodName           = "/dshctl.v1.OrchestratorControl/CleanCaches"
 	OrchestratorControl_ListContainers_FullMethodName        = "/dshctl.v1.OrchestratorControl/ListContainers"
 	OrchestratorControl_StartContainer_FullMethodName        = "/dshctl.v1.OrchestratorControl/StartContainer"
 	OrchestratorControl_RecreateContainer_FullMethodName     = "/dshctl.v1.OrchestratorControl/RecreateContainer"
@@ -70,6 +72,8 @@ type OrchestratorControlClient interface {
 	RemoveImage(ctx context.Context, in *RemoveImageRequest, opts ...grpc.CallOption) (*RemoveImageResponse, error)
 	RebuildBaseImage(ctx context.Context, in *RebuildBaseImageRequest, opts ...grpc.CallOption) (*Image, error)
 	PullBaseImage(ctx context.Context, in *PullBaseImageRequest, opts ...grpc.CallOption) (*Image, error)
+	ListCaches(ctx context.Context, in *ListCachesRequest, opts ...grpc.CallOption) (*ListCachesResponse, error)
+	CleanCaches(ctx context.Context, in *CleanCachesRequest, opts ...grpc.CallOption) (*CleanCachesResponse, error)
 	ListContainers(ctx context.Context, in *ListContainersRequest, opts ...grpc.CallOption) (*ListContainersResponse, error)
 	StartContainer(ctx context.Context, in *StartContainerRequest, opts ...grpc.CallOption) (*Container, error)
 	RecreateContainer(ctx context.Context, in *RecreateContainerRequest, opts ...grpc.CallOption) (*Workspace, error)
@@ -219,6 +223,26 @@ func (c *orchestratorControlClient) PullBaseImage(ctx context.Context, in *PullB
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(Image)
 	err := c.cc.Invoke(ctx, OrchestratorControl_PullBaseImage_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *orchestratorControlClient) ListCaches(ctx context.Context, in *ListCachesRequest, opts ...grpc.CallOption) (*ListCachesResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListCachesResponse)
+	err := c.cc.Invoke(ctx, OrchestratorControl_ListCaches_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *orchestratorControlClient) CleanCaches(ctx context.Context, in *CleanCachesRequest, opts ...grpc.CallOption) (*CleanCachesResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CleanCachesResponse)
+	err := c.cc.Invoke(ctx, OrchestratorControl_CleanCaches_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -392,6 +416,8 @@ type OrchestratorControlServer interface {
 	RemoveImage(context.Context, *RemoveImageRequest) (*RemoveImageResponse, error)
 	RebuildBaseImage(context.Context, *RebuildBaseImageRequest) (*Image, error)
 	PullBaseImage(context.Context, *PullBaseImageRequest) (*Image, error)
+	ListCaches(context.Context, *ListCachesRequest) (*ListCachesResponse, error)
+	CleanCaches(context.Context, *CleanCachesRequest) (*CleanCachesResponse, error)
 	ListContainers(context.Context, *ListContainersRequest) (*ListContainersResponse, error)
 	StartContainer(context.Context, *StartContainerRequest) (*Container, error)
 	RecreateContainer(context.Context, *RecreateContainerRequest) (*Workspace, error)
@@ -455,6 +481,12 @@ func (UnimplementedOrchestratorControlServer) RebuildBaseImage(context.Context, 
 }
 func (UnimplementedOrchestratorControlServer) PullBaseImage(context.Context, *PullBaseImageRequest) (*Image, error) {
 	return nil, status.Error(codes.Unimplemented, "method PullBaseImage not implemented")
+}
+func (UnimplementedOrchestratorControlServer) ListCaches(context.Context, *ListCachesRequest) (*ListCachesResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListCaches not implemented")
+}
+func (UnimplementedOrchestratorControlServer) CleanCaches(context.Context, *CleanCachesRequest) (*CleanCachesResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method CleanCaches not implemented")
 }
 func (UnimplementedOrchestratorControlServer) ListContainers(context.Context, *ListContainersRequest) (*ListContainersResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListContainers not implemented")
@@ -752,6 +784,42 @@ func _OrchestratorControl_PullBaseImage_Handler(srv interface{}, ctx context.Con
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(OrchestratorControlServer).PullBaseImage(ctx, req.(*PullBaseImageRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _OrchestratorControl_ListCaches_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListCachesRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(OrchestratorControlServer).ListCaches(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: OrchestratorControl_ListCaches_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(OrchestratorControlServer).ListCaches(ctx, req.(*ListCachesRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _OrchestratorControl_CleanCaches_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CleanCachesRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(OrchestratorControlServer).CleanCaches(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: OrchestratorControl_CleanCaches_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(OrchestratorControlServer).CleanCaches(ctx, req.(*CleanCachesRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -1084,6 +1152,14 @@ var OrchestratorControl_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "PullBaseImage",
 			Handler:    _OrchestratorControl_PullBaseImage_Handler,
+		},
+		{
+			MethodName: "ListCaches",
+			Handler:    _OrchestratorControl_ListCaches_Handler,
+		},
+		{
+			MethodName: "CleanCaches",
+			Handler:    _OrchestratorControl_CleanCaches_Handler,
 		},
 		{
 			MethodName: "ListContainers",

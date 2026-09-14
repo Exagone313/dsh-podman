@@ -1,0 +1,12 @@
+# SPDX-FileCopyrightText: 2026 Elouan Martinet <exa@elou.world>
+#
+# SPDX-License-Identifier: MIT
+
+# Global pnpm config for the dsh image. pnpm >= 11 gates every dependency
+# behind a 1-day minimumReleaseAge, including the profile installs `dsh plugin`
+# performs. Both scopes below ship as a set (a dsh bump moves ~80
+# @deepseek-ai packages at once), so exempt them; every other package keeps the
+# gate.
+minimumReleaseAgeExclude:
+  - "@exagone313/*"
+  - "@deepseek-ai/*"

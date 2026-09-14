@@ -9,3 +9,10 @@
 allowBuilds:
   esbuild: true
   protobufjs: true
+
+# pnpm >= 11 also gates every dependency behind a 1-day minimumReleaseAge.
+# Both scopes below ship as a set (a dsh bump moves ~80 @deepseek-ai packages
+# at once), so exempt them; every other package keeps the gate.
+minimumReleaseAgeExclude:
+  - "@exagone313/*"
+  - "@deepseek-ai/*"

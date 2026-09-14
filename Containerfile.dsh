@@ -22,5 +22,6 @@ RUN npm install -g pnpm@${PNPM_VERSION} @deepseek-ai/dsh@${DSH_VERSION} \
 
 RUN mkdir -p /opt/dsh
 COPY ./dsh/defaults.cordis.patch.yml /opt/dsh/
+COPY ./dsh/pnpm-config.yaml /root/.config/pnpm/config.yaml
 
 CMD ["dsh", "--profile", "web", "--patch", "/opt/dsh/defaults.cordis.patch.yml", "--no-open"]

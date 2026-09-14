@@ -39,11 +39,11 @@ func TestWorkspacesRoundTrip(t *testing.T) {
 	}
 	workspaces := []Workspace{{
 		WorkspaceSlug:   "proj",
-		ContainerName:   "dsh-workspace-proj",
+		ContainerName:   "dsh-podman-proj-default",
 		ImageID:         "arch",
 		Mounts:          []Mount{{ProjectName: "proj", Mode: "read_write"}},
 		Status:          "running",
-		AgentSocketPath: "/run/dsh-podman/dsh-workspace-proj/guest.sock",
+		AgentSocketPath: "/run/dsh-podman/dsh-podman-proj-default/guest.sock",
 		AgentToken:      "secret",
 		CreatedAt:       "now",
 	}}
@@ -54,7 +54,7 @@ func TestWorkspacesRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(got) != 1 || got[0].ContainerName != "dsh-workspace-proj" || got[0].Mounts[0].Mode != "read_write" || got[0].AgentToken != "secret" {
+	if len(got) != 1 || got[0].ContainerName != "dsh-podman-proj-default" || got[0].Mounts[0].Mode != "read_write" || got[0].AgentToken != "secret" {
 		t.Fatalf("round trip mismatch: %#v", got)
 	}
 }
@@ -64,7 +64,7 @@ func TestLegacyWorkspaceMigratesDefaultContainer(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	legacy := Workspace{WorkspaceSlug: "proj", ContainerName: "dsh-workspace-proj", ImageID: "arch", Status: "running", AgentSocketPath: "/run/dsh-podman/dsh-workspace-proj/guest.sock", AgentToken: "secret", CreatedAt: "now"}
+	legacy := Workspace{WorkspaceSlug: "proj", ContainerName: "dsh-podman-proj-default", ImageID: "arch", Status: "running", AgentSocketPath: "/run/dsh-podman/dsh-podman-proj-default/guest.sock", AgentToken: "secret", CreatedAt: "now"}
 	if err := store.SaveWorkspaces([]Workspace{legacy}); err != nil {
 		t.Fatal(err)
 	}
@@ -76,7 +76,7 @@ func TestLegacyWorkspaceMigratesDefaultContainer(t *testing.T) {
 		t.Fatalf("legacy workspace did not migrate a default container: %#v", got)
 	}
 	container := got[0].Containers[0]
-	if container.PodmanName != "dsh-workspace-proj" || container.ImageID != "arch" || container.Status != "running" || container.AgentSocketPath != legacy.AgentSocketPath || container.AgentToken != "secret" || container.CreatedAt != "now" {
+	if container.PodmanName != "dsh-podman-proj-default" || container.ImageID != "arch" || container.Status != "running" || container.AgentSocketPath != legacy.AgentSocketPath || container.AgentToken != "secret" || container.CreatedAt != "now" {
 		t.Fatalf("migrated default container projection mismatch: %#v", container)
 	}
 }
@@ -90,8 +90,8 @@ func TestWorkspacesWithNamedContainersRoundTrip(t *testing.T) {
 		WorkspaceSlug: "proj",
 		Mounts:        []Mount{{ProjectName: "team", Mode: "read_write"}},
 		Containers: []Container{
-			{Name: "default", PodmanName: "dsh-workspace-proj", ImageID: "arch", Status: "running", CreatedAt: "now", AgentSocketPath: "/run/dsh-podman/dsh-workspace-proj/guest.sock", AgentToken: "secret"},
-			{Name: "dev", PodmanName: "dsh-workspace-proj-dev", ImageID: "devimg", Status: "running", CreatedAt: "later", AgentSocketPath: "/run/dsh-podman/dsh-workspace-proj-dev/guest.sock", AgentToken: "devtok", Env: map[string]string{"FOO": "bar", "BAZ": "qux"}},
+			{Name: "default", PodmanName: "dsh-podman-proj-default", ImageID: "arch", Status: "running", CreatedAt: "now", AgentSocketPath: "/run/dsh-podman/dsh-podman-proj-default/guest.sock", AgentToken: "secret"},
+			{Name: "dev", PodmanName: "dsh-podman-proj-dev", ImageID: "devimg", Status: "running", CreatedAt: "later", AgentSocketPath: "/run/dsh-podman/dsh-podman-proj-dev/guest.sock", AgentToken: "devtok", Env: map[string]string{"FOO": "bar", "BAZ": "qux"}},
 		},
 	}}
 	if err := store.SaveWorkspaces(workspaces); err != nil {
@@ -104,10 +104,10 @@ func TestWorkspacesWithNamedContainersRoundTrip(t *testing.T) {
 	if len(got) != 1 || len(got[0].Containers) != 2 {
 		t.Fatalf("named containers did not survive round trip: %#v", got)
 	}
-	if got[0].Containers[0].Name != "default" || got[0].Containers[0].PodmanName != "dsh-workspace-proj" {
+	if got[0].Containers[0].Name != "default" || got[0].Containers[0].PodmanName != "dsh-podman-proj-default" {
 		t.Fatalf("default container mismatch: %#v", got[0].Containers[0])
 	}
-	if got[0].Containers[1].Name != "dev" || got[0].Containers[1].PodmanName != "dsh-workspace-proj-dev" || got[0].Containers[1].ImageID != "devimg" || got[0].Containers[1].AgentToken != "devtok" {
+	if got[0].Containers[1].Name != "dev" || got[0].Containers[1].PodmanName != "dsh-podman-proj-dev" || got[0].Containers[1].ImageID != "devimg" || got[0].Containers[1].AgentToken != "devtok" {
 		t.Fatalf("named container mismatch: %#v", got[0].Containers[1])
 	}
 	if len(got[0].Containers[1].Env) != 2 || got[0].Containers[1].Env["FOO"] != "bar" || got[0].Containers[1].Env["BAZ"] != "qux" {
@@ -124,7 +124,7 @@ func TestSecretEnvAndSecretMountRoundTrip(t *testing.T) {
 		WorkspaceSlug: "proj",
 		Containers: []Container{{
 			Name:       "dev",
-			PodmanName: "dsh-workspace-proj-dev",
+			PodmanName: "dsh-podman-proj-dev",
 			ImageID:    "arch",
 			Status:     "running",
 			Mounts: []Mount{
@@ -258,7 +258,7 @@ func TestContainerMountsRoundTrip(t *testing.T) {
 		Mounts:        []Mount{{ProjectName: "team", Mode: "read_write"}},
 		Containers: []Container{{
 			Name:       "default",
-			PodmanName: "dsh-workspace-proj",
+			PodmanName: "dsh-podman-proj-default",
 			ImageID:    "arch",
 			Status:     "running",
 			Mounts:     []Mount{{ProjectName: "team", Mode: "read_only", Path: "src/lib", Destination: "/workspaces/team/src/lib"}},
@@ -289,7 +289,7 @@ func TestTmpfsAndVolumeMountsRoundTrip(t *testing.T) {
 		WorkspaceSlug: "proj",
 		Containers: []Container{{
 			Name:       "dev",
-			PodmanName: "dsh-workspace-proj-dev",
+			PodmanName: "dsh-podman-proj-dev",
 			ImageID:    "arch",
 			Status:     "running",
 			Mounts: []Mount{

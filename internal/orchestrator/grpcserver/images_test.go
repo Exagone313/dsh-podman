@@ -376,7 +376,7 @@ func TestImageRefsMatch(t *testing.T) {
 
 func TestCreateWorkspaceRejectsUnknownImage(t *testing.T) {
 	server := &Server{Store: newTestStore(t), Logger: silentLogger()}
-	_, err := server.CreateWorkspace(context.Background(), &ctl.CreateWorkspaceRequest{WorkspaceSlug: "proj", ProjectName: "proj", ImageId: "missing"})
+	_, err := server.CreateWorkspace(context.Background(), &ctl.CreateWorkspaceRequest{WorkspaceSlug: testWorkspaceSlug, ProjectName: "proj", ImageId: "missing"})
 	if status.Code(err) != codes.NotFound {
 		t.Fatalf("expected NotFound, got %v", err)
 	}
@@ -384,7 +384,7 @@ func TestCreateWorkspaceRejectsUnknownImage(t *testing.T) {
 
 func TestCreateWorkspaceDefaultBase(t *testing.T) {
 	server := &Server{Store: newTestStore(t), Logger: silentLogger()}
-	_, err := server.CreateWorkspace(context.Background(), &ctl.CreateWorkspaceRequest{WorkspaceSlug: "proj", ProjectName: "proj"})
+	_, err := server.CreateWorkspace(context.Background(), &ctl.CreateWorkspaceRequest{WorkspaceSlug: testWorkspaceSlug, ProjectName: "proj"})
 	if status.Code(err) != codes.FailedPrecondition {
 		t.Fatalf("empty image id must resolve the default base (archlinux) and require podman, expected FailedPrecondition, got %v", err)
 	}

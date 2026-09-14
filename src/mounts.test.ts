@@ -9,6 +9,7 @@ import {
   MOUNT_TOOLS,
   guestExecRecorder,
   mountRequestRecorder,
+  WORKSPACE_ID,
 } from "./test-support.js";
 import { TOOLS, approvalDecision, preExecutePolicy, summarizeArgs, toolHandlers } from "./index.js";
 
@@ -190,7 +191,7 @@ test("an omitted mount kind is inferred from the source field", async () => {
   assert.deepEqual(requests[0], [
     "removeContainerMount",
     {
-      workspaceSlug: "team",
+      workspaceSlug: WORKSPACE_ID,
       container: "valkey-ctr",
       kind: "MOUNT_KIND_SECRET",
       secret: "valkey-tls",
@@ -199,7 +200,7 @@ test("an omitted mount kind is inferred from the source field", async () => {
   assert.deepEqual(requests[1], [
     "addContainerMount",
     {
-      workspaceSlug: "team",
+      workspaceSlug: WORKSPACE_ID,
       container: "valkey-ctr",
       kind: "MOUNT_KIND_VOLUME",
       volume: "valkey-data",
@@ -305,7 +306,7 @@ test("adding a tmpfs mount without a mode stays read_write", async () => {
   );
   assert.deepEqual(requests, [
     ["addContainerMount", {
-      workspaceSlug: "team",
+      workspaceSlug: WORKSPACE_ID,
       container: "web",
       kind: "MOUNT_KIND_TMPFS",
       destination: "/scratch",
@@ -339,14 +340,14 @@ test("mount tools default a missing kind to project and a missing mode to read_o
   );
   assert.deepEqual(requests, [
     ["addContainerMount", {
-      workspaceSlug: "team",
+      workspaceSlug: WORKSPACE_ID,
       container: "web",
       kind: "MOUNT_KIND_PROJECT",
       project: "team",
       mode: "MOUNT_MODE_READ_ONLY",
     }],
     ["addContainerMount", {
-      workspaceSlug: "team",
+      workspaceSlug: WORKSPACE_ID,
       container: "web",
       kind: "MOUNT_KIND_VOLUME",
       volume: "valkey-data",
@@ -354,7 +355,7 @@ test("mount tools default a missing kind to project and a missing mode to read_o
       mode: "MOUNT_MODE_READ_ONLY",
     }],
     ["removeContainerMount", {
-      workspaceSlug: "team",
+      workspaceSlug: WORKSPACE_ID,
       container: "web",
       kind: "MOUNT_KIND_PROJECT",
       project: "team",
@@ -404,7 +405,7 @@ test("container start maps valid mounts and defaults the mode to read_only", asy
   );
   assert.deepEqual(requests, [
     ["startContainer", {
-      workspaceSlug: "team",
+      workspaceSlug: WORKSPACE_ID,
       container: "web",
       imageId: "img1",
       mounts: [
@@ -480,12 +481,12 @@ test("mount schemas are object-rooted without per-property required", () => {
 test("container_mount_list returns mount objects", async () => {
   const resolver = {
     registry: {
-      resolveByPath: async () => ({ id: "team" }),
+      resolveByPath: async () => ({ id: WORKSPACE_ID }),
     },
     control: async () => ({
       containers: [
         {
-          workspaceSlug: "team",
+          workspaceSlug: WORKSPACE_ID,
           containerName: "default",
           mounts: [
             { projectName: "team", mode: "MOUNT_MODE_READ_WRITE", kind: "MOUNT_KIND_PROJECT" },

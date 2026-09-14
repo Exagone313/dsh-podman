@@ -16,12 +16,12 @@ import (
 
 func TestToProto(t *testing.T) {
 	workspace := state.Workspace{
-		WorkspaceSlug: "proj", ContainerName: "dsh-workspace-proj", ImageID: "arch", Status: "running",
+		WorkspaceSlug: "proj", ContainerName: "dsh-podman-proj-default", ImageID: "arch", Status: "running",
 		AgentSocketPath: "/sock", AgentToken: "tok", CreatedAt: "now",
 		Mounts: []state.Mount{{ProjectName: "a", Mode: "read_only"}, {ProjectName: "b", Mode: "read_write"}},
 	}
 	proto := toProto(workspace)
-	if proto.WorkspaceSlug != "proj" || proto.ContainerName != "dsh-workspace-proj" || proto.AgentToken != "tok" {
+	if proto.WorkspaceSlug != "proj" || proto.ContainerName != "dsh-podman-proj-default" || proto.AgentToken != "tok" {
 		t.Fatalf("unexpected proto: %#v", proto)
 	}
 	if len(proto.Mounts) != 2 || proto.Mounts[0].Mode != ctl.MountMode_MOUNT_MODE_READ_ONLY || proto.Mounts[1].Mode != ctl.MountMode_MOUNT_MODE_READ_WRITE {

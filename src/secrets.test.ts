@@ -4,7 +4,7 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
-import { MOUNT_EXEC, SECRET_TOOLS, mountRequestRecorder } from "./test-support.js";
+import { MOUNT_EXEC, SECRET_TOOLS, WORKSPACE_ID, mountRequestRecorder } from "./test-support.js";
 import { READ_ONLY_TOOLS, TOOLS, toolHandlers } from "./index.js";
 
 test("secret tools are registered with the expected schemas", () => {
@@ -57,7 +57,7 @@ test("secret mount kinds forward the secret to the orchestrator", async () => {
   const requests: Record<string, unknown>[] = [];
   const resolver = {
     registry: {
-      resolveByPath: async () => ({ id: "team" }),
+      resolveByPath: async () => ({ id: WORKSPACE_ID }),
     },
     getConfig: () => ({ projectsRoot: "/projects" }),
     async control(method: string, request: unknown) {
@@ -88,14 +88,14 @@ test("secret mount kinds forward the secret to the orchestrator", async () => {
     exec,
   );
   assert.deepEqual(requests[0], {
-    workspaceSlug: "team",
+    workspaceSlug: WORKSPACE_ID,
     container: "valkey-ctr",
     kind: "MOUNT_KIND_SECRET",
     secret: "valkey-tls",
     destination: "/run/secrets/tls",
   });
   assert.deepEqual(requests[1], {
-    workspaceSlug: "team",
+    workspaceSlug: WORKSPACE_ID,
     container: "valkey-ctr",
     kind: "MOUNT_KIND_SECRET",
     secret: "valkey-tls",
@@ -132,21 +132,21 @@ test("mount tools reject a read-write secret mount", async () => {
 test("container_list returns secret_env maps on container rows", async () => {
   const resolver = {
     registry: {
-      resolveByPath: async () => ({ id: "team" }),
+      resolveByPath: async () => ({ id: WORKSPACE_ID }),
     },
     control: async (method: string) => {
       if (method === "listContainers") {
         return {
           containers: [
             {
-              workspaceSlug: "team",
+              workspaceSlug: WORKSPACE_ID,
               containerName: "default",
               status: "running",
               imageId: "img-1",
               secretEnv: { REDIS_PASSWORD: "db-pass" },
             },
             {
-              workspaceSlug: "team",
+              workspaceSlug: WORKSPACE_ID,
               containerName: "db",
               status: "running",
               secretEnv: {
@@ -163,7 +163,7 @@ test("container_list returns secret_env maps on container rows", async () => {
               },
             },
             {
-              workspaceSlug: "team",
+              workspaceSlug: WORKSPACE_ID,
               containerName: "worker",
               status: "stopped",
             },

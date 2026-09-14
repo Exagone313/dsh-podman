@@ -47,7 +47,7 @@ function dshWorkspaceViews(registry: any, projectsRoot: string): WorkspaceView[]
       ? path.slice(projectsRoot.length + 1)
       : path;
     return {
-      workspaceSlug: workspaceSlug(String(workspace.id ?? "")),
+      workspaceSlug: workspaceSlug(workspace.id),
       projectName: projectName || String(workspace.title ?? "") || String(workspace.id ?? ""),
       containerName: "",
       imageId: "",

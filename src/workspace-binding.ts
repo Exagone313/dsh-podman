@@ -45,7 +45,7 @@ export class WorkspaceResolver {
       `${this.config.projectsRoot}/`,
       "",
     );
-    const key = workspaceSlug(String(workspace.id));
+    const key = workspaceSlug(workspace.id);
     const binding = await this.ready(key, relativePath);
     // The default container always keeps its project mount, so the session
     // directory is always mounted in it.
@@ -102,7 +102,7 @@ export class WorkspaceResolver {
     container: string,
   ): Promise<WorkspaceBinding> {
     const workspace = await this.workspaceForCwd(cwd);
-    const slug = workspaceSlug(String(workspace.id));
+    const slug = workspaceSlug(workspace.id);
     const result = await this.control<any>("listContainers", {});
     const row = containerRowFor(result.containers ?? [], slug, container);
     if (row === undefined) {
@@ -282,29 +282,20 @@ function waitForReady(agent: grpc.Client, timeoutMs = 15000): Promise<void> {
   });
 }
 
-export function workspaceSlug(session: unknown): string {
-  const value =
-    typeof session === "string"
-      ? session
-      : ((session as any)?.workspace?.name ??
-        (session as any)?.workspaceName ??
-        (session as any)?.projectName ??
-        (session as any)?.id ??
-        "default");
-  const raw = String(value);
-  const parts = raw.split(/[\\/]+/);
-  const safe = parts.includes("..")
-    ? parts.filter((part) => part !== "." && part !== "..").join("-") ||
-      "default"
-    : raw;
-  return (
-    safe
-      .replace(/[^a-zA-Z0-9_.-]+/g, "-")
-      .replace(/^-+|-+$/g, "")
-      .slice(0, fifty) || "default"
-  );
+// workspaceSlug validates the workspace id that names this workspace's pod
+// (dsh-podman-<slug>) and containers (dsh-podman-<slug>-<logical>). It must be
+// a UUID so a container name can never collide with a pod name.
+export function workspaceSlug(id: unknown): string {
+  const value = String(id ?? "");
+  if (!UUID_PATTERN.test(value)) {
+    throw new Error(
+      `invalid workspace id ${JSON.stringify(value)}: expected a UUID`,
+    );
+  }
+  return value.toLowerCase();
 }
-const fifty = 50;
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export function containerRowFor(
   containers: any[],
   slug: string,

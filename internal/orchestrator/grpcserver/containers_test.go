@@ -20,7 +20,7 @@ import (
 
 func TestListContainersStateDriven(t *testing.T) {
 	store := newTestStore(t)
-	if err := store.SaveWorkspaces([]state.Workspace{{WorkspaceSlug: "proj", ContainerName: "dsh-workspace-proj", Status: "running"}}); err != nil {
+	if err := store.SaveWorkspaces([]state.Workspace{{WorkspaceSlug: "proj", ContainerName: "dsh-podman-proj-default", Status: "running"}}); err != nil {
 		t.Fatal(err)
 	}
 	server := &Server{Store: store, Logger: silentLogger()}
@@ -28,7 +28,7 @@ func TestListContainersStateDriven(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(response.Containers) != 1 || response.Containers[0].ContainerName != "default" || response.Containers[0].PodmanName != "dsh-workspace-proj" || response.Containers[0].WorkspaceSlug != "proj" || response.Containers[0].Status != "running" {
+	if len(response.Containers) != 1 || response.Containers[0].ContainerName != "default" || response.Containers[0].PodmanName != "dsh-podman-proj-default" || response.Containers[0].WorkspaceSlug != "proj" || response.Containers[0].Status != "running" {
 		t.Fatalf("unexpected containers: %#v", response.Containers)
 	}
 }
@@ -36,10 +36,10 @@ func TestListContainersStateDriven(t *testing.T) {
 func TestListContainersSorted(t *testing.T) {
 	store := newTestStore(t)
 	workspaces := []state.Workspace{
-		{WorkspaceSlug: "b", Containers: []state.Container{{Name: "default", PodmanName: "dsh-workspace-b", Status: "running"}}},
+		{WorkspaceSlug: "b", Containers: []state.Container{{Name: "default", PodmanName: "dsh-podman-b-default", Status: "running"}}},
 		{WorkspaceSlug: "a", Containers: []state.Container{
-			{Name: "dev", PodmanName: "dsh-workspace-a-dev", Status: "running"},
-			{Name: "default", PodmanName: "dsh-workspace-a", Status: "running"},
+			{Name: "dev", PodmanName: "dsh-podman-a-dev", Status: "running"},
+			{Name: "default", PodmanName: "dsh-podman-a-default", Status: "running"},
 		}},
 	}
 	if err := store.SaveWorkspaces(workspaces); err != nil {
@@ -76,8 +76,8 @@ func TestContainerRows(t *testing.T) {
 		WorkspaceSlug: "proj",
 		Mounts:        []state.Mount{{ProjectName: "team", Mode: "read_write"}},
 		Containers: []state.Container{
-			{Name: "default", PodmanName: "dsh-workspace-proj", ImageID: "arch", Status: "running", CreatedAt: "now", AgentSocketPath: "/sock/default", AgentToken: "tok-default"},
-			{Name: "dev", PodmanName: "dsh-workspace-proj-dev", ImageID: "devimg", Status: "running", CreatedAt: "later", AgentSocketPath: "/sock/dev", AgentToken: "tok-dev"},
+			{Name: "default", PodmanName: "dsh-podman-proj-default", ImageID: "arch", Status: "running", CreatedAt: "now", AgentSocketPath: "/sock/default", AgentToken: "tok-default"},
+			{Name: "dev", PodmanName: "dsh-podman-proj-dev", ImageID: "devimg", Status: "running", CreatedAt: "later", AgentSocketPath: "/sock/dev", AgentToken: "tok-dev"},
 		},
 	}}
 	rows := containerRows(workspaces)
@@ -85,11 +85,11 @@ func TestContainerRows(t *testing.T) {
 		t.Fatalf("expected both containers, got %#v", rows)
 	}
 	def := rows[0]
-	if def.ContainerName != "default" || def.PodmanName != "dsh-workspace-proj" || def.WorkspaceSlug != "proj" || def.ImageId != "arch" || def.Status != "running" || def.CreatedAt != "now" || def.AgentSocketPath != "/sock/default" || def.AgentToken != "tok-default" {
+	if def.ContainerName != "default" || def.PodmanName != "dsh-podman-proj-default" || def.WorkspaceSlug != "proj" || def.ImageId != "arch" || def.Status != "running" || def.CreatedAt != "now" || def.AgentSocketPath != "/sock/default" || def.AgentToken != "tok-default" {
 		t.Fatalf("default row mismatch: %#v", def)
 	}
 	dev := rows[1]
-	if dev.ContainerName != "dev" || dev.PodmanName != "dsh-workspace-proj-dev" || dev.WorkspaceSlug != "proj" || dev.ImageId != "devimg" || dev.Status != "running" || dev.CreatedAt != "later" || dev.AgentSocketPath != "/sock/dev" || dev.AgentToken != "tok-dev" {
+	if dev.ContainerName != "dev" || dev.PodmanName != "dsh-podman-proj-dev" || dev.WorkspaceSlug != "proj" || dev.ImageId != "devimg" || dev.Status != "running" || dev.CreatedAt != "later" || dev.AgentSocketPath != "/sock/dev" || dev.AgentToken != "tok-dev" {
 		t.Fatalf("named row mismatch: %#v", dev)
 	}
 	if len(def.Mounts) != 1 || def.Mounts[0].ProjectName != "team" || def.Mounts[0].Mode != ctl.MountMode_MOUNT_MODE_READ_WRITE {
@@ -100,7 +100,7 @@ func TestContainerRows(t *testing.T) {
 func TestContainerRowsKeepsStoredStatus(t *testing.T) {
 	workspaces := []state.Workspace{{
 		WorkspaceSlug: "proj",
-		Containers:    []state.Container{{Name: "default", PodmanName: "dsh-workspace-proj", Status: "stopped"}},
+		Containers:    []state.Container{{Name: "default", PodmanName: "dsh-podman-proj-default", Status: "stopped"}},
 	}}
 	rows := containerRows(workspaces)
 	if len(rows) != 1 || rows[0].Status != "stopped" {
@@ -113,8 +113,8 @@ func TestReconcileContainersDropsDeletedNamedContainer(t *testing.T) {
 	workspaces := []state.Workspace{{
 		WorkspaceSlug: "proj",
 		Containers: []state.Container{
-			{Name: "default", PodmanName: "dsh-workspace-proj", Status: "running"},
-			{Name: "db", PodmanName: "dsh-workspace-proj-db", Status: "running"},
+			{Name: "default", PodmanName: "dsh-podman-proj-default", Status: "running"},
+			{Name: "db", PodmanName: "dsh-podman-proj-db", Status: "running"},
 		},
 	}}
 	if err := store.SaveWorkspaces(workspaces); err != nil {
@@ -122,7 +122,7 @@ func TestReconcileContainersDropsDeletedNamedContainer(t *testing.T) {
 	}
 	server := &Server{Store: store, Logger: silentLogger()}
 	exists := func(podmanName string) (bool, error) {
-		return podmanName == "dsh-workspace-proj", nil
+		return podmanName == "dsh-podman-proj-default", nil
 	}
 	reconciled, err := server.reconcileContainers(workspaces, exists, alwaysRunning)
 	if err != nil {
@@ -144,7 +144,7 @@ func TestReconcileContainersDropsWorkspaceWithoutContainers(t *testing.T) {
 	store := newTestStore(t)
 	workspaces := []state.Workspace{{
 		WorkspaceSlug: "proj",
-		Containers:    []state.Container{{Name: "default", PodmanName: "dsh-workspace-proj", Status: "running"}},
+		Containers:    []state.Container{{Name: "default", PodmanName: "dsh-podman-proj-default", Status: "running"}},
 	}}
 	if err := store.SaveWorkspaces(workspaces); err != nil {
 		t.Fatal(err)
@@ -173,8 +173,8 @@ func TestReconcileContainersKeepsWorkspaceWithNamedContainers(t *testing.T) {
 	workspaces := []state.Workspace{{
 		WorkspaceSlug: "proj",
 		Containers: []state.Container{
-			{Name: "default", PodmanName: "dsh-workspace-proj", Status: "running"},
-			{Name: "db", PodmanName: "dsh-workspace-proj-db", Status: "running"},
+			{Name: "default", PodmanName: "dsh-podman-proj-default", Status: "running"},
+			{Name: "db", PodmanName: "dsh-podman-proj-db", Status: "running"},
 		},
 	}}
 	if err := store.SaveWorkspaces(workspaces); err != nil {
@@ -182,7 +182,7 @@ func TestReconcileContainersKeepsWorkspaceWithNamedContainers(t *testing.T) {
 	}
 	server := &Server{Store: store, Logger: silentLogger()}
 	reconciled, err := server.reconcileContainers(workspaces, func(podmanName string) (bool, error) {
-		return podmanName == "dsh-workspace-proj-db", nil
+		return podmanName == "dsh-podman-proj-db", nil
 	}, alwaysRunning)
 	if err != nil {
 		t.Fatal(err)
@@ -203,7 +203,7 @@ func TestReconcileContainersKeepsOnLookupError(t *testing.T) {
 	store := newTestStore(t)
 	workspaces := []state.Workspace{{
 		WorkspaceSlug: "proj",
-		Containers:    []state.Container{{Name: "default", PodmanName: "dsh-workspace-proj", Status: "running"}},
+		Containers:    []state.Container{{Name: "default", PodmanName: "dsh-podman-proj-default", Status: "running"}},
 	}}
 	if err := store.SaveWorkspaces(workspaces); err != nil {
 		t.Fatal(err)
@@ -231,7 +231,7 @@ func TestReconcileContainersNoChangeDoesNotWrite(t *testing.T) {
 	store := newTestStore(t)
 	workspaces := []state.Workspace{{
 		WorkspaceSlug: "proj",
-		Containers:    []state.Container{{Name: "default", PodmanName: "dsh-workspace-proj", Status: "running"}},
+		Containers:    []state.Container{{Name: "default", PodmanName: "dsh-podman-proj-default", Status: "running"}},
 	}}
 	if err := store.SaveWorkspaces(workspaces); err != nil {
 		t.Fatal(err)
@@ -259,7 +259,7 @@ func TestReconcileContainersRefreshesStoppedStatus(t *testing.T) {
 	store := newTestStore(t)
 	workspaces := []state.Workspace{{
 		WorkspaceSlug: "proj",
-		Containers:    []state.Container{{Name: "default", PodmanName: "dsh-workspace-proj", Status: "running"}},
+		Containers:    []state.Container{{Name: "default", PodmanName: "dsh-podman-proj-default", Status: "running"}},
 	}}
 	if err := store.SaveWorkspaces(workspaces); err != nil {
 		t.Fatal(err)
@@ -296,16 +296,16 @@ func TestContainerNameHelpers(t *testing.T) {
 			t.Errorf("accepted invalid container name %q", invalid)
 		}
 	}
-	if got := podmanContainerName("proj", ""); got != "dsh-workspace-proj" {
+	if got := podmanContainerName("proj", ""); got != "dsh-podman-proj-default" {
 		t.Fatalf("default podman name mismatch: %q", got)
 	}
-	if got := podmanContainerName("proj", "default"); got != "dsh-workspace-proj" {
+	if got := podmanContainerName("proj", "default"); got != "dsh-podman-proj-default" {
 		t.Fatalf("default podman name mismatch: %q", got)
 	}
-	if got := podmanContainerName("proj", "dev"); got != "dsh-workspace-proj-dev" {
+	if got := podmanContainerName("proj", "dev"); got != "dsh-podman-proj-dev" {
 		t.Fatalf("named podman name mismatch: %q", got)
 	}
-	if got := podNameFor("proj"); got != "dsh-pod-proj" {
+	if got := podNameFor("proj"); got != "dsh-podman-proj" {
 		t.Fatalf("pod name mismatch: %q", got)
 	}
 }
@@ -315,7 +315,7 @@ func TestPodNameNeverCollidesWithContainerName(t *testing.T) {
 	logicals := []string{"", "default", "dev", "a1", "x-y"}
 	for _, slug := range slugs {
 		pod := podNameFor(slug)
-		if !strings.HasPrefix(pod, "dsh-pod-") {
+		if !strings.HasPrefix(pod, "dsh-podman-") {
 			t.Fatalf("unexpected pod name %q", pod)
 		}
 		for _, logical := range logicals {
@@ -329,8 +329,8 @@ func TestPodNameNeverCollidesWithContainerName(t *testing.T) {
 
 func TestContainerByLogical(t *testing.T) {
 	workspace := state.Workspace{Containers: []state.Container{
-		{Name: "default", PodmanName: "dsh-workspace-proj"},
-		{Name: "dev", PodmanName: "dsh-workspace-proj-dev"},
+		{Name: "default", PodmanName: "dsh-podman-proj-default"},
+		{Name: "dev", PodmanName: "dsh-podman-proj-dev"},
 	}}
 	for _, name := range []string{"", "default"} {
 		container, ok := containerByLogical(&workspace, name)
@@ -339,7 +339,7 @@ func TestContainerByLogical(t *testing.T) {
 		}
 	}
 	container, ok := containerByLogical(&workspace, "dev")
-	if !ok || container.PodmanName != "dsh-workspace-proj-dev" {
+	if !ok || container.PodmanName != "dsh-podman-proj-dev" {
 		t.Fatalf("expected dev container, got %#v, %v", container, ok)
 	}
 	if _, ok := containerByLogical(&workspace, "nope"); ok {
@@ -386,7 +386,7 @@ func (f *fakePodman) Stop(name string) error { f.running[name] = false; return n
 
 func TestStartContainerRequiresPodman(t *testing.T) {
 	store := newTestStore(t)
-	if err := store.SaveWorkspaces([]state.Workspace{{WorkspaceSlug: "proj", ContainerName: "dsh-workspace-proj"}}); err != nil {
+	if err := store.SaveWorkspaces([]state.Workspace{{WorkspaceSlug: "proj", ContainerName: "dsh-podman-proj-default"}}); err != nil {
 		t.Fatal(err)
 	}
 	if err := store.SaveImages([]state.Image{{ImageID: "arch", ImageTag: "localhost/dsh-podman/arch:latest"}}); err != nil {
@@ -408,15 +408,15 @@ func TestStartContainerRemovesUntrackedContainer(t *testing.T) {
 		t.Fatal(err)
 	}
 	fake := newFakePodman()
-	fake.exists["dsh-workspace-proj-dev"] = true
+	fake.exists["dsh-podman-proj-dev"] = true
 	server := &Server{Store: store, Podman: fake, Logger: silentLogger()}
 	if _, err := server.StartContainer(context.Background(), &ctl.StartContainerRequest{WorkspaceSlug: "proj", Container: "dev", ImageId: "arch"}); err != nil {
 		t.Fatal(err)
 	}
-	if len(fake.removed) != 1 || fake.removed[0] != "dsh-workspace-proj-dev" {
+	if len(fake.removed) != 1 || fake.removed[0] != "dsh-podman-proj-dev" {
 		t.Fatalf("expected the untracked container to be removed, got %v", fake.removed)
 	}
-	if len(fake.created) != 1 || fake.created[0] != "dsh-workspace-proj-dev" {
+	if len(fake.created) != 1 || fake.created[0] != "dsh-podman-proj-dev" {
 		t.Fatalf("expected the container to be created, got %v", fake.created)
 	}
 }
@@ -436,7 +436,7 @@ func TestStartContainerCleansUpFailedCreate(t *testing.T) {
 	if status.Code(err) != codes.Internal {
 		t.Fatalf("expected Internal, got %v", err)
 	}
-	if len(fake.removed) == 0 || fake.removed[len(fake.removed)-1] != "dsh-workspace-proj-dev" {
+	if len(fake.removed) == 0 || fake.removed[len(fake.removed)-1] != "dsh-podman-proj-dev" {
 		t.Fatalf("expected cleanup removal after failed create, got %v", fake.removed)
 	}
 }
@@ -447,12 +447,12 @@ func TestRemoveContainerRemovesOrphan(t *testing.T) {
 		t.Fatal(err)
 	}
 	fake := newFakePodman()
-	fake.exists["dsh-workspace-proj-dev"] = true
+	fake.exists["dsh-podman-proj-dev"] = true
 	server := &Server{Store: store, Podman: fake, Logger: silentLogger()}
 	if _, err := server.RemoveContainer(context.Background(), &ctl.RemoveContainerRequest{WorkspaceSlug: "proj", Container: "dev"}); err != nil {
 		t.Fatal(err)
 	}
-	if len(fake.removed) != 1 || fake.removed[0] != "dsh-workspace-proj-dev" {
+	if len(fake.removed) != 1 || fake.removed[0] != "dsh-podman-proj-dev" {
 		t.Fatalf("expected the orphan to be removed, got %v", fake.removed)
 	}
 }
@@ -481,7 +481,7 @@ func TestRemoveContainerRejectsInvalidName(t *testing.T) {
 
 func TestRemoveContainerAcceptsDefault(t *testing.T) {
 	store := newTestStore(t)
-	if err := store.SaveWorkspaces([]state.Workspace{{WorkspaceSlug: "proj", ContainerName: "dsh-workspace-proj", Containers: []state.Container{{Name: "default", PodmanName: "dsh-workspace-proj"}}}}); err != nil {
+	if err := store.SaveWorkspaces([]state.Workspace{{WorkspaceSlug: "proj", ContainerName: "dsh-podman-proj-default", Containers: []state.Container{{Name: "default", PodmanName: "dsh-podman-proj-default"}}}}); err != nil {
 		t.Fatal(err)
 	}
 	server := &Server{Store: store, Logger: silentLogger()}
@@ -493,7 +493,7 @@ func TestRemoveContainerAcceptsDefault(t *testing.T) {
 
 func TestRemoveContainerUnknownContainer(t *testing.T) {
 	store := newTestStore(t)
-	if err := store.SaveWorkspaces([]state.Workspace{{WorkspaceSlug: "proj", ContainerName: "dsh-workspace-proj"}}); err != nil {
+	if err := store.SaveWorkspaces([]state.Workspace{{WorkspaceSlug: "proj", ContainerName: "dsh-podman-proj-default"}}); err != nil {
 		t.Fatal(err)
 	}
 	server := &Server{Store: store, Logger: silentLogger()}
@@ -571,7 +571,7 @@ func TestStartContainerAcceptsShortName(t *testing.T) {
 
 func TestRemoveContainerRequiresPodman(t *testing.T) {
 	store := newTestStore(t)
-	if err := store.SaveWorkspaces([]state.Workspace{{WorkspaceSlug: "proj", ContainerName: "dsh-workspace-proj", Containers: []state.Container{{Name: "dev", PodmanName: "dsh-workspace-proj-dev", Status: "running"}}}}); err != nil {
+	if err := store.SaveWorkspaces([]state.Workspace{{WorkspaceSlug: "proj", ContainerName: "dsh-podman-proj-default", Containers: []state.Container{{Name: "dev", PodmanName: "dsh-podman-proj-dev", Status: "running"}}}}); err != nil {
 		t.Fatal(err)
 	}
 	server := &Server{Store: store, Logger: silentLogger()}
@@ -591,7 +591,7 @@ func TestRemoveContainerMissingWorkspace(t *testing.T) {
 
 func TestStartContainerRejectsReservedEnv(t *testing.T) {
 	store := newTestStore(t)
-	if err := store.SaveWorkspaces([]state.Workspace{{WorkspaceSlug: "proj", ContainerName: "dsh-workspace-proj"}}); err != nil {
+	if err := store.SaveWorkspaces([]state.Workspace{{WorkspaceSlug: "proj", ContainerName: "dsh-podman-proj-default"}}); err != nil {
 		t.Fatal(err)
 	}
 	if err := store.SaveImages([]state.Image{{ImageID: "arch", ImageTag: "localhost/dsh-podman/arch:latest"}}); err != nil {
@@ -606,7 +606,7 @@ func TestStartContainerRejectsReservedEnv(t *testing.T) {
 
 func TestRecreateContainerRejectsReservedEnv(t *testing.T) {
 	store := newTestStore(t)
-	if err := store.SaveWorkspaces([]state.Workspace{{WorkspaceSlug: "proj", Containers: []state.Container{{Name: "dev", PodmanName: "dsh-workspace-proj-dev", ImageID: "arch"}}}}); err != nil {
+	if err := store.SaveWorkspaces([]state.Workspace{{WorkspaceSlug: "proj", Containers: []state.Container{{Name: "dev", PodmanName: "dsh-podman-proj-dev", ImageID: "arch"}}}}); err != nil {
 		t.Fatal(err)
 	}
 	if err := store.SaveImages([]state.Image{{ImageID: "arch", ImageTag: "localhost/dsh-podman/arch:latest"}}); err != nil {
@@ -626,9 +626,9 @@ func TestStopContainerDaemonsUnreachable(t *testing.T) {
 
 func TestStopContainerDaemonsMissingSocketOrToken(t *testing.T) {
 	server := &Server{Logger: silentLogger()}
-	server.stopContainerDaemons(context.Background(), state.Container{PodmanName: "dsh-workspace-proj"})
-	server.stopContainerDaemons(context.Background(), state.Container{PodmanName: "dsh-workspace-proj", AgentSocketPath: "/nonexistent/guest.sock"})
-	server.stopContainerDaemons(context.Background(), state.Container{PodmanName: "dsh-workspace-proj", AgentToken: "tok"})
+	server.stopContainerDaemons(context.Background(), state.Container{PodmanName: "dsh-podman-proj-default"})
+	server.stopContainerDaemons(context.Background(), state.Container{PodmanName: "dsh-podman-proj-default", AgentSocketPath: "/nonexistent/guest.sock"})
+	server.stopContainerDaemons(context.Background(), state.Container{PodmanName: "dsh-podman-proj-default", AgentToken: "tok"})
 }
 
 func TestRecreateContainerStopsDaemons(t *testing.T) {
@@ -639,7 +639,7 @@ func TestRecreateContainerStopsDaemons(t *testing.T) {
 	if err := store.SaveWorkspaces([]state.Workspace{{
 		WorkspaceSlug: "proj",
 		Containers: []state.Container{{
-			Name: "default", PodmanName: "dsh-workspace-proj", ImageID: "arch", Status: "running",
+			Name: "default", PodmanName: "dsh-podman-proj-default", ImageID: "arch", Status: "running",
 		}},
 	}}); err != nil {
 		t.Fatal(err)

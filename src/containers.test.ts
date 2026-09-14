@@ -5,7 +5,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { join } from "node:path";
-import { guestExecRecorder, guestFileRecorder, secretBearingResolver } from "./test-support.js";
+import { WORKSPACE_ID, guestExecRecorder, guestFileRecorder, secretBearingResolver } from "./test-support.js";
 import {
   TOOLS,
   podmanRuntimeSection,
@@ -35,27 +35,27 @@ test("container start/recreate/bash accept an env map schema", () => {
 test("container_list returns sanitized container objects with env values", async () => {
   const resolver = {
     registry: {
-      resolveByPath: async () => ({ id: "team" }),
+      resolveByPath: async () => ({ id: WORKSPACE_ID }),
     },
     control: async (method: string) => {
       if (method === "listContainers") {
         return {
           containers: [
             {
-              workspaceSlug: "team",
+              workspaceSlug: WORKSPACE_ID,
               containerName: "default",
               status: "running",
               imageId: "img-1",
               env: { PATH: "/bin", HOME: "/root" },
             },
             {
-              workspaceSlug: "team",
+              workspaceSlug: WORKSPACE_ID,
               containerName: "db",
               status: "running",
               env: { PORT: "5432", DB: "main", X: "1", Y: "2" },
             },
             {
-              workspaceSlug: "team",
+              workspaceSlug: WORKSPACE_ID,
               containerName: "worker",
               status: "stopped",
             },
@@ -96,7 +96,7 @@ test("container_list returns sanitized container objects with env values", async
 test("container_list reports an uncreated default container as not started", async () => {
   const resolver = {
     registry: {
-      resolveByPath: async () => ({ id: "team" }),
+      resolveByPath: async () => ({ id: WORKSPACE_ID }),
     },
     control: async () => ({ containers: [] }),
   } as never;
@@ -136,12 +136,12 @@ test("container tools never expose internal fields in their results", async () =
 test("container_recreate returns the logical container name", async () => {
   const resolver = {
     registry: {
-      resolveByPath: async () => ({ id: "team" }),
+      resolveByPath: async () => ({ id: WORKSPACE_ID }),
     },
     getConfig: () => ({ projectsRoot: "/projects" }),
     control: async () => ({
-      workspaceSlug: "team",
-      containerName: "dsh-workspace-team",
+      workspaceSlug: WORKSPACE_ID,
+      containerName: `dsh-podman-${WORKSPACE_ID}-default`,
       imageId: "img-1",
       status: "running",
       mounts: [],

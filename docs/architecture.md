@@ -38,11 +38,12 @@ workspace's current image), `RemoveContainer`, `AddContainerMount`,
 
 ## Workspaces and pods
 
-Each workspace maps to a **podman pod** (`dsh-pod-<slug>`) so its containers
-share a network namespace. Every workspace has a **default container**
-(`dsh-workspace-<slug>`); additional, named containers can be created inside the
-same pod. Containers' root filesystems are mounted read-only; all writable state
-lives in the project bind mount, named volumes, or tmpfs mounts.
+Each workspace maps to a **podman pod** (`dsh-podman-<slug>`, where `<slug>` is
+the workspace UUID) so its containers share a network namespace. Every workspace
+has a **default container** (`dsh-podman-<slug>-default`); additional, named
+containers (`dsh-podman-<slug>-<name>`) can be created inside the same pod.
+Containers' root filesystems are mounted read-only; all writable state lives in
+the project bind mount, named volumes, or tmpfs mounts.
 
 Beyond project mounts, a container can mount named volumes (prefixed
 `DSH_PODMAN_VOLUME_PREFIX`, default `dsh-podman-`, and auto-created by podman on

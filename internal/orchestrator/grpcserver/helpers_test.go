@@ -30,6 +30,15 @@ func silentLogger() *slog.Logger {
 // existing container is treated as running.
 func alwaysRunning(string) (bool, error) { return true, nil }
 
+// testWorkspaceSlug is a valid workspace slug: workspace ids are UUIDs, so
+// tests that validate the slug (CreateWorkspace) or the stored container-name
+// shape (DescribeWorkspace) use it.
+const testWorkspaceSlug = "2c573001-4171-4900-904b-12a5cc02737a"
+
+// testDefaultContainer is the default container name derived from
+// testWorkspaceSlug.
+const testDefaultContainer = "dsh-podman-2c573001-4171-4900-904b-12a5cc02737a-default"
+
 // tempRoot returns a temporary directory with every symlink resolved.
 //
 // Mount sources are resolved before being handed to podman, so a test that

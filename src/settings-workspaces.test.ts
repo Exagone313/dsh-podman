@@ -6,6 +6,7 @@ import { test } from "node:test";
 import { strict as assert } from "node:assert";
 import { baseValue, fakeContext, fakeScope } from "./settings-bridge-support.js";
 import { installContainerSettings } from "./settings-bridge.js";
+import { WORKSPACE_ID } from "./test-support.js";
 
 test("refresh on install publishes containers, images and workspaces", async () => {
   const scope = fakeScope(baseValue());
@@ -195,7 +196,7 @@ test("create command drives createWorkspace without env when empty", async () =>
 test("workspace list comes from the dsh registry even without orchestrator state", async () => {  const scope = fakeScope(baseValue());
   const registry = {
     list: () => [
-      { id: "uuid-1", path: "/projects/team/app", title: "app", createdAt: "2026-01-01T00:00:00Z" },
+      { id: WORKSPACE_ID, path: "/projects/team/app", title: "app", createdAt: "2026-01-01T00:00:00Z" },
     ],
   };
   const resolver: any = {
@@ -228,7 +229,7 @@ test("dsh workspace layers orchestrator container info", async () => {
   const scope = fakeScope(baseValue());
   const registry = {
     list: () => [
-      { id: "uuid-1", path: "/projects/team/app", title: "app", createdAt: "2026-01-01T00:00:00Z" },
+      { id: WORKSPACE_ID, path: "/projects/team/app", title: "app", createdAt: "2026-01-01T00:00:00Z" },
     ],
   };
   const resolver: any = {
@@ -244,8 +245,8 @@ test("dsh workspace layers orchestrator container info", async () => {
       if (method === "listWorkspaces") {
         return {
           workspaces: [{
-            workspaceSlug: "uuid-1",
-            containerName: "dsh-workspace-uuid-1",
+            workspaceSlug: WORKSPACE_ID,
+            containerName: `dsh-podman-${WORKSPACE_ID}-default`,
             imageId: "arch",
             status: "running",
             mounts: [{ projectName: "team/app", mode: "MOUNT_MODE_READ_WRITE" }],
@@ -260,7 +261,7 @@ test("dsh workspace layers orchestrator container info", async () => {
   const workspaces = scope.value.workspaces as any[];
   assert.equal(workspaces.length, 1);
   assert.equal(workspaces[0].projectName, "team/app");
-  assert.equal(workspaces[0].containerName, "dsh-workspace-uuid-1");
+  assert.equal(workspaces[0].containerName, `dsh-podman-${WORKSPACE_ID}-default`);
   assert.equal(workspaces[0].status, "running");
   assert.equal(workspaces[0].imageId, "arch");
 });

@@ -112,15 +112,15 @@ func TestListWorkspacesEmpty(t *testing.T) {
 
 func TestDescribeWorkspace(t *testing.T) {
 	store := newTestStore(t)
-	if err := store.SaveWorkspaces([]state.Workspace{{WorkspaceSlug: "proj", ContainerName: "dsh-workspace-proj", Status: "running"}}); err != nil {
+	if err := store.SaveWorkspaces([]state.Workspace{{WorkspaceSlug: testWorkspaceSlug, ContainerName: testDefaultContainer, Status: "running"}}); err != nil {
 		t.Fatal(err)
 	}
 	server := &Server{Store: store, Logger: silentLogger()}
-	workspace, err := server.DescribeWorkspace(context.Background(), &ctl.DescribeWorkspaceRequest{WorkspaceSlug: "proj"})
+	workspace, err := server.DescribeWorkspace(context.Background(), &ctl.DescribeWorkspaceRequest{WorkspaceSlug: testWorkspaceSlug})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if workspace.WorkspaceSlug != "proj" || workspace.Status != "running" {
+	if workspace.WorkspaceSlug != testWorkspaceSlug || workspace.Status != "running" {
 		t.Fatalf("unexpected workspace: %#v", workspace)
 	}
 }
@@ -135,13 +135,13 @@ func TestDescribeWorkspaceNotFound(t *testing.T) {
 
 func TestCreateWorkspaceRejectsInvalidSlug(t *testing.T) {
 	server := &Server{Logger: silentLogger()}
-	for _, slug := range []string{"", "a/b", "../x", ".", "..", "-x", "a b", "a:b", "a\\b", "a#b", "a\nb", "x" + strings.Repeat("y", 70)} {
+	for _, slug := range []string{"", "a/b", "../x", ".", "..", "-x", "a b", "a:b", "a\\b", "a#b", "a\nb", "x" + strings.Repeat("y", 70), "proj", "team-app", "2c573001-4171-4900-904b", "2c573001-4171-4900-904b-12a5cc02737a-x"} {
 		_, err := server.CreateWorkspace(context.Background(), &ctl.CreateWorkspaceRequest{WorkspaceSlug: slug, ImageId: "arch"})
 		if status.Code(err) != codes.InvalidArgument {
 			t.Errorf("slug %q: expected InvalidArgument, got %v", slug, err)
 		}
 	}
-	for _, slug := range []string{"proj", "team-app", "a_b.c", "x1", "a-b_c.9-z"} {
+	for _, slug := range []string{testWorkspaceSlug, "00000000-0000-0000-0000-000000000000", "ABCDEF01-2345-6789-ABCD-EF0123456789"} {
 		if !validWorkspaceSlug(slug) {
 			t.Errorf("rejected valid slug %q", slug)
 		}
@@ -164,7 +164,7 @@ func TestCreateWorkspaceRejectsReservedEnv(t *testing.T) {
 		t.Fatal(err)
 	}
 	server := &Server{Store: store, Logger: silentLogger()}
-	_, err := server.CreateWorkspace(context.Background(), &ctl.CreateWorkspaceRequest{WorkspaceSlug: "proj", ImageId: "devimg", Env: map[string]string{"DSH_PODMAN_X": "1"}})
+	_, err := server.CreateWorkspace(context.Background(), &ctl.CreateWorkspaceRequest{WorkspaceSlug: testWorkspaceSlug, ImageId: "devimg", Env: map[string]string{"DSH_PODMAN_X": "1"}})
 	if status.Code(err) != codes.InvalidArgument {
 		t.Fatalf("expected InvalidArgument, got %v", err)
 	}
@@ -172,12 +172,12 @@ func TestCreateWorkspaceRejectsReservedEnv(t *testing.T) {
 
 func TestCreateWorkspaceRequiresProjectName(t *testing.T) {
 	server := &Server{Store: newTestStore(t), Logger: silentLogger()}
-	_, err := server.CreateWorkspace(context.Background(), &ctl.CreateWorkspaceRequest{WorkspaceSlug: "proj"})
+	_, err := server.CreateWorkspace(context.Background(), &ctl.CreateWorkspaceRequest{WorkspaceSlug: testWorkspaceSlug})
 	if status.Code(err) != codes.InvalidArgument {
 		t.Fatalf("expected InvalidArgument without a project name, got %v", err)
 	}
 	for _, name := range []string{"../x", "/abs", "a/../b"} {
-		_, err := server.CreateWorkspace(context.Background(), &ctl.CreateWorkspaceRequest{WorkspaceSlug: "proj", ProjectName: name})
+		_, err := server.CreateWorkspace(context.Background(), &ctl.CreateWorkspaceRequest{WorkspaceSlug: testWorkspaceSlug, ProjectName: name})
 		if status.Code(err) != codes.InvalidArgument {
 			t.Errorf("project name %q: expected InvalidArgument, got %v", name, err)
 		}

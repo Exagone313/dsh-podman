@@ -101,7 +101,7 @@ func TestValidateSecretEnv(t *testing.T) {
 
 func TestStartContainerRejectsReservedSecretEnv(t *testing.T) {
 	store := newTestStore(t)
-	if err := store.SaveWorkspaces([]state.Workspace{{WorkspaceSlug: "proj", ContainerName: "dsh-workspace-proj"}}); err != nil {
+	if err := store.SaveWorkspaces([]state.Workspace{{WorkspaceSlug: "proj", ContainerName: "dsh-podman-proj-default"}}); err != nil {
 		t.Fatal(err)
 	}
 	if err := store.SaveImages([]state.Image{{ImageID: "arch", ImageTag: "localhost/dsh-podman/arch:latest"}}); err != nil {
@@ -116,7 +116,7 @@ func TestStartContainerRejectsReservedSecretEnv(t *testing.T) {
 
 func TestStartContainerRejectsInvalidSecretName(t *testing.T) {
 	store := newTestStore(t)
-	if err := store.SaveWorkspaces([]state.Workspace{{WorkspaceSlug: "proj", ContainerName: "dsh-workspace-proj"}}); err != nil {
+	if err := store.SaveWorkspaces([]state.Workspace{{WorkspaceSlug: "proj", ContainerName: "dsh-podman-proj-default"}}); err != nil {
 		t.Fatal(err)
 	}
 	if err := store.SaveImages([]state.Image{{ImageID: "arch", ImageTag: "localhost/dsh-podman/arch:latest"}}); err != nil {
@@ -135,7 +135,7 @@ func TestCreateWorkspaceRejectsReservedSecretEnv(t *testing.T) {
 		t.Fatal(err)
 	}
 	server := &Server{Store: store, Logger: silentLogger()}
-	_, err := server.CreateWorkspace(context.Background(), &ctl.CreateWorkspaceRequest{WorkspaceSlug: "proj", ImageId: "devimg", SecretEnv: map[string]string{"DSH_PODMAN_X": "sec"}})
+	_, err := server.CreateWorkspace(context.Background(), &ctl.CreateWorkspaceRequest{WorkspaceSlug: testWorkspaceSlug, ImageId: "devimg", SecretEnv: map[string]string{"DSH_PODMAN_X": "sec"}})
 	if status.Code(err) != codes.InvalidArgument {
 		t.Fatalf("expected InvalidArgument, got %v", err)
 	}
@@ -147,7 +147,7 @@ func TestCreateWorkspaceRejectsInvalidSecretName(t *testing.T) {
 		t.Fatal(err)
 	}
 	server := &Server{Store: store, Logger: silentLogger()}
-	_, err := server.CreateWorkspace(context.Background(), &ctl.CreateWorkspaceRequest{WorkspaceSlug: "proj", ImageId: "devimg", SecretEnv: map[string]string{"TOKEN": "bad name"}})
+	_, err := server.CreateWorkspace(context.Background(), &ctl.CreateWorkspaceRequest{WorkspaceSlug: testWorkspaceSlug, ImageId: "devimg", SecretEnv: map[string]string{"TOKEN": "bad name"}})
 	if status.Code(err) != codes.InvalidArgument {
 		t.Fatalf("expected InvalidArgument, got %v", err)
 	}
@@ -161,7 +161,7 @@ func TestAddContainerMountSecret(t *testing.T) {
 	if err := store.SaveWorkspaces([]state.Workspace{{
 		WorkspaceSlug: "proj",
 		Containers: []state.Container{
-			{Name: "dev", PodmanName: "dsh-workspace-proj-dev", ImageID: "arch", Status: "running"},
+			{Name: "dev", PodmanName: "dsh-podman-proj-dev", ImageID: "arch", Status: "running"},
 		},
 	}}); err != nil {
 		t.Fatal(err)
@@ -193,7 +193,7 @@ func TestAddContainerMountDuplicateSecret(t *testing.T) {
 	if err := store.SaveWorkspaces([]state.Workspace{{
 		WorkspaceSlug: "proj",
 		Containers: []state.Container{{
-			Name: "dev", PodmanName: "dsh-workspace-proj-dev", ImageID: "arch", Status: "running",
+			Name: "dev", PodmanName: "dsh-podman-proj-dev", ImageID: "arch", Status: "running",
 			Mounts: []state.Mount{{Kind: "secret", Secret: "tls", Destination: "/run/secrets/tls"}},
 		}},
 	}}); err != nil {
@@ -213,7 +213,7 @@ func TestRemoveContainerMountSecret(t *testing.T) {
 	if err := store.SaveWorkspaces([]state.Workspace{{
 		WorkspaceSlug: "proj",
 		Containers: []state.Container{{
-			Name: "dev", PodmanName: "dsh-workspace-proj-dev", ImageID: "arch", Status: "running",
+			Name: "dev", PodmanName: "dsh-podman-proj-dev", ImageID: "arch", Status: "running",
 			Mounts: []state.Mount{{Kind: "secret", Secret: "tls", Destination: "/run/secrets/tls"}},
 		}},
 	}}); err != nil {
@@ -372,8 +372,8 @@ func TestAddContainerSecretRejectsReservedEnv(t *testing.T) {
 	if err := store.SaveWorkspaces([]state.Workspace{{
 		WorkspaceSlug: "proj",
 		Containers: []state.Container{
-			{Name: "default", PodmanName: "dsh-workspace-proj", ImageID: "arch", Status: "running"},
-			{Name: "dev", PodmanName: "dsh-workspace-proj-dev", ImageID: "arch", Status: "running", SecretEnv: map[string]string{"FOO": "existing"}},
+			{Name: "default", PodmanName: "dsh-podman-proj-default", ImageID: "arch", Status: "running"},
+			{Name: "dev", PodmanName: "dsh-podman-proj-dev", ImageID: "arch", Status: "running", SecretEnv: map[string]string{"FOO": "existing"}},
 		},
 	}}); err != nil {
 		t.Fatal(err)
@@ -411,7 +411,7 @@ func TestAddContainerSecretRejectsUnknownSecret(t *testing.T) {
 	if err := store.SaveWorkspaces([]state.Workspace{{
 		WorkspaceSlug: "proj",
 		Containers: []state.Container{
-			{Name: "default", PodmanName: "dsh-workspace-proj", ImageID: "arch", Status: "running", SecretEnv: map[string]string{"FOO": "known"}},
+			{Name: "default", PodmanName: "dsh-podman-proj-default", ImageID: "arch", Status: "running", SecretEnv: map[string]string{"FOO": "known"}},
 		},
 	}}); err != nil {
 		t.Fatal(err)
@@ -444,8 +444,8 @@ func TestRemoveContainerSecret(t *testing.T) {
 	if err := store.SaveWorkspaces([]state.Workspace{{
 		WorkspaceSlug: "proj",
 		Containers: []state.Container{
-			{Name: "default", PodmanName: "dsh-workspace-proj", ImageID: "arch", Status: "running"},
-			{Name: "dev", PodmanName: "dsh-workspace-proj-dev", ImageID: "arch", Status: "running", SecretEnv: map[string]string{"FOO": "existing"}},
+			{Name: "default", PodmanName: "dsh-podman-proj-default", ImageID: "arch", Status: "running"},
+			{Name: "dev", PodmanName: "dsh-podman-proj-dev", ImageID: "arch", Status: "running", SecretEnv: map[string]string{"FOO": "existing"}},
 		},
 	}}); err != nil {
 		t.Fatal(err)
@@ -475,7 +475,7 @@ func TestRemoveContainerSecretMissingBindingMessage(t *testing.T) {
 	if err := store.SaveWorkspaces([]state.Workspace{{
 		WorkspaceSlug: "proj",
 		Containers: []state.Container{
-			{Name: "default", PodmanName: "dsh-workspace-proj", ImageID: "arch", Status: "running"},
+			{Name: "default", PodmanName: "dsh-podman-proj-default", ImageID: "arch", Status: "running"},
 		},
 	}}); err != nil {
 		t.Fatal(err)

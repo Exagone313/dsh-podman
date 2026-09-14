@@ -5,6 +5,10 @@
 import { EventEmitter } from "node:events";
 import { createFilesystemProvider } from "./index.js";
 
+// WORKSPACE_ID is a valid workspace id: slugs are UUIDs, and the pod/container
+// names are derived from one.
+export const WORKSPACE_ID = "2c573001-4171-4900-904b-12a5cc02737a";
+
 export class FakeTerminalCall extends EventEmitter {
   readonly stdinChunks: Buffer[] = [];
 
@@ -129,7 +133,7 @@ export function mountRequestRecorder() {
   const requests: Array<[string, Record<string, unknown>]> = [];
   const resolver = {
     registry: {
-      resolveByPath: async () => ({ id: "team" }),
+      resolveByPath: async () => ({ id: WORKSPACE_ID }),
     },
     getConfig: () => ({ projectsRoot: "/projects" }),
     async control(method: string, request: unknown) {
@@ -151,13 +155,13 @@ export const DAEMON_TOOLS = [
 ];
 
 export const SECRET_BEARING_CONTAINER = {
-  workspaceSlug: "team",
+  workspaceSlug: WORKSPACE_ID,
   containerName: "default",
   imageId: "img-1",
   status: "running",
   createdAt: "2026-01-01T00:00:00Z",
-  podmanName: "dsh-workspace-team-default",
-  agentSocketPath: "/run/dsh-podman/team-default/guest.sock",
+  podmanName: `dsh-podman-${WORKSPACE_ID}-default`,
+  agentSocketPath: `/run/dsh-podman/${WORKSPACE_ID}-default/guest.sock`,
   agentToken: "super-secret-token",
   mounts: [
     { projectName: "team", mode: "MOUNT_MODE_READ_WRITE", kind: "MOUNT_KIND_PROJECT" },
@@ -169,7 +173,7 @@ export const SECRET_BEARING_CONTAINER = {
 export function secretBearingResolver() {
   return {
     registry: {
-      resolveByPath: async () => ({ id: "team" }),
+      resolveByPath: async () => ({ id: WORKSPACE_ID }),
     },
     getConfig: () => ({ projectsRoot: "/projects" }),
     control: async () => SECRET_BEARING_CONTAINER,

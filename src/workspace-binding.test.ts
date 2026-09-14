@@ -20,43 +20,34 @@ import {
   normalizeToolError,
 } from "./workspace-binding.js";
 
-test("workspace slugs are stable and container-safe", () => {
-  assert.equal(workspaceSlug({ projectName: "my/project" }), "my-project");
-  assert.equal(workspaceSlug({ id: "session-1" }), "session-1");
-  assert.equal(workspaceSlug({ projectName: "../../etc" }), "etc");
-  assert.equal(workspaceSlug("workspace-123"), "workspace-123");
+const SLUG = "2c573001-4171-4900-904b-12a5cc02737a";
+const SLUG_SUB = "3d684112-5282-4a11-a15c-23b6dd13848b";
+
+test("workspaceSlug accepts a UUID workspace id", () => {
+  assert.equal(workspaceSlug(SLUG), SLUG);
+  assert.equal(workspaceSlug(SLUG.toUpperCase()), SLUG);
 });
 
-test("workspace slugs read from the workspace shape", () => {
-  assert.equal(workspaceSlug({ workspace: { name: "alpha" } }), "alpha");
-  assert.equal(workspaceSlug({ workspaceName: "beta" }), "beta");
-  assert.equal(workspaceSlug({ projectName: "gamma" }), "gamma");
-  assert.equal(workspaceSlug({ id: "delta" }), "delta");
-});
-
-test("workspace slugs fall back to default", () => {
-  assert.equal(workspaceSlug(undefined), "default");
-  assert.equal(workspaceSlug(null), "default");
-  assert.equal(workspaceSlug({}), "default");
-  assert.equal(workspaceSlug({ workspace: { name: "" } }), "default");
-});
-
-test("workspace slugs are sanitized and truncated", () => {
-  assert.equal(workspaceSlug({ projectName: "a b/c-d" }), "a-b-c-d");
-  assert.equal(workspaceSlug("a b c"), "a-b-c");
-  assert.equal(workspaceSlug({ projectName: "x_y.z" }), "x_y.z");
-  assert.equal(workspaceSlug("-leading"), "leading");
-  assert.equal(workspaceSlug("trailing-"), "trailing");
-  assert.equal(workspaceSlug("a".repeat(200)), "a".repeat(50));
-  assert.equal(workspaceSlug("a/b/c"), "a-b-c");
-});
-
-test("workspace slugs handle traversal parts", () => {
-  assert.equal(workspaceSlug({ projectName: "../../etc" }), "etc");
-  assert.equal(workspaceSlug("../../etc/passwd"), "etc-passwd");
-  assert.equal(workspaceSlug("a/../b"), "a-b");
-  assert.equal(workspaceSlug(".."), "default");
-  assert.equal(workspaceSlug({ projectName: "../../.." }), "default");
+test("workspaceSlug rejects anything that is not a UUID", () => {
+  const invalid = [
+    undefined,
+    null,
+    "",
+    "proj",
+    "team-app",
+    "a/b",
+    "..",
+    "a b",
+    `${SLUG}-x`,
+    SLUG.slice(0, -1),
+  ];
+  for (const value of invalid) {
+    assert.throws(
+      () => workspaceSlug(value),
+      /expected a UUID/,
+      `expected ${JSON.stringify(value)} to be rejected`,
+    );
+  }
 });
 
 test("metadata carries the bearer token", () => {
@@ -258,7 +249,7 @@ test("the auto-created workspace mount stays read-write", async () => {
         projectsRoot: "/projects",
         controlToken: "",
       },
-      { resolveByPath: () => ({ id: "w1", path: "/projects/team" }) } as any,
+      { resolveByPath: () => ({ id: SLUG, path: "/projects/team" }) } as any,
     );
     await resolver.resolve("/projects/team");
     assert.equal(createRequests.length, 1);
@@ -282,7 +273,7 @@ test("resolve exposes the session directory as the default cwd", async () => {
         projectsRoot: "/projects",
         controlToken: "",
       },
-      { resolveByPath: () => ({ id: "w1", path: "/projects/team" }) } as any,
+      { resolveByPath: () => ({ id: SLUG, path: "/projects/team" }) } as any,
     );
     const binding = await resolver.resolve("/projects/team");
     assert.equal(binding.defaultCwd, "/projects/team");
@@ -293,7 +284,7 @@ test("resolve exposes the session directory as the default cwd", async () => {
 
 test("containerBinding exposes the session directory only when a project mount covers it", async () => {
   const mounted = await startControlServer([{
-    workspaceSlug: "w1",
+    workspaceSlug: SLUG,
     containerName: "db",
     agentSocketPath: "/run/x.sock",
     agentToken: "tok",
@@ -307,7 +298,7 @@ test("containerBinding exposes the session directory only when a project mount c
         projectsRoot: "/projects",
         controlToken: "",
       },
-      { resolveByPath: () => ({ id: "w1", path: "/projects/team" }) } as any,
+      { resolveByPath: () => ({ id: SLUG, path: "/projects/team" }) } as any,
     );
     const binding = await resolver.containerBinding("/projects/team", "db");
     assert.equal(binding.defaultCwd, "/projects/team");
@@ -316,7 +307,7 @@ test("containerBinding exposes the session directory only when a project mount c
   }
 
   const unmounted = await startControlServer([{
-    workspaceSlug: "w1",
+    workspaceSlug: SLUG,
     containerName: "db",
     agentSocketPath: "/run/x.sock",
     agentToken: "tok",
@@ -330,7 +321,7 @@ test("containerBinding exposes the session directory only when a project mount c
         projectsRoot: "/projects",
         controlToken: "",
       },
-      { resolveByPath: () => ({ id: "w1", path: "/projects/team" }) } as any,
+      { resolveByPath: () => ({ id: SLUG, path: "/projects/team" }) } as any,
     );
     const binding = await resolver.containerBinding("/projects/team", "db");
     assert.equal(binding.defaultCwd, undefined);
@@ -342,7 +333,7 @@ test("containerBinding exposes the session directory only when a project mount c
 test("containerBinding recreates a container whose agent never answers", async () => {
   const control = await startControlServer(
     [{
-      workspaceSlug: "w1",
+      workspaceSlug: SLUG,
       containerName: "db",
       agentSocketPath: "/nonexistent/guest.sock",
       agentToken: "tok",
@@ -359,7 +350,7 @@ test("containerBinding recreates a container whose agent never answers", async (
         controlToken: "",
         readyTimeoutMs: 50,
       },
-      { resolveByPath: () => ({ id: "w1", path: "/projects/team" }) } as any,
+      { resolveByPath: () => ({ id: SLUG, path: "/projects/team" }) } as any,
     );
     await assert.rejects(() => resolver.containerBinding("/projects/team", "db"));
     assert.equal(control.recreateRequests.length, 1);
@@ -381,13 +372,13 @@ test("resolveForPath derives the workspace from an absolute path without a cwd",
       },
       {
         list: () => [
-          { id: "w1", path: "/projects/team" },
-          { id: "w2", path: "/projects/team/sub" },
+          { id: SLUG, path: "/projects/team" },
+          { id: SLUG_SUB, path: "/projects/team/sub" },
         ],
         resolveByPath: (path: string) =>
           path === "/projects/team/sub"
-            ? { id: "w2", path: "/projects/team/sub" }
-            : { id: "w1", path: "/projects/team" },
+            ? { id: SLUG_SUB, path: "/projects/team/sub" }
+            : { id: SLUG, path: "/projects/team" },
       } as any,
     );
     const binding = await resolver.resolveForPath(
@@ -410,7 +401,7 @@ test("resolveForPath rejects paths it cannot map to a workspace", async () => {
       controlToken: "",
     },
     {
-      list: () => [{ id: "w1", path: "/projects/team" }],
+      list: () => [{ id: SLUG, path: "/projects/team" }],
       resolveByPath: () => undefined,
     } as any,
   );

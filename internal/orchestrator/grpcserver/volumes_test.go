@@ -179,7 +179,7 @@ func TestAddContainerMountTmpfsAndVolume(t *testing.T) {
 	if err := store.SaveWorkspaces([]state.Workspace{{
 		WorkspaceSlug: "proj",
 		Containers: []state.Container{
-			{Name: "dev", PodmanName: "dsh-workspace-proj-dev", ImageID: "arch", Status: "running"},
+			{Name: "dev", PodmanName: "dsh-podman-proj-dev", ImageID: "arch", Status: "running"},
 		},
 	}}); err != nil {
 		t.Fatal(err)
@@ -230,7 +230,7 @@ func TestAddContainerMountDuplicateTmpfsAndVolume(t *testing.T) {
 	if err := store.SaveWorkspaces([]state.Workspace{{
 		WorkspaceSlug: "proj",
 		Containers: []state.Container{{
-			Name: "dev", PodmanName: "dsh-workspace-proj-dev", ImageID: "arch", Status: "running",
+			Name: "dev", PodmanName: "dsh-podman-proj-dev", ImageID: "arch", Status: "running",
 			Mounts: []state.Mount{{Kind: "volume", Volume: "data", Destination: "/data", Mode: "read_write"}, {Kind: "tmpfs", Destination: "/tmp/x", Mode: "read_write"}},
 		}},
 	}}); err != nil {
@@ -253,7 +253,7 @@ func TestRemoveContainerMountVolume(t *testing.T) {
 	if err := store.SaveWorkspaces([]state.Workspace{{
 		WorkspaceSlug: "proj",
 		Containers: []state.Container{{
-			Name: "dev", PodmanName: "dsh-workspace-proj-dev", ImageID: "arch", Status: "running",
+			Name: "dev", PodmanName: "dsh-podman-proj-dev", ImageID: "arch", Status: "running",
 			Mounts: []state.Mount{{Kind: "volume", Volume: "data", Destination: "/data", Mode: "read_write"}},
 		}},
 	}}); err != nil {
@@ -332,7 +332,7 @@ func TestAddContainerMountAllowsSameVolumeAtDifferentDestination(t *testing.T) {
 	if err := store.SaveWorkspaces([]state.Workspace{{
 		WorkspaceSlug: "proj",
 		Containers: []state.Container{
-			{Name: "dev", PodmanName: "dsh-workspace-proj-dev", ImageID: "arch", Status: "running", Mounts: []state.Mount{{Kind: "volume", Volume: "vol", Destination: "/mnt/a", Mode: "read_write"}}},
+			{Name: "dev", PodmanName: "dsh-podman-proj-dev", ImageID: "arch", Status: "running", Mounts: []state.Mount{{Kind: "volume", Volume: "vol", Destination: "/mnt/a", Mode: "read_write"}}},
 		},
 	}}); err != nil {
 		t.Fatal(err)
@@ -341,7 +341,7 @@ func TestAddContainerMountAllowsSameVolumeAtDifferentDestination(t *testing.T) {
 		t.Fatal(err)
 	}
 	fake := newFakePodman()
-	fake.exists["dsh-workspace-proj-dev"] = true
+	fake.exists["dsh-podman-proj-dev"] = true
 	server := &Server{Store: store, Podman: fake, Logger: silentLogger()}
 	if _, err := server.AddContainerMount(context.Background(), &ctl.AddContainerMountRequest{
 		WorkspaceSlug: "proj", Container: "dev", Kind: ctl.MountKind_MOUNT_KIND_VOLUME, Volume: "vol", Destination: "/mnt/b", Mode: ctl.MountMode_MOUNT_MODE_READ_ONLY,
@@ -362,7 +362,7 @@ func TestAddContainerMountRejectsSameVolumeAtSameDestination(t *testing.T) {
 	if err := store.SaveWorkspaces([]state.Workspace{{
 		WorkspaceSlug: "proj",
 		Containers: []state.Container{
-			{Name: "dev", PodmanName: "dsh-workspace-proj-dev", ImageID: "arch", Status: "running", Mounts: []state.Mount{{Kind: "volume", Volume: "vol", Destination: "/mnt/a", Mode: "read_write"}}},
+			{Name: "dev", PodmanName: "dsh-podman-proj-dev", ImageID: "arch", Status: "running", Mounts: []state.Mount{{Kind: "volume", Volume: "vol", Destination: "/mnt/a", Mode: "read_write"}}},
 		},
 	}}); err != nil {
 		t.Fatal(err)
@@ -371,7 +371,7 @@ func TestAddContainerMountRejectsSameVolumeAtSameDestination(t *testing.T) {
 		t.Fatal(err)
 	}
 	fake := newFakePodman()
-	fake.exists["dsh-workspace-proj-dev"] = true
+	fake.exists["dsh-podman-proj-dev"] = true
 	server := &Server{Store: store, Podman: fake, Logger: silentLogger()}
 	_, err := server.AddContainerMount(context.Background(), &ctl.AddContainerMountRequest{
 		WorkspaceSlug: "proj", Container: "dev", Kind: ctl.MountKind_MOUNT_KIND_VOLUME, Volume: "vol", Destination: "/mnt/a", Mode: ctl.MountMode_MOUNT_MODE_READ_ONLY,

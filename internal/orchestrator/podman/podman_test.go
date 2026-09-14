@@ -14,8 +14,8 @@ import (
 )
 
 func TestGuestPodSpecCarriesRestartPolicy(t *testing.T) {
-	spec := newGuestPodSpec("dsh-pod-proj")
-	if spec.PodSpecGen.Name != "dsh-pod-proj" || spec.PodSpecGen.RestartPolicy != "unless-stopped" {
+	spec := newGuestPodSpec("dsh-podman-proj")
+	if spec.PodSpecGen.Name != "dsh-podman-proj" || spec.PodSpecGen.RestartPolicy != "unless-stopped" {
 		t.Fatalf("unexpected pod spec: %#v", spec.PodSpecGen)
 	}
 }
@@ -135,11 +135,11 @@ func TestClassifyMounts(t *testing.T) {
 }
 
 func TestContainerEnv(t *testing.T) {
-	env := containerEnv("/run/dsh-podman", "dsh-workspace-proj", "/workspaces", "tok", map[string]string{"FOO": "bar", "DSH_PODMAN_X": "should-be-skipped", "DSH_PODMAN_GUEST_TOKEN": "must-not-override"}, nil)
+	env := containerEnv("/run/dsh-podman", "dsh-podman-proj-default", "/workspaces", "tok", map[string]string{"FOO": "bar", "DSH_PODMAN_X": "should-be-skipped", "DSH_PODMAN_GUEST_TOKEN": "must-not-override"}, nil)
 	if env["DSH_PODMAN_GUEST_TOKEN"] != "tok" {
 		t.Fatalf("guest token must be the orchestrator value, got %q", env["DSH_PODMAN_GUEST_TOKEN"])
 	}
-	if env["DSH_PODMAN_GUEST_SOCKET"] != filepath.Join("/run/dsh-podman", "dsh-workspace-proj", "guest.sock") {
+	if env["DSH_PODMAN_GUEST_SOCKET"] != filepath.Join("/run/dsh-podman", "dsh-podman-proj-default", "guest.sock") {
 		t.Fatalf("unexpected guest socket: %q", env["DSH_PODMAN_GUEST_SOCKET"])
 	}
 	if env["DSH_PODMAN_PROJECTS_ROOT"] != "/workspaces" {
@@ -192,7 +192,7 @@ func TestGuestMountsEnv(t *testing.T) {
 }
 
 func TestContainerEnvGuestMounts(t *testing.T) {
-	env := containerEnv("/run/dsh-podman", "dsh-workspace-proj", "/workspaces", "tok", nil, []specs.Mount{
+	env := containerEnv("/run/dsh-podman", "dsh-podman-proj-default", "/workspaces", "tok", nil, []specs.Mount{
 		{Type: "tmpfs", Destination: "/scratch", Options: []string{"rw"}},
 		{Type: "volume", Source: "dsh-podman-data", Destination: "/data", Options: []string{"ro"}},
 	})

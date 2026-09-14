@@ -381,7 +381,7 @@ export async function sessionWorkspaceSlug(
     String(cwd),
   );
   if (workspace === undefined) return "default";
-  return workspaceSlug(String(workspace.id));
+  return workspaceSlug(workspace.id);
 }
 
 export async function resolveToolBinding(

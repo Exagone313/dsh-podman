@@ -13,20 +13,25 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-// workspaceSlugName restricts workspace slugs to characters podman accepts in
-// a container name; the container name is derived from the slug, so this is
-// the boundary against a client injecting arbitrary container names.
-var workspaceSlugName = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,62}$`)
+// uuidPattern is the shape of a workspace id. The harness's workspace registry
+// mints ids with crypto.randomUUID(), so a slug is always a UUID; enforcing it
+// here keeps the derived pod (dsh-podman-<slug>) and container
+// (dsh-podman-<slug>-<logical>) names from ever colliding.
+const uuidPattern = `[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}`
+
+// workspaceSlugName restricts workspace slugs to the UUID the pod and container
+// names are derived from; this is the boundary against a client injecting an
+// arbitrary container name.
+var workspaceSlugName = regexp.MustCompile(`^` + uuidPattern + `$`)
 
 // containerLogicalName restricts the logical names clients may assign to
 // named guest containers (e.g. "dev", "web", "api-2").
 var containerLogicalName = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{0,30}$`)
 
 // containerPodmanName is the exact shape of orchestrator-created guest
-// containers (dsh-workspace-<slug> or dsh-workspace-<slug>-<name>); any
-// workspace state that does not match it is treated as invalid rather than
-// acted upon.
-var containerPodmanName = regexp.MustCompile(`^dsh-workspace-[a-zA-Z0-9][a-zA-Z0-9_.-]{0,62}(?:-[a-z0-9][a-z0-9-]{0,30})?$`)
+// containers (dsh-podman-<slug>-<logical>); any workspace state that does not
+// match it is treated as invalid rather than acted upon.
+var containerPodmanName = regexp.MustCompile(`^dsh-podman-` + uuidPattern + `-[a-z0-9][a-z0-9-]{0,30}$`)
 
 // containerNamePattern is the exact shape of orchestrator-created guest
 // containers; see containerPodmanName.
@@ -52,7 +57,7 @@ func shortImageName(s string) bool {
 }
 
 func validWorkspaceSlug(slug string) bool {
-	return slug != "." && slug != ".." && workspaceSlugName.MatchString(slug)
+	return workspaceSlugName.MatchString(slug)
 }
 
 // validContainerName reports whether name is a usable logical container name:
@@ -63,19 +68,19 @@ func validContainerName(name string) bool {
 }
 
 // podmanContainerName derives the podman container name for a workspace's
-// logical container. The "default"/"" logical name maps to the workspace's
-// default container (dsh-workspace-<slug>); named containers are suffixed.
+// logical container: dsh-podman-<slug>-<logical>, where the "default"/"" logical
+// name is "default".
 func podmanContainerName(slug, logical string) string {
-	if logical == "" || logical == "default" {
-		return "dsh-workspace-" + slug
+	if logical == "" {
+		logical = "default"
 	}
-	return "dsh-workspace-" + slug + "-" + logical
+	return "dsh-podman-" + slug + "-" + logical
 }
 
 // podNameFor derives the podman pod name for a workspace. All containers of a
 // workspace live in this pod, sharing its network namespace.
 func podNameFor(slug string) string {
-	return "dsh-pod-" + slug
+	return "dsh-podman-" + slug
 }
 
 // containerByLogical returns the container record for the given logical name.

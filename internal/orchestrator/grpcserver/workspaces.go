@@ -242,7 +242,7 @@ func (s *Server) CreateWorkspace(ctx context.Context, request *ctl.CreateWorkspa
 		s.log().Warn("CreateWorkspace image state is stale", "image_id", imageID, "image_tag", imageTag)
 		return nil, status.Error(codes.NotFound, fmt.Sprintf("image %q not found", imageID))
 	}
-	name := "dsh-workspace-" + request.GetWorkspaceSlug()
+	name := podmanContainerName(request.GetWorkspaceSlug(), "default")
 	if err := s.Podman.CreateWorkspace(podNameFor(request.GetWorkspaceSlug()), name, imageTag, secret, podmanMounts, secrets, envSecrets, userEnv); err != nil {
 		s.log().Error("control request failed", "method", "CreateWorkspace", "workspace_slug", request.GetWorkspaceSlug(), "error", err)
 		return nil, status.Error(codes.Internal, err.Error())

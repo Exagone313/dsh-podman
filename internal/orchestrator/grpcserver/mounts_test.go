@@ -94,7 +94,7 @@ func TestRemoveContainerMountRefusesDefaultProjectMount(t *testing.T) {
 		ProjectName:   "team",
 		Containers: []state.Container{{
 			Name:       "default",
-			PodmanName: "dsh-workspace-proj",
+			PodmanName: "dsh-podman-proj-default",
 			Mounts:     []state.Mount{{ProjectName: "team", Mode: "read_write"}},
 		}},
 	}}); err != nil {
@@ -114,7 +114,7 @@ func TestRemoveContainerMountAllowsNamedProjectMountRemoval(t *testing.T) {
 		ProjectName:   "team",
 		Containers: []state.Container{{
 			Name:       "dev",
-			PodmanName: "dsh-workspace-proj-dev",
+			PodmanName: "dsh-podman-proj-dev",
 			Mounts:     []state.Mount{{ProjectName: "team", Mode: "read_write"}},
 		}},
 	}}); err != nil {
@@ -372,8 +372,8 @@ func TestAddContainerMount(t *testing.T) {
 		WorkspaceSlug: "proj",
 		Mounts:        []state.Mount{{ProjectName: "team", Mode: "read_write"}},
 		Containers: []state.Container{
-			{Name: "default", PodmanName: "dsh-workspace-proj", ImageID: "arch", Status: "running"},
-			{Name: "dev", PodmanName: "dsh-workspace-proj-dev", ImageID: "arch", Status: "running", Mounts: []state.Mount{{ProjectName: "team", Mode: "read_write"}}},
+			{Name: "default", PodmanName: "dsh-podman-proj-default", ImageID: "arch", Status: "running"},
+			{Name: "dev", PodmanName: "dsh-podman-proj-dev", ImageID: "arch", Status: "running", Mounts: []state.Mount{{ProjectName: "team", Mode: "read_write"}}},
 		},
 	}}); err != nil {
 		t.Fatal(err)
@@ -430,8 +430,8 @@ func TestRemoveContainerMount(t *testing.T) {
 		WorkspaceSlug: "proj",
 		Mounts:        []state.Mount{{ProjectName: "team", Mode: "read_write"}},
 		Containers: []state.Container{
-			{Name: "default", PodmanName: "dsh-workspace-proj", ImageID: "arch", Status: "running"},
-			{Name: "dev", PodmanName: "dsh-workspace-proj-dev", ImageID: "arch", Status: "running", Mounts: []state.Mount{{ProjectName: "team", Path: "src", Mode: "read_only"}, {ProjectName: "team", Mode: "read_write"}}},
+			{Name: "default", PodmanName: "dsh-podman-proj-default", ImageID: "arch", Status: "running"},
+			{Name: "dev", PodmanName: "dsh-podman-proj-dev", ImageID: "arch", Status: "running", Mounts: []state.Mount{{ProjectName: "team", Path: "src", Mode: "read_only"}, {ProjectName: "team", Mode: "read_write"}}},
 		},
 	}}); err != nil {
 		t.Fatal(err)
@@ -466,7 +466,7 @@ func TestStartContainerMountsValidation(t *testing.T) {
 		t.Fatal(err)
 	}
 	store := newTestStore(t)
-	if err := store.SaveWorkspaces([]state.Workspace{{WorkspaceSlug: "proj", ContainerName: "dsh-workspace-proj"}}); err != nil {
+	if err := store.SaveWorkspaces([]state.Workspace{{WorkspaceSlug: "proj", ContainerName: "dsh-podman-proj-default"}}); err != nil {
 		t.Fatal(err)
 	}
 	if err := store.SaveImages([]state.Image{{ImageID: "arch", ImageTag: "localhost/dsh-podman/arch:latest"}}); err != nil {
@@ -489,7 +489,7 @@ func TestRecreateContainerMountsValidation(t *testing.T) {
 		t.Fatal(err)
 	}
 	store := newTestStore(t)
-	if err := store.SaveWorkspaces([]state.Workspace{{WorkspaceSlug: "proj", Mounts: []state.Mount{{ProjectName: "team", Mode: "read_only"}}, Containers: []state.Container{{Name: "dev", PodmanName: "dsh-workspace-proj-dev", ImageID: "arch"}}}}); err != nil {
+	if err := store.SaveWorkspaces([]state.Workspace{{WorkspaceSlug: "proj", Mounts: []state.Mount{{ProjectName: "team", Mode: "read_only"}}, Containers: []state.Container{{Name: "dev", PodmanName: "dsh-podman-proj-dev", ImageID: "arch"}}}}); err != nil {
 		t.Fatal(err)
 	}
 	if err := store.SaveImages([]state.Image{{ImageID: "arch", ImageTag: "localhost/dsh-podman/arch:latest"}}); err != nil {
@@ -516,12 +516,12 @@ func TestCreateWorkspacePreservesDefaultContainerMounts(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err := store.SaveWorkspaces([]state.Workspace{{
-		WorkspaceSlug: "proj",
-		ContainerName: "dsh-workspace-proj",
+		WorkspaceSlug: testWorkspaceSlug,
+		ContainerName: testDefaultContainer,
 		ImageID:       "devimg",
 		Containers: []state.Container{{
 			Name:       "default",
-			PodmanName: "dsh-workspace-proj",
+			PodmanName: testDefaultContainer,
 			ImageID:    "devimg",
 			Mounts:     []state.Mount{{ProjectName: "team", Path: "src", Mode: "read_only"}},
 		}},
@@ -529,7 +529,7 @@ func TestCreateWorkspacePreservesDefaultContainerMounts(t *testing.T) {
 		t.Fatal(err)
 	}
 	server := &Server{Store: store, ProjectsRoot: root, Logger: silentLogger()}
-	_, err := server.CreateWorkspace(context.Background(), &ctl.CreateWorkspaceRequest{WorkspaceSlug: "proj", ProjectName: "team", ImageId: "devimg", Mounts: []*ctl.ProjectMount{{ProjectName: "team", Path: "nope", Mode: ctl.MountMode_MOUNT_MODE_READ_ONLY}}})
+	_, err := server.CreateWorkspace(context.Background(), &ctl.CreateWorkspaceRequest{WorkspaceSlug: testWorkspaceSlug, ProjectName: "team", ImageId: "devimg", Mounts: []*ctl.ProjectMount{{ProjectName: "team", Path: "nope", Mode: ctl.MountMode_MOUNT_MODE_READ_ONLY}}})
 	if status.Code(err) != codes.FailedPrecondition {
 		t.Fatalf("preserved default container mounts should win over invalid request mounts, expected FailedPrecondition, got %v", err)
 	}
@@ -560,7 +560,7 @@ func TestNonProjectDestinationReservedPaths(t *testing.T) {
 	}
 	rejected := []string{
 		"/run/dsh-podman",
-		"/run/dsh-podman/dsh-workspace-x",
+		"/run/dsh-podman/dsh-podman-x-default",
 		"/opt/dsh-podman/guest-agent",
 		"/opt/dsh-podman/guest-agent/bin",
 		// Ancestors hide every reserved path beneath them.
@@ -610,7 +610,7 @@ func TestAddContainerMountRestoresOnFailedRecreate(t *testing.T) {
 	if err := store.SaveWorkspaces([]state.Workspace{{
 		WorkspaceSlug: "proj",
 		Containers: []state.Container{
-			{Name: "dev", PodmanName: "dsh-workspace-proj-dev", ImageID: "arch", Status: "running"},
+			{Name: "dev", PodmanName: "dsh-podman-proj-dev", ImageID: "arch", Status: "running"},
 		},
 	}}); err != nil {
 		t.Fatal(err)
@@ -619,7 +619,7 @@ func TestAddContainerMountRestoresOnFailedRecreate(t *testing.T) {
 		t.Fatal(err)
 	}
 	fake := newFakePodman()
-	fake.exists["dsh-workspace-proj-dev"] = true
+	fake.exists["dsh-podman-proj-dev"] = true
 	fake.recreateFails = 1
 	server := &Server{Store: store, Podman: fake, Logger: silentLogger()}
 	_, err := server.AddContainerMount(context.Background(), &ctl.AddContainerMountRequest{
@@ -631,7 +631,7 @@ func TestAddContainerMountRestoresOnFailedRecreate(t *testing.T) {
 	if len(fake.recreated) != 2 {
 		t.Fatalf("expected the failed recreate and a restore, got %v", fake.recreated)
 	}
-	if !fake.exists["dsh-workspace-proj-dev"] {
+	if !fake.exists["dsh-podman-proj-dev"] {
 		t.Fatalf("the replaced container was not restored")
 	}
 	stored, err := store.Workspaces()

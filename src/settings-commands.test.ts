@@ -471,7 +471,6 @@ test("unset kind and mode strings map to project and read_only", async () => {
       mounts: [{
         kind: "",
         project: "team",
-        path: "",
         destination: "",
         mode: "",
         volume: "",

@@ -50,7 +50,6 @@ export function CreateContainerModal(props: {
     {
       kind: "project",
       project: workspace.projectName,
-      path: "",
       destination: "",
       mode: "read_write",
       volume: "",

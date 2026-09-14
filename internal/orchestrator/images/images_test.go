@@ -251,8 +251,8 @@ func TestContainerfileBaseDistros(t *testing.T) {
 	}{
 		{
 			name: "archlinux", wantFrom: "FROM docker.io/library/archlinux:latest\n",
-			spec:        BuildSpec{ImageID: "archlinux", From: "docker.io/library/archlinux:latest", PackageManager: "pacman", Packages: []string{"base-devel", "git", "python", "curl", "wget", "openssh", "ca-certificates", "ripgrep", "fd", "jq", "unzip", "zstd", "less", "procps-ng", "diffutils", "patch", "tree"}, IsBase: true},
-			wantInstall: "RUN pacman -Syu --needed --noconfirm base-devel git python curl wget openssh ca-certificates ripgrep fd jq unzip zstd less procps-ng diffutils patch tree\n",
+			spec:        BuildSpec{ImageID: "archlinux", From: "docker.io/library/archlinux:latest", PackageManager: "pacman", Packages: []string{"base-devel", "ca-certificates", "curl", "diffutils", "fd", "git", "jq", "less", "openssh", "patch", "procps-ng", "python", "ripgrep", "tree", "unzip", "wget", "zstd"}, IsBase: true},
+			wantInstall: "RUN pacman -Syu --needed --noconfirm base-devel ca-certificates curl diffutils fd git jq less openssh patch procps-ng python ripgrep tree unzip wget zstd\n",
 		},
 		{
 			name: "ubuntu", wantFrom: "FROM docker.io/library/ubuntu:latest\n",

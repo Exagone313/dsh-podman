@@ -66,7 +66,7 @@ type BaseImage struct {
 var BaseImages = []BaseImage{
 	{
 		ID: "archlinux", Primitive: "docker.io/library/archlinux:latest", PackageManager: "pacman", CachePath: "/var/cache/pacman/pkg",
-		Packages: []string{"base-devel", "git", "python", "curl", "wget", "openssh", "ca-certificates", "ripgrep", "fd", "jq", "unzip", "zstd", "less", "procps-ng", "diffutils", "patch", "tree"},
+		Packages: []string{"base-devel", "ca-certificates", "curl", "diffutils", "fd", "git", "jq", "less", "openssh", "patch", "procps-ng", "python", "ripgrep", "tree", "unzip", "wget", "zstd"},
 	},
 	{
 		ID: "ubuntu", Primitive: "docker.io/library/ubuntu:latest", PackageManager: "apt", CachePath: "/var/cache/apt/archives",

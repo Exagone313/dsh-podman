@@ -120,6 +120,7 @@ export function ContainerCard(props: ContainerCardProps): ReactNode {
                 onStartContainer={props.startContainer}
                 onAddContainerMount={props.addContainerMount}
                 onRemoveContainerMount={props.removeContainerMount}
+                onUpdateContainerMount={props.updateContainerMount}
                 onAddContainerSecret={props.addContainerSecret}
                 onRemoveContainerSecret={props.removeContainerSecret}
               />

@@ -104,6 +104,10 @@ export type ContainerPluginKey =
   | "mountMode"
   | "readOnly"
   | "readWrite"
+  | "remountReadOnly"
+  | "remountReadWrite"
+  | "confirmRemountReadOnly"
+  | "confirmRemountReadWrite"
   | "confirmRemoveMount"
   | "cachesTitle"
   | "noCaches"
@@ -266,6 +270,12 @@ export const en: Record<ContainerPluginKey, string> = {
   mountMode: "Mode",
   readOnly: "Read-only",
   readWrite: "Read-write",
+  remountReadOnly: "Remount as read-only",
+  remountReadWrite: "Remount as read-write",
+  confirmRemountReadOnly:
+    "Remount this mount as read-only and recreate the container?",
+  confirmRemountReadWrite:
+    "Remount this mount as read-write and recreate the container?",
   confirmRemoveMount: "Remove this mount from the container and recreate it?",
   cachesTitle: "Package caches",
   noCaches: "No package cache is configured.",
@@ -427,6 +437,10 @@ export const zh: Record<ContainerPluginKey, string> = {
   mountMode: "模式",
   readOnly: "只读",
   readWrite: "读写",
+  remountReadOnly: "重新挂载为只读",
+  remountReadWrite: "重新挂载为读写",
+  confirmRemountReadOnly: "将该挂载重新挂载为只读并重建容器？",
+  confirmRemountReadWrite: "将该挂载重新挂载为读写并重建容器？",
   confirmRemoveMount: "从容器中移除该挂载并重建容器？",
   cachesTitle: "软件包缓存",
   noCaches: "未配置软件包缓存。",

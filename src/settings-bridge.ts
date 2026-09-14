@@ -208,6 +208,21 @@ export function installContainerSettings(
             await resolver.control("removeContainerMount", request);
             break;
           }
+          case "container_mount_update": {
+            const m = command.mount;
+            if (m === null) break;
+            const kind = mountKindToProto(m.kind || undefined);
+            const request: Record<string, unknown> = {
+              workspaceSlug: command.workspace,
+              container: command.container || "default",
+              kind,
+              mode: mountModeToProto(m.mode),
+            };
+            if (kind === "MOUNT_KIND_PROJECT") { request.project = m.project; if (m.path) request.path = m.path; }
+            else if (kind === "MOUNT_KIND_VOLUME") { if (m.volume) request.volume = m.volume; if (m.destination) request.destination = m.destination; }
+            await resolver.control("updateContainerMount", request);
+            break;
+          }
           case "remove":
             await resolver.control("removeContainer", {
               workspaceSlug: command.workspace,

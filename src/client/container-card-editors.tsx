@@ -96,8 +96,12 @@ export function MountsEditor(props: {
   busy: boolean;
   enabled: boolean;
   confirmRemove?: boolean;
+  // The default container's primary project mount: it cannot be removed, so it
+  // offers only the remount control.
+  primaryProject?: string;
   onAdd: (mount: MountInput) => void;
   onRemove: (mount: MountInput) => void;
+  onUpdate?: (mount: MountInput) => void;
 }): ReactNode {
   const {
     t,
@@ -107,8 +111,10 @@ export function MountsEditor(props: {
     busy,
     enabled,
     confirmRemove,
+    primaryProject = "",
     onAdd,
     onRemove,
+    onUpdate,
   } = props;
   const [adding, setAdding] = useState(false);
   const [draft, setDraft] = useState<MountInput>(emptyMount());
@@ -261,47 +267,75 @@ export function MountsEditor(props: {
     );
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-      {mounts.map((mount) => (
-        <div
-          key={mountLabel(t, mount)}
-          style={{
-            display: "flex",
-            flexWrap: "wrap",
-            alignItems: "center",
-            gap: "8px",
-          }}
-        >
-          <code
+      {mounts.map((mount) => {
+        const nextMode = mount.mode === "read_write" ? "read_only" : "read_write";
+        const remountable = mount.kind === "project" || mount.kind === "volume";
+        const removable =
+          mount.kind !== "project" ||
+          primaryProject === "" ||
+          mount.project !== primaryProject ||
+          mount.path !== "";
+        return (
+          <div
+            key={mountLabel(t, mount)}
             style={{
-              ...greyId,
-              flex: 1,
-              fontSize: "13px",
-              color: "var(--dsw-alias-label-primary)",
+              display: "flex",
+              flexWrap: "wrap",
+              alignItems: "center",
+              gap: "8px",
             }}
           >
-            {mountLabel(t, mount)}
-          </code>
-          {confirmRemove ? (
-            <ConfirmButton
-              t={t}
-              label={t("remove")}
-              title={t("confirmTitle")}
-              description={t("confirmRemoveMount")}
-              disabled={!enabled}
-              onConfirm={() => onRemove(mount)}
-            />
-          ) : (
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={!enabled}
-              onClick={() => onRemove(mount)}
+            <code
+              style={{
+                ...greyId,
+                flex: 1,
+                fontSize: "13px",
+                color: "var(--dsw-alias-label-primary)",
+              }}
             >
-              {t("remove")}
-            </Button>
-          )}
-        </div>
-      ))}
+              {mountLabel(t, mount)}
+            </code>
+            {remountable && onUpdate !== undefined && (
+              <ConfirmButton
+                t={t}
+                label={
+                  nextMode === "read_only"
+                    ? t("remountReadOnly")
+                    : t("remountReadWrite")
+                }
+                title={t("confirmTitle")}
+                description={
+                  nextMode === "read_only"
+                    ? t("confirmRemountReadOnly")
+                    : t("confirmRemountReadWrite")
+                }
+                disabled={!enabled}
+                onConfirm={() => onUpdate({ ...mount, mode: nextMode })}
+              />
+            )}
+            {removable &&
+              (confirmRemove ? (
+                <ConfirmButton
+                  t={t}
+                  label={t("remove")}
+                  title={t("confirmTitle")}
+                  description={t("confirmRemoveMount")}
+                  disabled={!enabled}
+                  onConfirm={() => onRemove(mount)}
+                />
+              ) : (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={!enabled}
+                  onClick={() => onRemove(mount)}
+                >
+                  {t("remove")}
+                </Button>
+              ))}
+          </div>
+        );
+      })}
       <div>
         <Button
           variant="outline"

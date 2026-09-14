@@ -35,8 +35,10 @@ export function ContainerRow(props: {
   ) => void;
   onAddContainerMount: (workspace: string, container: string, mount: MountInput) => void;
   onRemoveContainerMount: (workspace: string, container: string, mount: MountInput) => void;
+  onUpdateContainerMount: (workspace: string, container: string, mount: MountInput) => void;
   onAddContainerSecret: (workspace: string, envVar: string, secret: string) => void;
   onRemoveContainerSecret: (workspace: string, envVar: string) => void;
+  projectName: string;
 }): ReactNode {
   const {
     t,
@@ -49,8 +51,10 @@ export function ContainerRow(props: {
     onRecreate,
     onAddContainerMount,
     onRemoveContainerMount,
+    onUpdateContainerMount,
     onAddContainerSecret,
     onRemoveContainerSecret,
+    projectName,
   } = props;
   const [selected, setSelected] = useState(container.imageId);
   const [env, setEnv] = useState<Record<string, string>>(container.env);
@@ -184,6 +188,16 @@ export function ContainerRow(props: {
             busy={busy}
             enabled={enabled}
             confirmRemove
+            primaryProject={
+              container.containerName === "default" ? projectName : ""
+            }
+            onUpdate={(mount) =>
+              onUpdateContainerMount(
+                container.workspaceSlug,
+                container.containerName,
+                mount,
+              )
+            }
             onRemove={(mount) =>
               onRemoveContainerMount(
                 container.workspaceSlug,

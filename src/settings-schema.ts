@@ -28,6 +28,7 @@ const commandSchema = z.object({
     z.const("image_base_pull"),
     z.const("container_mount_add"),
     z.const("container_mount_remove"),
+    z.const("container_mount_update"),
     z.const("cache_clean"),
   ]),
   workspace: z.string().default(""),
@@ -171,7 +172,7 @@ export interface MountInput {
 }
 
 export interface CommandRequest {
-  op: "refresh" | "remove" | "workspace_remove" | "recreate" | "create" | "volume_create" | "volume_remove" | "image_remove" | "secret_create" | "secret_remove" | "secret_set" | "image_rebuild" | "image_rebuild_all" | "container_secret_add" | "container_secret_remove" | "image_build" | "image_base_rebuild" | "image_base_pull" | "container_mount_add" | "container_mount_remove" | "cache_clean";
+  op: "refresh" | "remove" | "workspace_remove" | "recreate" | "create" | "volume_create" | "volume_remove" | "image_remove" | "secret_create" | "secret_remove" | "secret_set" | "image_rebuild" | "image_rebuild_all" | "container_secret_add" | "container_secret_remove" | "image_build" | "image_base_rebuild" | "image_base_pull" | "container_mount_add" | "container_mount_remove" | "container_mount_update" | "cache_clean";
   workspace: string;
   projectName: string;
   image: string;

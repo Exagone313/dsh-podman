@@ -303,6 +303,46 @@ test("container_mount_remove command drives removeContainerMount for each kind",
   assert.equal(scope.value.command, null);
 });
 
+test("container_mount_update command drives updateContainerMount", async () => {
+  const { scope, calls } = await installedMountScope();
+  await scope.update({
+    command: mountCommand("container_mount_update", {
+      kind: "project",
+      project: "team",
+      mode: "read_only",
+    }),
+  });
+  await new Promise((resolve) => setImmediate(resolve));
+  await scope.update({
+    command: mountCommand("container_mount_update", {
+      kind: "volume",
+      volume: "valkey-data",
+      destination: "/data",
+      mode: "read_write",
+    }),
+  });
+  await new Promise((resolve) => setImmediate(resolve));
+  const updateCalls = calls.filter(([method]) => method === "updateContainerMount");
+  assert.deepEqual(updateCalls.map(([, request]) => request), [
+    {
+      workspaceSlug: "w1",
+      container: "web",
+      kind: "MOUNT_KIND_PROJECT",
+      project: "team",
+      mode: "MOUNT_MODE_READ_ONLY",
+    },
+    {
+      workspaceSlug: "w1",
+      container: "web",
+      kind: "MOUNT_KIND_VOLUME",
+      volume: "valkey-data",
+      destination: "/data",
+      mode: "MOUNT_MODE_READ_WRITE",
+    },
+  ]);
+  assert.equal(scope.value.command, null);
+});
+
 test("container_mount_add command reports an unknown kind as a notice", async () => {
   const { scope, calls } = await installedMountScope();
   await scope.update({

@@ -66,11 +66,11 @@ type BaseImage struct {
 var BaseImages = []BaseImage{
 	{
 		ID: "archlinux", Primitive: "docker.io/library/archlinux:latest", PackageManager: "pacman", CachePath: "/var/cache/pacman/pkg",
-		Packages: []string{"base-devel", "ca-certificates", "curl", "diffutils", "fd", "git", "jq", "less", "openssh", "patch", "procps-ng", "python", "ripgrep", "tree", "unzip", "wget", "zstd"},
+		Packages: []string{"base-devel", "ca-certificates", "curl", "diffutils", "fd", "git", "inetutils", "jq", "less", "openbsd-netcat", "openssh", "patch", "procps-ng", "python", "ripgrep", "tree", "unzip", "wget", "zstd"},
 	},
 	{
 		ID: "ubuntu", Primitive: "docker.io/library/ubuntu:latest", PackageManager: "apt", CachePath: "/var/cache/apt/archives",
-		Packages:    []string{"build-essential", "ca-certificates", "curl", "diffutils", "fd-find", "git", "jq", "less", "openssh-client", "patch", "procps", "python3", "ripgrep", "tree", "unzip", "wget", "zstd"},
+		Packages:    []string{"build-essential", "ca-certificates", "curl", "diffutils", "fd-find", "git", "jq", "less", "netcat-openbsd", "openssh-client", "patch", "procps", "python3", "ripgrep", "tree", "unzip", "wget", "zstd"},
 		PostInstall: []string{"ln -s /usr/bin/fd-find /usr/local/bin/fd"},
 	},
 	{

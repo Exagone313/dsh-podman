@@ -251,13 +251,13 @@ func TestContainerfileBaseDistros(t *testing.T) {
 	}{
 		{
 			name: "archlinux", wantFrom: "FROM docker.io/library/archlinux:latest\n",
-			spec:        BuildSpec{ImageID: "archlinux", From: "docker.io/library/archlinux:latest", PackageManager: "pacman", Packages: []string{"base-devel", "ca-certificates", "curl", "diffutils", "fd", "git", "jq", "less", "openssh", "patch", "procps-ng", "python", "ripgrep", "tree", "unzip", "wget", "zstd"}, IsBase: true},
-			wantInstall: "RUN pacman -Syu --needed --noconfirm base-devel ca-certificates curl diffutils fd git jq less openssh patch procps-ng python ripgrep tree unzip wget zstd\n",
+			spec:        BuildSpec{ImageID: "archlinux", From: "docker.io/library/archlinux:latest", PackageManager: "pacman", Packages: []string{"base-devel", "ca-certificates", "curl", "diffutils", "fd", "git", "inetutils", "jq", "less", "openbsd-netcat", "openssh", "patch", "procps-ng", "python", "ripgrep", "tree", "unzip", "wget", "zstd"}, IsBase: true},
+			wantInstall: "RUN pacman -Syu --needed --noconfirm base-devel ca-certificates curl diffutils fd git inetutils jq less openbsd-netcat openssh patch procps-ng python ripgrep tree unzip wget zstd\n",
 		},
 		{
 			name: "ubuntu", wantFrom: "FROM docker.io/library/ubuntu:latest\n",
-			spec:        BuildSpec{ImageID: "ubuntu", From: "docker.io/library/ubuntu:latest", PackageManager: "apt", Packages: []string{"build-essential", "ca-certificates", "curl", "diffutils", "fd-find", "git", "jq", "less", "openssh-client", "patch", "procps", "python3", "ripgrep", "tree", "unzip", "wget", "zstd"}, IsBase: true, PostInstall: []string{"ln -s /usr/bin/fd-find /usr/local/bin/fd"}},
-			wantInstall: "RUN DEBIAN_FRONTEND=noninteractive apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends build-essential ca-certificates curl diffutils fd-find git jq less openssh-client patch procps python3 ripgrep tree unzip wget zstd && rm -rf /var/lib/apt/lists/*\n",
+			spec:        BuildSpec{ImageID: "ubuntu", From: "docker.io/library/ubuntu:latest", PackageManager: "apt", Packages: []string{"build-essential", "ca-certificates", "curl", "diffutils", "fd-find", "git", "jq", "less", "netcat-openbsd", "openssh-client", "patch", "procps", "python3", "ripgrep", "tree", "unzip", "wget", "zstd"}, IsBase: true, PostInstall: []string{"ln -s /usr/bin/fd-find /usr/local/bin/fd"}},
+			wantInstall: "RUN DEBIAN_FRONTEND=noninteractive apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends build-essential ca-certificates curl diffutils fd-find git jq less netcat-openbsd openssh-client patch procps python3 ripgrep tree unzip wget zstd && rm -rf /var/lib/apt/lists/*\n",
 			wantPost:    "RUN ln -s /usr/bin/fd-find /usr/local/bin/fd\n",
 		},
 		{

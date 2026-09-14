@@ -34,7 +34,7 @@ test("container_start approval depends on mounts being passed", () => {
     container: "web",
     image: "localhost/dsh-podman/nginx:latest",
     mounts: [
-      { project: "team", path: "src", mode: "read_only" },
+      { project: "team/src", mode: "read_only" },
       { project: "team", destination: "/workspace/team", mode: "read_write" },
     ],
   });
@@ -67,7 +67,7 @@ test("preExecutePolicy denies project mounts that carry a destination", async ()
   const deny = (await preExecutePolicy(
     {
       name: "container_mount_add",
-      arguments: { kind: "project", project: "team", path: "src", destination: "/custom" },
+      arguments: { kind: "project", project: "team/src", destination: "/custom" },
     },
     () => Promise.resolve({ kind: "allow" }),
     () => "/projects",
@@ -231,7 +231,7 @@ test("container_mount_update maps the selector and mode", async () => {
   const { requests, resolver } = mountRequestRecorder();
   await toolHandlers.container_mount_update(
     resolver as never,
-    { container: "valkey-ctr", kind: "project", project: "team", path: "src", mode: "read_only" },
+    { container: "valkey-ctr", kind: "project", project: "team/src", mode: "read_only" },
     MOUNT_EXEC,
   );
   await toolHandlers.container_mount_update(
@@ -245,8 +245,7 @@ test("container_mount_update maps the selector and mode", async () => {
       workspaceSlug: WORKSPACE_ID,
       container: "valkey-ctr",
       kind: "MOUNT_KIND_PROJECT",
-      project: "team",
-      path: "src",
+      project: "team/src",
       mode: "MOUNT_MODE_READ_ONLY",
     },
   ]);
@@ -336,7 +335,7 @@ test("container_mount_add rejects a destination on a project mount", async () =>
     () =>
       toolHandlers.container_mount_add(
         resolver as never,
-        { container: "web", kind: "project", project: "team", path: "src", destination: "/custom" },
+        { container: "web", kind: "project", project: "team/src", destination: "/custom" },
         MOUNT_EXEC,
       ),
     /Project mounts cannot set a destination; "team\/src" always mounts at "\/projects\/team\/src"/,
@@ -491,7 +490,7 @@ test("container start maps valid mounts and defaults the mode to read_only", asy
       container: "web",
       image: "img1",
       mounts: [
-        { project: "team", path: "src", mode: "read_only" },
+        { project: "team/src", mode: "read_only" },
         { project: "team", mode: "read_write" },
         { kind: "volume", volume: "valkey-data", destination: "/data" },
         { kind: "secret", secret: "valkey-tls", destination: "/run/secrets/tls" },
@@ -507,10 +506,9 @@ test("container start maps valid mounts and defaults the mode to read_only", asy
       imageId: "img1",
       mounts: [
         {
-          projectName: "team",
+          projectName: "team/src",
           kind: "MOUNT_KIND_PROJECT",
           mode: "MOUNT_MODE_READ_ONLY",
-          path: "src",
         },
         {
           projectName: "team",

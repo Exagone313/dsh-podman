@@ -21,16 +21,12 @@ export function inferMountKind(args: {
 }
 
 // The container-side destination a project mount always lands at: the project
-// root under projectsRoot plus the optional subpath. The container never gets a
-// caller-chosen destination for a project mount.
+// path under projectsRoot.
 export function projectMountMirror(
   projectsRoot: string,
   project: string,
-  path: unknown,
 ): string {
-  return [projectsRoot, project, path]
-    .filter((part) => typeof part === "string" && part !== "")
-    .join("/");
+  return [projectsRoot, project].filter((part) => part !== "").join("/");
 }
 
 // The reason to deny a mount item that carries a destination on a project (or
@@ -41,7 +37,6 @@ export function projectMountDestinationReason(
   args: {
     kind?: unknown;
     project?: unknown;
-    path?: unknown;
     destination?: unknown;
   },
   locale: ReasonLocale = "en",
@@ -49,17 +44,13 @@ export function projectMountDestinationReason(
   if (inferMountKind(args) !== "project") return undefined;
   if (args.destination === undefined || args.destination === "") return undefined;
   const project = typeof args.project === "string" ? args.project : "";
-  const path = args.path;
   const mirror =
     projectsRoot === undefined
       ? ""
-      : projectMountMirror(projectsRoot, project, path);
-  const source = [project, path]
-    .filter((part) => typeof part === "string" && part !== "")
-    .join("/");
+      : projectMountMirror(projectsRoot, project);
   return renderDenial(locale, {
     kind: "project_destination",
-    ...(source === "" ? {} : { source }),
+    ...(project === "" ? {} : { source: project }),
     ...(mirror === "" ? {} : { mirror }),
   });
 }
@@ -79,7 +70,6 @@ export function mountsFromInput(
     const kind = mountKindToProto(inferredKind);
     const mode = mountModeToProto(mount.mode ?? defaultMountMode(inferredKind));
     const result: Record<string, unknown> = { projectName: mount.project ?? "", kind, mode };
-    if (mount.path) result.path = mount.path;
     if (inferredKind !== "project" && mount.destination) {
       result.destination = mount.destination;
     }

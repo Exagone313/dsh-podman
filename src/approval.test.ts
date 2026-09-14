@@ -137,7 +137,7 @@ test("summarizeArgs renders the approval reason for each gated tool", () => {
       container: "web",
       image: "localhost/dsh-podman/nginx:latest",
       mounts: [
-        { project: "team", path: "src", mode: "read_only" },
+        { project: "team/src", mode: "read_only" },
         { project: "team", destination: "/workspace/team", mode: "read_write" },
       ],
     }),
@@ -148,7 +148,7 @@ test("summarizeArgs renders the approval reason for each gated tool", () => {
       container: "valkey-ctr",
       image: "localhost/dsh-podman/nginx:latest",
       mounts: [
-        { project: "team", path: "src", mode: "read_only" },
+        { project: "team/src", mode: "read_only" },
         { project: "team", destination: "/workspace/team", mode: "read_write" },
       ],
     }),
@@ -178,8 +178,7 @@ test("summarizeArgs renders the approval reason for each gated tool", () => {
     summarizeArgs("container_mount_add", {
       container: "valkey-ctr",
       kind: "project",
-      project: "team",
-      path: "src",
+      project: "team/src",
       destination: "/workspace/team",
       mode: "read_only",
     }),
@@ -207,8 +206,7 @@ test("summarizeArgs renders the approval reason for each gated tool", () => {
     summarizeArgs("container_mount_remove", {
       container: "valkey-ctr",
       kind: "project",
-      project: "team",
-      path: "src",
+      project: "team/src",
     }),
     'Remove mount from container "valkey-ctr": project "team/src".',
   );

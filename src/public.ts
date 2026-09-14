@@ -11,7 +11,6 @@ export function publicMount(mount: any): Record<string, unknown> {
   const mode = mountModeFromProto(mount?.mode);
   return {
     ...(mount?.projectName ? { projectName: mount.projectName } : {}),
-    ...(mount?.path ? { path: mount.path } : {}),
     ...(mount?.destination ? { destination: mount.destination } : {}),
     ...(mount?.volume ? { volume: mount.volume } : {}),
     ...(mount?.secret ? { secret: mount.secret } : {}),

@@ -30,13 +30,17 @@ const mountKindParam = {
     "Kind of mount: a project bind, a tmpfs, a named volume, or a named secret.",
 };
 
+// A project mount names a path under the projects root, so it may include
+// subdirectories: `team` mounts the project, `team/src` a directory inside it.
+const projectPathDescription =
+  'Project path under the projects root to mount, e.g. "team" or "team/src".';
+
 const projectMountItemParam = {
   type: "object",
   additionalProperties: false,
   properties: {
-    project: { type: "string", description: "Project name to mount." },
+    project: { type: "string", description: projectPathDescription },
     mode: mountModeParam,
-    path: { type: "string", description: "Path within the project to mount." },
     destination: {
       type: "string",
       description:
@@ -166,8 +170,7 @@ export const containerMountAddParameters = {
   properties: {
     container: containerParam,
     kind: mountKindParam,
-    project: { type: "string", description: "Project name to mount." },
-    path: { type: "string", description: "Path within the project to mount." },
+    project: { type: "string", description: projectPathDescription },
     destination: {
       type: "string",
       description:
@@ -192,12 +195,7 @@ export const containerMountRemoveParameters = {
     },
     project: {
       type: "string",
-      description: "Project name of the project mount to remove.",
-    },
-    path: {
-      type: "string",
-      description:
-        "Path within the project of the project mount to remove; omit it for the project root.",
+      description: "Project path of the project mount to remove.",
     },
     volume: {
       type: "string",
@@ -230,12 +228,7 @@ export const containerMountUpdateParameters = {
     },
     project: {
       type: "string",
-      description: "Project name of the project mount to update.",
-    },
-    path: {
-      type: "string",
-      description:
-        "Path within the project of the project mount to update; omit it for the project root.",
+      description: "Project path of the project mount to update.",
     },
     volume: {
       type: "string",

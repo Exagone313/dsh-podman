@@ -288,7 +288,6 @@ export const toolHandlers: Record<
       request.destination = input.destination;
     } else {
       request.project = input.project;
-      if (input.path !== undefined) request.path = input.path;
       request.mode = mode;
     }
     const row = await resolver.control("addContainerMount", request);
@@ -304,7 +303,6 @@ export const toolHandlers: Record<
     };
     if (kind === "project") {
       request.project = input.project;
-      if (input.path !== undefined) request.path = input.path;
     } else if (kind === "volume") {
       if (input.volume !== undefined) request.volume = input.volume;
     } else if (kind === "secret") {
@@ -334,7 +332,6 @@ export const toolHandlers: Record<
     };
     if (kind === "project") {
       request.project = input.project;
-      if (input.path !== undefined) request.path = input.path;
     } else {
       if (input.volume !== undefined) request.volume = input.volume;
       if (input.destination !== undefined) {

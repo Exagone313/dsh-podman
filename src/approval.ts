@@ -14,12 +14,6 @@ import {
   type ReasonLocale,
 } from "./approval-reasons.js";
 
-// Render a project mount path "team" or "team/src" from project + optional path.
-function projectPath(project: string, path?: string): string {
-  if (path === undefined || path === "") return project;
-  return `${project}/${path.replace(/^\/+/, "")}`;
-}
-
 // Build the mount fact for one mount object, or undefined when it names no
 // source. `readOnly` is the mount's mode when the call carries one; omit it
 // when the call does not (removal), so the reason names no mode.
@@ -44,7 +38,7 @@ function mountFact(
         : kind === "secret"
           ? typeof mount.secret === "string" ? mount.secret : ""
           : typeof mount.project === "string"
-            ? projectPath(mount.project, typeof mount.path === "string" ? mount.path : undefined)
+            ? mount.project
             : "";
   if (kind !== "tmpfs" && source === "") return undefined;
   return {

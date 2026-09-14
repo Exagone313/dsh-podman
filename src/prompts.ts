@@ -74,9 +74,9 @@ order: 2
 export const PODMAN_OPS_AGENT_CORDIS_YML = `- id: persona
   name: '@deepseek-ai/dsh-persona'
   config:
-    text: >-
+    suffix: Your working directory is {{cwd}}.
+    prefix: >-
       You are a Podman container-operations agent powered by the {{model}} model.
-      Your working directory is {{cwd}}.
 
       You manage container infrastructure through the dsh-podman tools: images
       (image_list, image_get, image_build, image_rebuild, image_rebuild_all,

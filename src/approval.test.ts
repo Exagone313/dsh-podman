@@ -468,6 +468,10 @@ test("Podman-ops preset content covers the recent tools", () => {
     );
   }
   assert.ok(PODMAN_OPS_PRESET_YML.includes("secrets"), "podman-ops metadata must mention secrets");
+  // The persona plugin takes its prose as `prefix` (a required field); `text`
+  // is not part of its schema and would make the preset fail to load.
+  assert.match(PODMAN_OPS_AGENT_CORDIS_YML, /prefix:/);
+  assert.doesNotMatch(PODMAN_OPS_AGENT_CORDIS_YML, /\btext:/);
 });
 
 test("Podman-ops preset writer overwrites existing content", () => {

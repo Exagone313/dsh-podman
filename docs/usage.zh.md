@@ -121,18 +121,18 @@ bash 进程）的 `env` 映射；`container_exec` 和 `daemon_start` 已经接�
 
 ### 挂载与卷
 
-| 工具                       | 参数                                                                                       | 描述                                                                 |
-| -------------------------- | ------------------------------------------------------------------------------------------ | -------------------------------------------------------------------- |
-| `container_mount_add` ✱    | `container`, optional `kind`, `project`, `path`, `destination`, `mode`, `volume`, `secret` | 添加挂载；`kind` 为 `project`（默认）、`tmpfs`、`volume` 或 `secret` |
-| `container_mount_list`     | `container`                                                                                | 列出容器的挂载                                                       |
-| `container_mount_remove` ✱ | `container`, optional `kind`, `project`, `path`, `volume`, `destination`, `secret`         | 移除挂载；通过 `kind` 及其标识字段指定（见下文）                     |
-| `container_mount_update` ✱ | `container`, `mode`, optional `kind`, `project`, `path`, `volume`, `destination`           | 更改项目或卷挂载的模式；标识方式同移除（见下文）                     |
-| `volume_create`            | `name`                                                                                     | 创建受管理的命名卷                                                   |
-| `volume_list`              | —                                                                                          | 列出受管理的命名卷（短名称）                                         |
-| `volume_remove` ✱          | `name`                                                                                     | 移除受管理的命名卷；当容器仍在挂载它时拒绝                           |
+| 工具                       | 参数                                                                               | 描述                                                                 |
+| -------------------------- | ---------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
+| `container_mount_add` ✱    | `container`, optional `kind`, `project`, `destination`, `mode`, `volume`, `secret` | 添加挂载；`kind` 为 `project`（默认）、`tmpfs`、`volume` 或 `secret` |
+| `container_mount_list`     | `container`                                                                        | 列出容器的挂载                                                       |
+| `container_mount_remove` ✱ | `container`, optional `kind`, `project`, `volume`, `destination`, `secret`         | 移除挂载；通过 `kind` 及其标识字段指定（见下文）                     |
+| `container_mount_update` ✱ | `container`, `mode`, optional `kind`, `project`, `volume`, `destination`           | 更改项目或卷挂载的模式；标识方式同移除（见下文）                     |
+| `volume_create`            | `name`                                                                             | 创建受管理的命名卷                                                   |
+| `volume_list`              | —                                                                                  | 列出受管理的命名卷（短名称）                                         |
+| `volume_remove` ✱          | `name`                                                                             | 移除受管理的命名卷；当容器仍在挂载它时拒绝                           |
 
-`project` 挂载将项目工作区中的一个目录绑定到容器；`tmpfs`
-挂载可写的内存文件系统，`volume` 挂载 podman
+`project` 挂载将 projects 根目录下的一个路径绑定到容器（`team`，或项目内的目录
+`team/src`）；`tmpfs` 挂载可写的内存文件系统，`volume` 挂载 podman
 命名卷（首次使用时自动创建）——两者都位于任意绝对容器路径，绝不位于 projects
 根目录或其他保留路径之下。`secret`
 挂载将受管理的机密作为只读文件暴露在绝对容器路径（参见[机密](#机密)）。
@@ -141,9 +141,8 @@ bash 进程）的 `env` 映射；`container_exec` 和 `daemon_start` 已经接�
 根目录下与之对应的路径上。`destination` 仅适用于 `tmpfs`、`volume` 和 `secret`
 挂载。
 
-移除挂载时，通过 `kind` 及该挂载自身的标识字段指定：项目挂载用 `project` 和
-`path`（省略 `path` 表示项目根目录），命名卷用 `volume`，机密用
-`secret`，`tmpfs` 挂载用
+移除挂载时，通过 `kind` 及该挂载自身的标识字段指定：项目挂载用
+`project`，命名卷用 `volume`，机密用 `secret`，`tmpfs` 挂载用
 `destination`。若某个标识字段匹配到多个挂载，请求会被拒绝，因此当同一卷或机密被挂载到多个位置时，还需一并传入
 `destination`。`container_mount_list` 会报告准确的值。`kind` 可省略——会从
 `secret` 或 `volume` 推断，否则为 `project`——但 `tmpfs`

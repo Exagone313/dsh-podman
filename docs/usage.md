@@ -147,35 +147,34 @@ by processes running inside the container.
 
 ### Mounts and volumes
 
-| Tool                       | Params                                                                                     | Description                                                                |
-| -------------------------- | ------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------- |
-| `container_mount_add` ✱    | `container`, optional `kind`, `project`, `path`, `destination`, `mode`, `volume`, `secret` | Add a mount; `kind` is `project` (default), `tmpfs`, `volume`, or `secret` |
-| `container_mount_list`     | `container`                                                                                | List the container's mounts                                                |
-| `container_mount_remove` ✱ | `container`, optional `kind`, `project`, `path`, `volume`, `destination`, `secret`         | Remove a mount; identify it by `kind` plus its handle (see below)          |
-| `container_mount_update` ✱ | `container`, `mode`, optional `kind`, `project`, `path`, `volume`, `destination`           | Change a project or volume mount's mode; identify it like removal (below)  |
-| `volume_create`            | `name`                                                                                     | Create a managed named volume                                              |
-| `volume_list`              | —                                                                                          | List the managed named volumes (short names)                               |
-| `volume_remove` ✱          | `name`                                                                                     | Remove a managed named volume; refused while a container still mounts it   |
+| Tool                       | Params                                                                             | Description                                                                |
+| -------------------------- | ---------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| `container_mount_add` ✱    | `container`, optional `kind`, `project`, `destination`, `mode`, `volume`, `secret` | Add a mount; `kind` is `project` (default), `tmpfs`, `volume`, or `secret` |
+| `container_mount_list`     | `container`                                                                        | List the container's mounts                                                |
+| `container_mount_remove` ✱ | `container`, optional `kind`, `project`, `volume`, `destination`, `secret`         | Remove a mount; identify it by `kind` plus its handle (see below)          |
+| `container_mount_update` ✱ | `container`, `mode`, optional `kind`, `project`, `volume`, `destination`           | Change a project or volume mount's mode; identify it like removal (below)  |
+| `volume_create`            | `name`                                                                             | Create a managed named volume                                              |
+| `volume_list`              | —                                                                                  | List the managed named volumes (short names)                               |
+| `volume_remove` ✱          | `name`                                                                             | Remove a managed named volume; refused while a container still mounts it   |
 
-A `project` mount binds a directory from the project's workspace; `tmpfs` mounts
-a writable in-memory filesystem and `volume` mounts a podman named volume
-(auto-created on first use) — both at an arbitrary absolute container path,
-never under the projects root or another reserved path. A `secret` mount exposes
-a managed secret as a read-only file at an absolute container path (see
-[Secrets](#secrets)).
+A `project` mount binds a path under the projects root (`team`, or `team/src`
+for a directory inside it); `tmpfs` mounts a writable in-memory filesystem and
+`volume` mounts a podman named volume (auto-created on first use) — both at an
+arbitrary absolute container path, never under the projects root or another
+reserved path. A `secret` mount exposes a managed secret as a read-only file at
+an absolute container path (see [Secrets](#secrets)).
 
 Project mounts do not take a `destination`: a project directory is always
 mounted at its mirrored path under the projects root. `destination` applies only
 to `tmpfs`, `volume` and `secret` mounts.
 
-Removing a mount names it by `kind` plus that mount's own handle: `project` and
-`path` for a project mount (`path` omitted means the project root), `volume` for
-a named volume, `secret` for a secret, and `destination` for a `tmpfs` mount. A
-handle that matches more than one mount is rejected, so pass `destination` as
-well when a volume or secret is mounted more than once. `container_mount_list`
-reports the exact values. `kind` is optional — inferred from `secret` or
-`volume`, otherwise `project` — except for `tmpfs`, which has no name to infer
-from and must be named explicitly.
+Removing a mount names it by `kind` plus that mount's own handle: `project` for
+a project mount, `volume` for a named volume, `secret` for a secret, and
+`destination` for a `tmpfs` mount. A handle that matches more than one mount is
+rejected, so pass `destination` as well when a volume or secret is mounted more
+than once. `container_mount_list` reports the exact values. `kind` is optional —
+inferred from `secret` or `volume`, otherwise `project` — except for `tmpfs`,
+which has no name to infer from and must be named explicitly.
 
 `mode` is `read_only` or `read_write`, and defaults to `read_only` so that
 adding a mount never grants write access that was not asked for. `tmpfs` mounts

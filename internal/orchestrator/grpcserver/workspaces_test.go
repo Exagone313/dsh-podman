@@ -237,3 +237,43 @@ func TestRemoveWorkspaceWithoutPodman(t *testing.T) {
 		t.Fatalf("expected FailedPrecondition, got %v", err)
 	}
 }
+
+// TestSyncDefaultFieldsTracksDefaultMounts pins the workspace-level mount list
+// to the default container's, so a later fallback (a fresh default container)
+// does not restore a stale mode.
+func TestSyncDefaultFieldsTracksDefaultMounts(t *testing.T) {
+	synced := state.Workspace{
+		WorkspaceSlug: "proj",
+		ProjectName:   "team",
+		Mounts:        []state.Mount{{ProjectName: "team", Mode: "read_write"}},
+		Containers: []state.Container{{
+			Name: "default", PodmanName: "dsh-podman-proj-default",
+			Mounts: []state.Mount{{ProjectName: "team", Mode: "read_only"}},
+		}},
+	}
+	syncDefaultFields(&synced)
+	if len(synced.Mounts) != 1 || synced.Mounts[0].Mode != "read_only" {
+		t.Fatalf("expected the workspace mounts to track the default container, got %#v", synced.Mounts)
+	}
+
+	// A default container with no own mounts leaves the fallback untouched.
+	fallback := state.Workspace{
+		ProjectName: "team",
+		Mounts:      []state.Mount{{ProjectName: "team", Mode: "read_only"}},
+		Containers:  []state.Container{{Name: "default", PodmanName: "dsh-podman-proj-default"}},
+	}
+	syncDefaultFields(&fallback)
+	if len(fallback.Mounts) != 1 || fallback.Mounts[0].Mode != "read_only" {
+		t.Fatalf("an empty default container must not clear the fallback, got %#v", fallback.Mounts)
+	}
+
+	// No default container keeps the last-known list for a fresh one.
+	removed := state.Workspace{
+		ProjectName: "team",
+		Mounts:      []state.Mount{{ProjectName: "team", Mode: "read_only"}},
+	}
+	syncDefaultFields(&removed)
+	if len(removed.Mounts) != 1 || removed.Mounts[0].Mode != "read_only" {
+		t.Fatalf("removing the default container must keep the last-known mounts, got %#v", removed.Mounts)
+	}
+}

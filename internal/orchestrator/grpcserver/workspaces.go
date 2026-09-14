@@ -166,6 +166,11 @@ func syncDefaultFields(ws *state.Workspace) {
 			ws.AgentSocketPath = ws.Containers[i].AgentSocketPath
 			ws.AgentToken = ws.Containers[i].AgentToken
 			ws.CreatedAt = ws.Containers[i].CreatedAt
+			// The default container's mounts are authoritative; the
+			// workspace-level list is the fallback a fresh default container
+			// starts from. An empty container list leaves it untouched, so a
+			// mode change survives the container being removed and restarted.
+			ws.Mounts = containerMounts(*ws, ws.Containers[i])
 			return
 		}
 	}

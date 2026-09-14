@@ -12,6 +12,7 @@ import {
   resolveReasonLocale,
 } from "./approval-reasons.js";
 import { preExecutePolicy, summarizeArgs } from "./index.js";
+import { testReadSession } from "./test-support.js";
 
 test("reasonLocale normalizes a locale id to a shipped language", () => {
   assert.equal(reasonLocale("zh"), "zh");
@@ -111,12 +112,12 @@ test("renderCacheCleanNotice reports the removed file count", () => {
 });
 
 test("preExecutePolicy renders a localized deny reason", async () => {
-  const readOnly = [{ type: "sandbox/mode", data: { mode: "read-only" } }];
   const denied = (await preExecutePolicy(
-    { name: "container_start", agent: { session: { events: readOnly } } },
+    { name: "container_start", agent: { session: { facts: { mode: "read-only" } } } },
     () => Promise.resolve({ kind: "allow" }),
     undefined,
     () => "zh",
+    testReadSession,
   )) as { kind: string; reason: string };
   assert.equal(denied.kind, "deny");
   assert.equal(denied.reason, "已拒绝：当前会话为只读，而 “container_start” 需要写入权限。");

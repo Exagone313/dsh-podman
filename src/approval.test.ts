@@ -7,7 +7,7 @@ import assert from "node:assert/strict";
 import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { presetExec, readOnlyExec } from "./test-support.js";
+import { presetExec, sessionExec, testReadSession } from "./test-support.js";
 import {
   PODMAN_OPS_AGENT_CORDIS_YML,
   PODMAN_OPS_PRESET_YML,
@@ -15,8 +15,6 @@ import {
   TOOLS,
   approvalDecision,
   ensurePodmanOpsPreset,
-  foldApprovalPolicy,
-  foldSandboxMode,
   preExecutePolicy,
   summarizeArgs,
 } from "./index.js";
@@ -266,73 +264,47 @@ test("preExecutePolicy asks for gated tools and delegates the rest", async () =>
   assert.equal(allowed.kind, "allow");
 });
 
-test("foldSandboxMode and foldApprovalPolicy fold last-wins with defaults", () => {
-  assert.equal(foldSandboxMode([]), undefined);
-  assert.equal(foldApprovalPolicy([]), undefined);
-  assert.equal(
-    foldSandboxMode([
-      { type: "sandbox/mode", data: { mode: "workspace-write" } },
-      { type: "sandbox/mode", data: { mode: "read-only" } },
-    ]),
-    "read-only",
-  );
-  assert.equal(
-    foldApprovalPolicy([
-      { type: "approval/policy", data: { policy: "ask" } },
-      { type: "approval/policy", data: { policy: "never" } },
-    ]),
-    "never",
-  );
-});
-
 test("read-only permission allows get/list tools and denies the rest", async () => {
-  const readOnly = [{ type: "sandbox/mode", data: { mode: "read-only" } }];
-
   for (const name of READ_ONLY_TOOLS) {
     let delegated = false;
-    const result = (await preExecutePolicy(readOnlyExec(name, readOnly), () => {
+    const result = (await preExecutePolicy(sessionExec(name), () => {
       delegated = true;
       return Promise.resolve({ kind: "allow" });
-    })) as { kind: string };
+    }, undefined, undefined, testReadSession)) as { kind: string };
     assert.equal(delegated, true, `${name} must be allowed under read-only`);
     assert.equal(result.kind, "allow");
   }
 
   for (const name of ["image_build", "container_start", "container_remove", "volume_remove"]) {
-    const result = (await preExecutePolicy(readOnlyExec(name, readOnly), () =>
-      Promise.resolve({ kind: "allow" }),
+    const result = (await preExecutePolicy(sessionExec(name), () =>
+      Promise.resolve({ kind: "allow" }), undefined, undefined, testReadSession,
     )) as { kind: string; reason: string };
     assert.equal(result.kind, "deny", `${name} must be denied under read-only`);
     assert.ok(result.reason.includes("read-only"), `${name} deny reason`);
   }
 
   let delegated = false;
-  const foreign = (await preExecutePolicy(readOnlyExec("write", readOnly), () => {
+  const foreign = (await preExecutePolicy(sessionExec("write"), () => {
     delegated = true;
     return Promise.resolve({ kind: "allow" });
-  })) as { kind: string };
+  }, undefined, undefined, testReadSession)) as { kind: string };
   assert.equal(delegated, true, "DSH-native tools must delegate under read-only");
   assert.equal(foreign.kind, "allow");
 });
 
 test("full-access (approval never) runs tools without asking", async () => {
-  const never = [{ type: "approval/policy", data: { policy: "never" } }];
   for (const name of ["image_build", "container_replace", "container_remove"]) {
     let delegated = false;
-    const result = (await preExecutePolicy(readOnlyExec(name, never), () => {
+    const result = (await preExecutePolicy(sessionExec(name, { policy: "never" }), () => {
       delegated = true;
       return Promise.resolve({ kind: "allow" });
-    })) as { kind: string };
+    }, undefined, undefined, testReadSession)) as { kind: string };
     assert.equal(delegated, true, `${name} must not ask under full access`);
     assert.equal(result.kind, "allow");
   }
 });
 
 test("workspace-write keeps the ask-based approval", async () => {
-  const workspaceWrite = [
-    { type: "sandbox/mode", data: { mode: "workspace-write" } },
-    { type: "approval/policy", data: { policy: "ask" } },
-  ];
   const asked = (await preExecutePolicy(
     {
       name: "image_build",
@@ -341,33 +313,36 @@ test("workspace-write keeps the ask-based approval", async () => {
         parent: "archlinux",
         packages: ["valkey"],
       },
-      agent: { session: { events: workspaceWrite } },
+      agent: { session: { facts: { mode: "workspace-write", policy: "ask" } } },
     },
     () => Promise.resolve({ kind: "allow" }),
+    undefined,
+    undefined,
+    testReadSession,
   )) as { kind: string; reason: string };
   assert.equal(asked.kind, "ask");
   assert.equal(asked.reason, 'Build image "valkey" from "archlinux" with packages: valkey.');
 });
 
 test("read-only wins over a never approval policy", async () => {
-  const readOnlyNever = [
-    { type: "sandbox/mode", data: { mode: "read-only" } },
-    { type: "approval/policy", data: { policy: "never" } },
-  ];
-  const result = (await preExecutePolicy(readOnlyExec("image_build", readOnlyNever), () =>
-    Promise.resolve({ kind: "allow" }),
+  const result = (await preExecutePolicy(
+    sessionExec("image_build", { mode: "read-only", policy: "never" }),
+    () => Promise.resolve({ kind: "allow" }),
+    undefined,
+    undefined,
+    testReadSession,
   )) as { kind: string };
   assert.equal(result.kind, "deny", "read-only must deny mutating tools even under full access");
 });
 
 test("podman-ops preset asks for its approval-gated tools only", async () => {
-  const workspaceWrite = [
-    { type: "sandbox/mode", data: { mode: "workspace-write" } },
-    { type: "approval/policy", data: { policy: "ask" } },
-  ];
+  const workspaceWrite = { mode: "workspace-write", policy: "ask" };
   const asked = (await preExecutePolicy(
     presetExec("container_bash", "podman-ops", { container: "valkey-ctr", command: "valkey-cli ping" }, workspaceWrite),
     () => Promise.resolve({ kind: "allow" }),
+    undefined,
+    undefined,
+    testReadSession,
   )) as { kind: string; reason: string };
   assert.equal(asked.kind, "ask");
   assert.equal(asked.reason, 'Run a shell command in container "valkey-ctr": valkey-cli ping');
@@ -375,16 +350,16 @@ test("podman-ops preset asks for its approval-gated tools only", async () => {
   const daemon = (await preExecutePolicy(
     presetExec("daemon_start", "podman-ops", { container: "valkey-ctr", name: "v1", argv: ["valkey-server"], uid: 1001 }, workspaceWrite),
     () => Promise.resolve({ kind: "allow" }),
+    undefined,
+    undefined,
+    testReadSession,
   )) as { kind: string; reason: string };
   assert.equal(daemon.kind, "ask");
   assert.equal(daemon.reason, 'Start daemon "v1" in container "valkey-ctr": valkey-server (uid 1001)');
 });
 
 test("podman-ops approval does not leak into other presets", async () => {
-  const workspaceWrite = [
-    { type: "sandbox/mode", data: { mode: "workspace-write" } },
-    { type: "approval/policy", data: { policy: "ask" } },
-  ];
+  const workspaceWrite = { mode: "workspace-write", policy: "ask" };
   for (const preset of ["standard", undefined]) {
     let delegated = false;
     const result = (await preExecutePolicy(
@@ -393,6 +368,9 @@ test("podman-ops approval does not leak into other presets", async () => {
         delegated = true;
         return Promise.resolve({ kind: "allow" });
       },
+      undefined,
+      undefined,
+      testReadSession,
     )) as { kind: string };
     assert.equal(delegated, true, `${preset}: container_bash must delegate`);
     assert.equal(result.kind, "allow");
@@ -400,10 +378,7 @@ test("podman-ops approval does not leak into other presets", async () => {
 });
 
 test("podman-ops keeps open tools ungated and respects permissions", async () => {
-  const workspaceWrite = [
-    { type: "sandbox/mode", data: { mode: "workspace-write" } },
-    { type: "approval/policy", data: { policy: "ask" } },
-  ];
+  const workspaceWrite = { mode: "workspace-write", policy: "ask" };
   let delegated = false;
   const open = (await preExecutePolicy(
     presetExec("image_list", "podman-ops", {}, workspaceWrite),
@@ -411,25 +386,32 @@ test("podman-ops keeps open tools ungated and respects permissions", async () =>
       delegated = true;
       return Promise.resolve({ kind: "allow" });
     },
+    undefined,
+    undefined,
+    testReadSession,
   )) as { kind: string };
   assert.equal(delegated, true, "image_list must stay open in podman-ops");
   assert.equal(open.kind, "allow");
 
-  const readOnly = [{ type: "sandbox/mode", data: { mode: "read-only" } }];
   const denied = (await preExecutePolicy(
-    presetExec("container_bash", "podman-ops", { container: "c", command: "ls" }, readOnly),
+    presetExec("container_bash", "podman-ops", { container: "c", command: "ls" }, { mode: "read-only" }),
     () => Promise.resolve({ kind: "allow" }),
+    undefined,
+    undefined,
+    testReadSession,
   )) as { kind: string };
   assert.equal(denied.kind, "deny", "read-only wins over podman-ops approval");
 
-  const never = [{ type: "approval/policy", data: { policy: "never" } }];
   let fullDelegated = false;
   const full = (await preExecutePolicy(
-    presetExec("daemon_start", "podman-ops", { container: "c", argv: ["x"] }, never),
+    presetExec("daemon_start", "podman-ops", { container: "c", argv: ["x"] }, { policy: "never" }),
     () => {
       fullDelegated = true;
       return Promise.resolve({ kind: "allow" });
     },
+    undefined,
+    undefined,
+    testReadSession,
   )) as { kind: string };
   assert.equal(fullDelegated, true, "full access must not ask");
   assert.equal(full.kind, "allow");

@@ -9,6 +9,7 @@ import {
   MOUNT_TOOLS,
   guestExecRecorder,
   mountRequestRecorder,
+  testReadSession,
   WORKSPACE_ID,
 } from "./test-support.js";
 import { TOOLS, approvalDecision, preExecutePolicy, summarizeArgs, toolHandlers } from "./index.js";
@@ -106,14 +107,12 @@ test("preExecutePolicy denies project mounts that carry a destination", async ()
     {
       name: "container_mount_add",
       arguments: { kind: "project", project: "team", destination: "/x" },
-      agent: {
-        session: {
-          events: [{ type: "approval/policy", data: { policy: "never" } }],
-        },
-      },
+      agent: { session: { facts: { policy: "never" } } },
     },
     () => Promise.resolve({ kind: "allow" }),
     () => "/projects",
+    undefined,
+    testReadSession,
   )) as { kind: string };
   assert.equal(underNever.kind, "deny", "full access must not accept an invalid project mount");
 });

@@ -302,26 +302,17 @@ export const PODMAN_OPS_APPROVAL_TOOLS: ReadonlySet<string> = new Set([
 // own tools and delegates DSH-native ones (bash, write, ...) to the harness.
 const OUR_TOOL_NAMES = new Set(TOOLS.map((tool) => tool.name));
 
-// Fold the session's effective sandbox mode (last `sandbox/mode` wins).
-export function foldSandboxMode(
-  events: readonly { type: string; data?: { mode?: string } }[],
-): string | undefined {
-  for (let index = events.length - 1; index >= 0; index -= 1) {
-    const event = events[index];
-    if (event.type === "sandbox/mode") return event.data?.mode;
-  }
-  return undefined;
-}
-
-// Fold the session's effective approval policy (last `approval/policy` wins).
-export function foldApprovalPolicy(
-  events: readonly { type: string; data?: { policy?: string } }[],
-): string | undefined {
-  for (let index = events.length - 1; index >= 0; index -= 1) {
-    const event = events[index];
-    if (event.type === "approval/policy") return event.data?.policy;
-  }
-  return undefined;
+// The session facts the policy needs. A session exposes no raw event array and
+// its header only names the preset it STARTED with, so the caller reads these
+// from the harness's own services (sandbox policy, approval policy, and the
+// agent-preset projection).
+export interface SessionFacts {
+  /** Effective sandbox mode ("read-only", "workspace-write", …). */
+  mode?: string;
+  /** Effective approval policy ("ask", "never", …). */
+  policy?: string;
+  /** The preset the session currently runs. */
+  preset?: string;
 }
 
 // The `tools/pre-execute` policy, driven by the session's permission knobs:
@@ -335,22 +326,19 @@ export async function preExecutePolicy(
   exec: {
     name: string;
     arguments?: unknown;
-    agent?: {
-      session?: {
-        header?: { agentPreset?: string };
-        events?: readonly { type: string; data?: { mode?: string; policy?: string } }[];
-      };
-    };
+    agent?: { session?: unknown };
   },
   next: () => Promise<unknown>,
   getProjectsRoot?: () => string,
   getLocale?: () => ReasonLocale,
+  readSession?: (session: unknown) => SessionFacts,
 ): Promise<unknown> {
   const name = exec.name;
   if (!OUR_TOOL_NAMES.has(name)) return next();
   const locale = getLocale?.() ?? "en";
-  const events = exec.agent?.session?.events ?? [];
-  if (foldSandboxMode(events) === "read-only") {
+  const session = exec.agent?.session;
+  const facts = session === undefined ? {} : readSession?.(session) ?? {};
+  if (facts.mode === "read-only") {
     if (READ_ONLY_TOOLS.has(name)) return next();
     return {
       kind: "deny",
@@ -365,10 +353,9 @@ export async function preExecutePolicy(
   if (denyReason !== undefined) {
     return { kind: "deny", reason: denyReason };
   }
-  if (foldApprovalPolicy(events) === "never") return next();
-  const preset = exec.agent?.session?.header?.agentPreset;
+  if (facts.policy === "never") return next();
   const sessionCwd = currentCwd(exec);
-  if (preset === PODMAN_OPS_PRESET && PODMAN_OPS_APPROVAL_TOOLS.has(name)) {
+  if (facts.preset === PODMAN_OPS_PRESET && PODMAN_OPS_APPROVAL_TOOLS.has(name)) {
     return { kind: "ask", ...askReason(name, parsed ?? {}, sessionCwd, locale) };
   }
   return approvalDecision(name, parsed, sessionCwd, locale) ?? next();

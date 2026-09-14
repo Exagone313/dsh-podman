@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: MIT
 
-import { preExecutePolicy } from "./approval.js";
+import { preExecutePolicy, type SessionFacts } from "./approval.js";
 import { resolveReasonLocale, type ReasonLocale } from "./approval-reasons.js";
 import { createFilesystemProvider } from "./fs-provider.js";
 import {
@@ -41,6 +41,20 @@ export function apply(ctx: any, config: PluginConfig = {}): void {
   ctx.inject(["settings"], (settingsCtx: any) => {
     readLocale = () => resolveReasonLocale(settingsCtx.settings);
   });
+  // The session's permission knobs live in the harness's own services: the
+  // sandbox policy resolves the effective mode (approved override, last logged
+  // mode, then the deployment default), the approval service reports the logged
+  // policy override, and the agent-preset projection reports the preset the
+  // session currently runs (its header only names the creation-time one).
+  const readSession = (session: any): SessionFacts => ({
+    mode: ctx.get("sandboxPolicy")?.resolve({ session })?.mode,
+    // The deployment default is private, so an unset override conservatively
+    // keeps asking.
+    policy: ctx.get("approval")?.overrideOf(session) ?? "ask",
+    preset:
+      ctx.get("sessionProjections")?.stateOf(session, "agentPreset") ??
+      session?.header?.agentPreset,
+  });
   ctx.on(
     "tools/pre-execute",
     (exec: any, next: any) =>
@@ -49,6 +63,7 @@ export function apply(ctx: any, config: PluginConfig = {}): void {
         next,
         () => resolver.getConfig().projectsRoot,
         () => readLocale(),
+        readSession,
       ),
   );
   ensurePodmanOpsPreset(ctx);
@@ -119,12 +134,11 @@ export {
   PODMAN_OPS_PRESET,
   READ_ONLY_TOOLS,
   approvalDecision,
-  foldApprovalPolicy,
-  foldSandboxMode,
   mountDestinationsReason,
   preExecutePolicy,
   summarizeArgs,
 } from "./approval.js";
+export type { SessionFacts } from "./approval.js";
 export { FilesystemProvider, createFilesystemProvider } from "./fs-provider.js";
 export { resolveGuestCwd, resolveGuestPath, remoteArgv } from "./guest-rpc.js";
 export {

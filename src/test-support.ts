@@ -102,15 +102,30 @@ export const EXPECTED_TOOLS = [
   "daemon_logs",
 ];
 
-export const readOnlyExec = (name: string, events: any[]): any => ({
+// The session facts the policy reads. The real `readSession` asks the harness
+// services; tests put the facts straight on the session stand-in.
+export interface TestSessionFacts {
+  mode?: string;
+  policy?: string;
+  preset?: string;
+}
+
+export const testReadSession = (session: any): TestSessionFacts => session?.facts ?? {};
+
+export const sessionExec = (name: string, facts: TestSessionFacts = { mode: "read-only" }): any => ({
   name,
-  agent: { session: { events } },
+  agent: { session: { facts } },
 });
 
-export const presetExec = (name: string, preset: string, args?: unknown, events: any[] = []): any => ({
+export const presetExec = (
+  name: string,
+  preset: string,
+  args?: unknown,
+  facts: TestSessionFacts = {},
+): any => ({
   name,
   arguments: args,
-  agent: { session: { header: { agentPreset: preset }, events } },
+  agent: { session: { header: { agentPreset: preset }, facts: { ...facts, preset } } },
 });
 
 export const MOUNT_TOOLS = [

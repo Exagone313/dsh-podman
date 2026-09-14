@@ -134,11 +134,11 @@ export const TOOL_DESCRIPTIONS: Record<string, string> = {
   container_grep:
     "Search file contents inside a container of the current workspace. Defaults to the session working directory when it is mounted; pass cwd to override.",
   container_mount_list:
-    "List the project mounts of a container in the current workspace.",
+    "List the mounts of a container in the current workspace, with the exact kind, project/path, volume, secret, and destination values to pass to container_mount_remove.",
   container_mount_add:
-    "Add a project mount to a container in the current workspace. Recreates the container, terminating its running processes; bind-mounted volume data persists. Requires approval: adding a mount changes the container filesystem view.",
+    "Add a mount to a container in the current workspace: a project bind (project, optional path), a tmpfs, a named volume, or a secret, selected by kind (default project). Recreates the container, terminating its running processes; bind-mounted volume data persists. Requires approval: adding a mount changes the container filesystem view.",
   container_mount_remove:
-    "Remove a project mount from a container in the current workspace. Recreates the container, terminating its running processes; bind-mounted volume data persists. Requires approval: removing a mount changes the container filesystem view.",
+    "Remove a mount from a container in the current workspace. Identify it by kind plus its own handle: project/path for a project mount, volume for a named volume, secret for a secret, and destination for tmpfs. A handle that matches more than one mount is rejected, so pass destination as well when a volume or secret is mounted more than once; copy the exact values from container_mount_list. Recreates the container, terminating its running processes; bind-mounted volume data persists. Requires approval: removing a mount changes the container filesystem view.",
   volume_list:
     "List the named volumes available to the current workspace.",
   volume_create: "Create a named volume in the current workspace.",

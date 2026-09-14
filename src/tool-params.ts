@@ -52,7 +52,8 @@ const projectMountItemParam = {
 const mountsParam = {
   type: "array",
   items: projectMountItemParam,
-  description: "Optional project mounts to apply.",
+  description:
+    "Optional mounts to apply: a project bind, a tmpfs, a named volume, or a secret.",
 };
 
 export const envParam = {
@@ -183,15 +184,35 @@ export const containerMountRemoveParameters = {
   type: "object",
   properties: {
     container: containerParam,
-    kind: mountKindParam,
-    project: { type: "string", description: "Project name to unmount." },
-    path: { type: "string", description: "Path within the project to unmount." },
-    volume: { type: "string", description: "Named volume to unmount." },
-    secret: { type: "string", description: "Named secret to unmount." },
+    kind: {
+      type: "string",
+      enum: ["project", "tmpfs", "volume", "secret"],
+      description:
+        "Kind of mount to remove; inferred from secret or volume when omitted, otherwise project. Pass tmpfs explicitly: it has no name to infer from.",
+    },
+    project: {
+      type: "string",
+      description: "Project name of the project mount to remove.",
+    },
+    path: {
+      type: "string",
+      description:
+        "Path within the project of the project mount to remove; omit it for the project root.",
+    },
+    volume: {
+      type: "string",
+      description:
+        "Named volume to remove; identifies the mount, so pass destination as well when the volume is mounted more than once.",
+    },
+    secret: {
+      type: "string",
+      description:
+        "Named secret the removed mount must use; identifies the mount, so pass destination as well when the secret is mounted more than once.",
+    },
     destination: {
       type: "string",
       description:
-        "Destination path inside the container (volume, tmpfs, and secret mounts only; project mounts are identified by project and path).",
+        "Destination path inside the container. Required for tmpfs; for a volume or secret it identifies the mount (and disambiguates one mounted more than once); not applicable to project mounts.",
     },
   },
   required: ["container"],

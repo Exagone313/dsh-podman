@@ -195,7 +195,7 @@ func TestContainerfileApkCachingVariant(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(file, "RUN apk add --no-cache git") {
+	if !strings.Contains(file, "RUN apk upgrade --no-cache && apk add --no-cache git") {
 		t.Fatalf("default apk build should use --no-cache: %s", file)
 	}
 	if strings.Contains(file, "--cache-packages") || strings.Contains(file, "--update-cache") {
@@ -205,7 +205,7 @@ func TestContainerfileApkCachingVariant(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(file, "RUN apk add --cache-packages --update-cache git") {
+	if !strings.Contains(file, "RUN apk upgrade --cache-packages --update-cache && apk add --cache-packages --update-cache git") {
 		t.Fatalf("caching apk build should use --cache-packages --update-cache: %s", file)
 	}
 	if strings.Contains(file, "--no-cache") {
@@ -257,13 +257,13 @@ func TestContainerfileBaseDistros(t *testing.T) {
 		{
 			name: "ubuntu", wantFrom: "FROM docker.io/library/ubuntu:latest\n",
 			spec:        BuildSpec{ImageID: "ubuntu", From: "docker.io/library/ubuntu:latest", PackageManager: "apt", Packages: []string{"build-essential", "ca-certificates", "curl", "diffutils", "fd-find", "git", "jq", "less", "netcat-openbsd", "openssh-client", "patch", "procps", "python3", "ripgrep", "tree", "unzip", "wget", "zstd"}, IsBase: true, PostInstall: []string{"ln -s /usr/bin/fd-find /usr/local/bin/fd"}},
-			wantInstall: "RUN DEBIAN_FRONTEND=noninteractive apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends build-essential ca-certificates curl diffutils fd-find git jq less netcat-openbsd openssh-client patch procps python3 ripgrep tree unzip wget zstd && rm -rf /var/lib/apt/lists/*\n",
+			wantInstall: "RUN DEBIAN_FRONTEND=noninteractive apt-get update && DEBIAN_FRONTEND=noninteractive apt-get dist-upgrade -y && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends build-essential ca-certificates curl diffutils fd-find git jq less netcat-openbsd openssh-client patch procps python3 ripgrep tree unzip wget zstd && rm -rf /var/lib/apt/lists/*\n",
 			wantPost:    "RUN ln -s /usr/bin/fd-find /usr/local/bin/fd\n",
 		},
 		{
 			name: "alpine", wantFrom: "FROM docker.io/library/alpine:latest\n",
 			spec:        BuildSpec{ImageID: "alpine", From: "docker.io/library/alpine:latest", PackageManager: "apk", Packages: []string{"bash", "build-base", "ca-certificates", "curl", "diffutils", "fd", "git", "jq", "less", "openssh-client", "patch", "procps", "python3", "ripgrep", "tree", "unzip", "wget", "zstd"}, IsBase: true},
-			wantInstall: "RUN apk add --no-cache bash build-base ca-certificates curl diffutils fd git jq less openssh-client patch procps python3 ripgrep tree unzip wget zstd\n",
+			wantInstall: "RUN apk upgrade --no-cache && apk add --no-cache bash build-base ca-certificates curl diffutils fd git jq less openssh-client patch procps python3 ripgrep tree unzip wget zstd\n",
 		},
 	}
 	for _, tc := range cases {

@@ -126,16 +126,16 @@ func Containerfile(spec BuildSpec) (string, error) {
 		}
 		lines = append(lines, line)
 	case "apt":
-		line := "RUN DEBIAN_FRONTEND=noninteractive apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends"
+		line := "RUN DEBIAN_FRONTEND=noninteractive apt-get update && DEBIAN_FRONTEND=noninteractive apt-get dist-upgrade -y && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends"
 		if len(spec.Packages) > 0 {
 			line += " " + strings.Join(spec.Packages, " ")
 		}
 		line += " && rm -rf /var/lib/apt/lists/*"
 		lines = append(lines, line)
 	case "apk":
-		line := "RUN apk add --no-cache"
+		line := "RUN apk upgrade --no-cache && apk add --no-cache"
 		if spec.CachePackages {
-			line = "RUN apk add --cache-packages --update-cache"
+			line = "RUN apk upgrade --cache-packages --update-cache && apk add --cache-packages --update-cache"
 		}
 		if len(spec.Packages) > 0 {
 			line += " " + strings.Join(spec.Packages, " ")

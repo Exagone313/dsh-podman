@@ -125,10 +125,12 @@ func (s *Server) Exec(stream guest.WorkspaceGuestAgent_ExecServer) error {
 			}
 		}
 	}()
-	waitErr := process.Command.Wait()
-	// Drain both pipes before sealing the spills and reporting the exit, so the
-	// spill validity and the final chunks are final when the caller sees them.
+	// Drain both pipes to EOF before reaping the process: Command.Wait closes
+	// the pipe read ends, which would discard output the copying goroutines
+	// have not read yet. The exit message is sent only after this, so the spill
+	// validity and the final chunks are final when the caller sees them.
 	copies.Wait()
+	waitErr := process.Command.Wait()
 	spillStdout.close()
 	spillStderr.close()
 	s.Processes.Remove(process.ID)

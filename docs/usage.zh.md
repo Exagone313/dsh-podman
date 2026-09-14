@@ -123,7 +123,7 @@ bash 进程）的 `env` 映射；`container_exec` 和 `daemon_start` 已经接�
 | -------------------------- | ------------------------------------------------------------------------------------------ | -------------------------------------------------------------------- |
 | `container_mount_add` ✱    | `container`, optional `kind`, `project`, `path`, `destination`, `mode`, `volume`, `secret` | 添加挂载；`kind` 为 `project`（默认）、`tmpfs`、`volume` 或 `secret` |
 | `container_mount_list`     | `container`                                                                                | 列出容器的挂载                                                       |
-| `container_mount_remove` ✱ | `container`, optional `kind`, `project`, `path`, `volume`, `destination`, `secret`         | 移除挂载                                                             |
+| `container_mount_remove` ✱ | `container`, optional `kind`, `project`, `path`, `volume`, `destination`, `secret`         | 移除挂载；通过 `kind` 及其标识字段指定（见下文）                     |
 | `volume_create`            | `name`                                                                                     | 创建受管理的命名卷                                                   |
 | `volume_list`              | —                                                                                          | 列出受管理的命名卷（短名称）                                         |
 | `volume_remove` ✱          | `name`                                                                                     | 移除受管理的命名卷；当容器仍在挂载它时拒绝                           |
@@ -137,6 +137,14 @@ bash 进程）的 `env` 映射；`container_exec` 和 `daemon_start` 已经接�
 `project` 挂载不接受 `destination`：项目目录始终挂载在 projects
 根目录下与之对应的路径上。`destination` 仅适用于 `tmpfs`、`volume` 和 `secret`
 挂载。
+
+移除挂载时，通过 `kind` 及该挂载自身的标识字段指定：项目挂载用 `project` 和
+`path`（省略 `path` 表示项目根目录），命名卷用 `volume`，机密用
+`secret`，`tmpfs` 挂载用
+`destination`。若某个标识字段匹配到多个挂载，请求会被拒绝，因此当同一卷或机密被挂载到多个位置时，还需一并传入
+`destination`。`container_mount_list` 会报告准确的值。`kind` 可省略——会从
+`secret` 或 `volume` 推断，否则为 `project`——但 `tmpfs`
+例外，它没有可推断的名称，必须显式指定。
 
 `mode` 为 `read_only` 或 `read_write`，默认为
 `read_only`，这样添加挂载永远不会授予未被请求的写权限。`tmpfs` 挂载始终为

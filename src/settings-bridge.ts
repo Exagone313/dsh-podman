@@ -10,8 +10,24 @@ import {
   settingsSchema,
 } from "./settings-schema.js";
 import { GIT_COMMIT, VERSION } from "./generated/version.js";
+import { renderCacheCleanNotice, resolveReasonLocale } from "./approval-reasons.js";
 import { defaultMountMode, mountKindToProto, mountModeToProto } from "./mount-enums.js";
 import { type WorkspaceResolver, workspaceSlug } from "./workspace-binding.js";
+
+// The cache clean modes the settings card can request, mapped to the control
+// plane's enum names.
+const CACHE_CLEAN_MODES: Record<string, string> = {
+  "keep-latest": "CACHE_CLEAN_MODE_KEEP_LATEST",
+  all: "CACHE_CLEAN_MODE_ALL",
+};
+
+function cacheCleanModeToProto(mode: string): string {
+  const proto = Object.prototype.hasOwnProperty.call(CACHE_CLEAN_MODES, mode)
+    ? CACHE_CLEAN_MODES[mode]
+    : undefined;
+  if (proto === undefined) throw new Error(`unknown cache clean mode: ${mode}`);
+  return proto;
+}
 
 function mountInputToProto(mount: { kind: string; project: string; path: string; destination: string; mode: string; volume: string; secret: string }): Record<string, unknown> {
   const kind = mountKindToProto(mount.kind || undefined);
@@ -93,16 +109,17 @@ export function installContainerSettings(
     }) as ContainerSettingsScope;
 
     let refreshing = false;
-    const refresh = async (): Promise<void> => {
+    const refresh = async (notice = ""): Promise<void> => {
       if (refreshing) return;
       refreshing = true;
       try {
-        const [containers, images, workspaces, volumes, secrets] = await Promise.all([
+        const [containers, images, workspaces, volumes, secrets, caches] = await Promise.all([
           resolver.control("listContainers", {}),
           resolver.control("listImages", {}),
           resolver.control("listWorkspaces", {}),
           resolver.control("listVolumes", {}),
           resolver.control("listSecrets", {}),
+          resolver.control("listCaches", {}),
         ]);
         await scope.update({
           containers: (containers as any).containers ?? [],
@@ -117,7 +134,14 @@ export function installContainerSettings(
           secrets: ((secrets as any).secrets ?? []).map((secret: any) => ({
             name: secret.name ?? "",
           })),
-          notice: "",
+          caches: ((caches as any).caches ?? []).map((cache: any) => ({
+            manager: cache.manager ?? "",
+            path: cache.path ?? "",
+            files: Number(cache.files ?? 0),
+            // The control plane reports int64 as a string.
+            bytes: Number(cache.bytes ?? 0),
+          })),
+          notice,
         });
       } catch (error) {
         await scope.update({
@@ -135,6 +159,7 @@ export function installContainerSettings(
       });
       const command = next.command;
       if (command === null || command === undefined) return;
+      let notice = "";
       try {
         switch (command.op) {
           case "refresh":
@@ -267,9 +292,19 @@ export function installContainerSettings(
               name: command.workspace,
             });
             break;
+          case "cache_clean": {
+            const result = (await resolver.control("cleanCaches", {
+              mode: cacheCleanModeToProto(command.cacheMode),
+            })) as { removedFiles?: unknown };
+            notice = renderCacheCleanNotice(
+              resolveReasonLocale(sctx.settings),
+              Number(result.removedFiles ?? 0),
+            );
+            break;
+          }
         }
         await scope.update({ command: null });
-        await refresh();
+        await refresh(notice);
       } catch (error) {
         await scope.update({
           notice: error instanceof Error ? error.message : String(error),

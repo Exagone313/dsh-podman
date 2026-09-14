@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: MIT
 
 import { BaseImageRow, ImageBuildModal, ImageItem } from "./container-card-images.js";
+import { CachesSection } from "./container-card-caches.js";
 import { SecretsSection } from "./container-card-secrets.js";
 import { CardChevron, ConfigField, ConfirmButton } from "./container-card-shared.js";
 import {
@@ -262,6 +263,12 @@ export function ContainerCard(props: ContainerCardProps): ReactNode {
               ))}
             </select>
           </Modal>
+          <CachesSection
+            t={t}
+            caches={state.caches}
+            busy={state.busy}
+            onClean={props.cleanCaches}
+          />
           <VolumesSection
             t={t}
             volumes={state.volumes}

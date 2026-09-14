@@ -105,6 +105,13 @@ export type ContainerPluginKey =
   | "readOnly"
   | "readWrite"
   | "confirmRemoveMount"
+  | "cachesTitle"
+  | "noCaches"
+  | "cacheUsage"
+  | "cacheKeepLatest"
+  | "confirmCacheKeepLatest"
+  | "cacheRemoveAll"
+  | "confirmCacheRemoveAll"
   | "createContainerTitle"
   | "addContainer"
   | "invalidContainerName"
@@ -259,6 +266,15 @@ export const en: Record<ContainerPluginKey, string> = {
   readOnly: "Read-only",
   readWrite: "Read-write",
   confirmRemoveMount: "Remove this mount from the container and recreate it?",
+  cachesTitle: "Package caches",
+  noCaches: "No package cache is configured.",
+  cacheUsage: "{size} · {n} files",
+  cacheKeepLatest: "Keep latest versions",
+  confirmCacheKeepLatest:
+    "Remove older cached package versions? Current versions are kept.",
+  cacheRemoveAll: "Remove all",
+  confirmCacheRemoveAll:
+    "Remove every cached package? The next build re-downloads what it needs.",
   createContainerTitle: "Create container",
   addContainer: "Add container",
   invalidContainerName: "Invalid container name",
@@ -410,6 +426,13 @@ export const zh: Record<ContainerPluginKey, string> = {
   readOnly: "只读",
   readWrite: "读写",
   confirmRemoveMount: "从容器中移除该挂载并重建容器？",
+  cachesTitle: "软件包缓存",
+  noCaches: "未配置软件包缓存。",
+  cacheUsage: "{size} · {n} 个文件",
+  cacheKeepLatest: "保留最新版本",
+  confirmCacheKeepLatest: "移除较旧的缓存软件包版本？当前版本会保留。",
+  cacheRemoveAll: "全部移除",
+  confirmCacheRemoveAll: "移除所有缓存的软件包？下次构建会重新下载所需内容。",
   createContainerTitle: "创建容器",
   addContainer: "添加容器",
   invalidContainerName: "容器名称无效",

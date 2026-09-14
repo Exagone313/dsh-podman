@@ -62,6 +62,12 @@ export interface VolumeView {
 export interface SecretView {
   name: string;
 }
+export interface CacheView {
+  manager: string;
+  path: string;
+  files: number;
+  bytes: number;
+}
 export interface WorkspaceView {
   workspaceSlug: string;
   projectName: string;
@@ -72,7 +78,7 @@ export interface WorkspaceView {
   mounts: readonly { projectName: string; mode: string }[];
 }
 export interface CommandRequest {
-  op: "refresh" | "remove" | "workspace_remove" | "recreate" | "create" | "volume_create" | "volume_remove" | "image_remove" | "secret_create" | "secret_remove" | "secret_set" | "image_rebuild" | "image_rebuild_all" | "container_secret_add" | "container_secret_remove" | "image_build" | "image_base_rebuild" | "image_base_pull" | "container_mount_add" | "container_mount_remove";
+  op: "refresh" | "remove" | "workspace_remove" | "recreate" | "create" | "volume_create" | "volume_remove" | "image_remove" | "secret_create" | "secret_remove" | "secret_set" | "image_rebuild" | "image_rebuild_all" | "container_secret_add" | "container_secret_remove" | "image_build" | "image_base_rebuild" | "image_base_pull" | "container_mount_add" | "container_mount_remove" | "cache_clean";
   workspace: string;
   image: string;
   at: number;
@@ -86,6 +92,7 @@ export interface CommandRequest {
   charset: string;
   packages: string[];
   secretEnvMap: Record<string, string>;
+  cacheMode: string;
   mount: MountInput | null;
 }
 export interface ContainerSettings {
@@ -101,6 +108,7 @@ export interface ContainerSettings {
   images: readonly ImageView[];
   volumes: readonly VolumeView[];
   secrets: readonly SecretView[];
+  caches: readonly CacheView[];
   command: CommandRequest | null;
 }
 
@@ -121,6 +129,7 @@ export interface CardState {
   images: readonly ImageView[];
   volumes: readonly VolumeView[];
   secrets: readonly SecretView[];
+  caches: readonly CacheView[];
 }
 
 export interface ContainerCardFace {
@@ -129,6 +138,7 @@ export interface ContainerCardFace {
   };
   reload: () => void;
   remove: (workspace: string) => void;
+  cleanCaches: (mode: string) => void;
   removeWorkspace: (workspace: string) => void;
   recreate: (workspace: string, image: string, env?: Record<string, string>) => void;
   createContainer: (workspace: WorkspaceView, config?: ContainerCreateConfig) => void;
@@ -194,6 +204,7 @@ export class ContainerCardController {
       images: value?.images ?? [],
       volumes: value?.volumes ?? [],
       secrets: value?.secrets ?? [],
+      caches: value?.caches ?? [],
     };
   }
 
@@ -217,6 +228,7 @@ export class ContainerCardController {
       charset?: string;
       packages?: string[];
       secretEnvMap?: Record<string, string>;
+      cacheMode?: string;
       mount?: MountInput | null;
     } = {},
   ): void {
@@ -233,6 +245,7 @@ export class ContainerCardController {
       charset: extra.charset ?? "",
       packages: extra.packages ?? [],
       secretEnvMap: extra.secretEnvMap ?? {},
+      cacheMode: extra.cacheMode ?? "",
       mount: extra.mount ?? null,
     });
   }
@@ -258,6 +271,7 @@ export class ContainerCardController {
       hooks: { containerCard: this.store },
       reload: () => this.command("refresh", "", ""),
       remove: (workspace) => this.command("remove", workspace, ""),
+      cleanCaches: (mode) => this.command("cache_clean", "", "", { cacheMode: mode }),
       removeWorkspace: (workspace) => this.command("workspace_remove", workspace, ""),
       recreate: (workspace, image, env) =>
         this.command("recreate", workspace, image, { ...(env ? { env } : {}) }),

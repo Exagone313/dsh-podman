@@ -59,6 +59,45 @@ test("workspace_remove command drives removeWorkspace and clears the command", a
   assert.equal(scope.value.command, null);
 });
 
+test("cache_clean command drives cleanCaches, maps the mode, and reports the result", async () => {
+  const scope = fakeScope(baseValue());
+  const calls: Array<[string, unknown]> = [];
+  const resolver: any = {
+    getConfig: () => ({}),
+    setConfig: () => {},
+    async control(method: string, request: unknown) {
+      calls.push([method, request]);
+      if (method === "listContainers") return { containers: [] };
+      if (method === "listImages") return { images: [] };
+      if (method === "cleanCaches") return { removedFiles: 2, removedBytes: "2048" };
+      if (method === "listCaches") {
+        return { caches: [{ manager: "pacman", path: "/cache", files: 1, bytes: "1024" }] };
+      }
+      return {};
+    },
+  };
+  installContainerSettings(fakeContext(scope), resolver);
+  await scope.update({
+    command: { op: "cache_clean", workspace: "", image: "", at: 3, cacheMode: "all" },
+  });
+  await new Promise((resolve) => setImmediate(resolve));
+  await scope.update({
+    command: { op: "cache_clean", workspace: "", image: "", at: 4, cacheMode: "keep-latest" },
+  });
+  await new Promise((resolve) => setImmediate(resolve));
+  const modes = calls
+    .filter(([method]) => method === "cleanCaches")
+    .map(([, request]) => (request as { mode: string }).mode);
+  assert.deepEqual(modes, ["CACHE_CLEAN_MODE_ALL", "CACHE_CLEAN_MODE_KEEP_LATEST"]);
+  assert.equal(scope.value.command, null);
+  assert.equal(scope.value.notice, "removed 2 cached files");
+  const caches = scope.value.caches as any[];
+  assert.equal(caches.length, 1);
+  assert.equal(caches[0].manager, "pacman");
+  // The control plane reports int64 as a string.
+  assert.equal(caches[0].bytes, 1024);
+});
+
 test("volume_remove command drives removeVolume with the name", async () => {
   const scope = fakeScope(baseValue());
   const calls: Array<[string, unknown]> = [];

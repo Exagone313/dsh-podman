@@ -42,7 +42,7 @@ test("refresh on install publishes containers, images and workspaces", async () 
   await scope.update({}); // settle the queued async refresh
   assert.deepEqual(
     calls.map(([method]) => method),
-    ["listContainers", "listImages", "listWorkspaces", "listVolumes", "listSecrets"],
+    ["listContainers", "listImages", "listWorkspaces", "listVolumes", "listSecrets", "listCaches"],
   );
   assert.equal((scope.value.containers as any[]).length, 1);
   assert.equal((scope.value.images as any[]).length, 1);

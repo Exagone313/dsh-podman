@@ -4,10 +4,11 @@
 
 import { CONTAINER_NS } from "./settings-schema.js";
 
-// The languages the plugin ships approval text in. The host has no locale
-// service, so the UI language arrives through settings: the browser client
-// writes its active locale into the plugin namespace (`uiLocale`) and the
-// durable user preference (`locale.preference`) is the fallback.
+// Localized text for the plugin's user-facing messages: approval reasons,
+// policy denials, and the cache-cleanup notice. The host has no locale service,
+// so the UI language arrives through settings: the browser client writes its
+// active locale into the plugin namespace (`uiLocale`) and the durable user
+// preference (`locale.preference`) is the fallback.
 export type ReasonLocale = "en" | "zh";
 
 // One mount as a reason renders it.
@@ -295,6 +296,16 @@ export function renderReason(locale: ReasonLocale, fact: ReasonFact): string {
       );
     }
   }
+}
+
+// Render the settings notice shown after a cache cleanup. The card already
+// shows the resulting sizes, so the notice only names how many files went.
+export function renderCacheCleanNotice(locale: ReasonLocale, files: number): string {
+  return pick(
+    locale,
+    `removed ${files} cached ${files === 1 ? "file" : "files"}`,
+    `已移除 ${files} 个缓存文件`,
+  );
 }
 
 // Render one policy denial.

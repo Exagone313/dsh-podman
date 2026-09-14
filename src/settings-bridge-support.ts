@@ -46,6 +46,9 @@ export function fakeContext(scope: FakeScope): any {
           register() {
             return scope;
           },
+          get() {
+            return undefined;
+          },
         },
       });
     },
@@ -62,6 +65,7 @@ export function baseValue(): Record<string, unknown> {
     images: [],
     volumes: [],
     secrets: [],
+    caches: [],
     command: null,
   };
 }

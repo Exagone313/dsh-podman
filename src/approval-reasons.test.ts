@@ -6,6 +6,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   reasonLocale,
+  renderCacheCleanNotice,
   renderDenial,
   renderReason,
   resolveReasonLocale,
@@ -101,6 +102,12 @@ test("renderReason covers the remaining reason kinds in both languages", () => {
     renderReason("zh", { kind: "container_secret_add", container: "c", secret: "s", env: "E" }),
     "将机密 “s” 作为 “E” 注入容器 “c”。",
   );
+});
+
+test("renderCacheCleanNotice reports the removed file count", () => {
+  assert.equal(renderCacheCleanNotice("en", 1), "removed 1 cached file");
+  assert.equal(renderCacheCleanNotice("en", 3), "removed 3 cached files");
+  assert.equal(renderCacheCleanNotice("zh", 3), "已移除 3 个缓存文件");
 });
 
 test("preExecutePolicy renders a localized deny reason", async () => {

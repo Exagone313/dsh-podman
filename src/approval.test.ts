@@ -141,7 +141,7 @@ test("summarizeArgs renders the approval reason for each gated tool", () => {
         { project: "team", destination: "/workspace/team", mode: "read_write" },
       ],
     }),
-    'Start container "web" from image "localhost/dsh-podman/nginx:latest" with mounts: directory "team/src" (read-only), directory "team" at "/workspace/team" (read-write).',
+    'Start container "web" from image "localhost/dsh-podman/nginx:latest" with mounts: project "team/src" (read-only), project "team" at "/workspace/team" (read-write).',
   );
   assert.equal(
     summarizeArgs("container_recreate", {
@@ -152,7 +152,7 @@ test("summarizeArgs renders the approval reason for each gated tool", () => {
         { project: "team", destination: "/workspace/team", mode: "read_write" },
       ],
     }),
-    'Recreate container "valkey-ctr" from image "localhost/dsh-podman/nginx:latest" with mounts: directory "team/src" (read-only), directory "team" at "/workspace/team" (read-write).',
+    'Recreate container "valkey-ctr" from image "localhost/dsh-podman/nginx:latest" with mounts: project "team/src" (read-only), project "team" at "/workspace/team" (read-write).',
   );
   assert.equal(
     summarizeArgs("container_mount_add", {
@@ -183,7 +183,7 @@ test("summarizeArgs renders the approval reason for each gated tool", () => {
       destination: "/workspace/team",
       mode: "read_only",
     }),
-    'Add mount to container "valkey-ctr": directory "team/src" at "/workspace/team" (read-only).',
+    'Add mount to container "valkey-ctr": project "team/src" at "/workspace/team" (read-only).',
   );
   assert.equal(
     summarizeArgs("container_mount_add", {
@@ -210,7 +210,7 @@ test("summarizeArgs renders the approval reason for each gated tool", () => {
       project: "team",
       path: "src",
     }),
-    'Remove mount from container "valkey-ctr": directory "team/src".',
+    'Remove mount from container "valkey-ctr": project "team/src".',
   );
   assert.equal(
     summarizeArgs("secret_remove", { name: "valkey-pass" }),
@@ -552,7 +552,7 @@ test("summarizeArgs includes env keys for container start/recreate", () => {
       mounts: [{ project: "team", mode: "read_only" }],
       env: { A: "1", B: "2", C: "3" },
     }),
-    'Start container "web" from image "localhost/dsh-podman/nginx:latest" with mounts: directory "team" (read-only) with env: A, B, C.',
+    'Start container "web" from image "localhost/dsh-podman/nginx:latest" with mounts: project "team" (read-only) with env: A, B, C.',
   );
   assert.equal(
     summarizeArgs("container_start", {

@@ -133,7 +133,7 @@ function mountText(locale: ReasonLocale, mount: MountFact): string {
         ? pick(locale, `volume ${name}`, `卷 ${name}`)
         : mount.kind === "secret"
           ? pick(locale, `secret ${name}`, `机密 ${name}`)
-          : pick(locale, `directory ${name}`, `目录 ${name}`);
+          : pick(locale, `project ${name}`, `项目 ${name}`);
   const destination =
     mount.destination === undefined
       ? ""
@@ -352,7 +352,7 @@ export function renderDenial(locale: ReasonLocale, fact: DenialFact): string {
       }
       const source =
         fact.source === undefined || fact.source === ""
-          ? pick(locale, "the directory", "该目录")
+          ? pick(locale, "the project", "该项目")
           : quoted(locale, fact.source);
       return pick(
         locale,

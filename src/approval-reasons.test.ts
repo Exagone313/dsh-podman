@@ -65,7 +65,7 @@ test("summarizeArgs renders reasons in Chinese when asked", () => {
       undefined,
       "zh",
     ),
-    "启动容器 “web”（镜像 “img”），挂载：目录 “team”（只读），环境变量：A。",
+    "启动容器 “web”（镜像 “img”），挂载：项目 “team”（只读），环境变量：A。",
   );
 });
 
@@ -89,6 +89,14 @@ test("renderDenial renders both languages", () => {
   assert.equal(
     renderDenial("zh", { kind: "project_destination" }),
     "项目挂载不能指定目标路径。",
+  );
+  assert.equal(
+    renderDenial("en", { kind: "project_destination", mirror: "/projects" }),
+    'Project mounts cannot set a destination; the project always mounts at "/projects".',
+  );
+  assert.equal(
+    renderDenial("zh", { kind: "project_destination", mirror: "/projects" }),
+    "项目挂载不能指定目标路径；该项目 始终挂载到 “/projects”。",
   );
 });
 

@@ -42,7 +42,7 @@ test("container_start approval depends on mounts being passed", () => {
   assert.equal(decision!.kind, "ask");
   assert.equal(
     decision!.reason,
-    'Start container "web" from image "localhost/dsh-podman/nginx:latest" with mounts: directory "team/src" (read-only), directory "team" at "/workspace/team" (read-write).',
+    'Start container "web" from image "localhost/dsh-podman/nginx:latest" with mounts: project "team/src" (read-only), project "team" at "/workspace/team" (read-write).',
   );
 });
 
@@ -294,7 +294,7 @@ test("summarizeArgs renders the remount reason", () => {
       project: "team",
       mode: "read_only",
     }),
-    'Change the mount mode in container "valkey-ctr": directory "team" (read-only).',
+    'Change the mount mode in container "valkey-ctr": project "team" (read-only).',
   );
   assert.equal(
     summarizeArgs("container_mount_update", {

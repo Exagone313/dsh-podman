@@ -12,6 +12,7 @@ import {
 import { GIT_COMMIT, VERSION } from "./generated/version.js";
 import { renderCacheCleanNotice, resolveReasonLocale } from "./approval-reasons.js";
 import { defaultMountMode, mountKindToProto, mountModeToProto } from "./mount-enums.js";
+import { unaryGuest } from "./guest-rpc.js";
 import { type WorkspaceResolver, workspaceSlug } from "./workspace-binding.js";
 
 // The cache clean modes the settings card can request, mapped to the control
@@ -73,10 +74,20 @@ function dshWorkspaceViews(registry: any, projectsRoot: string): WorkspaceView[]
   });
 }
 
+// dshWorkspaceCwd returns a registered dsh workspace's host path — the cwd the
+// resolver needs to bind a container for a settings-card action.
+function dshWorkspaceCwd(registry: any, slug: string): string {
+  for (const workspace of registry?.list?.() ?? []) {
+    if (workspaceSlug(workspace.id) === slug) {
+      return String(workspace.path ?? "");
+    }
+  }
+  throw new Error(`unknown workspace ${JSON.stringify(slug)}`);
+}
+
 function mergeWorkspaceViews(
   dhs: WorkspaceView[],
-  orchestrator: WorkspaceView[],
-): WorkspaceView[] {
+  orchestrator: WorkspaceView[],): WorkspaceView[] {
   const bySlug = new Map(orchestrator.map((workspace) => [workspace.workspaceSlug, workspace]));
   const seen = new Set<string>();
   const merged: WorkspaceView[] = [];
@@ -220,6 +231,23 @@ export function installContainerSettings(
             if (kind === "MOUNT_KIND_PROJECT") { request.project = m.project; }
             else if (kind === "MOUNT_KIND_VOLUME") { if (m.volume) request.volume = m.volume; if (m.destination) request.destination = m.destination; }
             await resolver.control("updateContainerMount", request);
+            break;
+          }
+          case "container_path_set": {
+            const paths = [...command.paths];
+            await resolver.control("setContainerPaths", {
+              workspaceSlug: command.workspace,
+              container: command.container || "default",
+              paths,
+            });
+            // The container is not recreated, so push the list to the running
+            // guest agent as well; the record above is what a recreate restores.
+            const cwd = dshWorkspaceCwd(workspaceRegistry, command.workspace);
+            const container = command.container || "default";
+            const binding = container === "default"
+              ? await resolver.resolve(cwd)
+              : await resolver.containerBinding(cwd, container);
+            await unaryGuest({ binding }, "setPaths", { paths });
             break;
           }
           case "remove":

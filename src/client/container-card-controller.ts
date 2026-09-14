@@ -39,6 +39,7 @@ export interface ContainerView {
   status: string;
   createdAt: string;
   mounts: readonly ProjectMountView[];
+  paths: readonly string[];
   env: Record<string, string>;
   secretEnv: Record<string, string>;
 }
@@ -76,7 +77,7 @@ export interface WorkspaceView {
   mounts: readonly { projectName: string; mode: string }[];
 }
 export interface CommandRequest {
-  op: "refresh" | "remove" | "workspace_remove" | "recreate" | "create" | "volume_create" | "volume_remove" | "image_remove" | "secret_create" | "secret_remove" | "secret_set" | "image_rebuild" | "image_rebuild_all" | "container_secret_add" | "container_secret_remove" | "image_build" | "image_base_rebuild" | "image_base_pull" | "container_mount_add" | "container_mount_remove" | "container_mount_update" | "cache_clean";
+  op: "refresh" | "remove" | "workspace_remove" | "recreate" | "create" | "volume_create" | "volume_remove" | "image_remove" | "secret_create" | "secret_remove" | "secret_set" | "image_rebuild" | "image_rebuild_all" | "container_secret_add" | "container_secret_remove" | "image_build" | "image_base_rebuild" | "image_base_pull" | "container_mount_add" | "container_mount_remove" | "container_mount_update" | "container_path_set" | "cache_clean";
   workspace: string;
   image: string;
   at: number;
@@ -144,6 +145,7 @@ export interface ContainerCardFace {
   addContainerMount: (workspace: string, container: string, mount: MountInput) => void;
   removeContainerMount: (workspace: string, container: string, mount: MountInput) => void;
   updateContainerMount: (workspace: string, container: string, mount: MountInput) => void;
+  setContainerPaths: (workspace: string, container: string, paths: readonly string[]) => void;
   createVolume: (name: string) => void;
   removeVolume: (name: string) => void;
   removeImage: (imageId: string) => void;
@@ -218,6 +220,7 @@ export class ContainerCardController {
     extra: {
       projectName?: string;
       mounts?: readonly MountInput[];
+      paths?: readonly string[];
       value?: string;
       env?: Record<string, string>;
       container?: string;
@@ -235,6 +238,7 @@ export class ContainerCardController {
       op, workspace, image, at: Date.now(),
       projectName: extra.projectName ?? "",
       mounts: extra.mounts ?? [],
+      paths: extra.paths ?? [],
       value: extra.value ?? "",
       env: extra.env ?? {},
       container: extra.container ?? "",
@@ -304,6 +308,8 @@ export class ContainerCardController {
         this.command("container_mount_remove", workspace, "", { container, mount }),
       updateContainerMount: (workspace, container, mount) =>
         this.command("container_mount_update", workspace, "", { container, mount }),
+      setContainerPaths: (workspace, container, paths) =>
+        this.command("container_path_set", workspace, "", { container, paths }),
       createVolume: (name) => this.command("volume_create", name, ""),
       removeVolume: (name) => this.command("volume_remove", name, ""),
       removeImage: (imageId) => this.command("image_remove", imageId, ""),

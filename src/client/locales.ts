@@ -99,6 +99,15 @@ export type ContainerPluginKey =
   | "mountProject"
   | "mountProjectPath"
   | "mountDestination"
+  | "pathsTitle"
+  | "noPaths"
+  | "editPaths"
+  | "addPath"
+  | "add"
+  | "moveUp"
+  | "moveDown"
+  | "apply"
+  | "dragToReorder"
   | "mountVolume"
   | "mountSecret"
   | "mountMode"
@@ -268,6 +277,15 @@ export const en: Record<ContainerPluginKey, string> = {
   mountProject: "Project",
   mountProjectPath: "Project path",
   mountDestination: "Destination",
+  pathsTitle: "PATH additions",
+  noPaths: "No PATH additions.",
+  editPaths: "Edit PATH additions",
+  addPath: "Path to add",
+  add: "Add",
+  moveUp: "Move up",
+  moveDown: "Move down",
+  apply: "Apply",
+  dragToReorder: "Drag to reorder",
   mountVolume: "Volume",
   mountSecret: "Secret",
   mountMode: "Mode",
@@ -438,6 +456,15 @@ export const zh: Record<ContainerPluginKey, string> = {
   mountProject: "项目",
   mountProjectPath: "项目路径",
   mountDestination: "目标路径",
+  pathsTitle: "PATH 附加项",
+  noPaths: "没有 PATH 附加项。",
+  editPaths: "编辑 PATH 附加项",
+  addPath: "要添加的路径",
+  add: "添加",
+  moveUp: "上移",
+  moveDown: "下移",
+  apply: "应用",
+  dragToReorder: "拖动以重新排序",
   mountVolume: "卷",
   mountSecret: "机密",
   mountMode: "模式",

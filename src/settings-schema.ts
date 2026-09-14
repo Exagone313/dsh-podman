@@ -29,6 +29,7 @@ const commandSchema = z.object({
     z.const("container_mount_add"),
     z.const("container_mount_remove"),
     z.const("container_mount_update"),
+    z.const("container_path_set"),
     z.const("cache_clean"),
   ]),
   workspace: z.string().default(""),
@@ -43,6 +44,7 @@ const commandSchema = z.object({
     volume: z.string().default(""),
     secret: z.string().default(""),
   })).default([]),
+  paths: z.array(z.string()).default([]),
   value: z.string().default(""),
   env: z.dict(z.string()).default({}),
   container: z.string().default(""),
@@ -169,12 +171,13 @@ export interface MountInput {
 }
 
 export interface CommandRequest {
-  op: "refresh" | "remove" | "workspace_remove" | "recreate" | "create" | "volume_create" | "volume_remove" | "image_remove" | "secret_create" | "secret_remove" | "secret_set" | "image_rebuild" | "image_rebuild_all" | "container_secret_add" | "container_secret_remove" | "image_build" | "image_base_rebuild" | "image_base_pull" | "container_mount_add" | "container_mount_remove" | "container_mount_update" | "cache_clean";
+  op: "refresh" | "remove" | "workspace_remove" | "recreate" | "create" | "volume_create" | "volume_remove" | "image_remove" | "secret_create" | "secret_remove" | "secret_set" | "image_rebuild" | "image_rebuild_all" | "container_secret_add" | "container_secret_remove" | "image_build" | "image_base_rebuild" | "image_base_pull" | "container_mount_add" | "container_mount_remove" | "container_mount_update" | "container_path_set" | "cache_clean";
   workspace: string;
   projectName: string;
   image: string;
   at: number;
   mounts: readonly MountInput[];
+  paths: readonly string[];
   value: string;
   env: Record<string, string>;
   container: string;
@@ -194,7 +197,8 @@ export interface ContainerView {
   imageId: string;
   status: string;
   createdAt: string;
-  mounts: readonly { projectName: string; path: string; destination: string; kind: string; mode: string; volume: string; secret: string }[];
+  mounts: readonly { projectName: string; destination: string; kind: string; mode: string; volume: string; secret: string }[];
+  paths: readonly string[];
   env: Record<string, string>;
   secretEnv: Record<string, string>;
 }

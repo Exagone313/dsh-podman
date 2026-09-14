@@ -53,6 +53,11 @@ export function WorkspaceSection(props: {
     container: string,
     mount: MountInput,
   ) => void;
+  onSetContainerPaths: (
+    workspace: string,
+    container: string,
+    paths: readonly string[],
+  ) => void;
   onAddContainerSecret: (workspace: string, envVar: string, secret: string) => void;
   onRemoveContainerSecret: (workspace: string, envVar: string) => void;
 }): ReactNode {
@@ -73,6 +78,7 @@ export function WorkspaceSection(props: {
     onAddContainerMount,
     onRemoveContainerMount,
     onUpdateContainerMount,
+    onSetContainerPaths,
     onAddContainerSecret,
     onRemoveContainerSecret,
   } = props;
@@ -125,6 +131,7 @@ export function WorkspaceSection(props: {
                 onAddContainerMount={onAddContainerMount}
                 onRemoveContainerMount={onRemoveContainerMount}
                 onUpdateContainerMount={onUpdateContainerMount}
+                onSetContainerPaths={onSetContainerPaths}
                 projectName={workspace.projectName}
                 onAddContainerSecret={onAddContainerSecret}
                 onRemoveContainerSecret={onRemoveContainerSecret}

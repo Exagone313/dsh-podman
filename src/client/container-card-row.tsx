@@ -4,6 +4,7 @@
 
 import { type ContainerView, type MountInput } from "./container-card-controller.js";
 import { EnvEditor, MountsEditor } from "./container-card-editors.js";
+import { PathsEditor } from "./container-card-paths.js";
 import { ConfirmButton, mountViewToInput } from "./container-card-shared.js";
 import {
   actions,
@@ -36,6 +37,11 @@ export function ContainerRow(props: {
   onAddContainerMount: (workspace: string, container: string, mount: MountInput) => void;
   onRemoveContainerMount: (workspace: string, container: string, mount: MountInput) => void;
   onUpdateContainerMount: (workspace: string, container: string, mount: MountInput) => void;
+  onSetContainerPaths: (
+    workspace: string,
+    container: string,
+    paths: readonly string[],
+  ) => void;
   onAddContainerSecret: (workspace: string, envVar: string, secret: string) => void;
   onRemoveContainerSecret: (workspace: string, envVar: string) => void;
   projectName: string;
@@ -52,6 +58,7 @@ export function ContainerRow(props: {
     onAddContainerMount,
     onRemoveContainerMount,
     onUpdateContainerMount,
+    onSetContainerPaths,
     onAddContainerSecret,
     onRemoveContainerSecret,
     projectName,
@@ -60,6 +67,7 @@ export function ContainerRow(props: {
   const [env, setEnv] = useState<Record<string, string>>(container.env);
   const [envOpen, setEnvOpen] = useState(false);
   const [mountOpen, setMountOpen] = useState(false);
+  const [pathOpen, setPathOpen] = useState(false);
   const [secretOpen, setSecretOpen] = useState(false);
   const [attachSecret, setAttachSecret] = useState("");
   const [attachVar, setAttachVar] = useState("");
@@ -210,6 +218,29 @@ export function ContainerRow(props: {
                 container.workspaceSlug,
                 container.containerName,
                 mount,
+              )
+            }
+          />
+        </div>
+      </DisclosureRow>
+      <DisclosureRow
+        icon={<span />}
+        title={t("pathsTitle")}
+        open={pathOpen}
+        expandable
+        onToggle={() => setPathOpen(!pathOpen)}
+      >
+        <div style={wsBody}>
+          <PathsEditor
+            t={t}
+            paths={container.paths}
+            busy={busy}
+            enabled={enabled}
+            onApply={(paths) =>
+              onSetContainerPaths(
+                container.workspaceSlug,
+                container.containerName,
+                paths,
               )
             }
           />

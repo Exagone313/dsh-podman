@@ -413,11 +413,19 @@ test("container_glob caps its result at 100 files", async () => {
 test("podmanRuntimeSection clarifies that the built-in tools run in the container", () => {
   const section = podmanRuntimeSection();
   assert.equal(section.name, "podman:runtime");
-  assert.equal(section.order, 90);
+  assert.equal(section.order, 950);
   for (const tool of ["bash", "read", "write", "edit", "glob", "grep"]) {
     assert.match(section.text, new RegExp("`" + tool + "`"));
   }
   assert.match(section.text, /container-backed/);
   assert.match(section.text, /There is no host shell/);
   assert.match(section.text, /container_\*/);
+  // The facts that pre-empt the "bash runs on the host" hallucination: the
+  // built-in shell and container_bash use one container, and identical uname
+  // output is the shared kernel, not a host shell.
+  assert.match(section.text, /container: "default"/);
+  assert.match(section.text, /identical output by construction/);
+  assert.match(section.text, /share the host kernel/);
+  assert.match(section.text, /hostname/);
+  assert.match(section.text, /\/etc\/os-release/);
 });

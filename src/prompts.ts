@@ -24,7 +24,12 @@ export function withoutHarnessSourceSection(assembly: any): any {
 }
 
 // Correct the model's host/container mental model: the built-in shell and
-// filesystem tools are container-backed too, so there is no host shell.
+// filesystem tools are container-backed too, so there is no host shell. It sits
+// just before the tool sections so the correction lands next to the tool
+// descriptions it explains, and it states the two facts that otherwise invite a
+// "bash runs on the host" hallucination: `bash` and `container_bash` use the
+// same container, and a container shares the host kernel (so `uname` matches
+// the host even though the container's identity does not).
 export function podmanRuntimeSection(): {
   name: string;
   order: number;
@@ -32,16 +37,21 @@ export function podmanRuntimeSection(): {
 } {
   return {
     name: "podman:runtime",
-    order: 90,
+    order: 950,
     text:
-      "This session runs inside a Podman workspace. The shell and filesystem " +
-      "tools execute in the workspace's default container, not on the host: " +
-      "`bash`, `read`, `write`, `edit`, `glob`, and `grep` are all " +
-      "container-backed and only see the mounted project and that container's " +
-      "filesystem. There is no host shell, and host paths are unavailable. The " +
-      "`container_*` tools are the same operations against a named container " +
-      '(pass `container`; "default" selects the same default container as ' +
-      "`bash`) plus container, image, mount, volume, secret, and daemon management.",
+      "This session runs inside a Podman workspace. `bash`, `read`, `write`, " +
+      "`edit`, `glob`, and `grep` are container-backed: they execute inside " +
+      "this workspace's default container, the same container the `container_*` " +
+      'tools target with `container: "default"`. There is no host shell — never ' +
+      "describe their output as the host's — and host paths do not exist. " +
+      "Because `bash` and `container_bash` use that one container, the same " +
+      "command returns identical output by construction, and matching output is " +
+      "never evidence of a host shell. Containers share the host kernel, so " +
+      "`uname -a`, `uname -r`, and `/proc/version` do report the host kernel; " +
+      "the container's own identity shows in `hostname`, `/etc/os-release`, and " +
+      "`/proc/1/cmdline`. The `container_*` tools are those same operations " +
+      "against a named container, plus container, image, mount, volume, secret, " +
+      "and daemon management.",
   };
 }
 

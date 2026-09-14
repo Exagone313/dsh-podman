@@ -361,11 +361,17 @@ func (s *Server) removeSocketDir(podmanName string) {
 
 func toProto(workspace state.Workspace) *ctl.Workspace {
 	result := &ctl.Workspace{WorkspaceSlug: workspace.WorkspaceSlug, ProjectName: workspace.ProjectName, ContainerName: workspace.ContainerName, ImageId: workspace.ImageID, Status: workspace.Status, AgentSocketPath: workspace.AgentSocketPath, AgentToken: workspace.AgentToken, CreatedAt: workspace.CreatedAt}
+	// The default container's mounts are authoritative: the workspace-level
+	// list is only the fallback for a workspace whose default container has
+	// none. Reporting the fallback here would hide a mode change applied to
+	// the default container (for example by RecreateContainer).
+	mounts := workspace.Mounts
 	if defaultContainer, ok := containerByLogical(&workspace, "default"); ok {
 		result.Env = cloneMap(defaultContainer.Env)
 		result.SecretEnv = cloneMap(defaultContainer.SecretEnv)
+		mounts = containerMounts(workspace, *defaultContainer)
 	}
-	for _, mount := range workspace.Mounts {
+	for _, mount := range mounts {
 		mode := ctl.MountMode_MOUNT_MODE_READ_ONLY
 		if mount.Mode == "read_write" {
 			mode = ctl.MountMode_MOUNT_MODE_READ_WRITE

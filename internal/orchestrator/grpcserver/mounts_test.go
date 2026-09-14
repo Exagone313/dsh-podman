@@ -705,3 +705,116 @@ func TestAddContainerMountRestoresOnFailedRecreate(t *testing.T) {
 		t.Fatalf("the failed mutation must not be persisted: %#v", stored[0].Containers[0].Mounts)
 	}
 }
+
+// TestToProtoReportsDefaultContainerMounts pins the workspace projection to the
+// default container's mounts, not the workspace-level fallback: a mode change
+// applied to the default container (RecreateContainer) must not be masked by a
+// stale workspace list.
+func TestToProtoReportsDefaultContainerMounts(t *testing.T) {
+	workspace := state.Workspace{
+		WorkspaceSlug: "proj",
+		ProjectName:   "team",
+		Mounts:        []state.Mount{{ProjectName: "team", Mode: "read_write"}},
+		Containers: []state.Container{{
+			Name:   "default",
+			Mounts: []state.Mount{{ProjectName: "team", Mode: "read_only"}},
+		}},
+	}
+	proto := toProto(workspace)
+	if len(proto.GetMounts()) != 1 || proto.GetMounts()[0].GetMode() != ctl.MountMode_MOUNT_MODE_READ_ONLY {
+		t.Fatalf("toProto must report the default container's mounts, got %v", proto.GetMounts())
+	}
+	// With no default container the workspace-level list is the only source.
+	fallback := toProto(state.Workspace{
+		WorkspaceSlug: "proj",
+		ProjectName:   "team",
+		Mounts:        []state.Mount{{ProjectName: "team", Mode: "read_only"}},
+	})
+	if len(fallback.GetMounts()) != 1 || fallback.GetMounts()[0].GetMode() != ctl.MountMode_MOUNT_MODE_READ_ONLY {
+		t.Fatalf("toProto must fall back to the workspace mounts, got %v", fallback.GetMounts())
+	}
+}
+
+// TestRecreateContainerReportsDefaultProjectReadOnly recreates the default
+// container with its primary project mount read-only and asserts the returned
+// workspace and the stored record agree.
+func TestRecreateContainerReportsDefaultProjectReadOnly(t *testing.T) {
+	root := tempRoot(t)
+	if err := os.MkdirAll(filepath.Join(root, "team"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	store := newTestStore(t)
+	if err := store.SaveImages([]state.Image{{ImageID: "arch", ImageTag: "localhost/dsh-podman/arch:latest"}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.SaveWorkspaces([]state.Workspace{{
+		WorkspaceSlug: "proj",
+		ProjectName:   "team",
+		Mounts:        []state.Mount{{ProjectName: "team", Mode: "read_write"}},
+		Containers: []state.Container{{
+			Name: "default", PodmanName: "dsh-podman-proj-default", ImageID: "arch", Status: "running",
+			Mounts: []state.Mount{{ProjectName: "team", Mode: "read_write"}},
+		}},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	fake := newFakePodman()
+	fake.exists["dsh-podman-proj-default"] = true
+	server := &Server{Store: store, Podman: fake, ProjectsRoot: root, Logger: silentLogger()}
+
+	workspace, err := server.RecreateContainer(context.Background(), &ctl.RecreateContainerRequest{
+		WorkspaceSlug: "proj", Container: "default",
+		Mounts: []*ctl.ProjectMount{{ProjectName: "team", Mode: ctl.MountMode_MOUNT_MODE_READ_ONLY}},
+	})
+	if err != nil {
+		t.Fatalf("recreate failed: %v", err)
+	}
+	if len(workspace.GetMounts()) != 1 || workspace.GetMounts()[0].GetMode() != ctl.MountMode_MOUNT_MODE_READ_ONLY {
+		t.Fatalf("the returned workspace must report the read-only mount, got %v", workspace.GetMounts())
+	}
+	stored, err := store.Workspaces()
+	if err != nil {
+		t.Fatal(err)
+	}
+	container, ok := containerByLogical(&stored[0], "default")
+	if !ok || len(container.Mounts) != 1 || container.Mounts[0].Mode != "read_only" {
+		t.Fatalf("the stored default container must be read-only, got %#v", container)
+	}
+}
+
+// TestAddContainerMountRejectsExistingPrimaryWithDifferentMode guards the strict
+// add contract: re-adding an existing mount is rejected rather than silently
+// changing its mode. Changing a mode is UpdateContainerMount's job.
+func TestAddContainerMountRejectsExistingPrimaryWithDifferentMode(t *testing.T) {
+	root := tempRoot(t)
+	if err := os.MkdirAll(filepath.Join(root, "team"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	store := newTestStore(t)
+	if err := store.SaveWorkspaces([]state.Workspace{{
+		WorkspaceSlug: "proj",
+		ProjectName:   "team",
+		Mounts:        []state.Mount{{ProjectName: "team", Mode: "read_write"}},
+		Containers: []state.Container{{
+			Name: "default", PodmanName: "dsh-podman-proj-default", ImageID: "arch", Status: "running",
+			Mounts: []state.Mount{{ProjectName: "team", Mode: "read_write"}},
+		}},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	server := &Server{Store: store, ProjectsRoot: root, Logger: silentLogger()}
+	_, err := server.AddContainerMount(context.Background(), &ctl.AddContainerMountRequest{
+		WorkspaceSlug: "proj", Container: "default", Project: "team", Mode: ctl.MountMode_MOUNT_MODE_READ_ONLY,
+	})
+	if status.Code(err) != codes.AlreadyExists {
+		t.Fatalf("re-adding the primary must be rejected, got %v", err)
+	}
+	stored, err := store.Workspaces()
+	if err != nil {
+		t.Fatal(err)
+	}
+	container, ok := containerByLogical(&stored[0], "default")
+	if !ok || len(container.Mounts) != 1 || container.Mounts[0].Mode != "read_write" {
+		t.Fatalf("the rejected add must not change the stored mode, got %#v", container)
+	}
+}

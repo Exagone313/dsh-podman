@@ -72,7 +72,7 @@ export interface WorkspaceView {
   mounts: readonly { projectName: string; mode: string }[];
 }
 export interface CommandRequest {
-  op: "refresh" | "remove" | "recreate" | "create" | "volume_create" | "volume_remove" | "image_remove" | "secret_create" | "secret_remove" | "secret_set" | "image_rebuild" | "image_rebuild_all" | "container_secret_add" | "container_secret_remove" | "image_build" | "image_base_rebuild" | "image_base_pull" | "container_mount_add" | "container_mount_remove";
+  op: "refresh" | "remove" | "workspace_remove" | "recreate" | "create" | "volume_create" | "volume_remove" | "image_remove" | "secret_create" | "secret_remove" | "secret_set" | "image_rebuild" | "image_rebuild_all" | "container_secret_add" | "container_secret_remove" | "image_build" | "image_base_rebuild" | "image_base_pull" | "container_mount_add" | "container_mount_remove";
   workspace: string;
   image: string;
   at: number;
@@ -129,6 +129,7 @@ export interface ContainerCardFace {
   };
   reload: () => void;
   remove: (workspace: string) => void;
+  removeWorkspace: (workspace: string) => void;
   recreate: (workspace: string, image: string, env?: Record<string, string>) => void;
   createContainer: (workspace: WorkspaceView, config?: ContainerCreateConfig) => void;
   startContainer: (workspace: WorkspaceView, container: string, config?: ContainerCreateConfig) => void;
@@ -257,6 +258,7 @@ export class ContainerCardController {
       hooks: { containerCard: this.store },
       reload: () => this.command("refresh", "", ""),
       remove: (workspace) => this.command("remove", workspace, ""),
+      removeWorkspace: (workspace) => this.command("workspace_remove", workspace, ""),
       recreate: (workspace, image, env) =>
         this.command("recreate", workspace, image, { ...(env ? { env } : {}) }),
       createContainer: (workspace, config) =>

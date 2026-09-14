@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: MIT
 
 import { ContainerRow, CreateContainerModal } from "./container-card-row.js";
-import { containerStateDot } from "./container-card-shared.js";
+import { ConfirmButton, containerStateDot } from "./container-card-shared.js";
 import { greyId, hint, wsBody } from "./container-card-styles.js";
 import {
   type ContainerCreateConfig,
@@ -26,6 +26,7 @@ export function WorkspaceSection(props: {
   busy: boolean;
   defaultImage: string;
   onRemove: (workspace: string) => void;
+  onRemoveWorkspace: (workspace: string) => void;
   onRecreate: (
     workspace: string,
     image: string,
@@ -60,6 +61,7 @@ export function WorkspaceSection(props: {
     busy,
     defaultImage,
     onRemove,
+    onRemoveWorkspace,
     onRecreate,
     onCreate,
     onStartContainer,
@@ -132,6 +134,16 @@ export function WorkspaceSection(props: {
             </div>
           </>
         )}
+        <div>
+          <ConfirmButton
+            t={t}
+            label={t("removePod")}
+            title={t("confirmTitle")}
+            description={t("confirmRemovePod")}
+            disabled={busy}
+            onConfirm={() => onRemoveWorkspace(workspace.workspaceSlug)}
+          />
+        </div>
       </div>
       <CreateContainerModal
         t={t}

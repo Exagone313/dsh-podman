@@ -188,6 +188,11 @@ export function installContainerSettings(
               workspaceSlug: command.workspace,
             });
             break;
+          case "workspace_remove":
+            await resolver.control("removeWorkspace", {
+              workspaceSlug: command.workspace,
+            });
+            break;
           case "recreate":
             await resolver.control("recreateContainer", {
               workspaceSlug: command.workspace,

@@ -30,6 +30,8 @@ export type ContainerPluginKey =
   | "created"
   | "projects"
   | "remove"
+  | "removePod"
+  | "confirmRemovePod"
   | "recreate"
   | "recreateWithImage"
   | "imagesTitle"
@@ -176,6 +178,9 @@ export const en: Record<ContainerPluginKey, string> = {
   created: "Created",
   projects: "Projects",
   remove: "Remove",
+  removePod: "Remove pod",
+  confirmRemovePod:
+    "Remove this workspace's pod and all its containers? Volume and project data is kept.",
   recreate: "Recreate",
   recreateWithImage: "Recreate with image",
   imagesTitle: "Images",
@@ -330,6 +335,8 @@ export const zh: Record<ContainerPluginKey, string> = {
   created: "创建时间",
   projects: "项目",
   remove: "移除",
+  removePod: "移除 Pod",
+  confirmRemovePod: "移除该工作区的 Pod 及其所有容器？卷和项目数据会保留。",
   recreate: "重建",
   recreateWithImage: "使用镜像重建",
   imagesTitle: "镜像",

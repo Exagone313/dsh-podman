@@ -36,6 +36,29 @@ test("remove command drives removeContainer and clears the command", async () =>
   assert.equal(scope.value.command, null);
 });
 
+test("workspace_remove command drives removeWorkspace and clears the command", async () => {
+  const scope = fakeScope(baseValue());
+  const calls: Array<[string, unknown]> = [];
+  const resolver: any = {
+    getConfig: () => ({}),
+    setConfig: () => {},
+    async control(method: string, request: unknown) {
+      calls.push([method, request]);
+      if (method === "listContainers") return { containers: [] };
+      if (method === "listImages") return { images: [] };
+      return {};
+    },
+  };
+  installContainerSettings(fakeContext(scope), resolver);
+  await scope.update({
+    command: { op: "workspace_remove", workspace: "w1", image: "", at: 2 },
+  });
+  await new Promise((resolve) => setImmediate(resolve));
+  const removeCall = calls.find(([method]) => method === "removeWorkspace");
+  assert.deepEqual(removeCall?.[1], { workspaceSlug: "w1" });
+  assert.equal(scope.value.command, null);
+});
+
 test("volume_remove command drives removeVolume with the name", async () => {
   const scope = fakeScope(baseValue());
   const calls: Array<[string, unknown]> = [];

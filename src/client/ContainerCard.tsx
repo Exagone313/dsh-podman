@@ -113,6 +113,7 @@ export function ContainerCard(props: ContainerCardProps): ReactNode {
                 busy={state.busy}
                 defaultImage={state.defaultImage}
                 onRemove={props.remove}
+                onRemoveWorkspace={props.removeWorkspace}
                 onRecreate={props.recreate}
                 onCreate={props.createContainer}
                 onStartContainer={props.startContainer}

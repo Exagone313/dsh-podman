@@ -45,6 +45,12 @@ containers (`dsh-podman-<slug>-<name>`) can be created inside the same pod.
 Containers' root filesystems are mounted read-only; all writable state lives in
 the project bind mount, named volumes, or tmpfs mounts.
 
+A workspace's pod is torn down when its last container is removed, or directly
+through `RemoveWorkspace` (the settings card's **Remove pod** action), which
+stops the containers' daemons, removes the pod and its containers, cleans their
+socket directories, and drops the stored workspace. Volumes, secrets, and
+project data are left untouched.
+
 Beyond project mounts, a container can mount named volumes (prefixed
 `DSH_PODMAN_VOLUME_PREFIX`, default `dsh-podman-`, and auto-created by podman on
 first use), secrets, or tmpfs at arbitrary container paths — except where they

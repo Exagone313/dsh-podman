@@ -206,8 +206,10 @@ UI 使用短名称。`secret_create` 的值由服务端用 `crypto/rand`
 secret）以及机密环境变量——而已有容器的工作区通过同一个模态框提供 **Add
 container**
 按钮，用于添加额外的命名容器。容器行显示其环境和机密环境变量及其挂载，允许编辑环境变量和添加/移除挂载（每次移除都会确认），以及将命名机密附加/分离到容器的环境变量；每行还提供
-**Remove**、**Recreate**（相同镜像）和 **Recreate with image**。卡片头部有一个
-**Reload this view**
+**Remove**、**Recreate**（相同镜像）和 **Recreate with
+image**。每个工作区行还提供 **移除 Pod**，它会移除该工作区的
+Pod、其所有容器以及编排器对应的记录（卷、机密和项目数据会保留）；移除工作区的最后一个容器也会一并移除其
+Pod，因此不会留下空的 Pod。卡片头部有一个 **Reload this view**
 按钮。镜像部分可以重建单个镜像或按依赖顺序**重建全部**；**Build image**
 打开一个弹窗，包含 image-id/base-image 表单和用于软件包列表的 chip
 输入框（输入名称并按空格/逗号，或粘贴列表，以添加可移除的

@@ -288,7 +288,7 @@ test("containerBinding exposes the session directory only when a project mount c
     containerName: "db",
     agentSocketPath: "/run/x.sock",
     agentToken: "tok",
-    mounts: [{ kind: "MOUNT_KIND_PROJECT", projectName: "team", path: "" }],
+    mounts: [{ kind: "MOUNT_KIND_PROJECT", projectName: "team" }],
   }]);
   try {
     const resolver = new WorkspaceResolver(

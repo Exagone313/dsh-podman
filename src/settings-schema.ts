@@ -38,7 +38,6 @@ const commandSchema = z.object({
   mounts: z.array(z.object({
     kind: z.string().default(""),
     project: z.string().default(""),
-    path: z.string().default(""),
     destination: z.string().default(""),
     mode: z.string().default(""),
     volume: z.string().default(""),
@@ -58,7 +57,6 @@ const commandSchema = z.object({
     z.object({
       kind: z.string().default(""),
       project: z.string().default(""),
-      path: z.string().default(""),
       destination: z.string().default(""),
       mode: z.string().default(""),
       volume: z.string().default(""),
@@ -164,7 +162,6 @@ export const settingsSchema = z.object({
 export interface MountInput {
   kind: string;
   project: string;
-  path: string;
   destination: string;
   mode: string;
   volume: string;

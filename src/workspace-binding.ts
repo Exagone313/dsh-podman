@@ -330,8 +330,7 @@ function projectMountCovers(
 ): boolean {
   return mounts.some((mount) => {
     if (!isProjectMount(mount)) return false;
-    const base = `${projectsRoot}/${mount.projectName}`;
-    const destination = mount.path ? `${base}/${mount.path}` : base;
+    const destination = `${projectsRoot}/${mount.projectName}`;
     return path === destination || path.startsWith(`${destination}/`);
   });
 }

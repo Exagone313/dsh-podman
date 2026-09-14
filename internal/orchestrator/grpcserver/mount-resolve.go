@@ -16,16 +16,17 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-// validProjectName reports whether name is an acceptable project name: a
+// validProjectPath reports whether path is an acceptable project path: a
 // non-empty, relative, lexically clean path with no "." or ".." segments and
-// no NUL byte. It is a purely lexical check; existence and confinement are
-// established by resolveDirUnderRoot.
-func validProjectName(name string) bool {
-	if name == "" || strings.ContainsRune(name, '\x00') || filepath.IsAbs(name) {
+// no NUL byte. A project mount names a path under the projects root, so it may
+// include subdirectories (`team` or `team/src`). It is a purely lexical check;
+// existence and confinement are established by resolveDirUnderRoot.
+func validProjectPath(path string) bool {
+	if path == "" || strings.ContainsRune(path, '\x00') || filepath.IsAbs(path) {
 		return false
 	}
-	clean := filepath.Clean(filepath.FromSlash(name))
-	if clean != filepath.FromSlash(name) {
+	clean := filepath.Clean(filepath.FromSlash(path))
+	if clean != filepath.FromSlash(path) {
 		return false
 	}
 	return clean != "." && clean != ".." && !strings.HasPrefix(clean, ".."+string(filepath.Separator))
@@ -69,18 +70,6 @@ func resolveDirUnderRoot(root, rel string) (resolvedRoot, resolved string, err e
 		return "", "", fmt.Errorf("%q escapes %q", rel, root)
 	}
 	return resolvedRoot, resolved, nil
-}
-
-// validMountSubpath reports whether path is an acceptable project subpath:
-// empty (the project root), or a relative path with no "." / ".." segments,
-// redundant separators, or absolute form.
-func validMountSubpath(path string) bool {
-	if path == "" {
-		return true
-	}
-	raw := filepath.FromSlash(path)
-	cleaned := filepath.Clean(raw)
-	return !filepath.IsAbs(raw) && cleaned == raw && cleaned != "." && cleaned != ".." && !strings.HasPrefix(cleaned, ".."+string(filepath.Separator))
 }
 
 // reservedDestinations lists the container paths a mount must not shadow: the
@@ -140,31 +129,27 @@ func (s *Server) nonProjectDestination(dest string) error {
 }
 
 // resolveMount resolves a single stored mount to its host source path and its
-// container destination path, validating the project, the subpath, and (when
-// set) the destination. The empty destination defaults to a mirror of the host
-// source under projectsRoot.
+// container destination path, validating the project path and (when set) the
+// destination. The empty destination defaults to a mirror of the host source
+// under projectsRoot.
 //
-// The project and its subpath are resolved through symlinks and confined to
-// projectsRoot, so a symlink planted inside a writable project cannot make
-// podman bind-mount a path outside the projects root. Note that podman
-// resolves the source again, in the host's mount namespace, when it performs
-// the mount: the source handed to it is the resolved path precisely because
-// every component was a real directory at validation time, so redirecting the
-// mount afterwards means replacing a directory with a symlink (rmdir refuses
-// a non-empty directory) rather than repointing an existing symlink. That
-// narrows the race; it does not remove it, and it cannot be removed from here
-// while podman takes a path rather than a file descriptor.
+// The project path (which may name a subdirectory) is resolved through symlinks
+// and confined to projectsRoot, so a symlink planted inside a writable project
+// cannot make podman bind-mount a path outside the projects root. Note that
+// podman resolves the source again, in the host's mount namespace, when it
+// performs the mount: the source handed to it is the resolved path precisely
+// because every component was a real directory at validation time, so
+// redirecting the mount afterwards means replacing a directory with a symlink
+// (rmdir refuses a non-empty directory) rather than repointing an existing
+// symlink. That narrows the race; it does not remove it, and it cannot be
+// removed from here while podman takes a path rather than a file descriptor.
 func resolveMount(projectsRoot, hostProjectsRoot string, mount state.Mount) (hostPath, destination string, err error) {
-	if !validProjectName(mount.ProjectName) {
-		return "", "", fmt.Errorf("invalid project name %q", mount.ProjectName)
+	if !validProjectPath(mount.ProjectName) {
+		return "", "", fmt.Errorf("invalid project path %q", mount.ProjectName)
 	}
-	if !validMountSubpath(mount.Path) {
-		return "", "", fmt.Errorf("invalid mount path %q", mount.Path)
-	}
-	subpath := filepath.FromSlash(mount.Path)
-	resolvedRoot, resolved, err := resolveDirUnderRoot(projectsRoot, filepath.Join(filepath.FromSlash(mount.ProjectName), subpath))
+	resolvedRoot, resolved, err := resolveDirUnderRoot(projectsRoot, filepath.FromSlash(mount.ProjectName))
 	if err != nil {
-		return "", "", fmt.Errorf("mount path %q does not exist under project %q", mount.Path, mount.ProjectName)
+		return "", "", fmt.Errorf("project path %q does not exist under %q", mount.ProjectName, projectsRoot)
 	}
 	// hostProjectsRoot names the same tree as projectsRoot in the host's
 	// mount namespace, so the resolved path is re-expressed relative to the
@@ -173,7 +158,7 @@ func resolveMount(projectsRoot, hostProjectsRoot string, mount state.Mount) (hos
 	if hostProjectsRoot != "" {
 		relative, relErr := filepath.Rel(resolvedRoot, resolved)
 		if relErr != nil {
-			return "", "", fmt.Errorf("mount path %q does not exist under project %q", mount.Path, mount.ProjectName)
+			return "", "", fmt.Errorf("project path %q does not exist under %q", mount.ProjectName, projectsRoot)
 		}
 		hostPath = filepath.Join(hostProjectsRoot, relative)
 	}
@@ -182,7 +167,7 @@ func resolveMount(projectsRoot, hostProjectsRoot string, mount state.Mount) (hos
 	// an internal symlink, or the plugin and the guest agent would disagree
 	// about where the files are. Project mounts never take a caller-supplied
 	// destination; the fixed location below is the only one used.
-	destination = filepath.Join(projectsRoot, mount.ProjectName, subpath)
+	destination = filepath.Join(projectsRoot, mount.ProjectName)
 	if mount.Destination != "" {
 		return "", "", fmt.Errorf("project mounts do not accept a destination; the directory will be mounted at %s", destination)
 	}
@@ -239,7 +224,7 @@ func (s *Server) podmanMounts(mounts []state.Mount) ([]specs.Mount, error) {
 // The name must be lexically clean and relative, and the directory it names
 // must resolve, through any symlinks, to a path confined to root.
 func ValidateProject(root, name string) (string, error) {
-	if !validProjectName(name) {
+	if !validProjectPath(name) {
 		return "", fmt.Errorf("invalid project name %q", name)
 	}
 	_, resolved, err := resolveDirUnderRoot(root, filepath.FromSlash(name))

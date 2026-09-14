@@ -265,7 +265,7 @@ func TestRemoveContainerMountVolume(t *testing.T) {
 	if status.Code(err) != codes.NotFound {
 		t.Fatalf("missing volume: expected NotFound, got %v", err)
 	}
-	_, err = server.RemoveContainerMount(context.Background(), &ctl.RemoveContainerMountRequest{WorkspaceSlug: "proj", Container: "dev", Project: "team", Path: "src"})
+	_, err = server.RemoveContainerMount(context.Background(), &ctl.RemoveContainerMountRequest{WorkspaceSlug: "proj", Container: "dev", Project: "team/src"})
 	if status.Code(err) != codes.NotFound {
 		t.Fatalf("project match against a volume mount: expected NotFound, got %v", err)
 	}

@@ -191,7 +191,7 @@ func (s *Server) CreateWorkspace(ctx context.Context, request *ctl.CreateWorkspa
 	if projectName == "" {
 		return nil, status.Error(codes.InvalidArgument, "project name is required")
 	}
-	if !validProjectName(projectName) {
+	if !validProjectPath(projectName) {
 		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("invalid project name %q", projectName))
 	}
 	imageID := request.GetImageId()
@@ -381,7 +381,7 @@ func toProto(workspace state.Workspace) *ctl.Workspace {
 		if mount.Mode == "read_write" {
 			mode = ctl.MountMode_MOUNT_MODE_READ_WRITE
 		}
-		result.Mounts = append(result.Mounts, &ctl.ProjectMount{ProjectName: mount.ProjectName, Path: mount.Path, Destination: mount.Destination, Mode: mode, Kind: mountKindToProto(mount.Kind), Volume: mount.Volume})
+		result.Mounts = append(result.Mounts, &ctl.ProjectMount{ProjectName: mount.ProjectName, Destination: mount.Destination, Mode: mode, Kind: mountKindToProto(mount.Kind), Volume: mount.Volume})
 	}
 	return result
 }

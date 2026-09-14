@@ -46,7 +46,7 @@ func mountFromProto(mount *ctl.ProjectMount) (state.Mount, error) {
 	if err != nil {
 		return state.Mount{}, err
 	}
-	return state.Mount{ProjectName: mount.GetProjectName(), Path: mount.GetPath(), Destination: mount.GetDestination(), Mode: mode, Kind: kind, Volume: mount.GetVolume()}, nil
+	return state.Mount{ProjectName: mount.GetProjectName(), Destination: mount.GetDestination(), Mode: mode, Kind: kind, Volume: mount.GetVolume()}, nil
 }
 
 // mountKindFromProto maps a control plane mount kind onto the state's string

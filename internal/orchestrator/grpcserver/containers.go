@@ -52,7 +52,7 @@ func containerProto(ws state.Workspace, c state.Container) *ctl.Container {
 		if mount.Mode == "read_write" {
 			mode = ctl.MountMode_MOUNT_MODE_READ_WRITE
 		}
-		row.Mounts = append(row.Mounts, &ctl.ProjectMount{ProjectName: mount.ProjectName, Path: mount.Path, Destination: mount.Destination, Mode: mode, Kind: mountKindToProto(mount.Kind), Volume: mount.Volume, Secret: mount.Secret})
+		row.Mounts = append(row.Mounts, &ctl.ProjectMount{ProjectName: mount.ProjectName, Destination: mount.Destination, Mode: mode, Kind: mountKindToProto(mount.Kind), Volume: mount.Volume, Secret: mount.Secret})
 	}
 	return row
 }

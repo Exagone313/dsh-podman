@@ -19,7 +19,7 @@ import (
 // container's mount list and recreates the podman container so the change
 // takes effect.
 func (s *Server) AddContainerMount(ctx context.Context, request *ctl.AddContainerMountRequest) (*ctl.Container, error) {
-	s.log().Info("control request", "method", "AddContainerMount", "workspace_slug", request.GetWorkspaceSlug(), "container", request.GetContainer(), "project", request.GetProject(), "path", request.GetPath(), "kind", request.GetKind(), "volume", request.GetVolume())
+	s.log().Info("control request", "method", "AddContainerMount", "workspace_slug", request.GetWorkspaceSlug(), "container", request.GetContainer(), "project", request.GetProject(), "kind", request.GetKind(), "volume", request.GetVolume())
 	workspace, err := workspaceBySlug(s.Store, request.GetWorkspaceSlug())
 	if err != nil {
 		return nil, status.Error(codes.NotFound, err.Error())
@@ -44,7 +44,7 @@ func (s *Server) AddContainerMount(ctx context.Context, request *ctl.AddContaine
 	var newMount state.Mount
 	switch kind {
 	case "":
-		newMount = state.Mount{ProjectName: request.GetProject(), Path: request.GetPath(), Destination: request.GetDestination(), Mode: mode}
+		newMount = state.Mount{ProjectName: request.GetProject(), Destination: request.GetDestination(), Mode: mode}
 		if _, _, err := resolveMount(s.ProjectsRoot, s.HostProjectsRoot, newMount); err != nil {
 			s.log().Error("AddContainerMount project validation failed", "workspace_slug", workspace.WorkspaceSlug, "error", err)
 			return nil, status.Error(codes.InvalidArgument, err.Error())
@@ -71,7 +71,7 @@ func (s *Server) AddContainerMount(ctx context.Context, request *ctl.AddContaine
 		duplicate := false
 		switch kind {
 		case "":
-			duplicate = existing.ProjectName == newMount.ProjectName && existing.Path == newMount.Path
+			duplicate = existing.ProjectName == newMount.ProjectName
 		case "tmpfs":
 			duplicate = existing.Kind == "tmpfs" && existing.Destination == newMount.Destination
 		case "volume":
@@ -116,7 +116,7 @@ func (s *Server) AddContainerMount(ctx context.Context, request *ctl.AddContaine
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	s.log().Info("control request completed", "method", "AddContainerMount", "workspace_slug", request.GetWorkspaceSlug(), "container", request.GetContainer(), "project", request.GetProject(), "path", request.GetPath())
+	s.log().Info("control request completed", "method", "AddContainerMount", "workspace_slug", request.GetWorkspaceSlug(), "container", request.GetContainer(), "project", request.GetProject())
 	return containerProto(updated, *record), nil
 }
 
@@ -124,7 +124,7 @@ func (s *Server) AddContainerMount(ctx context.Context, request *ctl.AddContaine
 // container's mount list and recreates the podman container so the change
 // takes effect.
 func (s *Server) RemoveContainerMount(ctx context.Context, request *ctl.RemoveContainerMountRequest) (*ctl.Container, error) {
-	s.log().Info("control request", "method", "RemoveContainerMount", "workspace_slug", request.GetWorkspaceSlug(), "container", request.GetContainer(), "project", request.GetProject(), "path", request.GetPath(), "kind", request.GetKind(), "volume", request.GetVolume())
+	s.log().Info("control request", "method", "RemoveContainerMount", "workspace_slug", request.GetWorkspaceSlug(), "container", request.GetContainer(), "project", request.GetProject(), "kind", request.GetKind(), "volume", request.GetVolume())
 	workspace, err := workspaceBySlug(s.Store, request.GetWorkspaceSlug())
 	if err != nil {
 		return nil, status.Error(codes.NotFound, err.Error())
@@ -143,7 +143,7 @@ func (s *Server) RemoveContainerMount(ctx context.Context, request *ctl.RemoveCo
 		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("invalid mount kind %q", kind))
 	}
 	effective := containerMounts(workspace, *record)
-	requested := state.Mount{Kind: kind, ProjectName: request.GetProject(), Path: request.GetPath(), Volume: request.GetVolume(), Secret: request.GetSecret(), Destination: request.GetDestination()}
+	requested := state.Mount{Kind: kind, ProjectName: request.GetProject(), Volume: request.GetVolume(), Secret: request.GetSecret(), Destination: request.GetDestination()}
 	if !mountSelectorIdentifies(kind, request) {
 		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("a %s mount is identified by %s", mountKindName(kind), mountSelectorHandles(kind)))
 	}
@@ -159,7 +159,7 @@ func (s *Server) RemoveContainerMount(ctx context.Context, request *ctl.RemoveCo
 		return nil, status.Error(codes.NotFound, mountNotFoundMessage(kind, requested, effective))
 	case len(matches) > 1:
 		s.log().Warn("control request failed", "method", "RemoveContainerMount", "workspace_slug", request.GetWorkspaceSlug(), "container", request.GetContainer(), "reason", "ambiguous mount")
-		return nil, status.Error(codes.InvalidArgument, ambiguousMountMessage(kind, requested, effective, matches))
+		return nil, status.Error(codes.InvalidArgument, ambiguousMountMessage(requested, effective, matches))
 	}
 	index := matches[0]
 	if record.Name == "default" && isWorkspaceProjectMount(workspace, effective[index]) {
@@ -198,7 +198,7 @@ func (s *Server) RemoveContainerMount(ctx context.Context, request *ctl.RemoveCo
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	s.log().Info("control request completed", "method", "RemoveContainerMount", "workspace_slug", request.GetWorkspaceSlug(), "container", request.GetContainer(), "project", request.GetProject(), "path", request.GetPath())
+	s.log().Info("control request completed", "method", "RemoveContainerMount", "workspace_slug", request.GetWorkspaceSlug(), "container", request.GetContainer(), "project", request.GetProject())
 	return containerProto(updated, *record), nil
 }
 
@@ -209,7 +209,7 @@ func (s *Server) RemoveContainerMount(ctx context.Context, request *ctl.RemoveCo
 // project mount is updateable — that is how a workspace's project is remounted
 // read-only.
 func (s *Server) UpdateContainerMount(ctx context.Context, request *ctl.UpdateContainerMountRequest) (*ctl.Container, error) {
-	s.log().Info("control request", "method", "UpdateContainerMount", "workspace_slug", request.GetWorkspaceSlug(), "container", request.GetContainer(), "project", request.GetProject(), "path", request.GetPath(), "kind", request.GetKind(), "volume", request.GetVolume())
+	s.log().Info("control request", "method", "UpdateContainerMount", "workspace_slug", request.GetWorkspaceSlug(), "container", request.GetContainer(), "project", request.GetProject(), "kind", request.GetKind(), "volume", request.GetVolume())
 	workspace, err := workspaceBySlug(s.Store, request.GetWorkspaceSlug())
 	if err != nil {
 		return nil, status.Error(codes.NotFound, err.Error())
@@ -234,7 +234,7 @@ func (s *Server) UpdateContainerMount(ctx context.Context, request *ctl.UpdateCo
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 	effective := containerMounts(workspace, *record)
-	requested := state.Mount{Kind: kind, ProjectName: request.GetProject(), Path: request.GetPath(), Volume: request.GetVolume(), Secret: request.GetSecret(), Destination: request.GetDestination()}
+	requested := state.Mount{Kind: kind, ProjectName: request.GetProject(), Volume: request.GetVolume(), Secret: request.GetSecret(), Destination: request.GetDestination()}
 	if !mountSelectorIdentifies(kind, request) {
 		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("a %s mount is identified by %s", mountKindName(kind), mountSelectorHandles(kind)))
 	}
@@ -250,7 +250,7 @@ func (s *Server) UpdateContainerMount(ctx context.Context, request *ctl.UpdateCo
 		return nil, status.Error(codes.NotFound, mountNotFoundMessage(kind, requested, effective))
 	case len(matches) > 1:
 		s.log().Warn("control request failed", "method", "UpdateContainerMount", "workspace_slug", request.GetWorkspaceSlug(), "container", request.GetContainer(), "reason", "ambiguous mount")
-		return nil, status.Error(codes.InvalidArgument, ambiguousMountMessage(kind, requested, effective, matches))
+		return nil, status.Error(codes.InvalidArgument, ambiguousMountMessage(requested, effective, matches))
 	}
 	if effective[matches[0]].Mode == mode {
 		return nil, status.Error(codes.AlreadyExists, fmt.Sprintf("mount already has mode %q", mode))
@@ -289,7 +289,7 @@ func (s *Server) UpdateContainerMount(ctx context.Context, request *ctl.UpdateCo
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	s.log().Info("control request completed", "method", "UpdateContainerMount", "workspace_slug", request.GetWorkspaceSlug(), "container", request.GetContainer(), "project", request.GetProject(), "path", request.GetPath())
+	s.log().Info("control request completed", "method", "UpdateContainerMount", "workspace_slug", request.GetWorkspaceSlug(), "container", request.GetContainer(), "project", request.GetProject())
 	return containerProto(updated, *record), nil
 }
 
@@ -298,7 +298,6 @@ func (s *Server) UpdateContainerMount(ctx context.Context, request *ctl.UpdateCo
 // types carry the same handles.
 type mountSelectorRequest interface {
 	GetProject() string
-	GetPath() string
 	GetVolume() string
 	GetSecret() string
 	GetDestination() string
@@ -312,7 +311,7 @@ type mountSelectorRequest interface {
 func mountSelectorMatches(kind string, existing state.Mount, request mountSelectorRequest) bool {
 	switch kind {
 	case "":
-		return existing.Kind == "" && existing.ProjectName == request.GetProject() && existing.Path == request.GetPath()
+		return existing.Kind == "" && existing.ProjectName == request.GetProject()
 	case "tmpfs":
 		return existing.Kind == "tmpfs" && existing.Destination == request.GetDestination()
 	case "volume":
@@ -388,12 +387,12 @@ func mountNotFoundMessage(kind string, requested state.Mount, mounts []state.Mou
 
 // ambiguousMountMessage builds the InvalidArgument reason for a name that
 // selects more than one mount, naming the handle that would disambiguate.
-func ambiguousMountMessage(kind string, requested state.Mount, mounts []state.Mount, matches []int) string {
+func ambiguousMountMessage(requested state.Mount, mounts []state.Mount, matches []int) string {
 	distinguishers := make([]string, 0, len(matches))
 	for _, index := range matches {
-		distinguishers = append(distinguishers, mountDistinguisher(kind, mounts[index]))
+		distinguishers = append(distinguishers, mountDistinguisher(mounts[index]))
 	}
-	return fmt.Sprintf("ambiguous mount: %s matches %s; pass %s", mountLabel(requested), strings.Join(distinguishers, ", "), mountDisambiguator(kind))
+	return fmt.Sprintf("ambiguous mount: %s matches %s; pass %s", mountLabel(requested), strings.Join(distinguishers, ", "), mountDisambiguator())
 }
 
 // mountCandidates labels the container's mounts of the requested kind that the
@@ -419,23 +418,15 @@ func mountCandidates(kind string, requested state.Mount, mounts []state.Mount) [
 }
 
 // mountDistinguisher renders the value that tells two mounts of the same kind
-// apart: a destination, or a project mount's path.
-func mountDistinguisher(kind string, mount state.Mount) string {
-	if kind != "" {
-		return fmt.Sprintf("%q", mount.Destination)
-	}
-	if mount.Path == "" {
-		return "the project root"
-	}
-	return fmt.Sprintf("path %q", mount.Path)
+// apart: their destination. A project mount is unique by project path, so it
+// never needs disambiguating.
+func mountDistinguisher(mount state.Mount) string {
+	return fmt.Sprintf("%q", mount.Destination)
 }
 
 // mountDisambiguator names the handle that distinguishes two mounts of the
 // same kind.
-func mountDisambiguator(kind string) string {
-	if kind == "" {
-		return "path"
-	}
+func mountDisambiguator() string {
 	return "destination"
 }
 
@@ -457,7 +448,7 @@ func containerMounts(ws state.Workspace, c state.Container) []state.Mount {
 // project mount: the project-kind mount at the workspace's project directory
 // root. The default container always keeps it.
 func isWorkspaceProjectMount(ws state.Workspace, mount state.Mount) bool {
-	return ws.ProjectName != "" && mount.Kind == "" && mount.ProjectName == ws.ProjectName && mount.Path == ""
+	return ws.ProjectName != "" && mount.Kind == "" && mount.ProjectName == ws.ProjectName
 }
 
 // ensureWorkspaceProjectMount returns mounts with the workspace's primary

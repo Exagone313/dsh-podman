@@ -25,7 +25,7 @@ func TestMountLabel(t *testing.T) {
 		{state.Mount{Kind: "tmpfs", Destination: "/scratch"}, `tmpfs at "/scratch"`},
 		{state.Mount{Kind: "volume", Volume: "data", Destination: "/data"}, `volume "data" at "/data"`},
 		{state.Mount{Kind: "secret", Secret: "tls", Destination: "/run/secrets/tls"}, `secret "tls" at "/run/secrets/tls"`},
-		{state.Mount{ProjectName: "team", Path: "src"}, `project "team" path "src"`},
+		{state.Mount{ProjectName: "team/src"}, `project "team/src"`},
 		{state.Mount{ProjectName: "team"}, `project "team"`},
 	}
 	for _, tc := range cases {
@@ -46,9 +46,9 @@ func TestContainerMountsFallback(t *testing.T) {
 	if got := containerMounts(ws, state.Container{Name: "dev"}); got != nil {
 		t.Fatalf("named containers do not inherit the workspace mounts, got %#v", got)
 	}
-	withOwn := state.Container{Name: "dev", Mounts: []state.Mount{{ProjectName: "b", Mode: "read_write", Path: "src"}}}
+	withOwn := state.Container{Name: "dev", Mounts: []state.Mount{{ProjectName: "b", Mode: "read_write"}}}
 	got := containerMounts(ws, withOwn)
-	if len(got) != 1 || got[0].ProjectName != "b" || got[0].Path != "src" || got[0].Mode != "read_write" {
+	if len(got) != 1 || got[0].ProjectName != "b" || got[0].Mode != "read_write" {
 		t.Fatalf("expected container's own mounts, got %#v", got)
 	}
 }
@@ -58,7 +58,7 @@ func TestIsWorkspaceProjectMount(t *testing.T) {
 	if !isWorkspaceProjectMount(ws, state.Mount{ProjectName: "team", Mode: "read_write"}) {
 		t.Fatal("expected the workspace project root mount to match")
 	}
-	if isWorkspaceProjectMount(ws, state.Mount{ProjectName: "team", Path: "src"}) {
+	if isWorkspaceProjectMount(ws, state.Mount{ProjectName: "team/src"}) {
 		t.Fatal("a project subpath is not the primary project mount")
 	}
 	if isWorkspaceProjectMount(ws, state.Mount{ProjectName: "other"}) {
@@ -128,11 +128,11 @@ func TestRemoveContainerMountAllowsNamedProjectMountRemoval(t *testing.T) {
 }
 
 func TestMountFromProto(t *testing.T) {
-	mount, err := mountFromProto(&ctl.ProjectMount{ProjectName: "team", Path: "src", Destination: "/x", Mode: ctl.MountMode_MOUNT_MODE_READ_WRITE})
+	mount, err := mountFromProto(&ctl.ProjectMount{ProjectName: "team/src", Destination: "/x", Mode: ctl.MountMode_MOUNT_MODE_READ_WRITE})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if mount.ProjectName != "team" || mount.Mode != "read_write" || mount.Path != "src" || mount.Destination != "/x" {
+	if mount.ProjectName != "team/src" || mount.Mode != "read_write" || mount.Destination != "/x" {
 		t.Fatalf("unexpected mount: %#v", mount)
 	}
 	ro, err := mountFromProto(&ctl.ProjectMount{ProjectName: "team", Mode: ctl.MountMode_MOUNT_MODE_READ_ONLY})
@@ -188,7 +188,7 @@ func TestResolveMount(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(hostRoot, "team", "src"), 0755); err != nil {
 		t.Fatal(err)
 	}
-	host, dest, err := resolveMount(root, "", state.Mount{ProjectName: "team", Path: "src", Mode: "read_only"})
+	host, dest, err := resolveMount(root, "", state.Mount{ProjectName: "team/src", Mode: "read_only"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -200,26 +200,26 @@ func TestResolveMount(t *testing.T) {
 		filepath.Join(root, "custom", "mount"),
 		filepath.Join(root, "team", "code"),
 	} {
-		_, _, err := resolveMount(root, "", state.Mount{ProjectName: "team", Path: "src", Destination: dest})
+		_, _, err := resolveMount(root, "", state.Mount{ProjectName: "team/src", Destination: dest})
 		if err == nil {
 			t.Errorf("accepted a project mount destination %q", dest)
 		}
 	}
-	if _, _, err := resolveMount(root, "", state.Mount{ProjectName: "team", Path: "src", Destination: filepath.Join(root, "custom", "mount")}); err == nil || !strings.Contains(err.Error(), "will be mounted at "+filepath.Join(root, "team", "src")) {
+	if _, _, err := resolveMount(root, "", state.Mount{ProjectName: "team/src", Destination: filepath.Join(root, "custom", "mount")}); err == nil || !strings.Contains(err.Error(), "will be mounted at "+filepath.Join(root, "team", "src")) {
 		t.Fatalf("rejection should name the fixed destination, got %v", err)
 	}
 	for _, path := range []string{"..", "../x", "/abs", "a/../b", "a//b", "a/b/", "."} {
-		if _, _, err := resolveMount(root, "", state.Mount{ProjectName: "team", Path: path}); err == nil {
-			t.Errorf("accepted invalid subpath %q", path)
+		if _, _, err := resolveMount(root, "", state.Mount{ProjectName: path}); err == nil {
+			t.Errorf("accepted invalid project path %q", path)
 		}
 	}
 	for _, dest := range []string{"relative", "/outside", "/workspaces2/x", "/workspaces/../x", "/workspaces/team/../src/"} {
-		if _, _, err := resolveMount(root, "", state.Mount{ProjectName: "team", Path: "src", Destination: dest}); err == nil {
+		if _, _, err := resolveMount(root, "", state.Mount{ProjectName: "team/src", Destination: dest}); err == nil {
 			t.Errorf("accepted invalid destination %q", dest)
 		}
 	}
-	if _, _, err := resolveMount(root, "", state.Mount{ProjectName: "team", Path: "missing"}); err == nil {
-		t.Fatal("accepted a missing subpath")
+	if _, _, err := resolveMount(root, "", state.Mount{ProjectName: "team/missing"}); err == nil {
+		t.Fatal("accepted a missing project path")
 	}
 	if _, _, err := resolveMount(root, "", state.Mount{ProjectName: "nope"}); err == nil {
 		t.Fatal("accepted a missing project")
@@ -241,7 +241,7 @@ func TestResolveMountSymlinkedRoot(t *testing.T) {
 	}
 
 	// Without a host projects root the resolved path is used directly.
-	host, dest, err := resolveMount(linked, "", state.Mount{ProjectName: "team", Path: "src"})
+	host, dest, err := resolveMount(linked, "", state.Mount{ProjectName: "team/src"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -253,7 +253,7 @@ func TestResolveMountSymlinkedRoot(t *testing.T) {
 	}
 
 	// With one, the resolved path is re-expressed against it.
-	host, _, err = resolveMount(linked, "/host/projects", state.Mount{ProjectName: "team", Path: "src"})
+	host, _, err = resolveMount(linked, "/host/projects", state.Mount{ProjectName: "team/src"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -296,13 +296,13 @@ func TestResolveMountSymlinks(t *testing.T) {
 	// shape a planted link takes, and naming the other project directly is
 	// the supported way to mount it.
 	for _, path := range []string{"escape", "slash", "loop", "absolute"} {
-		if _, _, err := resolveMount(root, hostRoot, state.Mount{ProjectName: "team", Path: path}); err == nil {
-			t.Errorf("accepted symlinked subpath %q", path)
+		if _, _, err := resolveMount(root, hostRoot, state.Mount{ProjectName: "team/" + path}); err == nil {
+			t.Errorf("accepted symlinked project path %q", path)
 		}
 	}
 	// A relative symlink that stays inside the projects root resolves to its
 	// target, and the host source is re-expressed against the host root.
-	host, dest, err := resolveMount(root, hostRoot, state.Mount{ProjectName: "team", Path: "inside"})
+	host, dest, err := resolveMount(root, hostRoot, state.Mount{ProjectName: "team/inside"})
 	if err != nil {
 		t.Fatalf("rejected an internal symlink: %v", err)
 	}
@@ -322,21 +322,21 @@ func TestResolveMountSymlinks(t *testing.T) {
 	}
 }
 
-func TestPodmanMountsSubpathAndDestination(t *testing.T) {
+func TestPodmanMountsProjectPathAndDestination(t *testing.T) {
 	root := tempRoot(t)
 	if err := os.MkdirAll(filepath.Join(root, "team", "src"), 0755); err != nil {
 		t.Fatal(err)
 	}
 	server := &Server{ProjectsRoot: root, Logger: silentLogger()}
-	mounts, err := server.podmanMounts([]state.Mount{{ProjectName: "team", Path: "src", Mode: "read_write"}})
+	mounts, err := server.podmanMounts([]state.Mount{{ProjectName: "team/src", Mode: "read_write"}})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(mounts) != 1 || mounts[0].Type != "bind" || mounts[0].Source != filepath.Join(root, "team", "src") || mounts[0].Destination != filepath.Join(root, "team", "src") || len(mounts[0].Options) != 1 || mounts[0].Options[0] != "rw" {
 		t.Fatalf("unexpected podman mount: %#v", mounts)
 	}
-	if _, err := server.podmanMounts([]state.Mount{{ProjectName: "team", Path: "../x"}}); status.Code(err) != codes.InvalidArgument {
-		t.Fatalf("expected InvalidArgument for subpath, got %v", err)
+	if _, err := server.podmanMounts([]state.Mount{{ProjectName: "../x"}}); status.Code(err) != codes.InvalidArgument {
+		t.Fatalf("expected InvalidArgument for project path, got %v", err)
 	}
 	if _, err := server.podmanMounts([]state.Mount{{ProjectName: "team", Destination: "/outside"}}); status.Code(err) != codes.InvalidArgument {
 		t.Fatalf("expected InvalidArgument for destination, got %v", err)
@@ -349,11 +349,11 @@ func TestContainerProtoProjectsContainerMounts(t *testing.T) {
 		Mounts:        []state.Mount{{ProjectName: "ws", Mode: "read_only"}},
 		Containers: []state.Container{{
 			Name:   "dev",
-			Mounts: []state.Mount{{ProjectName: "devp", Mode: "read_write", Path: "src/lib", Destination: "/workspaces/devp/src/lib"}},
+			Mounts: []state.Mount{{ProjectName: "devp/src/lib", Mode: "read_write", Destination: "/workspaces/devp/src/lib"}},
 		}},
 	}
 	row := containerProto(ws, ws.Containers[0])
-	if len(row.Mounts) != 1 || row.Mounts[0].ProjectName != "devp" || row.Mounts[0].Mode != ctl.MountMode_MOUNT_MODE_READ_WRITE || row.Mounts[0].Path != "src/lib" || row.Mounts[0].Destination != "/workspaces/devp/src/lib" {
+	if len(row.Mounts) != 1 || row.Mounts[0].ProjectName != "devp/src/lib" || row.Mounts[0].Mode != ctl.MountMode_MOUNT_MODE_READ_WRITE || row.Mounts[0].Destination != "/workspaces/devp/src/lib" {
 		t.Fatalf("container mounts not projected: %#v", row.Mounts)
 	}
 	fallback := containerProto(ws, state.Container{Name: "default"})
@@ -392,11 +392,11 @@ func TestAddContainerMount(t *testing.T) {
 	if status.Code(err) != codes.InvalidArgument {
 		t.Fatalf("invalid project: expected InvalidArgument, got %v", err)
 	}
-	_, err = server.AddContainerMount(context.Background(), &ctl.AddContainerMountRequest{WorkspaceSlug: "proj", Container: "dev", Project: "team", Path: "../x", Mode: ctl.MountMode_MOUNT_MODE_READ_ONLY})
+	_, err = server.AddContainerMount(context.Background(), &ctl.AddContainerMountRequest{WorkspaceSlug: "proj", Container: "dev", Project: "../x", Mode: ctl.MountMode_MOUNT_MODE_READ_ONLY})
 	if status.Code(err) != codes.InvalidArgument {
-		t.Fatalf("invalid path: expected InvalidArgument, got %v", err)
+		t.Fatalf("invalid project path: expected InvalidArgument, got %v", err)
 	}
-	_, err = server.AddContainerMount(context.Background(), &ctl.AddContainerMountRequest{WorkspaceSlug: "proj", Container: "dev", Project: "team", Path: "src", Destination: "/outside", Mode: ctl.MountMode_MOUNT_MODE_READ_ONLY})
+	_, err = server.AddContainerMount(context.Background(), &ctl.AddContainerMountRequest{WorkspaceSlug: "proj", Container: "dev", Project: "team/src", Destination: "/outside", Mode: ctl.MountMode_MOUNT_MODE_READ_ONLY})
 	if status.Code(err) != codes.InvalidArgument {
 		t.Fatalf("invalid destination: expected InvalidArgument, got %v", err)
 	}
@@ -405,11 +405,11 @@ func TestAddContainerMount(t *testing.T) {
 		t.Fatalf("invalid mode: expected InvalidArgument, got %v", err)
 	}
 
-	_, err = server.AddContainerMount(context.Background(), &ctl.AddContainerMountRequest{WorkspaceSlug: "proj", Container: "dev", Project: "team", Path: "src", Mode: ctl.MountMode_MOUNT_MODE_READ_ONLY})
+	_, err = server.AddContainerMount(context.Background(), &ctl.AddContainerMountRequest{WorkspaceSlug: "proj", Container: "dev", Project: "team/src", Mode: ctl.MountMode_MOUNT_MODE_READ_ONLY})
 	if status.Code(err) != codes.FailedPrecondition {
 		t.Fatalf("valid add to named container: expected FailedPrecondition, got %v", err)
 	}
-	_, err = server.AddContainerMount(context.Background(), &ctl.AddContainerMountRequest{WorkspaceSlug: "proj", Container: "default", Project: "team", Path: "src", Destination: filepath.Join(root, "team", "other"), Mode: ctl.MountMode_MOUNT_MODE_READ_ONLY})
+	_, err = server.AddContainerMount(context.Background(), &ctl.AddContainerMountRequest{WorkspaceSlug: "proj", Container: "default", Project: "team/src", Destination: filepath.Join(root, "team", "other"), Mode: ctl.MountMode_MOUNT_MODE_READ_ONLY})
 	if status.Code(err) != codes.InvalidArgument {
 		t.Fatalf("project mount with a destination: expected InvalidArgument, got %v", err)
 	}
@@ -431,7 +431,7 @@ func TestRemoveContainerMount(t *testing.T) {
 		Mounts:        []state.Mount{{ProjectName: "team", Mode: "read_write"}},
 		Containers: []state.Container{
 			{Name: "default", PodmanName: "dsh-podman-proj-default", ImageID: "arch", Status: "running"},
-			{Name: "dev", PodmanName: "dsh-podman-proj-dev", ImageID: "arch", Status: "running", Mounts: []state.Mount{{ProjectName: "team", Path: "src", Mode: "read_only"}, {ProjectName: "team", Mode: "read_write"}}},
+			{Name: "dev", PodmanName: "dsh-podman-proj-dev", ImageID: "arch", Status: "running", Mounts: []state.Mount{{ProjectName: "team/src", Mode: "read_only"}, {ProjectName: "team", Mode: "read_write"}}},
 		},
 	}}); err != nil {
 		t.Fatal(err)
@@ -446,11 +446,11 @@ func TestRemoveContainerMount(t *testing.T) {
 	if status.Code(err) != codes.NotFound {
 		t.Fatalf("unknown container: expected NotFound, got %v", err)
 	}
-	_, err = server.RemoveContainerMount(context.Background(), &ctl.RemoveContainerMountRequest{WorkspaceSlug: "proj", Container: "dev", Project: "team", Path: "nope"})
+	_, err = server.RemoveContainerMount(context.Background(), &ctl.RemoveContainerMountRequest{WorkspaceSlug: "proj", Container: "dev", Project: "team/nope"})
 	if status.Code(err) != codes.NotFound {
 		t.Fatalf("unknown mount: expected NotFound, got %v", err)
 	}
-	_, err = server.RemoveContainerMount(context.Background(), &ctl.RemoveContainerMountRequest{WorkspaceSlug: "proj", Container: "dev", Project: "team", Path: "src"})
+	_, err = server.RemoveContainerMount(context.Background(), &ctl.RemoveContainerMountRequest{WorkspaceSlug: "proj", Container: "dev", Project: "team/src"})
 	if status.Code(err) != codes.FailedPrecondition {
 		t.Fatalf("matching mount removal: expected FailedPrecondition, got %v", err)
 	}
@@ -536,11 +536,11 @@ func TestStartContainerMountsValidation(t *testing.T) {
 		t.Fatal(err)
 	}
 	server := &Server{Store: store, ProjectsRoot: root, Logger: silentLogger()}
-	_, err := server.StartContainer(context.Background(), &ctl.StartContainerRequest{WorkspaceSlug: "proj", Container: "dev", Mounts: []*ctl.ProjectMount{{ProjectName: "team", Path: "../x"}}})
+	_, err := server.StartContainer(context.Background(), &ctl.StartContainerRequest{WorkspaceSlug: "proj", Container: "dev", Mounts: []*ctl.ProjectMount{{ProjectName: "../x"}}})
 	if status.Code(err) != codes.InvalidArgument {
 		t.Fatalf("invalid mount: expected InvalidArgument, got %v", err)
 	}
-	_, err = server.StartContainer(context.Background(), &ctl.StartContainerRequest{WorkspaceSlug: "proj", Container: "dev", ImageId: "arch", Mounts: []*ctl.ProjectMount{{ProjectName: "team", Path: "src", Mode: ctl.MountMode_MOUNT_MODE_READ_WRITE}}})
+	_, err = server.StartContainer(context.Background(), &ctl.StartContainerRequest{WorkspaceSlug: "proj", Container: "dev", ImageId: "arch", Mounts: []*ctl.ProjectMount{{ProjectName: "team/src", Mode: ctl.MountMode_MOUNT_MODE_READ_WRITE}}})
 	if status.Code(err) != codes.FailedPrecondition {
 		t.Fatalf("valid mounts: expected FailedPrecondition, got %v", err)
 	}
@@ -563,7 +563,7 @@ func TestRecreateContainerMountsValidation(t *testing.T) {
 	if status.Code(err) != codes.InvalidArgument {
 		t.Fatalf("invalid destination: expected InvalidArgument, got %v", err)
 	}
-	_, err = server.RecreateContainer(context.Background(), &ctl.RecreateContainerRequest{WorkspaceSlug: "proj", Container: "dev", ImageId: "arch", Mounts: []*ctl.ProjectMount{{ProjectName: "team", Path: "src", Mode: ctl.MountMode_MOUNT_MODE_READ_ONLY}}})
+	_, err = server.RecreateContainer(context.Background(), &ctl.RecreateContainerRequest{WorkspaceSlug: "proj", Container: "dev", ImageId: "arch", Mounts: []*ctl.ProjectMount{{ProjectName: "team/src", Mode: ctl.MountMode_MOUNT_MODE_READ_ONLY}}})
 	if status.Code(err) != codes.FailedPrecondition {
 		t.Fatalf("valid mounts: expected FailedPrecondition, got %v", err)
 	}
@@ -586,13 +586,13 @@ func TestCreateWorkspacePreservesDefaultContainerMounts(t *testing.T) {
 			Name:       "default",
 			PodmanName: testDefaultContainer,
 			ImageID:    "devimg",
-			Mounts:     []state.Mount{{ProjectName: "team", Path: "src", Mode: "read_only"}},
+			Mounts:     []state.Mount{{ProjectName: "team/src", Mode: "read_only"}},
 		}},
 	}}); err != nil {
 		t.Fatal(err)
 	}
 	server := &Server{Store: store, ProjectsRoot: root, Logger: silentLogger()}
-	_, err := server.CreateWorkspace(context.Background(), &ctl.CreateWorkspaceRequest{WorkspaceSlug: testWorkspaceSlug, ProjectName: "team", ImageId: "devimg", Mounts: []*ctl.ProjectMount{{ProjectName: "team", Path: "nope", Mode: ctl.MountMode_MOUNT_MODE_READ_ONLY}}})
+	_, err := server.CreateWorkspace(context.Background(), &ctl.CreateWorkspaceRequest{WorkspaceSlug: testWorkspaceSlug, ProjectName: "team", ImageId: "devimg", Mounts: []*ctl.ProjectMount{{ProjectName: "team/nope", Mode: ctl.MountMode_MOUNT_MODE_READ_ONLY}}})
 	if status.Code(err) != codes.FailedPrecondition {
 		t.Fatalf("preserved default container mounts should win over invalid request mounts, expected FailedPrecondition, got %v", err)
 	}

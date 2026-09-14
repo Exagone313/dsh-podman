@@ -25,7 +25,6 @@ type Image struct {
 type Mount struct {
 	ProjectName string `toml:"project_name"`
 	Mode        string `toml:"mode"`
-	Path        string `toml:"path,omitempty"`
 	Destination string `toml:"destination,omitempty"`
 	Kind        string `toml:"kind,omitempty"`
 	Volume      string `toml:"volume,omitempty"`

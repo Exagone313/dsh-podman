@@ -126,11 +126,7 @@ func mountLabel(mount state.Mount) string {
 	}
 	switch mount.Kind {
 	case "", "project":
-		label := "project" + mountName(mount.ProjectName)
-		if mount.Path != "" {
-			label += fmt.Sprintf(" path %q", mount.Path)
-		}
-		return label
+		return "project" + mountName(mount.ProjectName)
 	case "volume":
 		return fmt.Sprintf("volume%s%s", mountName(mount.Volume), at)
 	case "secret":

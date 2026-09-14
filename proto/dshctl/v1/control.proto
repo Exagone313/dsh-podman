@@ -48,7 +48,7 @@ enum MountKind { MOUNT_KIND_UNSPECIFIED = 0; MOUNT_KIND_PROJECT = 1; MOUNT_KIND_
 message ProjectMount {
   string project_name = 1;
   MountMode mode = 2;
-  string path = 3;
+  reserved 3;
   string destination = 4;
   MountKind kind = 5;
   string volume = 6;
@@ -110,9 +110,9 @@ message StartContainerRequest { string workspace_slug = 1; string container = 2;
 message RecreateContainerRequest { string workspace_slug = 1; string image_id = 2; string container = 3; repeated ProjectMount mounts = 4; map<string, string> env = 5; }
 message RemoveContainerRequest { string workspace_slug = 1; string container = 2; }
 message RemoveContainerResponse {}
-message AddContainerMountRequest { string workspace_slug = 1; string container = 2; string project = 3; string path = 4; string destination = 5; MountMode mode = 6; MountKind kind = 7; string volume = 8; string secret = 9; }
-message RemoveContainerMountRequest { string workspace_slug = 1; string container = 2; string project = 3; string path = 4; MountKind kind = 5; string volume = 6; string destination = 7; string secret = 8; }
-message UpdateContainerMountRequest { string workspace_slug = 1; string container = 2; string project = 3; string path = 4; MountKind kind = 5; string volume = 6; string destination = 7; string secret = 8; MountMode mode = 9; }
+message AddContainerMountRequest { string workspace_slug = 1; string container = 2; string project = 3; reserved 4; string destination = 5; MountMode mode = 6; MountKind kind = 7; string volume = 8; string secret = 9; }
+message RemoveContainerMountRequest { string workspace_slug = 1; string container = 2; string project = 3; reserved 4; MountKind kind = 5; string volume = 6; string destination = 7; string secret = 8; }
+message UpdateContainerMountRequest { string workspace_slug = 1; string container = 2; string project = 3; reserved 4; MountKind kind = 5; string volume = 6; string destination = 7; string secret = 8; MountMode mode = 9; }
 message ListVolumesRequest {}
 message ListVolumesResponse { repeated Volume volumes = 1; }
 message Volume { string name = 1; }

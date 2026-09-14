@@ -314,7 +314,6 @@ type ProjectMount struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	ProjectName   string                 `protobuf:"bytes,1,opt,name=project_name,json=projectName,proto3" json:"project_name,omitempty"`
 	Mode          MountMode              `protobuf:"varint,2,opt,name=mode,proto3,enum=dshctl.v1.MountMode" json:"mode,omitempty"`
-	Path          string                 `protobuf:"bytes,3,opt,name=path,proto3" json:"path,omitempty"`
 	Destination   string                 `protobuf:"bytes,4,opt,name=destination,proto3" json:"destination,omitempty"`
 	Kind          MountKind              `protobuf:"varint,5,opt,name=kind,proto3,enum=dshctl.v1.MountKind" json:"kind,omitempty"`
 	Volume        string                 `protobuf:"bytes,6,opt,name=volume,proto3" json:"volume,omitempty"`
@@ -365,13 +364,6 @@ func (x *ProjectMount) GetMode() MountMode {
 		return x.Mode
 	}
 	return MountMode_MOUNT_MODE_UNSPECIFIED
-}
-
-func (x *ProjectMount) GetPath() string {
-	if x != nil {
-		return x.Path
-	}
-	return ""
 }
 
 func (x *ProjectMount) GetDestination() string {
@@ -2131,7 +2123,6 @@ type AddContainerMountRequest struct {
 	WorkspaceSlug string                 `protobuf:"bytes,1,opt,name=workspace_slug,json=workspaceSlug,proto3" json:"workspace_slug,omitempty"`
 	Container     string                 `protobuf:"bytes,2,opt,name=container,proto3" json:"container,omitempty"`
 	Project       string                 `protobuf:"bytes,3,opt,name=project,proto3" json:"project,omitempty"`
-	Path          string                 `protobuf:"bytes,4,opt,name=path,proto3" json:"path,omitempty"`
 	Destination   string                 `protobuf:"bytes,5,opt,name=destination,proto3" json:"destination,omitempty"`
 	Mode          MountMode              `protobuf:"varint,6,opt,name=mode,proto3,enum=dshctl.v1.MountMode" json:"mode,omitempty"`
 	Kind          MountKind              `protobuf:"varint,7,opt,name=kind,proto3,enum=dshctl.v1.MountKind" json:"kind,omitempty"`
@@ -2192,13 +2183,6 @@ func (x *AddContainerMountRequest) GetProject() string {
 	return ""
 }
 
-func (x *AddContainerMountRequest) GetPath() string {
-	if x != nil {
-		return x.Path
-	}
-	return ""
-}
-
 func (x *AddContainerMountRequest) GetDestination() string {
 	if x != nil {
 		return x.Destination
@@ -2239,7 +2223,6 @@ type RemoveContainerMountRequest struct {
 	WorkspaceSlug string                 `protobuf:"bytes,1,opt,name=workspace_slug,json=workspaceSlug,proto3" json:"workspace_slug,omitempty"`
 	Container     string                 `protobuf:"bytes,2,opt,name=container,proto3" json:"container,omitempty"`
 	Project       string                 `protobuf:"bytes,3,opt,name=project,proto3" json:"project,omitempty"`
-	Path          string                 `protobuf:"bytes,4,opt,name=path,proto3" json:"path,omitempty"`
 	Kind          MountKind              `protobuf:"varint,5,opt,name=kind,proto3,enum=dshctl.v1.MountKind" json:"kind,omitempty"`
 	Volume        string                 `protobuf:"bytes,6,opt,name=volume,proto3" json:"volume,omitempty"`
 	Destination   string                 `protobuf:"bytes,7,opt,name=destination,proto3" json:"destination,omitempty"`
@@ -2299,13 +2282,6 @@ func (x *RemoveContainerMountRequest) GetProject() string {
 	return ""
 }
 
-func (x *RemoveContainerMountRequest) GetPath() string {
-	if x != nil {
-		return x.Path
-	}
-	return ""
-}
-
 func (x *RemoveContainerMountRequest) GetKind() MountKind {
 	if x != nil {
 		return x.Kind
@@ -2339,7 +2315,6 @@ type UpdateContainerMountRequest struct {
 	WorkspaceSlug string                 `protobuf:"bytes,1,opt,name=workspace_slug,json=workspaceSlug,proto3" json:"workspace_slug,omitempty"`
 	Container     string                 `protobuf:"bytes,2,opt,name=container,proto3" json:"container,omitempty"`
 	Project       string                 `protobuf:"bytes,3,opt,name=project,proto3" json:"project,omitempty"`
-	Path          string                 `protobuf:"bytes,4,opt,name=path,proto3" json:"path,omitempty"`
 	Kind          MountKind              `protobuf:"varint,5,opt,name=kind,proto3,enum=dshctl.v1.MountKind" json:"kind,omitempty"`
 	Volume        string                 `protobuf:"bytes,6,opt,name=volume,proto3" json:"volume,omitempty"`
 	Destination   string                 `protobuf:"bytes,7,opt,name=destination,proto3" json:"destination,omitempty"`
@@ -2396,13 +2371,6 @@ func (x *UpdateContainerMountRequest) GetContainer() string {
 func (x *UpdateContainerMountRequest) GetProject() string {
 	if x != nil {
 		return x.Project
-	}
-	return ""
-}
-
-func (x *UpdateContainerMountRequest) GetPath() string {
-	if x != nil {
-		return x.Path
 	}
 	return ""
 }
@@ -3144,15 +3112,14 @@ const file_dshctl_v1_control_proto_rawDesc = "" +
 	"\bprojects\x18\x01 \x03(\v2\x12.dshctl.v1.ProjectR\bprojects\":\n" +
 	"\aProject\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x1b\n" +
-	"\thost_path\x18\x02 \x01(\tR\bhostPath\"\xeb\x01\n" +
+	"\thost_path\x18\x02 \x01(\tR\bhostPath\"\xdd\x01\n" +
 	"\fProjectMount\x12!\n" +
 	"\fproject_name\x18\x01 \x01(\tR\vprojectName\x12(\n" +
-	"\x04mode\x18\x02 \x01(\x0e2\x14.dshctl.v1.MountModeR\x04mode\x12\x12\n" +
-	"\x04path\x18\x03 \x01(\tR\x04path\x12 \n" +
+	"\x04mode\x18\x02 \x01(\x0e2\x14.dshctl.v1.MountModeR\x04mode\x12 \n" +
 	"\vdestination\x18\x04 \x01(\tR\vdestination\x12(\n" +
 	"\x04kind\x18\x05 \x01(\x0e2\x14.dshctl.v1.MountKindR\x04kind\x12\x16\n" +
 	"\x06volume\x18\x06 \x01(\tR\x06volume\x12\x16\n" +
-	"\x06secret\x18\a \x01(\tR\x06secret\"\xb3\x03\n" +
+	"\x06secret\x18\a \x01(\tR\x06secretJ\x04\b\x03\x10\x04\"\xb3\x03\n" +
 	"\x16CreateWorkspaceRequest\x12%\n" +
 	"\x0eworkspace_slug\x18\x01 \x01(\tR\rworkspaceSlug\x12\x19\n" +
 	"\bimage_id\x18\x02 \x01(\tR\aimageId\x12/\n" +
@@ -3303,36 +3270,33 @@ const file_dshctl_v1_control_proto_rawDesc = "" +
 	"\x16RemoveContainerRequest\x12%\n" +
 	"\x0eworkspace_slug\x18\x01 \x01(\tR\rworkspaceSlug\x12\x1c\n" +
 	"\tcontainer\x18\x02 \x01(\tR\tcontainer\"\x19\n" +
-	"\x17RemoveContainerResponse\"\xb3\x02\n" +
+	"\x17RemoveContainerResponse\"\xa5\x02\n" +
 	"\x18AddContainerMountRequest\x12%\n" +
 	"\x0eworkspace_slug\x18\x01 \x01(\tR\rworkspaceSlug\x12\x1c\n" +
 	"\tcontainer\x18\x02 \x01(\tR\tcontainer\x12\x18\n" +
-	"\aproject\x18\x03 \x01(\tR\aproject\x12\x12\n" +
-	"\x04path\x18\x04 \x01(\tR\x04path\x12 \n" +
+	"\aproject\x18\x03 \x01(\tR\aproject\x12 \n" +
 	"\vdestination\x18\x05 \x01(\tR\vdestination\x12(\n" +
 	"\x04mode\x18\x06 \x01(\x0e2\x14.dshctl.v1.MountModeR\x04mode\x12(\n" +
 	"\x04kind\x18\a \x01(\x0e2\x14.dshctl.v1.MountKindR\x04kind\x12\x16\n" +
 	"\x06volume\x18\b \x01(\tR\x06volume\x12\x16\n" +
-	"\x06secret\x18\t \x01(\tR\x06secret\"\x8c\x02\n" +
+	"\x06secret\x18\t \x01(\tR\x06secretJ\x04\b\x04\x10\x05\"\xfe\x01\n" +
 	"\x1bRemoveContainerMountRequest\x12%\n" +
 	"\x0eworkspace_slug\x18\x01 \x01(\tR\rworkspaceSlug\x12\x1c\n" +
 	"\tcontainer\x18\x02 \x01(\tR\tcontainer\x12\x18\n" +
-	"\aproject\x18\x03 \x01(\tR\aproject\x12\x12\n" +
-	"\x04path\x18\x04 \x01(\tR\x04path\x12(\n" +
+	"\aproject\x18\x03 \x01(\tR\aproject\x12(\n" +
 	"\x04kind\x18\x05 \x01(\x0e2\x14.dshctl.v1.MountKindR\x04kind\x12\x16\n" +
 	"\x06volume\x18\x06 \x01(\tR\x06volume\x12 \n" +
 	"\vdestination\x18\a \x01(\tR\vdestination\x12\x16\n" +
-	"\x06secret\x18\b \x01(\tR\x06secret\"\xb6\x02\n" +
+	"\x06secret\x18\b \x01(\tR\x06secretJ\x04\b\x04\x10\x05\"\xa8\x02\n" +
 	"\x1bUpdateContainerMountRequest\x12%\n" +
 	"\x0eworkspace_slug\x18\x01 \x01(\tR\rworkspaceSlug\x12\x1c\n" +
 	"\tcontainer\x18\x02 \x01(\tR\tcontainer\x12\x18\n" +
-	"\aproject\x18\x03 \x01(\tR\aproject\x12\x12\n" +
-	"\x04path\x18\x04 \x01(\tR\x04path\x12(\n" +
+	"\aproject\x18\x03 \x01(\tR\aproject\x12(\n" +
 	"\x04kind\x18\x05 \x01(\x0e2\x14.dshctl.v1.MountKindR\x04kind\x12\x16\n" +
 	"\x06volume\x18\x06 \x01(\tR\x06volume\x12 \n" +
 	"\vdestination\x18\a \x01(\tR\vdestination\x12\x16\n" +
 	"\x06secret\x18\b \x01(\tR\x06secret\x12(\n" +
-	"\x04mode\x18\t \x01(\x0e2\x14.dshctl.v1.MountModeR\x04mode\"\x14\n" +
+	"\x04mode\x18\t \x01(\x0e2\x14.dshctl.v1.MountModeR\x04modeJ\x04\b\x04\x10\x05\"\x14\n" +
 	"\x12ListVolumesRequest\"B\n" +
 	"\x13ListVolumesResponse\x12+\n" +
 	"\avolumes\x18\x01 \x03(\v2\x11.dshctl.v1.VolumeR\avolumes\"\x1c\n" +

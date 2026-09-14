@@ -261,7 +261,7 @@ func TestContainerMountsRoundTrip(t *testing.T) {
 			PodmanName: "dsh-podman-proj-default",
 			ImageID:    "arch",
 			Status:     "running",
-			Mounts:     []Mount{{ProjectName: "team", Mode: "read_only", Path: "src/lib", Destination: "/workspaces/team/src/lib"}},
+			Mounts:     []Mount{{ProjectName: "team/src/lib", Mode: "read_only", Destination: "/workspaces/team/src/lib"}},
 		}},
 	}}
 	if err := store.SaveWorkspaces(workspaces); err != nil {
@@ -275,7 +275,7 @@ func TestContainerMountsRoundTrip(t *testing.T) {
 		t.Fatalf("round trip mismatch: %#v", got)
 	}
 	mounts := got[0].Containers[0].Mounts
-	if len(mounts) != 1 || mounts[0].ProjectName != "team" || mounts[0].Mode != "read_only" || mounts[0].Path != "src/lib" || mounts[0].Destination != "/workspaces/team/src/lib" {
+	if len(mounts) != 1 || mounts[0].ProjectName != "team/src/lib" || mounts[0].Mode != "read_only" || mounts[0].Destination != "/workspaces/team/src/lib" {
 		t.Fatalf("container mounts did not survive round trip: %#v", mounts)
 	}
 }

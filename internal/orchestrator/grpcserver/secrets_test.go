@@ -237,6 +237,51 @@ func TestRemoveContainerMountSecret(t *testing.T) {
 	if status.Code(err) != codes.FailedPrecondition {
 		t.Fatalf("matching secret removal by name: expected FailedPrecondition, got %v", err)
 	}
+	// A secret name that identifies exactly one mount is enough on its own.
+	_, err = server.RemoveContainerMount(context.Background(), &ctl.RemoveContainerMountRequest{WorkspaceSlug: "proj", Container: "dev", Kind: ctl.MountKind_MOUNT_KIND_SECRET, Secret: "tls"})
+	if status.Code(err) != codes.FailedPrecondition {
+		t.Fatalf("secret removal by name alone: expected FailedPrecondition, got %v", err)
+	}
+}
+
+// TestRemoveContainerMountSecretAmbiguous covers a secret mounted at two
+// destinations: the name alone is rejected, naming the destinations to pass.
+func TestRemoveContainerMountSecretAmbiguous(t *testing.T) {
+	store := newTestStore(t)
+	if err := store.SaveWorkspaces([]state.Workspace{{
+		WorkspaceSlug: "proj",
+		Containers: []state.Container{{
+			Name: "dev", PodmanName: "dsh-podman-proj-dev", ImageID: "arch", Status: "running",
+			Mounts: []state.Mount{
+				{Kind: "secret", Secret: "tls", Destination: "/run/secrets/a"},
+				{Kind: "secret", Secret: "tls", Destination: "/run/secrets/b"},
+			},
+		}},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	server := &Server{Store: store, ProjectsRoot: tempRoot(t), SecretPrefix: "dsh-podman-", Logger: silentLogger()}
+
+	_, err := server.RemoveContainerMount(context.Background(), &ctl.RemoveContainerMountRequest{WorkspaceSlug: "proj", Container: "dev", Kind: ctl.MountKind_MOUNT_KIND_SECRET, Secret: "tls"})
+	if status.Code(err) != codes.InvalidArgument {
+		t.Fatalf("ambiguous secret: expected InvalidArgument, got %v", err)
+	}
+	if got := status.Convert(err).Message(); got != `ambiguous mount: secret "tls" matches "/run/secrets/a", "/run/secrets/b"; pass destination` {
+		t.Fatalf("ambiguous message: %q", got)
+	}
+	// A wrong destination reports the mounts that do exist.
+	_, err = server.RemoveContainerMount(context.Background(), &ctl.RemoveContainerMountRequest{WorkspaceSlug: "proj", Container: "dev", Kind: ctl.MountKind_MOUNT_KIND_SECRET, Secret: "tls", Destination: "/run/secrets/wrong"})
+	if status.Code(err) != codes.NotFound {
+		t.Fatalf("wrong secret destination: expected NotFound, got %v", err)
+	}
+	if got := status.Convert(err).Message(); got != `mount not found: secret "tls" at "/run/secrets/wrong"; the container mounts secret "tls" at "/run/secrets/a", secret "tls" at "/run/secrets/b"` {
+		t.Fatalf("secret not-found message: %q", got)
+	}
+	// The destination still selects one of them.
+	_, err = server.RemoveContainerMount(context.Background(), &ctl.RemoveContainerMountRequest{WorkspaceSlug: "proj", Container: "dev", Kind: ctl.MountKind_MOUNT_KIND_SECRET, Secret: "tls", Destination: "/run/secrets/b"})
+	if status.Code(err) != codes.FailedPrecondition {
+		t.Fatalf("secret by destination: expected FailedPrecondition, got %v", err)
+	}
 }
 
 func TestPodmanSecrets(t *testing.T) {

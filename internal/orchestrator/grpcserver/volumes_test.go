@@ -273,6 +273,10 @@ func TestRemoveContainerMountVolume(t *testing.T) {
 	if status.Code(err) != codes.FailedPrecondition {
 		t.Fatalf("matching volume removal: expected FailedPrecondition, got %v", err)
 	}
+	_, err = server.RemoveContainerMount(context.Background(), &ctl.RemoveContainerMountRequest{WorkspaceSlug: "proj", Container: "dev", Kind: ctl.MountKind_MOUNT_KIND_VOLUME, Destination: "/data"})
+	if status.Code(err) != codes.FailedPrecondition {
+		t.Fatalf("volume removal by destination: expected FailedPrecondition, got %v", err)
+	}
 	_, err = server.RemoveContainerMount(context.Background(), &ctl.RemoveContainerMountRequest{WorkspaceSlug: "nope", Container: "dev", Kind: ctl.MountKind_MOUNT_KIND_VOLUME, Volume: "data"})
 	if status.Code(err) != codes.NotFound {
 		t.Fatalf("unknown workspace: expected NotFound, got %v", err)
@@ -280,6 +284,37 @@ func TestRemoveContainerMountVolume(t *testing.T) {
 	_, err = server.RemoveContainerMount(context.Background(), &ctl.RemoveContainerMountRequest{WorkspaceSlug: "proj", Container: "nope", Kind: ctl.MountKind_MOUNT_KIND_VOLUME, Volume: "data"})
 	if status.Code(err) != codes.NotFound {
 		t.Fatalf("unknown container: expected NotFound, got %v", err)
+	}
+}
+
+// TestRemoveContainerMountVolumeAmbiguous covers a volume mounted at two
+// destinations: the name alone is rejected, naming the destinations to pass.
+func TestRemoveContainerMountVolumeAmbiguous(t *testing.T) {
+	store := newTestStore(t)
+	if err := store.SaveWorkspaces([]state.Workspace{{
+		WorkspaceSlug: "proj",
+		Containers: []state.Container{{
+			Name: "dev", PodmanName: "dsh-podman-proj-dev", ImageID: "arch", Status: "running",
+			Mounts: []state.Mount{
+				{Kind: "volume", Volume: "data", Destination: "/a", Mode: "read_write"},
+				{Kind: "volume", Volume: "data", Destination: "/b", Mode: "read_write"},
+			},
+		}},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	server := &Server{Store: store, ProjectsRoot: tempRoot(t), VolumePrefix: "dsh-podman-", Logger: silentLogger()}
+
+	_, err := server.RemoveContainerMount(context.Background(), &ctl.RemoveContainerMountRequest{WorkspaceSlug: "proj", Container: "dev", Kind: ctl.MountKind_MOUNT_KIND_VOLUME, Volume: "data"})
+	if status.Code(err) != codes.InvalidArgument {
+		t.Fatalf("ambiguous volume: expected InvalidArgument, got %v", err)
+	}
+	if got := status.Convert(err).Message(); got != `ambiguous mount: volume "data" matches "/a", "/b"; pass destination` {
+		t.Fatalf("ambiguous message: %q", got)
+	}
+	_, err = server.RemoveContainerMount(context.Background(), &ctl.RemoveContainerMountRequest{WorkspaceSlug: "proj", Container: "dev", Kind: ctl.MountKind_MOUNT_KIND_VOLUME, Destination: "/b"})
+	if status.Code(err) != codes.FailedPrecondition {
+		t.Fatalf("volume by destination: expected FailedPrecondition, got %v", err)
 	}
 }
 

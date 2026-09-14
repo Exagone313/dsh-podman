@@ -460,6 +460,69 @@ func TestRemoveContainerMount(t *testing.T) {
 	}
 }
 
+// TestRemoveContainerMountIdentifiers covers how a removal request names its
+// mount: a handle-free request is rejected, a name that selects exactly one
+// mount is enough, and a wrong destination is reported with the mounts that do
+// exist.
+func TestRemoveContainerMountIdentifiers(t *testing.T) {
+	root := tempRoot(t)
+	store := newTestStore(t)
+	if err := store.SaveWorkspaces([]state.Workspace{{
+		WorkspaceSlug: "proj",
+		Containers: []state.Container{{
+			Name: "dev", PodmanName: "dsh-podman-proj-dev", ImageID: "arch", Status: "running",
+			Mounts: []state.Mount{
+				{Kind: "volume", Volume: "data", Destination: "/data", Mode: "read_write"},
+				{Kind: "secret", Secret: "tls", Destination: "/run/secrets/tls"},
+				{Kind: "tmpfs", Destination: "/scratch", Mode: "read_write"},
+			},
+		}},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	server := &Server{Store: store, ProjectsRoot: root, VolumePrefix: "dsh-podman-", SecretPrefix: "dsh-podman-", Logger: silentLogger()}
+
+	for _, name := range []struct {
+		label   string
+		request *ctl.RemoveContainerMountRequest
+	}{
+		{"secret without a handle", &ctl.RemoveContainerMountRequest{WorkspaceSlug: "proj", Container: "dev", Kind: ctl.MountKind_MOUNT_KIND_SECRET}},
+		{"tmpfs without a destination", &ctl.RemoveContainerMountRequest{WorkspaceSlug: "proj", Container: "dev", Kind: ctl.MountKind_MOUNT_KIND_TMPFS}},
+		{"project without a project", &ctl.RemoveContainerMountRequest{WorkspaceSlug: "proj", Container: "dev"}},
+	} {
+		_, err := server.RemoveContainerMount(context.Background(), name.request)
+		if status.Code(err) != codes.InvalidArgument {
+			t.Errorf("%s: expected InvalidArgument, got %v", name.label, err)
+		}
+	}
+
+	// A name that identifies exactly one mount is enough, and the destination
+	// alone identifies a volume too.
+	for _, name := range []struct {
+		label   string
+		request *ctl.RemoveContainerMountRequest
+	}{
+		{"secret by name", &ctl.RemoveContainerMountRequest{WorkspaceSlug: "proj", Container: "dev", Kind: ctl.MountKind_MOUNT_KIND_SECRET, Secret: "tls"}},
+		{"volume by name", &ctl.RemoveContainerMountRequest{WorkspaceSlug: "proj", Container: "dev", Kind: ctl.MountKind_MOUNT_KIND_VOLUME, Volume: "data"}},
+		{"volume by destination", &ctl.RemoveContainerMountRequest{WorkspaceSlug: "proj", Container: "dev", Kind: ctl.MountKind_MOUNT_KIND_VOLUME, Destination: "/data"}},
+		{"tmpfs by destination", &ctl.RemoveContainerMountRequest{WorkspaceSlug: "proj", Container: "dev", Kind: ctl.MountKind_MOUNT_KIND_TMPFS, Destination: "/scratch"}},
+	} {
+		_, err := server.RemoveContainerMount(context.Background(), name.request)
+		// The match succeeded; the call then stops at the nil podman client.
+		if status.Code(err) != codes.FailedPrecondition {
+			t.Errorf("%s: expected FailedPrecondition, got %v", name.label, err)
+		}
+	}
+
+	_, err := server.RemoveContainerMount(context.Background(), &ctl.RemoveContainerMountRequest{WorkspaceSlug: "proj", Container: "dev", Kind: ctl.MountKind_MOUNT_KIND_TMPFS, Destination: "/nope"})
+	if status.Code(err) != codes.NotFound {
+		t.Fatalf("unknown tmpfs: expected NotFound, got %v", err)
+	}
+	if got := status.Convert(err).Message(); got != `mount not found: tmpfs at "/nope"; the container mounts tmpfs at "/scratch"` {
+		t.Fatalf("tmpfs not-found message: %q", got)
+	}
+}
+
 func TestStartContainerMountsValidation(t *testing.T) {
 	root := tempRoot(t)
 	if err := os.MkdirAll(filepath.Join(root, "team", "src"), 0755); err != nil {

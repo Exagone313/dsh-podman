@@ -7,6 +7,7 @@ package grpcserver
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	ctl "github.com/Exagone313/dsh-podman/internal/genproto/dshctl/v1"
 	"github.com/Exagone313/dsh-podman/internal/orchestrator/state"
@@ -142,38 +143,25 @@ func (s *Server) RemoveContainerMount(ctx context.Context, request *ctl.RemoveCo
 		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("invalid mount kind %q", kind))
 	}
 	effective := containerMounts(workspace, *record)
-	index := -1
+	requested := state.Mount{Kind: kind, ProjectName: request.GetProject(), Path: request.GetPath(), Volume: request.GetVolume(), Secret: request.GetSecret(), Destination: request.GetDestination()}
+	if !mountSelectorIdentifies(kind, request) {
+		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("a %s mount is identified by %s", mountKindName(kind), mountSelectorHandles(kind)))
+	}
+	matches := make([]int, 0, 1)
 	for i, existing := range effective {
-		matched := false
-		switch kind {
-		case "":
-			matched = existing.Kind == "" && existing.ProjectName == request.GetProject() && existing.Path == request.GetPath()
-		case "tmpfs":
-			matched = existing.Kind == "tmpfs" && existing.Destination == request.GetDestination()
-		case "volume":
-			// The volume names the mount; a supplied destination must agree, so
-			// the same volume at two destinations stays distinguishable.
-			matched = existing.Kind == "volume" && existing.Volume == request.GetVolume()
-			if matched && request.GetDestination() != "" {
-				matched = existing.Destination == request.GetDestination()
-			}
-		case "secret":
-			// The destination identifies the mount; the secret name, when
-			// given, must agree.
-			matched = existing.Kind == "secret" && existing.Destination == request.GetDestination()
-			if matched && request.GetSecret() != "" {
-				matched = existing.Secret == request.GetSecret()
-			}
-		}
-		if matched {
-			index = i
-			break
+		if mountSelectorMatches(kind, existing, request) {
+			matches = append(matches, i)
 		}
 	}
-	if index < 0 {
+	switch {
+	case len(matches) == 0:
 		s.log().Warn("control request failed", "method", "RemoveContainerMount", "workspace_slug", request.GetWorkspaceSlug(), "container", request.GetContainer(), "reason", "mount not found")
-		return nil, status.Error(codes.NotFound, fmt.Sprintf("mount not found: %s", mountLabel(state.Mount{Kind: kind, ProjectName: request.GetProject(), Path: request.GetPath(), Volume: request.GetVolume(), Secret: request.GetSecret(), Destination: request.GetDestination()})))
+		return nil, status.Error(codes.NotFound, mountNotFoundMessage(kind, requested, effective))
+	case len(matches) > 1:
+		s.log().Warn("control request failed", "method", "RemoveContainerMount", "workspace_slug", request.GetWorkspaceSlug(), "container", request.GetContainer(), "reason", "ambiguous mount")
+		return nil, status.Error(codes.InvalidArgument, ambiguousMountMessage(kind, requested, effective, matches))
 	}
+	index := matches[0]
 	if record.Name == "default" && isWorkspaceProjectMount(workspace, effective[index]) {
 		return nil, status.Error(codes.FailedPrecondition, "the default container keeps the workspace project mount")
 	}
@@ -212,6 +200,141 @@ func (s *Server) RemoveContainerMount(ctx context.Context, request *ctl.RemoveCo
 	}
 	s.log().Info("control request completed", "method", "RemoveContainerMount", "workspace_slug", request.GetWorkspaceSlug(), "container", request.GetContainer(), "project", request.GetProject(), "path", request.GetPath())
 	return containerProto(updated, *record), nil
+}
+
+// mountSelectorMatches reports whether a stored mount is identified by the
+// removal request: the kind must agree and every handle the caller supplied
+// must agree too. A handle the caller omitted matches any value, so a name
+// alone selects the mount whenever it is unambiguous (the caller then gets
+// every match and RemoveContainerMount rejects an ambiguous selection).
+func mountSelectorMatches(kind string, existing state.Mount, request *ctl.RemoveContainerMountRequest) bool {
+	switch kind {
+	case "":
+		return existing.Kind == "" && existing.ProjectName == request.GetProject() && existing.Path == request.GetPath()
+	case "tmpfs":
+		return existing.Kind == "tmpfs" && existing.Destination == request.GetDestination()
+	case "volume":
+		if existing.Kind != "volume" {
+			return false
+		}
+		if request.GetVolume() != "" && existing.Volume != request.GetVolume() {
+			return false
+		}
+		return request.GetDestination() == "" || existing.Destination == request.GetDestination()
+	case "secret":
+		if existing.Kind != "secret" {
+			return false
+		}
+		if request.GetSecret() != "" && existing.Secret != request.GetSecret() {
+			return false
+		}
+		return request.GetDestination() == "" || existing.Destination == request.GetDestination()
+	}
+	return false
+}
+
+// mountSelectorIdentifies reports whether the request carries a handle for its
+// kind, so a handle-free request cannot match (and remove) an arbitrary mount.
+func mountSelectorIdentifies(kind string, request *ctl.RemoveContainerMountRequest) bool {
+	switch kind {
+	case "":
+		return request.GetProject() != ""
+	case "tmpfs":
+		return request.GetDestination() != ""
+	case "volume":
+		return request.GetVolume() != "" || request.GetDestination() != ""
+	case "secret":
+		return request.GetSecret() != "" || request.GetDestination() != ""
+	}
+	return false
+}
+
+// mountSelectorHandles names the handles a removal request needs, for the
+// under-specified-request error.
+func mountSelectorHandles(kind string) string {
+	switch kind {
+	case "tmpfs":
+		return "destination"
+	case "volume":
+		return "volume or destination"
+	case "secret":
+		return "secret or destination"
+	default:
+		return "project"
+	}
+}
+
+// mountKindName names a mount kind the way a caller sees it (the empty kind is
+// the legacy project kind).
+func mountKindName(kind string) string {
+	if kind == "" {
+		return "project"
+	}
+	return kind
+}
+
+// mountNotFoundMessage builds the NotFound reason for a removal that matched
+// nothing, listing the container's mounts of the same kind that the caller's
+// name filters still allow, so a missing destination is visible.
+func mountNotFoundMessage(kind string, requested state.Mount, mounts []state.Mount) string {
+	candidates := mountCandidates(kind, requested, mounts)
+	if len(candidates) == 0 {
+		return fmt.Sprintf("mount not found: %s", mountLabel(requested))
+	}
+	return fmt.Sprintf("mount not found: %s; the container mounts %s", mountLabel(requested), strings.Join(candidates, ", "))
+}
+
+// ambiguousMountMessage builds the InvalidArgument reason for a name that
+// selects more than one mount, naming the handle that would disambiguate.
+func ambiguousMountMessage(kind string, requested state.Mount, mounts []state.Mount, matches []int) string {
+	distinguishers := make([]string, 0, len(matches))
+	for _, index := range matches {
+		distinguishers = append(distinguishers, mountDistinguisher(kind, mounts[index]))
+	}
+	return fmt.Sprintf("ambiguous mount: %s matches %s; pass %s", mountLabel(requested), strings.Join(distinguishers, ", "), mountDisambiguator(kind))
+}
+
+// mountCandidates labels the container's mounts of the requested kind that the
+// caller's name filters (volume, secret, project) still allow.
+func mountCandidates(kind string, requested state.Mount, mounts []state.Mount) []string {
+	labels := make([]string, 0, len(mounts))
+	for _, mount := range mounts {
+		if mount.Kind != kind {
+			continue
+		}
+		if requested.ProjectName != "" && mount.ProjectName != requested.ProjectName {
+			continue
+		}
+		if requested.Volume != "" && mount.Volume != requested.Volume {
+			continue
+		}
+		if requested.Secret != "" && mount.Secret != requested.Secret {
+			continue
+		}
+		labels = append(labels, mountLabel(mount))
+	}
+	return labels
+}
+
+// mountDistinguisher renders the value that tells two mounts of the same kind
+// apart: a destination, or a project mount's path.
+func mountDistinguisher(kind string, mount state.Mount) string {
+	if kind != "" {
+		return fmt.Sprintf("%q", mount.Destination)
+	}
+	if mount.Path == "" {
+		return "the project root"
+	}
+	return fmt.Sprintf("path %q", mount.Path)
+}
+
+// mountDisambiguator names the handle that distinguishes two mounts of the
+// same kind.
+func mountDisambiguator(kind string) string {
+	if kind == "" {
+		return "path"
+	}
+	return "destination"
 }
 
 // containerMounts returns the mounts that apply to a container: its own list

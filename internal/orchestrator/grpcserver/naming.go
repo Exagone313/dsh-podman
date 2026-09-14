@@ -117,7 +117,8 @@ func containerNotFoundError(container, slug string) error {
 
 // mountLabel names a stored mount for error messages: a project mount by its
 // project and optional subpath, every other kind by its destination and (when
-// present) the volume or secret it draws from.
+// present) the volume or secret it draws from. An absent name is omitted, so an
+// under-specified removal request does not read as `secret ""`.
 func mountLabel(mount state.Mount) string {
 	at := ""
 	if mount.Destination != "" {
@@ -125,18 +126,26 @@ func mountLabel(mount state.Mount) string {
 	}
 	switch mount.Kind {
 	case "", "project":
-		label := fmt.Sprintf("project %q", mount.ProjectName)
+		label := "project" + mountName(mount.ProjectName)
 		if mount.Path != "" {
 			label += fmt.Sprintf(" path %q", mount.Path)
 		}
 		return label
 	case "volume":
-		return fmt.Sprintf("volume %q%s", mount.Volume, at)
+		return fmt.Sprintf("volume%s%s", mountName(mount.Volume), at)
 	case "secret":
-		return fmt.Sprintf("secret %q%s", mount.Secret, at)
+		return fmt.Sprintf("secret%s%s", mountName(mount.Secret), at)
 	default:
 		return fmt.Sprintf("tmpfs%s", at)
 	}
+}
+
+// mountName renders a quoted mount name, or nothing when it is empty.
+func mountName(name string) string {
+	if name == "" {
+		return ""
+	}
+	return fmt.Sprintf(" %q", name)
 }
 
 // workspaceBySlug returns the stored workspace with the given slug, or an

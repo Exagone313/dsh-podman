@@ -103,6 +103,8 @@ The settings card and the orchestrator talk over the settings transport:
 
 - The host half registers the `podman` settings namespace and keeps a live view
   (`containers`, `images`, `volumes`, `secrets`, `notice`) in it.
+- The card records its active locale as `uiLocale`, so the host can render
+  approval text in the session language (see [Approval](usage.md#approval)).
 - The card writes an action into `command` (`refresh` / `remove` / `recreate` /
   `create` / `image_rebuild` / `image_rebuild_all` / volume / secret /
   secret-env / mount ops); the host `watch` handler executes it against the

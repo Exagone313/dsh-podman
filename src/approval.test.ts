@@ -101,7 +101,7 @@ test("summarizeArgs renders the approval reason for each gated tool", () => {
       parent: "archlinux",
       packages: ["valkey"],
     }),
-    "build image valkey from archlinux • packages: valkey",
+    'Build image "valkey" from "archlinux" with packages: valkey.',
   );
   assert.equal(
     summarizeArgs("image_build", {
@@ -109,22 +109,22 @@ test("summarizeArgs renders the approval reason for each gated tool", () => {
       parent: "archlinux",
       packages: ["git", "curl", "tmux", "vim", "zsh", "openssh", "jq", "ripgrep", "make", "cc", "go"],
     }),
-    "build image dev from archlinux • packages: git, curl, tmux, vim, zsh, openssh, jq, ripgrep, +3 more",
+    'Build image "dev" from "archlinux" with packages: git, curl, tmux, vim, zsh, openssh, jq, ripgrep, +3 more.',
   );
-  assert.equal(summarizeArgs("image_rebuild", { imageId: "valkey" }), "rebuild image valkey");
-  assert.equal(summarizeArgs("image_rebuild_all", {}), "rebuild all images");
-  assert.equal(summarizeArgs("image_remove", { imageId: "valkey" }), "remove image valkey");
+  assert.equal(summarizeArgs("image_rebuild", { imageId: "valkey" }), 'Rebuild image "valkey".');
+  assert.equal(summarizeArgs("image_rebuild_all", {}), "Rebuild all images.");
+  assert.equal(summarizeArgs("image_remove", { imageId: "valkey" }), 'Remove image "valkey".');
   assert.equal(
     summarizeArgs("container_recreate", { container: "valkey-ctr" }),
-    "recreate container valkey-ctr",
+    'Recreate container "valkey-ctr".',
   );
   assert.equal(
     summarizeArgs("container_remove", { container: "valkey-ctr" }),
-    "remove container valkey-ctr",
+    'Remove container "valkey-ctr".',
   );
   assert.equal(
     summarizeArgs("volume_remove", { name: "valkey-data" }),
-    "remove volume valkey-data",
+    'Remove volume "valkey-data".',
   );
   assert.equal(
     summarizeArgs("container_start", {
@@ -135,7 +135,7 @@ test("summarizeArgs renders the approval reason for each gated tool", () => {
         { project: "team", destination: "/workspace/team", mode: "read_write" },
       ],
     }),
-    "start container web with localhost/dsh-podman/nginx:latest • mounts: team/src (ro), team → /workspace/team",
+    'Start container "web" from image "localhost/dsh-podman/nginx:latest" with mounts: directory "team/src" (read-only), directory "team" at "/workspace/team".',
   );
   assert.equal(
     summarizeArgs("container_recreate", {
@@ -146,7 +146,7 @@ test("summarizeArgs renders the approval reason for each gated tool", () => {
         { project: "team", destination: "/workspace/team", mode: "read_write" },
       ],
     }),
-    "recreate container valkey-ctr with localhost/dsh-podman/nginx:latest • mounts: team/src (ro), team → /workspace/team",
+    'Recreate container "valkey-ctr" from image "localhost/dsh-podman/nginx:latest" with mounts: directory "team/src" (read-only), directory "team" at "/workspace/team".',
   );
   assert.equal(
     summarizeArgs("container_mount_add", {
@@ -156,7 +156,7 @@ test("summarizeArgs renders the approval reason for each gated tool", () => {
       destination: "/data",
       mode: "read_write",
     }),
-    "container valkey-ctr: mount volume valkey-data at /data",
+    'Add mount to container "valkey-ctr": volume "valkey-data" at "/data".',
   );
   assert.equal(
     summarizeArgs("container_mount_add", {
@@ -167,7 +167,7 @@ test("summarizeArgs renders the approval reason for each gated tool", () => {
       destination: "/workspace/team",
       mode: "read_only",
     }),
-    "container valkey-ctr: mount directory team/src at /workspace/team (ro)",
+    'Add mount to container "valkey-ctr": directory "team/src" at "/workspace/team" (read-only).',
   );
   assert.equal(
     summarizeArgs("container_mount_add", {
@@ -176,7 +176,7 @@ test("summarizeArgs renders the approval reason for each gated tool", () => {
       destination: "/dev/shm",
       mode: "read_write",
     }),
-    "container valkey-ctr: mount tmpfs at /dev/shm",
+    'Add mount to container "valkey-ctr": tmpfs at "/dev/shm".',
   );
   assert.equal(
     summarizeArgs("container_mount_remove", {
@@ -185,7 +185,7 @@ test("summarizeArgs renders the approval reason for each gated tool", () => {
       volume: "valkey-data",
       destination: "/data",
     }),
-    "container valkey-ctr: unmount volume valkey-data at /data",
+    'Remove mount from container "valkey-ctr": volume "valkey-data" at "/data".',
   );
   assert.equal(
     summarizeArgs("container_mount_remove", {
@@ -194,11 +194,11 @@ test("summarizeArgs renders the approval reason for each gated tool", () => {
       project: "team",
       path: "src",
     }),
-    "container valkey-ctr: unmount directory team/src",
+    'Remove mount from container "valkey-ctr": directory "team/src".',
   );
   assert.equal(
     summarizeArgs("secret_remove", { name: "valkey-pass" }),
-    "remove secret valkey-pass",
+    'Remove secret "valkey-pass".',
   );
   assert.equal(
     summarizeArgs("container_secret_add", {
@@ -206,14 +206,14 @@ test("summarizeArgs renders the approval reason for each gated tool", () => {
       env: "REDIS_PASSWORD",
       secret: "valkey-pass",
     }),
-    "container valkey-ctr: add secret valkey-pass as REDIS_PASSWORD",
+    'Attach secret "valkey-pass" to container "valkey-ctr" as "REDIS_PASSWORD".',
   );
   assert.equal(
     summarizeArgs("container_secret_remove", {
       container: "valkey-ctr",
       env: "REDIS_PASSWORD",
     }),
-    "container valkey-ctr: remove secret REDIS_PASSWORD",
+    'Detach secret env var "REDIS_PASSWORD" from container "valkey-ctr".',
   );
   assert.equal(
     summarizeArgs("container_mount_add", {
@@ -222,7 +222,7 @@ test("summarizeArgs renders the approval reason for each gated tool", () => {
       secret: "valkey-tls",
       destination: "/run/secrets/tls",
     }),
-    "container valkey-ctr: mount secret valkey-tls at /run/secrets/tls",
+    'Add mount to container "valkey-ctr": secret "valkey-tls" at "/run/secrets/tls".',
   );
   assert.equal(
     summarizeArgs("container_mount_remove", {
@@ -230,7 +230,7 @@ test("summarizeArgs renders the approval reason for each gated tool", () => {
       kind: "secret",
       secret: "valkey-tls",
     }),
-    "container valkey-ctr: unmount secret valkey-tls",
+    'Remove mount from container "valkey-ctr": secret "valkey-tls".',
   );
 });
 
@@ -238,14 +238,14 @@ test("summarizeArgs tolerates missing or malformed arguments", () => {
   assert.equal(summarizeArgs("image_build", {}), "");
   assert.equal(summarizeArgs("container_mount_add", { container: "c" }), "");
   assert.equal(summarizeArgs("image_list", { imageId: "x" }), "");
-  assert.equal(summarizeArgs("container_recreate", { container: "c" }), "recreate container c");
+  assert.equal(summarizeArgs("container_recreate", { container: "c" }), 'Recreate container "c".');
   assert.equal(
     summarizeArgs("container_recreate", {
       container: "c",
       image: "img",
       mounts: [{ mode: "read_only" }, "garbage", 42],
     }),
-    "recreate container c with img",
+    'Recreate container "c" from image "img".',
   );
 });
 
@@ -255,7 +255,7 @@ test("preExecutePolicy asks for gated tools and delegates the rest", async () =>
     () => Promise.resolve({ kind: "allow" }),
   )) as { kind: string; reason: string };
   assert.equal(asked.kind, "ask");
-  assert.equal(asked.reason, "remove image valkey");
+  assert.equal(asked.reason, 'Remove image "valkey".');
 
   let delegated = false;
   const allowed = (await preExecutePolicy({ name: "image_list" }, () => {
@@ -346,7 +346,7 @@ test("workspace-write keeps the ask-based approval", async () => {
     () => Promise.resolve({ kind: "allow" }),
   )) as { kind: string; reason: string };
   assert.equal(asked.kind, "ask");
-  assert.equal(asked.reason, "build image valkey from archlinux • packages: valkey");
+  assert.equal(asked.reason, 'Build image "valkey" from "archlinux" with packages: valkey.');
 });
 
 test("read-only wins over a never approval policy", async () => {
@@ -370,14 +370,14 @@ test("podman-ops preset asks for its approval-gated tools only", async () => {
     () => Promise.resolve({ kind: "allow" }),
   )) as { kind: string; reason: string };
   assert.equal(asked.kind, "ask");
-  assert.equal(asked.reason, "run shell in container valkey-ctr: valkey-cli ping");
+  assert.equal(asked.reason, 'Run a shell command in container "valkey-ctr": valkey-cli ping');
 
   const daemon = (await preExecutePolicy(
     presetExec("daemon_start", "podman-ops", { container: "valkey-ctr", name: "v1", argv: ["valkey-server"], uid: 1001 }, workspaceWrite),
     () => Promise.resolve({ kind: "allow" }),
   )) as { kind: string; reason: string };
   assert.equal(daemon.kind, "ask");
-  assert.equal(daemon.reason, "start daemon v1 in container valkey-ctr: valkey-server • uid: 1001");
+  assert.equal(daemon.reason, 'Start daemon "v1" in container "valkey-ctr": valkey-server (uid 1001)');
 });
 
 test("podman-ops approval does not leak into other presets", async () => {
@@ -438,11 +438,19 @@ test("podman-ops keeps open tools ungated and respects permissions", async () =>
 test("summarizeArgs renders reasons for the podman-ops gated tools", () => {
   assert.equal(
     summarizeArgs("container_exec", { container: "c", argv: ["python", "run.py", "--x", "1", "--y", "2", "--z", "3", "--w", "4", "--v", "5"] }),
-    "run in container c: python run.py --x 1 --y 2 --z 3 …",
+    'Run a command in container "c": python run.py --x 1 --y 2 --z 3 …',
   );
-  assert.equal(summarizeArgs("container_write", { container: "c", file_path: "/etc/valkey/valkey.conf" }), "write /etc/valkey/valkey.conf in container c");
-  assert.equal(summarizeArgs("container_edit", { container: "c", file_path: "/etc/valkey/valkey.conf" }), "edit /etc/valkey/valkey.conf in container c");
-  assert.equal(summarizeArgs("container_bash", { container: "c", command: "ping -c 1 8.8.8.8" }), "run shell in container c: ping -c 1 8.8.8.8");
+  assert.equal(summarizeArgs("container_write", { container: "c", file_path: "/etc/valkey/valkey.conf" }), 'Write "/etc/valkey/valkey.conf" in container "c".');
+  assert.equal(summarizeArgs("container_edit", { container: "c", file_path: "/etc/valkey/valkey.conf" }), 'Edit "/etc/valkey/valkey.conf" in container "c".');
+  assert.equal(summarizeArgs("container_bash", { container: "c", command: "ping -c 1 8.8.8.8" }), 'Run a shell command in container "c": ping -c 1 8.8.8.8');
+  assert.equal(
+    summarizeArgs("container_bash", { container: "c", command: "ls", workdir: "/srv" }),
+    'Run a shell command in container "c" (cwd "/srv"): ls',
+  );
+  assert.equal(
+    summarizeArgs("container_exec", { container: "c", argv: ["ls"], workdir: "/srv" }),
+    'Run a command in container "c" (cwd "/srv"): ls',
+  );
 });
 
 test("Podman-ops preset content covers the recent tools", () => {
@@ -491,7 +499,7 @@ test("summarizeArgs includes env keys for container start/recreate", () => {
       container: "web",
       env: { A: "1", B: "2" },
     }),
-    "start container web • env: A, B",
+    'Start container "web" with env: A, B.',
   );
   assert.equal(
     summarizeArgs("container_start", {
@@ -500,14 +508,14 @@ test("summarizeArgs includes env keys for container start/recreate", () => {
       mounts: [{ project: "team", mode: "read_only" }],
       env: { A: "1", B: "2", C: "3" },
     }),
-    "start container web with localhost/dsh-podman/nginx:latest • mounts: team (ro) • env: A, B, C",
+    'Start container "web" from image "localhost/dsh-podman/nginx:latest" with mounts: directory "team" (read-only) with env: A, B, C.',
   );
   assert.equal(
     summarizeArgs("container_start", {
       container: "web",
       env: { A: "1", B: "2", C: "3", D: "4", E: "5", F: "6", G: "7", H: "8", I: "9", J: "10" },
     }),
-    "start container web • env: A, B, C, D, E, F, G, H, +2 more",
+    'Start container "web" with env: A, B, C, D, E, F, G, H, +2 more.',
   );
   assert.equal(
     summarizeArgs("container_recreate", {
@@ -515,31 +523,31 @@ test("summarizeArgs includes env keys for container start/recreate", () => {
       image: "img",
       env: { A: "1" },
     }),
-    "recreate container c with img • env: A",
+    'Recreate container "c" from image "img" with env: A.',
   );
   assert.equal(
     summarizeArgs("container_recreate", { container: "c", env: {} }),
-    "recreate container c",
+    'Recreate container "c".',
   );
 });
 
 test("approval prompts name the resolved path", () => {
   assert.equal(
     summarizeArgs("container_write", { container: "c", file_path: "notes.md" }, "/projects/team"),
-    "write /projects/team/notes.md in container c",
+    'Write "/projects/team/notes.md" in container "c".',
   );
   assert.equal(
     summarizeArgs("container_edit", { container: "c", file_path: "notes.md" }, "/projects/team"),
-    "edit /projects/team/notes.md in container c",
+    'Edit "/projects/team/notes.md" in container "c".',
   );
   // Without a session cwd, or for a path that cannot resolve, the prompt still
   // renders with the value as given.
   assert.equal(
     summarizeArgs("container_write", { container: "c", file_path: "notes.md" }),
-    "write notes.md in container c",
+    'Write "notes.md" in container "c".',
   );
   assert.equal(
     summarizeArgs("container_write", { container: "c", file_path: "../x" }, "/projects/team"),
-    "write ../x in container c",
+    'Write "../x" in container "c".',
   );
 });

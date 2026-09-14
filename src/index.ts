@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: MIT
 
 import { preExecutePolicy } from "./approval.js";
+import { resolveReasonLocale, type ReasonLocale } from "./approval-reasons.js";
 import { createFilesystemProvider } from "./fs-provider.js";
 import {
   ensurePodmanOpsPreset,
@@ -33,10 +34,22 @@ export interface PluginConfig {
 }
 
 export function apply(ctx: any, config: PluginConfig = {}): void {
+  // Approval text follows the session language: the browser client records its
+  // active locale in the plugin namespace, with the durable user preference as
+  // the fallback. Without a settings provider everything renders in English.
+  let readLocale: () => ReasonLocale = () => "en";
+  ctx.inject(["settings"], (settingsCtx: any) => {
+    readLocale = () => resolveReasonLocale(settingsCtx.settings);
+  });
   ctx.on(
     "tools/pre-execute",
     (exec: any, next: any) =>
-      preExecutePolicy(exec, next, () => resolver.getConfig().projectsRoot),
+      preExecutePolicy(
+        exec,
+        next,
+        () => resolver.getConfig().projectsRoot,
+        () => readLocale(),
+      ),
   );
   ensurePodmanOpsPreset(ctx);
   const imagePrefix = withTrailingSlash(

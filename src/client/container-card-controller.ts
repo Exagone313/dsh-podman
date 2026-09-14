@@ -95,6 +95,7 @@ export interface ContainerSettings {
   socketsRoot: string;
   projectsRoot: string;
   notice: string;
+  uiLocale?: string;
   workspaces: readonly WorkspaceView[];
   containers: readonly ContainerView[];
   images: readonly ImageView[];

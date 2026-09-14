@@ -71,6 +71,7 @@ export const settingsSchema = z.object({
   socketsRoot: z.string().default(""),
   projectsRoot: z.string().default(""),
   notice: z.string().default(""),
+  uiLocale: z.string().default(""),
   workspaces: z
     .array(
       z.object({
@@ -224,6 +225,7 @@ export interface ContainerSettings {
   socketsRoot: string;
   projectsRoot: string;
   notice: string;
+  uiLocale: string;
   workspaces: readonly WorkspaceView[];
   containers: readonly ContainerView[];
   images: readonly ImageView[];

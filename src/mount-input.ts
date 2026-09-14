@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: MIT
 
 import { defaultMountMode, mountKindToProto, mountModeToProto } from "./mount-enums.js";
+import { renderDenial, type ReasonLocale } from "./approval-reasons.js";
 
 // The mount kind for a call: an explicit non-empty `kind` wins, otherwise it is
 // inferred from the source field the caller supplied (`secret`/`volume`), since
@@ -43,20 +44,24 @@ export function projectMountDestinationReason(
     path?: unknown;
     destination?: unknown;
   },
+  locale: ReasonLocale = "en",
 ): string | undefined {
   if (inferMountKind(args) !== "project") return undefined;
   if (args.destination === undefined || args.destination === "") return undefined;
+  const project = typeof args.project === "string" ? args.project : "";
+  const path = args.path;
   const mirror =
     projectsRoot === undefined
       ? ""
-      : projectMountMirror(
-          projectsRoot,
-          typeof args.project === "string" ? args.project : "",
-          args.path,
-        );
-  return mirror === ""
-    ? "destination is not supported for project mounts"
-    : `destination is not supported for project mounts; the directory always mounts at ${mirror}`;
+      : projectMountMirror(projectsRoot, project, path);
+  const source = [project, path]
+    .filter((part) => typeof part === "string" && part !== "")
+    .join("/");
+  return renderDenial(locale, {
+    kind: "project_destination",
+    ...(source === "" ? {} : { source }),
+    ...(mirror === "" ? {} : { mirror }),
+  });
 }
 
 export function mountsFromInput(

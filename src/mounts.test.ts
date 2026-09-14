@@ -41,7 +41,7 @@ test("container_start approval depends on mounts being passed", () => {
   assert.equal(decision!.kind, "ask");
   assert.equal(
     decision!.reason,
-    "start container web with localhost/dsh-podman/nginx:latest • mounts: team/src (ro), team → /workspace/team",
+    'Start container "web" from image "localhost/dsh-podman/nginx:latest" with mounts: directory "team/src" (read-only), directory "team" at "/workspace/team".',
   );
 });
 
@@ -51,14 +51,14 @@ test("summarizeArgs infers the mount target when kind is omitted", () => {
       container: "valkey-ctr",
       secret: "valkey-tls",
     }),
-    "container valkey-ctr: unmount secret valkey-tls",
+    'Remove mount from container "valkey-ctr": secret "valkey-tls".',
   );
   assert.equal(
     summarizeArgs("container_mount_add", {
       container: "valkey-ctr",
       volume: "valkey-data",
     }),
-    "container valkey-ctr: mount volume valkey-data",
+    'Add mount to container "valkey-ctr": volume "valkey-data".',
   );
 });
 
@@ -74,7 +74,7 @@ test("preExecutePolicy denies project mounts that carry a destination", async ()
   assert.equal(deny.kind, "deny", "must deny instead of asking");
   assert.equal(
     deny.reason,
-    "destination is not supported for project mounts; the directory always mounts at /projects/team/src",
+    'Project mounts cannot set a destination; "team/src" always mounts at "/projects/team/src".',
   );
 
   const startDeny = (await preExecutePolicy(
@@ -242,7 +242,7 @@ test("container_mount_add rejects a destination on a project mount", async () =>
         { container: "web", kind: "project", project: "team", path: "src", destination: "/custom" },
         MOUNT_EXEC,
       ),
-    /destination is not supported for project mounts; the directory always mounts at \/projects\/team\/src/,
+    /Project mounts cannot set a destination; "team\/src" always mounts at "\/projects\/team\/src"/,
   );
   await assert.rejects(
     () =>
@@ -251,7 +251,7 @@ test("container_mount_add rejects a destination on a project mount", async () =>
         { container: "web", project: "team", destination: "/custom" },
         MOUNT_EXEC,
       ),
-    /destination is not supported for project mounts/,
+    /Project mounts cannot set a destination/,
   );
   assert.deepEqual(requests, [], "a rejected mount must not reach the orchestrator");
 
@@ -276,7 +276,7 @@ test("container_start rejects a destination on a project mount", async () => {
         },
         MOUNT_EXEC,
       ),
-    /destination is not supported for project mounts/,
+    /Project mounts cannot set a destination/,
   );
   assert.deepEqual(requests, [], "a rejected mount must not reach the orchestrator");
 });

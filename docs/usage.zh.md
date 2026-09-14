@@ -57,9 +57,8 @@ dsh-podman 将容器运行的镜像组织为三个层级：
   仅在传入 `mounts` 时询问。
 - **Full access** — 工具运行时不显示审批提示。
 
-审批提示的原因会内联总结调用的关键参数（image
-id/base/packages、container/image，以及每个挂载及其种类、目标和 `(ro)`
-只读标记）。设置卡片操作是直接的控制调用，不进行门控。
+审批提示的原因是一句话，说明操作及其涉及的对象，并对每个标识符加引号——例如
+`Add mount to container "web": volume "data"`。它涵盖容器镜像、每个挂载的类型与目标路径、环境变量的键，以及解析后的文件路径。它会跟随界面语言：浏览器客户端将当前语言记录到插件设置中，并以持久化的语言偏好作为回退（两者都未设置时为英文）。策略拒绝——只读沙箱，或项目挂载上指定了目标路径——也会使用相同的语言。设置卡片操作是直接的控制调用，不进行门控。
 
 `container_start`、`container_recreate` 和 `container_bash` 接受应用于容器（或
 bash 进程）的 `env` 映射；`container_exec` 和 `daemon_start` 已经接受 `env`，而

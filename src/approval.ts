@@ -5,21 +5,13 @@
 import { approvalPath, currentCwd } from "./guest-rpc.js";
 import { inferMountKind, projectMountDestinationReason } from "./mount-input.js";
 import { TOOLS } from "./tool-schemas.js";
-
-// Join top-level parts of an approval reason. List elements within a part
-// (packages, mounts) stay comma-joined instead.
-export const part = (...items: (string | undefined)[]): string =>
-  items.filter((item) => item !== undefined && item !== "").join(" • ");
-
-// Join list elements, capping at 8 with a "+N more" tail.
-const LIST_CAP = 8;
-
-function list(items: readonly unknown[], format: (item: unknown) => string): string {
-  if (items.length === 0) return "";
-  const shown = items.slice(0, LIST_CAP).map(format);
-  const extra = items.length - LIST_CAP;
-  return extra > 0 ? [...shown, `+${extra} more`].join(", ") : shown.join(", ");
-}
+import {
+  renderDenial,
+  renderReason,
+  type MountFact,
+  type ReasonFact,
+  type ReasonLocale,
+} from "./approval-reasons.js";
 
 // Render a project mount path "team" or "team/src" from project + optional path.
 function projectPath(project: string, path?: string): string {
@@ -27,228 +19,217 @@ function projectPath(project: string, path?: string): string {
   return `${project}/${path.replace(/^\/+/, "")}`;
 }
 
-// Render a mount's mode suffix: "(ro)" for read_only, nothing for read_write.
-function mountMode(mode: unknown): string {
-  return mode === "read_only" ? " (ro)" : "";
-}
-
-// Summarize the mount source for container_mount_add/remove.
-function mountTarget(args: Record<string, unknown>): string {
-  switch (inferMountKind(args)) {
-    case "volume":
-      return typeof args.volume === "string" ? `volume ${args.volume}` : "";
-    case "tmpfs":
-      return "tmpfs";
-    case "secret":
-      return typeof args.secret === "string" ? `secret ${args.secret}` : "";
-    default:
-      return typeof args.project === "string" ? `directory ${projectPath(args.project, typeof args.path === "string" ? args.path : undefined)}` : "";
-  }
-}
-
-// Render a single mount item, e.g. "team/src (ro)" or "volume valkey-data → /data".
-function replaceMountItem(mount: Record<string, unknown>): string {
-  const kind = typeof mount.kind === "string" ? mount.kind : "";
+// Build the mount fact for one mount object, or undefined when it names no
+// source. `readOnly` is only meaningful where the caller tracks a mode.
+function mountFact(
+  mount: Record<string, unknown>,
+  readOnly: boolean,
+): MountFact | undefined {
+  const inferred = inferMountKind(mount);
+  const kind: MountFact["kind"] =
+    inferred === "volume" || inferred === "secret" || inferred === "tmpfs"
+      ? inferred
+      : "project";
   const destination =
     typeof mount.destination === "string" && mount.destination !== ""
       ? mount.destination
       : undefined;
-  const mode = mountMode(mount.mode);
-  if (kind === "volume") {
-    const volume = typeof mount.volume === "string" ? mount.volume : "";
-    if (volume === "") return "";
-    return `volume ${volume}${destination === undefined ? "" : ` → ${destination}`}${mode}`;
-  }
-  if (kind === "tmpfs") {
-    return `tmpfs${destination === undefined ? "" : ` at ${destination}`}${mode}`;
-  }
-  if (kind === "secret") {
-    const secret = typeof mount.secret === "string" ? mount.secret : "";
-    if (secret === "") return "";
-    return `secret ${secret}${destination === undefined ? "" : ` → ${destination}`}${mode}`;
-  }
-  const project = typeof mount.project === "string" ? mount.project : "";
-  if (project === "") return "";
-  const path = typeof mount.path === "string" ? mount.path : undefined;
-  const item = destination === undefined
-    ? projectPath(project, path)
-    : `${projectPath(project, path)} → ${destination}`;
-  return item + mode;
+  const source =
+    kind === "tmpfs"
+      ? ""
+      : kind === "volume"
+        ? typeof mount.volume === "string" ? mount.volume : ""
+        : kind === "secret"
+          ? typeof mount.secret === "string" ? mount.secret : ""
+          : typeof mount.project === "string"
+            ? projectPath(mount.project, typeof mount.path === "string" ? mount.path : undefined)
+            : "";
+  if (kind !== "tmpfs" && source === "") return undefined;
+  return {
+    kind,
+    source,
+    ...(destination === undefined ? {} : { destination }),
+    readOnly,
+  };
 }
 
-// Build the single-line approval summary shown for a gated tool call.
-//
-// sessionCwd is used to name the resolved target of a relative path, so the
-// prompt describes the file that will actually be touched.
-export function summarizeArgs(
+// Build the locale-independent reason fact for a gated call, or undefined when
+// the arguments carry too little to describe the call.
+export function reasonFact(
   name: string,
   args: Record<string, unknown>,
   sessionCwd?: unknown,
-): string {
+): ReasonFact | undefined {
   const str = (key: string): string | undefined =>
     typeof args[key] === "string" && args[key] !== "" ? (args[key] as string) : undefined;
-  const count = (key: string): string | undefined => {
+  const listOf = (key: string): string[] | undefined => {
     const value = args[key];
-    return Array.isArray(value) && value.length > 0 ? String(value.length) : undefined;
+    return Array.isArray(value) && value.length > 0
+      ? value.map((item) => String(item))
+      : undefined;
   };
-  const listOf = (key: string): string | undefined => {
-    const value = args[key];
-    if (!Array.isArray(value) || value.length === 0) return undefined;
-    return list(value, (item) => String(item));
-  };
-  const mounts = (): string | undefined => {
+  const mountItems = (): MountFact[] | undefined => {
     const value = args.mounts;
     if (!Array.isArray(value) || value.length === 0) return undefined;
-    const items = value.map((item) =>
-      typeof item === "object" && item !== null
-        ? replaceMountItem(item as Record<string, unknown>)
-        : "",
-    ).filter((item) => item !== "");
-    if (items.length === 0) return undefined;
-    const shown = items.slice(0, LIST_CAP);
-    const beyond = items.length - LIST_CAP;
-    return beyond > 0 ? `${shown.join(", ")}, +${beyond} more` : shown.join(", ");
+    const items = value
+      .map((item) =>
+        typeof item === "object" && item !== null
+          ? mountFact(
+              item as Record<string, unknown>,
+              (item as Record<string, unknown>).mode === "read_only",
+            )
+          : undefined,
+      )
+      .filter((item): item is MountFact => item !== undefined);
+    return items.length === 0 ? undefined : items;
   };
-  const envKeys = (): string | undefined => {
+  const envKeys = (): string[] | undefined => {
     const value = args.env;
     if (typeof value !== "object" || value === null || Array.isArray(value)) {
       return undefined;
     }
     const keys = Object.keys(value);
-    if (keys.length === 0) return undefined;
-    return list(keys, (key) => String(key));
+    return keys.length === 0 ? undefined : keys;
   };
 
   switch (name) {
     case "image_build": {
       const image = str("imageId");
+      if (image === undefined) return undefined;
       const parent = str("parent");
       const packages = listOf("packages");
-      if (image === undefined) return "";
-      const phrase = `build image ${image}${parent === undefined ? "" : ` from ${parent}`}`;
-      return part(
-        phrase,
-        packages === undefined ? undefined : `packages: ${packages}`,
-      );
+      return {
+        kind: "image_build",
+        image,
+        ...(parent === undefined ? {} : { parent }),
+        ...(packages === undefined ? {} : { packages }),
+      };
     }
     case "image_rebuild": {
       const image = str("imageId");
-      return image === undefined ? "" : `rebuild image ${image}`;
+      return image === undefined ? undefined : { kind: "image_rebuild", image };
     }
     case "image_rebuild_all":
-      return "rebuild all images";
+      return { kind: "image_rebuild_all" };
     case "image_remove": {
       const image = str("imageId");
-      return image === undefined ? "" : `remove image ${image}`;
+      return image === undefined ? undefined : { kind: "image_remove", image };
     }
-    case "container_recreate": {
+    case "container_recreate":
+    case "container_start": {
       const container = str("container");
+      if (container === undefined) return undefined;
       const image = str("image");
-      const mountItems = mounts();
+      const mounts = mountItems();
       const env = envKeys();
-      if (container === undefined) return "";
-      const phrase = `recreate container ${container}${image === undefined ? "" : ` with ${image}`}`;
-      return part(
-        phrase,
-        mountItems === undefined ? undefined : `mounts: ${mountItems}`,
-        env === undefined ? undefined : `env: ${env}`,
-      );
+      return {
+        kind: name,
+        container,
+        ...(image === undefined ? {} : { image }),
+        ...(mounts === undefined ? {} : { mounts }),
+        ...(env === undefined ? {} : { env }),
+      };
     }
     case "container_remove": {
       const container = str("container");
-      return container === undefined ? "" : `remove container ${container}`;
-    }
-    case "container_start": {
-      const container = str("container");
-      const image = str("image");
-      const mountItems = mounts();
-      const env = envKeys();
-      if (container === undefined) return "";
-      const phrase = `start container ${container}${image === undefined ? "" : ` with ${image}`}`;
-      return part(
-        phrase,
-        mountItems === undefined ? undefined : `mounts: ${mountItems}`,
-        env === undefined ? undefined : `env: ${env}`,
-      );
+      return container === undefined ? undefined : { kind: "container_remove", container };
     }
     case "volume_remove": {
-      const name = str("name");
-      return name === undefined ? "" : `remove volume ${name}`;
+      const volume = str("name");
+      return volume === undefined ? undefined : { kind: "volume_remove", name: volume };
     }
     case "secret_remove": {
-      const name = str("name");
-      return name === undefined ? "" : `remove secret ${name}`;
+      const secret = str("name");
+      return secret === undefined ? undefined : { kind: "secret_remove", name: secret };
     }
     case "container_secret_add": {
       const container = str("container");
       const env = str("env");
       const secret = str("secret");
       if (container === undefined || env === undefined || secret === undefined) {
-        return "";
+        return undefined;
       }
-      return `container ${container}: add secret ${secret} as ${env}`;
+      return { kind: "container_secret_add", container, secret, env };
     }
     case "container_secret_remove": {
       const container = str("container");
       const env = str("env");
-      if (container === undefined || env === undefined) return "";
-      return `container ${container}: remove secret ${env}`;
+      if (container === undefined || env === undefined) return undefined;
+      return { kind: "container_secret_remove", container, env };
     }
     case "container_mount_add":
     case "container_mount_remove": {
       const container = str("container");
-      const target = mountTarget(args);
-      const destination = str("destination");
-      const verb = name === "container_mount_add" ? "mount" : "unmount";
-      if (container === undefined || target === "") return "";
-      const suffix = destination === undefined ? "" : ` at ${destination}`;
-      return `container ${container}: ${verb} ${target}${suffix}${name === "container_mount_add" ? mountMode(args.mode) : ""}`;
+      if (container === undefined) return undefined;
+      const mount = mountFact(args, name === "container_mount_add" && args.mode === "read_only");
+      if (mount === undefined) return undefined;
+      return { kind: name, container, mount };
     }
     case "container_bash": {
       const container = str("container");
       const command = str("command");
-      if (container === undefined || command === undefined) return "";
-      return `run shell in container ${container}: ${command}`;
+      if (container === undefined || command === undefined) return undefined;
+      const cwd = str("workdir");
+      return {
+        kind: "container_bash",
+        container,
+        command,
+        ...(cwd === undefined ? {} : { cwd }),
+      };
     }
     case "container_exec": {
       const container = str("container");
-      const argv = args.argv;
-      if (container === undefined || !Array.isArray(argv) || argv.length === 0) return "";
-      const words = argv.map((word) => String(word)).slice(0, 8);
-      const tail = argv.length > 8 ? " …" : "";
-      return `run in container ${container}: ${words.join(" ")}${tail}`;
+      const argv = listOf("argv");
+      if (container === undefined || argv === undefined) return undefined;
+      const cwd = str("workdir");
+      return {
+        kind: "container_exec",
+        container,
+        argv,
+        ...(cwd === undefined ? {} : { cwd }),
+      };
     }
-    case "container_write": {
-      const container = str("container");
-      const path = str("file_path");
-      if (container === undefined || path === undefined) return "";
-      return `write ${approvalPath(path, sessionCwd)} in container ${container}`;
-    }
+    case "container_write":
     case "container_edit": {
       const container = str("container");
       const path = str("file_path");
-      if (container === undefined || path === undefined) return "";
-      return `edit ${approvalPath(path, sessionCwd)} in container ${container}`;
+      if (container === undefined || path === undefined) return undefined;
+      return { kind: name, container, path: approvalPath(path, sessionCwd) };
     }
     case "daemon_start": {
       const container = str("container");
-      const argv = args.argv;
-      if (container === undefined || !Array.isArray(argv) || argv.length === 0) return "";
-      const named = str("name");
-      const words = argv.map((word) => String(word)).slice(0, 8);
-      const tail = argv.length > 8 ? " …" : "";
-      const command = `${named === undefined ? "" : ` ${named}`}`;
-      const uid = typeof args.uid === "number" ? String(args.uid) : undefined;
-      const gid = typeof args.gid === "number" ? String(args.gid) : undefined;
-      return part(
-        `start daemon${command} in container ${container}: ${words.join(" ")}${tail}`,
-        uid === undefined ? undefined : `uid: ${uid}`,
-        gid === undefined ? undefined : `gid: ${gid}`,
-      );
+      const argv = listOf("argv");
+      if (container === undefined || argv === undefined) return undefined;
+      const daemon = str("name");
+      const uid = typeof args.uid === "number" ? args.uid : undefined;
+      const gid = typeof args.gid === "number" ? args.gid : undefined;
+      return {
+        kind: "daemon_start",
+        container,
+        argv,
+        ...(daemon === undefined ? {} : { name: daemon }),
+        ...(uid === undefined ? {} : { uid }),
+        ...(gid === undefined ? {} : { gid }),
+      };
     }
     default:
-      return "";
+      return undefined;
   }
+}
+
+// Build the single-line approval summary shown for a gated tool call.
+//
+// sessionCwd is used to name the resolved target of a relative path, so the
+// prompt describes the file that will actually be touched. `locale` selects
+// the language; it defaults to English.
+export function summarizeArgs(
+  name: string,
+  args: Record<string, unknown>,
+  sessionCwd?: unknown,
+  locale: ReasonLocale = "en",
+): string {
+  const fact = reasonFact(name, args, sessionCwd);
+  return fact === undefined ? "" : renderReason(locale, fact);
 }
 
 // The ask reason, omitted when no summary can be derived so the approval panel
@@ -258,8 +239,9 @@ function askReason(
   name: string,
   args: Record<string, unknown>,
   sessionCwd?: unknown,
+  locale: ReasonLocale = "en",
 ): { reason?: string } {
-  const reason = summarizeArgs(name, args, sessionCwd);
+  const reason = summarizeArgs(name, args, sessionCwd, locale);
   return reason === "" ? {} : { reason };
 }
 
@@ -273,14 +255,15 @@ export function approvalDecision(
   name: string,
   args?: Record<string, unknown>,
   sessionCwd?: unknown,
+  locale: ReasonLocale = "en",
 ): { kind: "ask"; reason?: string } | undefined {
   const tool = TOOLS.find((entry) => entry.name === name);
   if (tool === undefined) return undefined;
   if (tool.approval === true) {
-    return { kind: "ask", ...askReason(name, args ?? {}, sessionCwd) };
+    return { kind: "ask", ...askReason(name, args ?? {}, sessionCwd, locale) };
   }
   if (tool.approvalWhen !== undefined && tool.approvalWhen(args ?? {})) {
-    return { kind: "ask", ...askReason(name, args ?? {}, sessionCwd) };
+    return { kind: "ask", ...askReason(name, args ?? {}, sessionCwd, locale) };
   }
   return undefined;
 }
@@ -361,22 +344,24 @@ export async function preExecutePolicy(
   },
   next: () => Promise<unknown>,
   getProjectsRoot?: () => string,
+  getLocale?: () => ReasonLocale,
 ): Promise<unknown> {
   const name = exec.name;
   if (!OUR_TOOL_NAMES.has(name)) return next();
+  const locale = getLocale?.() ?? "en";
   const events = exec.agent?.session?.events ?? [];
   if (foldSandboxMode(events) === "read-only") {
     if (READ_ONLY_TOOLS.has(name)) return next();
     return {
       kind: "deny",
-      reason: `tool "${name}" requires a writable permission (current: read-only)`,
+      reason: renderDenial(locale, { kind: "read_only", tool: name }),
     };
   }
   const args = exec.arguments;
   const parsed =
     typeof args === "object" && args !== null ? (args as Record<string, unknown>) : undefined;
   const projectsRoot = getProjectsRoot?.();
-  const denyReason = mountDestinationsReason(name, parsed, projectsRoot);
+  const denyReason = mountDestinationsReason(name, parsed, projectsRoot, locale);
   if (denyReason !== undefined) {
     return { kind: "deny", reason: denyReason };
   }
@@ -384,9 +369,9 @@ export async function preExecutePolicy(
   const preset = exec.agent?.session?.header?.agentPreset;
   const sessionCwd = currentCwd(exec);
   if (preset === PODMAN_OPS_PRESET && PODMAN_OPS_APPROVAL_TOOLS.has(name)) {
-    return { kind: "ask", ...askReason(name, parsed ?? {}, sessionCwd) };
+    return { kind: "ask", ...askReason(name, parsed ?? {}, sessionCwd, locale) };
   }
-  return approvalDecision(name, parsed, sessionCwd) ?? next();
+  return approvalDecision(name, parsed, sessionCwd, locale) ?? next();
 }
 
 // The reason to deny a mount-bearing tool call that puts a destination on a
@@ -397,17 +382,22 @@ export function mountDestinationsReason(
   name: string,
   args: Record<string, unknown> | undefined,
   projectsRoot: string | undefined,
+  locale: ReasonLocale = "en",
 ): string | undefined {
   if (args === undefined) return undefined;
   if (name === "container_mount_add" || name === "container_mount_remove") {
-    return projectMountDestinationReason(projectsRoot, args);
+    return projectMountDestinationReason(projectsRoot, args, locale);
   }
   if (name === "container_start" || name === "container_recreate") {
     const mounts = args.mounts;
     if (!Array.isArray(mounts)) return undefined;
     for (const item of mounts) {
       if (typeof item !== "object" || item === null) continue;
-      const reason = projectMountDestinationReason(projectsRoot, item as Record<string, unknown>);
+      const reason = projectMountDestinationReason(
+        projectsRoot,
+        item as Record<string, unknown>,
+        locale,
+      );
       if (reason !== undefined) return reason;
     }
   }

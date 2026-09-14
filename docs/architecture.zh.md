@@ -85,6 +85,8 @@ orchestrator 通过 Podman 构建工作区镜像（有关原始/基础/自定义
 
 - 主机半部分注册 `podman`
   设置命名空间并保持其中的实时视图（`containers`、`images`、`volumes`、`secrets`、`notice`）。
+- 卡片将其当前语言记录为
+  `uiLocale`，以便主机以会话语言呈现审批文本（参见[审批](usage.zh.md#审批)）。
 - 卡片将操作写入 `command`（`refresh` / `remove` / `recreate` / `create` /
   `image_rebuild` / `image_rebuild_all` / volume / secret / secret-env / mount
   操作）；主机的 `watch` 处理程序针对 orchestrator

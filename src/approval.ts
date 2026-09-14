@@ -171,6 +171,21 @@ export function reasonFact(
       if (mount === undefined) return undefined;
       return { kind: name, container, mount };
     }
+    case "container_path_set": {
+      const container = str("container");
+      if (container === undefined) return undefined;
+      const paths = Array.isArray(args.paths)
+        ? args.paths.map((path) => String(path))
+        : [];
+      return { kind: "container_path_set", container, paths };
+    }
+    case "container_path_add":
+    case "container_path_remove": {
+      const container = str("container");
+      const path = str("path");
+      if (container === undefined || path === undefined) return undefined;
+      return { kind: name, container, path };
+    }
     case "container_bash": {
       const container = str("container");
       const command = str("command");

@@ -40,6 +40,9 @@ export type ReasonFact =
   | { kind: "container_mount_add"; container: string; mount: MountFact }
   | { kind: "container_mount_remove"; container: string; mount: MountFact }
   | { kind: "container_mount_update"; container: string; mount: MountFact }
+  | { kind: "container_path_set"; container: string; paths: readonly string[] }
+  | { kind: "container_path_add"; container: string; path: string }
+  | { kind: "container_path_remove"; container: string; path: string }
   | { kind: "volume_remove"; name: string }
   | { kind: "secret_remove"; name: string }
   | { kind: "container_secret_add"; container: string; secret: string; env: string }
@@ -295,6 +298,29 @@ export function renderReason(locale: ReasonLocale, fact: ReasonFact): string {
         `更新容器 ${quoted(locale, fact.container)} 中的挂载：将${target}重新挂载为${mode}。`,
       );
     }
+    case "container_path_set": {
+      const list =
+        fact.paths.length === 0
+          ? pick(locale, "(none)", "（无）")
+          : joinList(locale, fact.paths.map((path) => quoted(locale, path)));
+      return pick(
+        locale,
+        `Set the PATH additions of container ${quoted(locale, fact.container)}: ${list}.`,
+        `设置容器 ${quoted(locale, fact.container)} 的 PATH 附加项：${list}。`,
+      );
+    }
+    case "container_path_add":
+      return pick(
+        locale,
+        `Add ${quoted(locale, fact.path)} to the PATH of container ${quoted(locale, fact.container)}.`,
+        `将 ${quoted(locale, fact.path)} 添加到容器 ${quoted(locale, fact.container)} 的 PATH 中。`,
+      );
+    case "container_path_remove":
+      return pick(
+        locale,
+        `Remove ${quoted(locale, fact.path)} from the PATH of container ${quoted(locale, fact.container)}.`,
+        `从容器 ${quoted(locale, fact.container)} 的 PATH 中移除 ${quoted(locale, fact.path)}。`,
+      );
     case "volume_remove":
       return pick(locale, `Remove volume ${quoted(locale, fact.name)}.`, `移除卷 ${quoted(locale, fact.name)}。`);
     case "secret_remove":

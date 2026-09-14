@@ -27,6 +27,9 @@ test("the destructive mutations require approval", () => {
     "container_mount_add",
     "container_mount_remove",
     "container_mount_update",
+    "container_path_add",
+    "container_path_remove",
+    "container_path_set",
     "container_recreate",
     "container_remove",
     "container_secret_add",
@@ -76,6 +79,12 @@ test("approvalDecision gates exactly the approval-flagged tools", () => {
       destination: "/data",
       mode: "read_only",
     },
+    container_path_set: {
+      container: "valkey-ctr",
+      paths: ["/opt/bin", "/usr/local/bin"],
+    },
+    container_path_add: { container: "valkey-ctr", path: "/opt/bin" },
+    container_path_remove: { container: "valkey-ctr", path: "/opt/bin" },
     secret_remove: { name: "valkey-pass" },
     container_secret_add: {
       container: "valkey-ctr",

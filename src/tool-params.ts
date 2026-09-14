@@ -245,6 +245,50 @@ export const containerMountUpdateParameters = {
   required: ["container", "mode"],
 };
 
+export const containerPathSetParameters = {
+  type: "object",
+  properties: {
+    container: containerParam,
+    paths: {
+      type: "array",
+      items: {
+        type: "string",
+        description:
+          "Absolute directory to prepend to the container's PATH (no ':', NUL, or newline).",
+      },
+      description:
+        "Complete ordered list of PATH additions, highest priority first. Replaces the current list; an empty list clears it.",
+    },
+  },
+  required: ["container", "paths"],
+};
+
+export const containerPathAddParameters = {
+  type: "object",
+  properties: {
+    container: containerParam,
+    path: {
+      type: "string",
+      description:
+        "Absolute directory to prepend to the container's PATH (no ':', NUL, or newline). An existing entry is moved to the front.",
+    },
+  },
+  required: ["container", "path"],
+};
+
+export const containerPathRemoveParameters = {
+  type: "object",
+  properties: {
+    container: containerParam,
+    path: {
+      type: "string",
+      description:
+        "PATH addition to remove. A directory that is only part of the container's default PATH cannot be removed.",
+    },
+  },
+  required: ["container", "path"],
+};
+
 export const containerRemoveParameters = {
   type: "object",
   properties: { container: containerParam },

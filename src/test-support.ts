@@ -88,6 +88,9 @@ export const EXPECTED_TOOLS = [
   "container_mount_add",
   "container_mount_remove",
   "container_mount_update",
+  "container_path_set",
+  "container_path_add",
+  "container_path_remove",
   "volume_list",
   "volume_create",
   "volume_remove",
@@ -277,6 +280,45 @@ export function guestExecRecorder(defaultCwd?: string, stdout?: string) {
     containerBinding: async () => binding,
   };
   return { starts, resolver };
+}
+
+// A resolver for the container_path_* tools: the guest stubs GetPaths/SetPaths
+// (the agent's live list) and control records the setContainerPaths call.
+export function pathRequestRecorder(
+  options: { paths?: string[]; defaultPath?: string } = {},
+) {
+  const controlCalls: Array<[string, Record<string, unknown>]> = [];
+  const setCalls: string[][] = [];
+  const defaultPath = options.defaultPath ?? "/usr/bin";
+  let paths = options.paths ?? [];
+  const guest = {
+    getPaths: (
+      _request: unknown,
+      _metadata: unknown,
+      callback: (error: Error | null, result: unknown) => void,
+    ) => callback(null, { paths, defaultPath }),
+    setPaths: (
+      request: { paths: string[] },
+      _metadata: unknown,
+      callback: (error: Error | null, result: unknown) => void,
+    ) => {
+      setCalls.push(request.paths);
+      paths = request.paths;
+      callback(null, { paths, defaultPath });
+    },
+  };
+  const binding = { guest, token: "t", socket: "/run/x.sock" };
+  const resolver = {
+    registry: { resolveByPath: async () => ({ id: WORKSPACE_ID }) },
+    getConfig: () => ({ projectsRoot: "/projects" }),
+    resolve: async () => binding,
+    containerBinding: async () => binding,
+    async control(method: string, request: unknown) {
+      controlCalls.push([method, request as Record<string, unknown>]);
+      return { paths: (request as { paths?: string[] }).paths ?? [] };
+    },
+  };
+  return { controlCalls, setCalls, resolver };
 }
 
 // A fake guest whose readFile honors offset/length, so the provider's byte

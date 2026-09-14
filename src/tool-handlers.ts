@@ -133,7 +133,7 @@ export const toolHandlers: Record<
     const binding = await resolveToolBinding(resolver, sessionCwd, input.container);
     return runExec(
       binding,
-      ["bash", "-lc", input.command],
+      ["bash", "-c", input.command],
       guestCwd(input.workdir, sessionCwd, binding),
       input.env,
       input.timeoutMs,
@@ -341,6 +341,50 @@ export const toolHandlers: Record<
     const row = await resolver.control("updateContainerMount", request);
     return publicContainer(row);
   },
+  container_path_set: async (resolver, input, exec) => {
+    const sessionCwd = currentCwd(exec);
+    const slug = await sessionWorkspaceSlug(resolver, sessionCwd);
+    const binding = await resolveToolBinding(resolver, sessionCwd, input.container);
+    const paths = Array.isArray(input.paths) ? input.paths.map(String) : [];
+    return {
+      paths: await applyContainerPaths(resolver, binding, slug, input.container, paths),
+    };
+  },
+  container_path_add: async (resolver, input, exec) => {
+    const sessionCwd = currentCwd(exec);
+    const slug = await sessionWorkspaceSlug(resolver, sessionCwd);
+    const binding = await resolveToolBinding(resolver, sessionCwd, input.container);
+    const current = await containerPathState(binding);
+    // Prepending gives the new path the highest priority; an existing entry is
+    // moved to the front rather than duplicated.
+    const paths = [
+      input.path,
+      ...current.paths.filter((path) => path !== input.path),
+    ];
+    return {
+      paths: await applyContainerPaths(resolver, binding, slug, input.container, paths),
+    };
+  },
+  container_path_remove: async (resolver, input, exec) => {
+    const sessionCwd = currentCwd(exec);
+    const slug = await sessionWorkspaceSlug(resolver, sessionCwd);
+    const binding = await resolveToolBinding(resolver, sessionCwd, input.container);
+    const current = await containerPathState(binding);
+    if (!current.paths.includes(input.path)) {
+      if (current.defaultPaths.includes(input.path)) {
+        throw new Error(
+          `path ${JSON.stringify(input.path)} is part of the container's default PATH and cannot be removed`,
+        );
+      }
+      throw new Error(
+        `path ${JSON.stringify(input.path)} is not an added path`,
+      );
+    }
+    const paths = current.paths.filter((path) => path !== input.path);
+    return {
+      paths: await applyContainerPaths(resolver, binding, slug, input.container, paths),
+    };
+  },
   volume_list: async (resolver) => {
     const result = await resolver.control<{ volumes?: any[] }>("listVolumes", {});
     return (result.volumes ?? []).map((volume: any) => ({ name: volume.name }));
@@ -485,6 +529,51 @@ function daemonNotFound(name: string): Error {
   const error = new Error(`daemon ${JSON.stringify(name)} not found`);
   (error as { code?: string }).code = "NOT_FOUND";
   return error;
+}
+
+// containerPathState reads the guest's live PATH additions and the default PATH
+// they are prepended to.
+async function containerPathState(binding: {
+  guest: any;
+  token: string;
+}): Promise<{ paths: string[]; defaultPaths: string[] }> {
+  const result = (await unaryGuest({ binding }, "getPaths", {})) as any;
+  const paths = Array.isArray(result?.paths)
+    ? result.paths.map((path: unknown) => String(path))
+    : [];
+  const defaultPath =
+    typeof result?.defaultPath === "string" ? result.defaultPath : "";
+  return {
+    paths,
+    defaultPaths: defaultPath === "" ? [] : defaultPath.split(":"),
+  };
+}
+
+// applyContainerPaths persists the list on the container and pushes it to the
+// running guest agent, returning the applied (validated, deduplicated) list.
+// The guest holds the live list; the container record is what a recreate
+// restores it from.
+async function applyContainerPaths(
+  resolver: any,
+  binding: { guest: any; token: string },
+  slug: string,
+  container: string,
+  paths: readonly string[],
+): Promise<string[]> {
+  const row = (await resolver.control("setContainerPaths", {
+    workspaceSlug: slug,
+    container,
+    paths: [...paths],
+  })) as any;
+  const persisted = Array.isArray(row?.paths)
+    ? row.paths.map((path: unknown) => String(path))
+    : [...paths];
+  const result = (await unaryGuest({ binding }, "setPaths", {
+    paths: persisted,
+  })) as any;
+  return Array.isArray(result?.paths)
+    ? result.paths.map((path: unknown) => String(path))
+    : persisted;
 }
 
 // daemonCall maps the guest agent's generic "unknown daemon" to a message that

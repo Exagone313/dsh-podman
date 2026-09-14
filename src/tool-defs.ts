@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: MIT
 
-import { containerBashParameters, containerEditParameters, containerExecParameters, containerGlobParameters, containerGrepParameters, containerListParameters, containerMountAddParameters, containerMountListParameters, containerMountRemoveParameters, containerMountUpdateParameters, containerReadParameters, containerRecreateParameters, containerRemoveParameters, containerSecretAddParameters, containerSecretRemoveParameters, containerStartParameters, containerWriteParameters, daemonListParameters, daemonLogsParameters, daemonRestartParameters, daemonStartParameters, daemonStopParameters, imageBuildParameters, imageGetParameters, imageListParameters, imageRebuildAllParameters, imageRebuildParameters, imageRemoveParameters, secretCreateParameters, secretListParameters, secretRemoveParameters, volumeCreateParameters, volumeListParameters, volumeRemoveParameters } from "./tool-params.js";
+import { containerBashParameters, containerEditParameters, containerExecParameters, containerGlobParameters, containerGrepParameters, containerListParameters, containerMountAddParameters, containerMountListParameters, containerMountRemoveParameters, containerMountUpdateParameters, containerPathAddParameters, containerPathRemoveParameters, containerPathSetParameters, containerReadParameters, containerRecreateParameters, containerRemoveParameters, containerSecretAddParameters, containerSecretRemoveParameters, containerStartParameters, containerWriteParameters, daemonListParameters, daemonLogsParameters, daemonRestartParameters, daemonStartParameters, daemonStopParameters, imageBuildParameters, imageGetParameters, imageListParameters, imageRebuildAllParameters, imageRebuildParameters, imageRemoveParameters, secretCreateParameters, secretListParameters, secretRemoveParameters, volumeCreateParameters, volumeListParameters, volumeRemoveParameters } from "./tool-params.js";
 
 export function defineTool<T>(definition: T): T {
   return definition;
@@ -78,6 +78,21 @@ export const TOOLS: ToolDefinition[] = [
     parameters: containerMountUpdateParameters,
     approval: true,
   },
+  {
+    name: "container_path_set",
+    parameters: containerPathSetParameters,
+    approval: true,
+  },
+  {
+    name: "container_path_add",
+    parameters: containerPathAddParameters,
+    approval: true,
+  },
+  {
+    name: "container_path_remove",
+    parameters: containerPathRemoveParameters,
+    approval: true,
+  },
   { name: "volume_list", parameters: volumeListParameters },
   { name: "volume_create", parameters: volumeCreateParameters },
   { name: "volume_remove", parameters: volumeRemoveParameters, approval: true },
@@ -146,6 +161,12 @@ export const TOOL_DESCRIPTIONS: Record<string, string> = {
     "Remove a mount from a container in the current workspace. Identify it by kind plus its own handle: project for a project mount, volume for a named volume, secret for a secret, and destination for tmpfs. A handle that matches more than one mount is rejected, so pass destination as well when a volume or secret is mounted more than once; copy the exact values from container_mount_list. Recreates the container, terminating its running processes; bind-mounted volume data persists. Requires approval: removing a mount changes the container filesystem view.",
   container_mount_update:
     "Change the mode of an existing project or volume mount in the current workspace (read_only or read_write). Identify it by kind plus its own handle, exactly like container_mount_remove; a handle that matches more than one mount is rejected. The default container's workspace project mount can be remounted read-only. Recreates the container, terminating its running processes; bind-mounted volume data persists. Requires approval: changing a mount's mode changes the container filesystem view.",
+  container_path_set:
+    "Replace the directories the container prepends to PATH for every command it runs, highest priority first. Applied immediately to future shell, exec, terminal, and daemon runs without recreating the container; already-running daemons keep their old PATH. A recreated container restores the list. Requires approval: changing PATH changes which binaries run.",
+  container_path_add:
+    "Prepend one directory to the container's PATH additions, moving it to the front when it is already there. Applied immediately without recreating the container; already-running daemons keep their old PATH. Requires approval: changing PATH changes which binaries run.",
+  container_path_remove:
+    "Remove one directory from the container's PATH additions. A directory that is only part of the container's default PATH cannot be removed. Applied immediately without recreating the container; already-running daemons keep their old PATH. Requires approval: changing PATH changes which binaries run.",
   volume_list:
     "List the named volumes available to the current workspace.",
   volume_create: "Create a named volume in the current workspace.",
@@ -196,6 +217,9 @@ export const TOOL_UI: Record<string, { title: string; kind: string }> = {
   container_mount_add: { title: "Add mount", kind: "edit" },
   container_mount_remove: { title: "Remove mount", kind: "delete" },
   container_mount_update: { title: "Change mount mode", kind: "edit" },
+  container_path_set: { title: "Set PATH additions", kind: "edit" },
+  container_path_add: { title: "Add PATH entry", kind: "edit" },
+  container_path_remove: { title: "Remove PATH entry", kind: "delete" },
   volume_list: { title: "List volumes", kind: "search" },
   volume_create: { title: "Create volume", kind: "execute" },
   volume_remove: { title: "Remove volume", kind: "delete" },

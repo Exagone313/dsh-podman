@@ -117,7 +117,40 @@ export type ContainerPluginKey =
   | "terminalNoOutput"
   | "terminalCollapseAria"
   | "terminalExpandAria"
-  | "terminalExpandRest";
+  | "terminalExpandRest"
+  | "toolTitle_container_bash"
+  | "toolTitle_container_exec"
+  | "toolTitle_container_read"
+  | "toolTitle_container_write"
+  | "toolTitle_container_edit"
+  | "toolTitle_container_glob"
+  | "toolTitle_container_grep"
+  | "toolTitle_container_list"
+  | "toolTitle_container_start"
+  | "toolTitle_container_recreate"
+  | "toolTitle_container_remove"
+  | "toolTitle_container_mount_list"
+  | "toolTitle_container_mount_add"
+  | "toolTitle_container_mount_remove"
+  | "toolTitle_container_secret_add"
+  | "toolTitle_container_secret_remove"
+  | "toolTitle_image_list"
+  | "toolTitle_image_get"
+  | "toolTitle_image_build"
+  | "toolTitle_image_rebuild"
+  | "toolTitle_image_rebuild_all"
+  | "toolTitle_image_remove"
+  | "toolTitle_volume_list"
+  | "toolTitle_volume_create"
+  | "toolTitle_volume_remove"
+  | "toolTitle_secret_list"
+  | "toolTitle_secret_create"
+  | "toolTitle_secret_remove"
+  | "toolTitle_daemon_start"
+  | "toolTitle_daemon_list"
+  | "toolTitle_daemon_logs"
+  | "toolTitle_daemon_restart"
+  | "toolTitle_daemon_stop";
 
 export const en: Record<ContainerPluginKey, string> = {
   cardTitle: "dsh-podman",
@@ -238,6 +271,39 @@ export const en: Record<ContainerPluginKey, string> = {
   terminalCollapseAria: "Collapse output",
   terminalExpandAria: "Expand the remaining {n} output lines",
   terminalExpandRest: "… {n} more lines",
+  toolTitle_container_bash: "Container bash",
+  toolTitle_container_exec: "Container exec",
+  toolTitle_container_read: "Container read",
+  toolTitle_container_write: "Container write",
+  toolTitle_container_edit: "Container edit",
+  toolTitle_container_glob: "Container glob",
+  toolTitle_container_grep: "Container grep",
+  toolTitle_container_list: "List containers",
+  toolTitle_container_start: "Start container",
+  toolTitle_container_recreate: "Recreate container",
+  toolTitle_container_remove: "Remove container",
+  toolTitle_container_mount_list: "List mounts",
+  toolTitle_container_mount_add: "Add mount",
+  toolTitle_container_mount_remove: "Remove mount",
+  toolTitle_container_secret_add: "Attach secret",
+  toolTitle_container_secret_remove: "Detach secret",
+  toolTitle_image_list: "List images",
+  toolTitle_image_get: "Inspect image",
+  toolTitle_image_build: "Build image",
+  toolTitle_image_rebuild: "Rebuild image",
+  toolTitle_image_rebuild_all: "Rebuild all images",
+  toolTitle_image_remove: "Remove image",
+  toolTitle_volume_list: "List volumes",
+  toolTitle_volume_create: "Create volume",
+  toolTitle_volume_remove: "Remove volume",
+  toolTitle_secret_list: "List secrets",
+  toolTitle_secret_create: "Create secret",
+  toolTitle_secret_remove: "Remove secret",
+  toolTitle_daemon_start: "Start daemon",
+  toolTitle_daemon_list: "List daemons",
+  toolTitle_daemon_logs: "Daemon logs",
+  toolTitle_daemon_restart: "Restart daemon",
+  toolTitle_daemon_stop: "Stop daemon",
 };
 
 export const zh: Record<ContainerPluginKey, string> = {
@@ -352,6 +418,39 @@ export const zh: Record<ContainerPluginKey, string> = {
   terminalCollapseAria: "收起输出",
   terminalExpandAria: "展开其余 {n} 行输出",
   terminalExpandRest: "… 其余 {n} 行",
+  toolTitle_container_bash: "容器 Bash",
+  toolTitle_container_exec: "容器执行",
+  toolTitle_container_read: "读取容器文件",
+  toolTitle_container_write: "写入容器文件",
+  toolTitle_container_edit: "编辑容器文件",
+  toolTitle_container_glob: "容器文件匹配",
+  toolTitle_container_grep: "容器文件搜索",
+  toolTitle_container_list: "列出容器",
+  toolTitle_container_start: "启动容器",
+  toolTitle_container_recreate: "重建容器",
+  toolTitle_container_remove: "移除容器",
+  toolTitle_container_mount_list: "列出挂载",
+  toolTitle_container_mount_add: "添加挂载",
+  toolTitle_container_mount_remove: "移除挂载",
+  toolTitle_container_secret_add: "注入机密",
+  toolTitle_container_secret_remove: "移除机密注入",
+  toolTitle_image_list: "列出镜像",
+  toolTitle_image_get: "查看镜像",
+  toolTitle_image_build: "构建镜像",
+  toolTitle_image_rebuild: "重建镜像",
+  toolTitle_image_rebuild_all: "重建全部镜像",
+  toolTitle_image_remove: "移除镜像",
+  toolTitle_volume_list: "列出卷",
+  toolTitle_volume_create: "创建卷",
+  toolTitle_volume_remove: "移除卷",
+  toolTitle_secret_list: "列出机密",
+  toolTitle_secret_create: "创建机密",
+  toolTitle_secret_remove: "移除机密",
+  toolTitle_daemon_start: "启动守护进程",
+  toolTitle_daemon_list: "列出守护进程",
+  toolTitle_daemon_logs: "守护进程日志",
+  toolTitle_daemon_restart: "重启守护进程",
+  toolTitle_daemon_stop: "停止守护进程",
 };
 
 declare module "@deepseek-ai/dsh-client-ui-slots" {

@@ -25,7 +25,7 @@ import {
 } from "@deepseek-ai/dsh-client-ui-primitives";
 import type { PropsLocale, TranslateNS } from "@deepseek-ai/dsh-client-ui-slots";
 import type { ToolCallViewProps } from "@deepseek-ai/dsh-client-ui-tool/client";
-import { NS } from "./locales.js";
+import { NS, type ContainerPluginKey } from "./locales.js";
 import { TERMINAL_CLASS } from "./terminal-styles.js";
 
 // A domain-owned row for every podman tool, registered over the keyed
@@ -33,45 +33,45 @@ import { TERMINAL_CLASS } from "./terminal-styles.js";
 // "Tool call · <tool name>"; this row owns the icon, title, summary and body.
 
 interface ToolPresentation {
-  readonly title: string;
+  readonly titleKey: ContainerPluginKey;
   readonly icon: ReactNode;
   readonly summaryKeys: readonly string[];
 }
 
 const TOOL_PRESENTATION: Record<string, ToolPresentation> = {
-  container_bash: { title: "Container bash", icon: <IconApiOutline14 size={14} />, summaryKeys: ["description", "command"] },
-  container_exec: { title: "Container exec", icon: <IconApiOutline14 size={14} />, summaryKeys: ["description", "argv"] },
-  container_read: { title: "Container read", icon: <IconBrowseOutline16 size={14} />, summaryKeys: ["file_path"] },
-  container_write: { title: "Container write", icon: <IconEditOutline16 size={14} />, summaryKeys: ["file_path"] },
-  container_edit: { title: "Container edit", icon: <IconEditOutline16 size={14} />, summaryKeys: ["file_path"] },
-  container_glob: { title: "Container glob", icon: <IconSearchOutline16 size={14} />, summaryKeys: ["pattern"] },
-  container_grep: { title: "Container grep", icon: <IconSearchOutline16 size={14} />, summaryKeys: ["pattern"] },
-  container_list: { title: "List containers", icon: <IconDataOutline16 size={14} />, summaryKeys: [] },
-  container_start: { title: "Start container", icon: <IconPlayOutline16 size={14} />, summaryKeys: ["container", "image"] },
-  container_recreate: { title: "Recreate container", icon: <IconRefreshOutline16 size={14} />, summaryKeys: ["container", "image"] },
-  container_remove: { title: "Remove container", icon: <IconTrashOutline16 size={14} />, summaryKeys: ["container"] },
-  container_mount_list: { title: "List mounts", icon: <IconFolderOpenOutline16 size={14} />, summaryKeys: ["container"] },
-  container_mount_add: { title: "Add mount", icon: <IconFolderOpenOutline16 size={14} />, summaryKeys: ["container", "kind"] },
-  container_mount_remove: { title: "Remove mount", icon: <IconTrashOutline16 size={14} />, summaryKeys: ["container"] },
-  container_secret_add: { title: "Attach secret", icon: <IconLinkOutline16 size={14} />, summaryKeys: ["container", "env"] },
-  container_secret_remove: { title: "Detach secret", icon: <IconLinkOutline16 size={14} />, summaryKeys: ["container", "env"] },
-  image_list: { title: "List images", icon: <IconArchiveOutline20 size={14} />, summaryKeys: [] },
-  image_get: { title: "Inspect image", icon: <IconArchiveOutline20 size={14} />, summaryKeys: ["imageId"] },
-  image_build: { title: "Build image", icon: <IconPlusOutline16 size={14} />, summaryKeys: ["imageId", "parent"] },
-  image_rebuild: { title: "Rebuild image", icon: <IconRefreshOutline16 size={14} />, summaryKeys: ["imageId"] },
-  image_rebuild_all: { title: "Rebuild all images", icon: <IconRefreshOutline16 size={14} />, summaryKeys: [] },
-  image_remove: { title: "Remove image", icon: <IconTrashOutline16 size={14} />, summaryKeys: ["imageId"] },
-  volume_list: { title: "List volumes", icon: <IconDataOutline16 size={14} />, summaryKeys: [] },
-  volume_create: { title: "Create volume", icon: <IconPlusOutline16 size={14} />, summaryKeys: ["name"] },
-  volume_remove: { title: "Remove volume", icon: <IconTrashOutline16 size={14} />, summaryKeys: ["name"] },
-  secret_list: { title: "List secrets", icon: <IconLinkOutline16 size={14} />, summaryKeys: [] },
-  secret_create: { title: "Create secret", icon: <IconPlusOutline16 size={14} />, summaryKeys: ["name"] },
-  secret_remove: { title: "Remove secret", icon: <IconTrashOutline16 size={14} />, summaryKeys: ["name"] },
-  daemon_start: { title: "Start daemon", icon: <IconPlayOutline16 size={14} />, summaryKeys: ["name"] },
-  daemon_list: { title: "List daemons", icon: <IconPlayOutline16 size={14} />, summaryKeys: ["container"] },
-  daemon_logs: { title: "Daemon logs", icon: <IconBrowseOutline16 size={14} />, summaryKeys: ["name"] },
-  daemon_restart: { title: "Restart daemon", icon: <IconRefreshOutline16 size={14} />, summaryKeys: ["name"] },
-  daemon_stop: { title: "Stop daemon", icon: <IconStopFill16 size={14} />, summaryKeys: ["name"] },
+  container_bash: { titleKey: "toolTitle_container_bash", icon: <IconApiOutline14 size={14} />, summaryKeys: ["description", "command"] },
+  container_exec: { titleKey: "toolTitle_container_exec", icon: <IconApiOutline14 size={14} />, summaryKeys: ["description", "argv"] },
+  container_read: { titleKey: "toolTitle_container_read", icon: <IconBrowseOutline16 size={14} />, summaryKeys: ["file_path"] },
+  container_write: { titleKey: "toolTitle_container_write", icon: <IconEditOutline16 size={14} />, summaryKeys: ["file_path"] },
+  container_edit: { titleKey: "toolTitle_container_edit", icon: <IconEditOutline16 size={14} />, summaryKeys: ["file_path"] },
+  container_glob: { titleKey: "toolTitle_container_glob", icon: <IconSearchOutline16 size={14} />, summaryKeys: ["pattern"] },
+  container_grep: { titleKey: "toolTitle_container_grep", icon: <IconSearchOutline16 size={14} />, summaryKeys: ["pattern"] },
+  container_list: { titleKey: "toolTitle_container_list", icon: <IconDataOutline16 size={14} />, summaryKeys: [] },
+  container_start: { titleKey: "toolTitle_container_start", icon: <IconPlayOutline16 size={14} />, summaryKeys: ["container", "image"] },
+  container_recreate: { titleKey: "toolTitle_container_recreate", icon: <IconRefreshOutline16 size={14} />, summaryKeys: ["container", "image"] },
+  container_remove: { titleKey: "toolTitle_container_remove", icon: <IconTrashOutline16 size={14} />, summaryKeys: ["container"] },
+  container_mount_list: { titleKey: "toolTitle_container_mount_list", icon: <IconFolderOpenOutline16 size={14} />, summaryKeys: ["container"] },
+  container_mount_add: { titleKey: "toolTitle_container_mount_add", icon: <IconFolderOpenOutline16 size={14} />, summaryKeys: ["container", "kind"] },
+  container_mount_remove: { titleKey: "toolTitle_container_mount_remove", icon: <IconTrashOutline16 size={14} />, summaryKeys: ["container"] },
+  container_secret_add: { titleKey: "toolTitle_container_secret_add", icon: <IconLinkOutline16 size={14} />, summaryKeys: ["container", "env"] },
+  container_secret_remove: { titleKey: "toolTitle_container_secret_remove", icon: <IconLinkOutline16 size={14} />, summaryKeys: ["container", "env"] },
+  image_list: { titleKey: "toolTitle_image_list", icon: <IconArchiveOutline20 size={14} />, summaryKeys: [] },
+  image_get: { titleKey: "toolTitle_image_get", icon: <IconArchiveOutline20 size={14} />, summaryKeys: ["imageId"] },
+  image_build: { titleKey: "toolTitle_image_build", icon: <IconPlusOutline16 size={14} />, summaryKeys: ["imageId", "parent"] },
+  image_rebuild: { titleKey: "toolTitle_image_rebuild", icon: <IconRefreshOutline16 size={14} />, summaryKeys: ["imageId"] },
+  image_rebuild_all: { titleKey: "toolTitle_image_rebuild_all", icon: <IconRefreshOutline16 size={14} />, summaryKeys: [] },
+  image_remove: { titleKey: "toolTitle_image_remove", icon: <IconTrashOutline16 size={14} />, summaryKeys: ["imageId"] },
+  volume_list: { titleKey: "toolTitle_volume_list", icon: <IconDataOutline16 size={14} />, summaryKeys: [] },
+  volume_create: { titleKey: "toolTitle_volume_create", icon: <IconPlusOutline16 size={14} />, summaryKeys: ["name"] },
+  volume_remove: { titleKey: "toolTitle_volume_remove", icon: <IconTrashOutline16 size={14} />, summaryKeys: ["name"] },
+  secret_list: { titleKey: "toolTitle_secret_list", icon: <IconLinkOutline16 size={14} />, summaryKeys: [] },
+  secret_create: { titleKey: "toolTitle_secret_create", icon: <IconPlusOutline16 size={14} />, summaryKeys: ["name"] },
+  secret_remove: { titleKey: "toolTitle_secret_remove", icon: <IconTrashOutline16 size={14} />, summaryKeys: ["name"] },
+  daemon_start: { titleKey: "toolTitle_daemon_start", icon: <IconPlayOutline16 size={14} />, summaryKeys: ["name"] },
+  daemon_list: { titleKey: "toolTitle_daemon_list", icon: <IconPlayOutline16 size={14} />, summaryKeys: ["container"] },
+  daemon_logs: { titleKey: "toolTitle_daemon_logs", icon: <IconBrowseOutline16 size={14} />, summaryKeys: ["name"] },
+  daemon_restart: { titleKey: "toolTitle_daemon_restart", icon: <IconRefreshOutline16 size={14} />, summaryKeys: ["name"] },
+  daemon_stop: { titleKey: "toolTitle_daemon_stop", icon: <IconStopFill16 size={14} />, summaryKeys: ["name"] },
 };
 
 /** The wire tool names this package owns a row for. */
@@ -281,11 +281,8 @@ export function PodmanToolRow({
   inspect,
   t,
 }: PodmanToolRowProps) {
-  const presentation = TOOL_PRESENTATION[toolName] ?? {
-    title: toolName,
-    icon: <IconSparkle16 size={14} />,
-    summaryKeys: [] as readonly string[],
-  };
+  const presentation = TOOL_PRESENTATION[toolName];
+  const title = presentation === undefined ? toolName : t(presentation.titleKey);
   const settled = "kind" in block;
   const argsRaw =
     ((settled ? block.call?.argsRaw : block.argsRaw) ?? "");
@@ -305,7 +302,7 @@ export function PodmanToolRow({
       : null;
   const summary =
     failureLine ??
-    argSummary(args, presentation.summaryKeys, firstLine(argsRaw) || block.callId);
+    argSummary(args, presentation?.summaryKeys ?? [], firstLine(argsRaw) || block.callId);
   const [expanded, setExpanded] = useState(false);
   const expandable = terminal !== null || (output !== null && output !== "");
   const leading =
@@ -314,13 +311,13 @@ export function PodmanToolRow({
     ) : state === "stopped" ? (
       <StateDot state="warning" />
     ) : (
-      presentation.icon
+      presentation?.icon ?? <IconSparkle16 size={14} />
     );
   void inspect;
   return (
     <DisclosureRow
       icon={leading}
-      title={presentation.title}
+      title={title}
       open={expanded && expandable}
       expandable={expandable}
       onToggle={() => setExpanded((value) => !value)}

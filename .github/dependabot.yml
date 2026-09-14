@@ -16,6 +16,10 @@ updates:
       interval: "weekly"
     cooldown:
       default-days: 7
+    ignore:
+      # The harness packages are pinned to the supported dsh release and must
+      # move together with it, not on their own.
+      - dependency-name: "@deepseek-ai/*"
   - package-ecosystem: "gomod"
     directory: "/"
     schedule:

@@ -132,7 +132,7 @@ SPDX-License-Identifier: MIT
 ## 验证
 
 - 打开 **Settings → Plugins →
-  Podman**：卡片应列出基础镜像，并针对工作区提供创建其默认容器的选项。
+  dsh-podman**：卡片应列出基础镜像，并针对工作区提供创建其默认容器的选项。
 - 在 dsh 会话中运行一条 shell 命令。它应在当前工作区的 Podman
   容器内执行（插件会在首次使用时自动创建工作区的默认容器）。
 

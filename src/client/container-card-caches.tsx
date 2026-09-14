@@ -5,6 +5,7 @@
 import { ConfirmButton } from "./container-card-shared.js";
 import { hint, sectionTitle, wsBody } from "./container-card-styles.js";
 import { type CacheView } from "./container-card-controller.js";
+import { NS } from "./locales.js";
 import { type TranslateNS } from "@deepseek-ai/dsh-client-ui-slots";
 import { type ReactNode } from "react";
 
@@ -24,7 +25,7 @@ function formatBytes(bytes: number): string {
 // The package-manager build caches: their current size and the two cleanup
 // actions. The caches are re-downloadable, so neither action is destructive.
 export function CachesSection(props: {
-  t: TranslateNS<"podman">;
+  t: TranslateNS<typeof NS>;
   caches: readonly CacheView[];
   busy: boolean;
   onClean: (mode: string) => void;

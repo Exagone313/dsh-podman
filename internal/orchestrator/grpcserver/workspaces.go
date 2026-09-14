@@ -278,6 +278,52 @@ func (s *Server) CreateWorkspace(ctx context.Context, request *ctl.CreateWorkspa
 	return toProto(workspace), nil
 }
 
+// RemoveWorkspace tears a workspace down: it stops the daemons of every stored
+// container, removes the workspace's pod (which removes any container left in
+// it), cleans the containers' socket directories, and drops the stored
+// workspace. It is idempotent: an absent workspace or pod succeeds, so the
+// settings card can call it for a workspace that never had a container.
+func (s *Server) RemoveWorkspace(_ context.Context, request *ctl.RemoveWorkspaceRequest) (*ctl.RemoveWorkspaceResponse, error) {
+	slug := request.GetWorkspaceSlug()
+	s.log().Info("control request", "method", "RemoveWorkspace", "workspace_slug", slug)
+	if !validWorkspaceSlug(slug) {
+		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("invalid workspace slug %q", slug))
+	}
+	if s.Podman == nil {
+		return nil, status.Error(codes.FailedPrecondition, "podman is not configured")
+	}
+	workspace, err := workspaceBySlug(s.Store, slug)
+	if err != nil {
+		// Tolerate an absent record: the pod may still exist (for example after
+		// a reconcile dropped the workspace), so tear it down either way.
+		s.log().Info("RemoveWorkspace has no stored workspace", "workspace_slug", slug)
+		workspace = state.Workspace{WorkspaceSlug: slug}
+	}
+	for i := range workspace.Containers {
+		s.stopContainerDaemons(context.Background(), workspace.Containers[i])
+	}
+	if err := s.Podman.RemovePod(podNameFor(slug)); err != nil {
+		s.log().Error("control request failed", "method", "RemoveWorkspace", "workspace_slug", slug, "error", err)
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	for i := range workspace.Containers {
+		s.removeSocketDir(workspace.Containers[i].PodmanName)
+	}
+	if err := s.Store.UpdateWorkspaces(func(all []state.Workspace) ([]state.Workspace, error) {
+		remaining := make([]state.Workspace, 0, len(all))
+		for _, ws := range all {
+			if ws.WorkspaceSlug != slug {
+				remaining = append(remaining, ws)
+			}
+		}
+		return remaining, nil
+	}); err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	s.log().Info("control request completed", "method", "RemoveWorkspace", "workspace_slug", slug)
+	return &ctl.RemoveWorkspaceResponse{}, nil
+}
+
 // removePodIfEmpty deletes a workspace's pod when the store no longer holds any
 // container for it, so an orphan cleanup does not leave an empty pod behind.
 func (s *Server) removePodIfEmpty(slug string) {

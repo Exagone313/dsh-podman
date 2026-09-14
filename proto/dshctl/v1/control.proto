@@ -11,6 +11,7 @@ service OrchestratorControl {
   rpc CreateWorkspace(CreateWorkspaceRequest) returns (Workspace);
   rpc DescribeWorkspace(DescribeWorkspaceRequest) returns (Workspace);
   rpc ListWorkspaces(ListWorkspacesRequest) returns (ListWorkspacesResponse);
+  rpc RemoveWorkspace(RemoveWorkspaceRequest) returns (RemoveWorkspaceResponse);
   rpc ListImages(ListImagesRequest) returns (ListImagesResponse);
   rpc GetImage(GetImageRequest) returns (Image);
   rpc BuildImage(BuildImageRequest) returns (Image);
@@ -52,6 +53,8 @@ message ProjectMount {
 }
 message CreateWorkspaceRequest { string workspace_slug = 1; string image_id = 2; repeated ProjectMount mounts = 3; map<string, string> env = 4; map<string, string> secret_env = 5; string project_name = 6; }
 message DescribeWorkspaceRequest { string workspace_slug = 1; }
+message RemoveWorkspaceRequest { string workspace_slug = 1; }
+message RemoveWorkspaceResponse {}
 message ListWorkspacesRequest {}
 message ListWorkspacesResponse { repeated Workspace workspaces = 1; }
 message Workspace {

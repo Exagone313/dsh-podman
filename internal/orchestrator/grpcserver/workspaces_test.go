@@ -183,3 +183,57 @@ func TestCreateWorkspaceRequiresProjectName(t *testing.T) {
 		}
 	}
 }
+
+func TestRemoveWorkspaceRemovesPodAndRecord(t *testing.T) {
+	store := newTestStore(t)
+	if err := store.SaveWorkspaces([]state.Workspace{{
+		WorkspaceSlug: testWorkspaceSlug,
+		ContainerName: testDefaultContainer,
+		ImageID:       "arch",
+		Status:        "running",
+		Containers: []state.Container{{
+			Name: "default", PodmanName: testDefaultContainer, ImageID: "arch", Status: "running",
+		}},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	fake := newFakePodman()
+	server := &Server{Store: store, Podman: fake, SocketsRoot: t.TempDir(), Logger: silentLogger()}
+
+	if _, err := server.RemoveWorkspace(context.Background(), &ctl.RemoveWorkspaceRequest{WorkspaceSlug: testWorkspaceSlug}); err != nil {
+		t.Fatal(err)
+	}
+	if !sameStrings(fake.removedPods, []string{podNameFor(testWorkspaceSlug)}) {
+		t.Fatalf("pod not removed: %#v", fake.removedPods)
+	}
+	if !sameStrings(fake.removedSocketDirs, []string{testDefaultContainer}) {
+		t.Fatalf("socket dir not removed: %#v", fake.removedSocketDirs)
+	}
+	workspaces, err := store.Workspaces()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(workspaces) != 0 {
+		t.Fatalf("workspace not dropped: %#v", workspaces)
+	}
+	// Idempotent: a second call succeeds and still removes the (absent) pod.
+	if _, err := server.RemoveWorkspace(context.Background(), &ctl.RemoveWorkspaceRequest{WorkspaceSlug: testWorkspaceSlug}); err != nil {
+		t.Fatalf("second RemoveWorkspace: %v", err)
+	}
+}
+
+func TestRemoveWorkspaceRejectsInvalidSlug(t *testing.T) {
+	server := &Server{Store: newTestStore(t), Podman: newFakePodman(), Logger: silentLogger()}
+	_, err := server.RemoveWorkspace(context.Background(), &ctl.RemoveWorkspaceRequest{WorkspaceSlug: "nope"})
+	if status.Code(err) != codes.InvalidArgument {
+		t.Fatalf("expected InvalidArgument, got %v", err)
+	}
+}
+
+func TestRemoveWorkspaceWithoutPodman(t *testing.T) {
+	server := &Server{Store: newTestStore(t), Logger: silentLogger()}
+	_, err := server.RemoveWorkspace(context.Background(), &ctl.RemoveWorkspaceRequest{WorkspaceSlug: testWorkspaceSlug})
+	if status.Code(err) != codes.FailedPrecondition {
+		t.Fatalf("expected FailedPrecondition, got %v", err)
+	}
+}

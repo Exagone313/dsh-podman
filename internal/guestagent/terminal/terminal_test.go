@@ -9,6 +9,8 @@ import (
 	"syscall"
 	"testing"
 	"time"
+
+	"github.com/Exagone313/dsh-podman/internal/guestagent/childenv"
 )
 
 // collectUntil drains PTY output until marker appears, failing on timeout.
@@ -33,7 +35,7 @@ func collectUntil(t *testing.T, output <-chan []byte, marker string, timeout tim
 }
 
 func TestStartRejectsEmptyArgv(t *testing.T) {
-	manager := NewManager()
+	manager := NewManager(childenv.NewPaths())
 	for _, argv := range [][]string{nil, {}, {""}} {
 		if _, err := manager.Start(argv, "", nil, 0, 0); err == nil {
 			t.Fatalf("accepted argv %#v", argv)
@@ -42,7 +44,7 @@ func TestStartRejectsEmptyArgv(t *testing.T) {
 }
 
 func TestSessionEchoInspectAndTerminate(t *testing.T) {
-	manager := NewManager()
+	manager := NewManager(childenv.NewPaths())
 	session, err := manager.Start([]string{"/bin/sh"}, "", nil, 24, 80)
 	if err != nil {
 		t.Fatal(err)
@@ -83,7 +85,7 @@ func TestSessionEchoInspectAndTerminate(t *testing.T) {
 }
 
 func TestSessionExitsOnCommandCompletion(t *testing.T) {
-	manager := NewManager()
+	manager := NewManager(childenv.NewPaths())
 	session, err := manager.Start([]string{"/bin/sh", "-c", "exit 7"}, "", nil, 24, 80)
 	if err != nil {
 		t.Fatal(err)
@@ -100,7 +102,7 @@ func TestSessionExitsOnCommandCompletion(t *testing.T) {
 }
 
 func TestSignalForegroundUnknownSignal(t *testing.T) {
-	manager := NewManager()
+	manager := NewManager(childenv.NewPaths())
 	session, err := manager.Start([]string{"/bin/sh"}, "", nil, 24, 80)
 	if err != nil {
 		t.Fatal(err)
@@ -115,7 +117,7 @@ func TestSignalForegroundUnknownSignal(t *testing.T) {
 }
 
 func TestManagerStopAll(t *testing.T) {
-	manager := NewManager()
+	manager := NewManager(childenv.NewPaths())
 	session, err := manager.Start([]string{"/bin/sh"}, "", nil, 24, 80)
 	if err != nil {
 		t.Fatal(err)

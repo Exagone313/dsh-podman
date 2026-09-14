@@ -24,9 +24,12 @@ type Manager struct {
 	mu        sync.Mutex
 	nextID    uint64
 	processes map[string]*Process
+	paths     *childenv.Paths
 }
 
-func NewManager() *Manager { return &Manager{processes: make(map[string]*Process)} }
+func NewManager(paths *childenv.Paths) *Manager {
+	return &Manager{processes: make(map[string]*Process), paths: paths}
+}
 
 func (m *Manager) Start(ctx context.Context, argv []string, cwd string, env map[string]string, unset ...string) (*Process, error) {
 	if len(argv) == 0 || argv[0] == "" {
@@ -36,7 +39,7 @@ func (m *Manager) Start(ctx context.Context, argv []string, cwd string, env map[
 	cmd.Dir = cwd
 	// Always set the environment explicitly: leaving cmd.Env nil would make
 	// the child inherit the agent's own, reserved variables included.
-	cmd.Env = childenv.Build(env, unset...)
+	cmd.Env = childenv.Build(m.paths, env, unset...)
 	proc := &Process{Argv: append([]string(nil), argv...), Command: cmd}
 	m.mu.Lock()
 	m.nextID++

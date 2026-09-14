@@ -71,9 +71,12 @@ type daemon struct {
 type Manager struct {
 	mu      sync.Mutex
 	daemons map[string]*daemon
+	paths   *childenv.Paths
 }
 
-func NewManager() *Manager { return &Manager{daemons: make(map[string]*daemon)} }
+func NewManager(paths *childenv.Paths) *Manager {
+	return &Manager{daemons: make(map[string]*daemon), paths: paths}
+}
 
 // credentialFor returns the process credential described by opts, or nil when
 // no identity override was requested.
@@ -148,9 +151,9 @@ func (m *Manager) Start(name string, argv []string, cwd string, env map[string]s
 	cmd := exec.CommandContext(context.Background(), argv[0], argv[1:]...)
 	cmd.Dir = cwd
 	if opts.IsolatedEnv {
-		cmd.Env = childenv.BuildIsolated(envCopy)
+		cmd.Env = childenv.BuildIsolated(m.paths, envCopy)
 	} else {
-		cmd.Env = childenv.Build(envCopy)
+		cmd.Env = childenv.Build(m.paths, envCopy)
 	}
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	if cred := credentialFor(opts); cred != nil {

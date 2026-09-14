@@ -10,6 +10,7 @@ import (
 	"time"
 
 	guest "github.com/Exagone313/dsh-podman/internal/genproto/dshguest/v1"
+	"github.com/Exagone313/dsh-podman/internal/guestagent/childenv"
 	"github.com/Exagone313/dsh-podman/internal/guestagent/daemon"
 	"github.com/Exagone313/dsh-podman/internal/guestagent/exec"
 	workspacefs "github.com/Exagone313/dsh-podman/internal/guestagent/fs"
@@ -26,10 +27,18 @@ type Server struct {
 	Daemons   *daemon.Manager
 	Terminals *terminal.Manager
 	FS        *workspacefs.WorkspaceFS
+	// Paths holds the additions prepended to every child's PATH.
+	Paths *childenv.Paths
 }
 
 func New() *Server {
-	return &Server{Processes: exec.NewManager(), Daemons: daemon.NewManager(), Terminals: terminal.NewManager()}
+	paths := childenv.NewPaths()
+	return &Server{
+		Processes: exec.NewManager(paths),
+		Daemons:   daemon.NewManager(paths),
+		Terminals: terminal.NewManager(paths),
+		Paths:     paths,
+	}
 }
 
 func (s *Server) WithFS(filesystem *workspacefs.WorkspaceFS) *Server { s.FS = filesystem; return s }

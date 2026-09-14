@@ -195,9 +195,12 @@ func outcomeFromWait(err error) Outcome {
 type Manager struct {
 	mu       sync.Mutex
 	sessions map[int]*Session
+	paths    *childenv.Paths
 }
 
-func NewManager() *Manager { return &Manager{sessions: make(map[int]*Session)} }
+func NewManager(paths *childenv.Paths) *Manager {
+	return &Manager{sessions: make(map[int]*Session), paths: paths}
+}
 
 // Start launches argv on a fresh PTY with the given working directory and
 // environment, then registers the session.
@@ -209,7 +212,7 @@ func (m *Manager) Start(argv []string, cwd string, env map[string]string, rows, 
 	cmd.Dir = cwd
 	// Build already withholds the agent's reserved variables; TERM is added so
 	// the child does not inherit a dumb or missing terminal type.
-	cmd.Env = append(childenv.Build(env), "TERM=xterm-256color")
+	cmd.Env = append(childenv.Build(m.paths, env), "TERM=xterm-256color")
 	size := &pty.Winsize{Rows: rows, Cols: cols}
 	if size.Rows == 0 {
 		size.Rows = 24

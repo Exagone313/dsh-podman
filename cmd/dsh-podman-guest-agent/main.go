@@ -47,6 +47,10 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+	paths, err := guestPaths(os.Getenv("DSH_PODMAN_GUEST_PATHS"))
+	if err != nil {
+		panic(err)
+	}
 	filesystem, err := workspacefs.New(append(
 		[]workspacefs.Mount{{Virtual: root, Host: root}},
 		extra...,
@@ -58,7 +62,9 @@ func main() {
 		grpc.ChainUnaryInterceptor(auth.Unary(token), recovery.Unary(logger)),
 		grpc.ChainStreamInterceptor(auth.Stream(token), recovery.Stream(logger)),
 	)
-	guest.RegisterWorkspaceGuestAgentServer(server, grpcserver.New().WithFS(filesystem))
+	agent := grpcserver.New().WithFS(filesystem)
+	agent.Paths.Set(paths)
+	guest.RegisterWorkspaceGuestAgentServer(server, agent)
 	logger.Info("guest agent listening", "socket", socket)
 	if err := server.Serve(listener); err != nil {
 		panic(err)
@@ -90,4 +96,17 @@ func guestMounts(encoded string) ([]workspacefs.Mount, error) {
 		})
 	}
 	return mounts, nil
+}
+
+// guestPaths decodes the orchestrator-provided DSH_PODMAN_GUEST_PATHS value
+// into the PATH additions the agent prepends to every child, or nil when unset.
+func guestPaths(encoded string) ([]string, error) {
+	if encoded == "" {
+		return nil, nil
+	}
+	var paths []string
+	if err := json.Unmarshal([]byte(encoded), &paths); err != nil {
+		return nil, fmt.Errorf("decode DSH_PODMAN_GUEST_PATHS: %w", err)
+	}
+	return paths, nil
 }

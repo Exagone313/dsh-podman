@@ -10,6 +10,8 @@ import (
 	"syscall"
 	"testing"
 	"time"
+
+	"github.com/Exagone313/dsh-podman/internal/guestagent/childenv"
 )
 
 func findInfo(m *Manager, name string) *Daemon {
@@ -43,7 +45,7 @@ func cleanupDaemon(t *testing.T, m *Manager, name string) {
 }
 
 func TestStartRejectsEmptyArgv(t *testing.T) {
-	m := NewManager()
+	m := NewManager(childenv.NewPaths())
 	if _, err := m.Start("a", nil, "", nil, StartOptions{}); err == nil {
 		t.Fatal("expected error for empty argv")
 	}
@@ -53,7 +55,7 @@ func TestStartRejectsEmptyArgv(t *testing.T) {
 }
 
 func TestStartRequiresName(t *testing.T) {
-	m := NewManager()
+	m := NewManager(childenv.NewPaths())
 	if _, err := m.Start("", []string{"true"}, "", nil, StartOptions{}); err == nil {
 		t.Fatal("expected an error for an empty daemon name")
 	}
@@ -66,7 +68,7 @@ func TestStartRequiresName(t *testing.T) {
 func TestStartWithholdsReservedEnv(t *testing.T) {
 	t.Setenv("DSH_PODMAN_GUEST_TOKEN", "super-secret")
 	t.Setenv("DSH_PODMAN_PROJECTS_ROOT", "/projects")
-	m := NewManager()
+	m := NewManager(childenv.NewPaths())
 	name, err := m.Start("printenv", []string{"env"}, "", map[string]string{"FOO": "bar"}, StartOptions{})
 	if err != nil {
 		t.Fatal(err)
@@ -95,7 +97,7 @@ func TestStartWithholdsReservedEnv(t *testing.T) {
 func TestStartIsolatedEnv(t *testing.T) {
 	t.Setenv("HOME", "/root")
 	t.Setenv("INHERITED", "leak")
-	m := NewManager()
+	m := NewManager(childenv.NewPaths())
 	name, err := m.Start("printenv", []string{"env"}, "", map[string]string{"FOO": "bar"}, StartOptions{IsolatedEnv: true})
 	if err != nil {
 		t.Fatal(err)
@@ -118,7 +120,7 @@ func TestStartIsolatedEnv(t *testing.T) {
 }
 
 func TestStartRejectsInvalidNames(t *testing.T) {
-	m := NewManager()
+	m := NewManager(childenv.NewPaths())
 	for _, name := range []string{"-foo", "foo bar", "a/b", "foo@bar", strings.Repeat("a", 65)} {
 		if _, err := m.Start(name, []string{"true"}, "", nil, StartOptions{}); err == nil {
 			t.Errorf("expected error for name %q", name)
@@ -127,7 +129,7 @@ func TestStartRejectsInvalidNames(t *testing.T) {
 }
 
 func TestStartErrAlreadyRunning(t *testing.T) {
-	m := NewManager()
+	m := NewManager(childenv.NewPaths())
 	name, err := m.Start("long", []string{"sleep", "30"}, "", nil, StartOptions{})
 	if err != nil {
 		t.Fatal(err)
@@ -139,7 +141,7 @@ func TestStartErrAlreadyRunning(t *testing.T) {
 }
 
 func TestStartStopNonRunningReturnsNil(t *testing.T) {
-	m := NewManager()
+	m := NewManager(childenv.NewPaths())
 	name, err := m.Start("quick", []string{"true"}, "", nil, StartOptions{})
 	if err != nil {
 		t.Fatal(err)
@@ -151,7 +153,7 @@ func TestStartStopNonRunningReturnsNil(t *testing.T) {
 }
 
 func TestShortLivedCommandExitsZero(t *testing.T) {
-	m := NewManager()
+	m := NewManager(childenv.NewPaths())
 	name, err := m.Start("greet", []string{"sh", "-c", "echo hi; sleep 0.05"}, "", nil, StartOptions{})
 	if err != nil {
 		t.Fatal(err)
@@ -176,7 +178,7 @@ func TestShortLivedCommandExitsZero(t *testing.T) {
 }
 
 func TestStopTerminates(t *testing.T) {
-	m := NewManager()
+	m := NewManager(childenv.NewPaths())
 	name, err := m.Start("sleeper", []string{"sleep", "30"}, "", nil, StartOptions{})
 	if err != nil {
 		t.Fatal(err)
@@ -189,7 +191,7 @@ func TestStopTerminates(t *testing.T) {
 }
 
 func TestStopAll(t *testing.T) {
-	m := NewManager()
+	m := NewManager(childenv.NewPaths())
 	for _, name := range []string{"b", "a"} {
 		if _, err := m.Start(name, []string{"sleep", "30"}, "", nil, StartOptions{}); err != nil {
 			t.Fatal(err)
@@ -207,14 +209,14 @@ func TestStopAll(t *testing.T) {
 }
 
 func TestStopAllNoDaemons(t *testing.T) {
-	m := NewManager()
+	m := NewManager(childenv.NewPaths())
 	if stopped := m.StopAll(syscall.SIGTERM); len(stopped) != 0 {
 		t.Fatalf("StopAll on empty manager returned %v", stopped)
 	}
 }
 
 func TestRestartReruns(t *testing.T) {
-	m := NewManager()
+	m := NewManager(childenv.NewPaths())
 	name, err := m.Start("worker", []string{"sh", "-c", "echo one; sleep 1"}, "", nil, StartOptions{})
 	if err != nil {
 		t.Fatal(err)
@@ -233,7 +235,7 @@ func TestRestartReruns(t *testing.T) {
 }
 
 func TestLogsTail(t *testing.T) {
-	m := NewManager()
+	m := NewManager(childenv.NewPaths())
 	name, err := m.Start("tailer", []string{"sh", "-c", "printf 'abcdefghij'"}, "", nil, StartOptions{})
 	if err != nil {
 		t.Fatal(err)
@@ -249,7 +251,7 @@ func TestLogsTail(t *testing.T) {
 }
 
 func TestUnknownDaemon(t *testing.T) {
-	m := NewManager()
+	m := NewManager(childenv.NewPaths())
 	if err := m.Stop("nope", syscall.SIGTERM); !errors.Is(err, ErrUnknown) {
 		t.Fatalf("Stop: %v", err)
 	}
@@ -262,7 +264,7 @@ func TestUnknownDaemon(t *testing.T) {
 }
 
 func TestListSortedByNames(t *testing.T) {
-	m := NewManager()
+	m := NewManager(childenv.NewPaths())
 	for _, name := range []string{"zebra", "alpha", "mike"} {
 		if _, err := m.Start(name, []string{"true"}, "", nil, StartOptions{}); err != nil {
 			t.Fatal(err)
@@ -322,7 +324,7 @@ func TestStartWithUidRunsAsUser(t *testing.T) {
 	if !CanSwitchUser() {
 		t.Skip("requires uid switching")
 	}
-	m := NewManager()
+	m := NewManager(childenv.NewPaths())
 	uid := uint32(1000)
 	name, err := m.Start("uidtest", []string{"id", "-u"}, "", nil, StartOptions{Uid: &uid})
 	if err != nil {
@@ -349,7 +351,7 @@ func TestStartUidOnlyDefaultsGid(t *testing.T) {
 	if !CanSwitchUser() {
 		t.Skip("requires uid switching")
 	}
-	m := NewManager()
+	m := NewManager(childenv.NewPaths())
 	uid := uint32(1000)
 	name, err := m.Start("uidgidtest", []string{"sh", "-c", "id -g"}, "", nil, StartOptions{Uid: &uid})
 	if err != nil {

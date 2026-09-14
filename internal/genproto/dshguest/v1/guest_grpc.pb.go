@@ -31,6 +31,8 @@ const (
 	WorkspaceGuestAgent_ReadDir_FullMethodName        = "/dshguest.v1.WorkspaceGuestAgent/ReadDir"
 	WorkspaceGuestAgent_Mkdir_FullMethodName          = "/dshguest.v1.WorkspaceGuestAgent/Mkdir"
 	WorkspaceGuestAgent_Delete_FullMethodName         = "/dshguest.v1.WorkspaceGuestAgent/Delete"
+	WorkspaceGuestAgent_SetPaths_FullMethodName       = "/dshguest.v1.WorkspaceGuestAgent/SetPaths"
+	WorkspaceGuestAgent_GetPaths_FullMethodName       = "/dshguest.v1.WorkspaceGuestAgent/GetPaths"
 	WorkspaceGuestAgent_StartDaemon_FullMethodName    = "/dshguest.v1.WorkspaceGuestAgent/StartDaemon"
 	WorkspaceGuestAgent_ListDaemons_FullMethodName    = "/dshguest.v1.WorkspaceGuestAgent/ListDaemons"
 	WorkspaceGuestAgent_StopDaemon_FullMethodName     = "/dshguest.v1.WorkspaceGuestAgent/StopDaemon"
@@ -52,6 +54,8 @@ type WorkspaceGuestAgentClient interface {
 	ReadDir(ctx context.Context, in *ReadDirRequest, opts ...grpc.CallOption) (*ReadDirResponse, error)
 	Mkdir(ctx context.Context, in *MkdirRequest, opts ...grpc.CallOption) (*MkdirResponse, error)
 	Delete(ctx context.Context, in *DeleteRequest, opts ...grpc.CallOption) (*DeleteResponse, error)
+	SetPaths(ctx context.Context, in *SetPathsRequest, opts ...grpc.CallOption) (*PathsResponse, error)
+	GetPaths(ctx context.Context, in *GetPathsRequest, opts ...grpc.CallOption) (*PathsResponse, error)
 	StartDaemon(ctx context.Context, in *StartDaemonRequest, opts ...grpc.CallOption) (*DaemonInfo, error)
 	ListDaemons(ctx context.Context, in *ListDaemonsRequest, opts ...grpc.CallOption) (*ListDaemonsResponse, error)
 	StopDaemon(ctx context.Context, in *StopDaemonRequest, opts ...grpc.CallOption) (*StopDaemonResponse, error)
@@ -164,6 +168,26 @@ func (c *workspaceGuestAgentClient) Delete(ctx context.Context, in *DeleteReques
 	return out, nil
 }
 
+func (c *workspaceGuestAgentClient) SetPaths(ctx context.Context, in *SetPathsRequest, opts ...grpc.CallOption) (*PathsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(PathsResponse)
+	err := c.cc.Invoke(ctx, WorkspaceGuestAgent_SetPaths_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *workspaceGuestAgentClient) GetPaths(ctx context.Context, in *GetPathsRequest, opts ...grpc.CallOption) (*PathsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(PathsResponse)
+	err := c.cc.Invoke(ctx, WorkspaceGuestAgent_GetPaths_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *workspaceGuestAgentClient) StartDaemon(ctx context.Context, in *StartDaemonRequest, opts ...grpc.CallOption) (*DaemonInfo, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(DaemonInfo)
@@ -249,6 +273,8 @@ type WorkspaceGuestAgentServer interface {
 	ReadDir(context.Context, *ReadDirRequest) (*ReadDirResponse, error)
 	Mkdir(context.Context, *MkdirRequest) (*MkdirResponse, error)
 	Delete(context.Context, *DeleteRequest) (*DeleteResponse, error)
+	SetPaths(context.Context, *SetPathsRequest) (*PathsResponse, error)
+	GetPaths(context.Context, *GetPathsRequest) (*PathsResponse, error)
 	StartDaemon(context.Context, *StartDaemonRequest) (*DaemonInfo, error)
 	ListDaemons(context.Context, *ListDaemonsRequest) (*ListDaemonsResponse, error)
 	StopDaemon(context.Context, *StopDaemonRequest) (*StopDaemonResponse, error)
@@ -289,6 +315,12 @@ func (UnimplementedWorkspaceGuestAgentServer) Mkdir(context.Context, *MkdirReque
 }
 func (UnimplementedWorkspaceGuestAgentServer) Delete(context.Context, *DeleteRequest) (*DeleteResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method Delete not implemented")
+}
+func (UnimplementedWorkspaceGuestAgentServer) SetPaths(context.Context, *SetPathsRequest) (*PathsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method SetPaths not implemented")
+}
+func (UnimplementedWorkspaceGuestAgentServer) GetPaths(context.Context, *GetPathsRequest) (*PathsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetPaths not implemented")
 }
 func (UnimplementedWorkspaceGuestAgentServer) StartDaemon(context.Context, *StartDaemonRequest) (*DaemonInfo, error) {
 	return nil, status.Error(codes.Unimplemented, "method StartDaemon not implemented")
@@ -447,6 +479,42 @@ func _WorkspaceGuestAgent_Delete_Handler(srv interface{}, ctx context.Context, d
 	return interceptor(ctx, in, info, handler)
 }
 
+func _WorkspaceGuestAgent_SetPaths_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SetPathsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(WorkspaceGuestAgentServer).SetPaths(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: WorkspaceGuestAgent_SetPaths_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(WorkspaceGuestAgentServer).SetPaths(ctx, req.(*SetPathsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _WorkspaceGuestAgent_GetPaths_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetPathsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(WorkspaceGuestAgentServer).GetPaths(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: WorkspaceGuestAgent_GetPaths_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(WorkspaceGuestAgentServer).GetPaths(ctx, req.(*GetPathsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _WorkspaceGuestAgent_StartDaemon_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(StartDaemonRequest)
 	if err := dec(in); err != nil {
@@ -588,6 +656,14 @@ var WorkspaceGuestAgent_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Delete",
 			Handler:    _WorkspaceGuestAgent_Delete_Handler,
+		},
+		{
+			MethodName: "SetPaths",
+			Handler:    _WorkspaceGuestAgent_SetPaths_Handler,
+		},
+		{
+			MethodName: "GetPaths",
+			Handler:    _WorkspaceGuestAgent_GetPaths_Handler,
 		},
 		{
 			MethodName: "StartDaemon",

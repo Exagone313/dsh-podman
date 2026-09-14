@@ -9,10 +9,12 @@ import (
 	"slices"
 	"strings"
 	"testing"
+
+	"github.com/Exagone313/dsh-podman/internal/guestagent/childenv"
 )
 
 func TestStartRejectsEmptyArgv(t *testing.T) {
-	manager := NewManager()
+	manager := NewManager(childenv.NewPaths())
 	for _, argv := range [][]string{nil, {}, {""}} {
 		if _, err := manager.Start(context.Background(), argv, "", nil); err == nil {
 			t.Fatalf("accepted argv %#v", argv)
@@ -21,7 +23,7 @@ func TestStartRejectsEmptyArgv(t *testing.T) {
 }
 
 func TestStartAssignsSequentialIDs(t *testing.T) {
-	manager := NewManager()
+	manager := NewManager(childenv.NewPaths())
 	first, err := manager.Start(context.Background(), []string{"echo", "hi"}, "/tmp", nil)
 	if err != nil {
 		t.Fatal(err)
@@ -39,7 +41,7 @@ func TestStartAssignsSequentialIDs(t *testing.T) {
 }
 
 func TestListAndRemove(t *testing.T) {
-	manager := NewManager()
+	manager := NewManager(childenv.NewPaths())
 	process, err := manager.Start(context.Background(), []string{"sleep", "1"}, "", nil)
 	if err != nil {
 		t.Fatal(err)
@@ -55,7 +57,7 @@ func TestListAndRemove(t *testing.T) {
 }
 
 func TestStartSetsEnv(t *testing.T) {
-	manager := NewManager()
+	manager := NewManager(childenv.NewPaths())
 	process, err := manager.Start(context.Background(), []string{"env"}, "", map[string]string{"FOO": "bar"})
 	if err != nil {
 		t.Fatal(err)
@@ -79,7 +81,7 @@ func TestStartSetsEnv(t *testing.T) {
 // reserved variables and all.
 func TestStartAlwaysSetsEnv(t *testing.T) {
 	t.Setenv("PATH", "/usr/bin")
-	manager := NewManager()
+	manager := NewManager(childenv.NewPaths())
 	process, err := manager.Start(context.Background(), []string{"env"}, "", nil)
 	if err != nil {
 		t.Fatal(err)
@@ -98,7 +100,7 @@ func TestStartAlwaysSetsEnv(t *testing.T) {
 func TestStartWithholdsReservedEnv(t *testing.T) {
 	t.Setenv("DSH_PODMAN_GUEST_TOKEN", "super-secret")
 	t.Setenv("DSH_PODMAN_PROJECTS_ROOT", "/projects")
-	manager := NewManager()
+	manager := NewManager(childenv.NewPaths())
 	for _, env := range []map[string]string{nil, {"FOO": "bar"}} {
 		process, err := manager.Start(context.Background(), []string{"env"}, "", env)
 		if err != nil {
@@ -113,7 +115,7 @@ func TestStartWithholdsReservedEnv(t *testing.T) {
 }
 
 func TestListCopiesProcesses(t *testing.T) {
-	manager := NewManager()
+	manager := NewManager(childenv.NewPaths())
 	if _, err := manager.Start(context.Background(), []string{"true"}, "", nil); err != nil {
 		t.Fatal(err)
 	}
@@ -125,7 +127,7 @@ func TestListCopiesProcesses(t *testing.T) {
 }
 
 func TestStartCopiesArgv(t *testing.T) {
-	manager := NewManager()
+	manager := NewManager(childenv.NewPaths())
 	argv := []string{"echo", "x"}
 	process, err := manager.Start(context.Background(), argv, "", nil)
 	if err != nil {
@@ -138,7 +140,7 @@ func TestStartCopiesArgv(t *testing.T) {
 }
 
 func TestStartUsesConfiguredWorkingDirectory(t *testing.T) {
-	manager := NewManager()
+	manager := NewManager(childenv.NewPaths())
 	process, err := manager.Start(context.Background(), []string{"pwd"}, "/srv", nil)
 	if err != nil {
 		t.Fatal(err)
@@ -149,7 +151,7 @@ func TestStartUsesConfiguredWorkingDirectory(t *testing.T) {
 }
 
 func TestStartPropagatesCommandInArgv(t *testing.T) {
-	manager := NewManager()
+	manager := NewManager(childenv.NewPaths())
 	process, err := manager.Start(context.Background(), []string{"bash", "-c", "echo hi"}, "", nil)
 	if err != nil {
 		t.Fatal(err)

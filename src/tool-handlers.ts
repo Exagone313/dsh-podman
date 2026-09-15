@@ -47,6 +47,31 @@ function failOnSearchError(
   throw new Error(detail === "" ? `${tool} search failed (ripgrep exit code 2)` : detail);
 }
 
+// The terminal environment the harness's shell executors impose on every
+// command (`ENV_OVERRIDES` in dsh-bash-local), so a container command sees the
+// same non-interactive terminal as the built-in `bash`.
+const ENV_OVERRIDES = {
+  NO_COLOR: "1",
+  TERM: "dumb",
+  PAGER: "cat",
+  GIT_PAGER: "cat",
+};
+
+// managedEnv layers a container command's environment exactly like the
+// harness's shell executors: the terminal overrides first, then the caller's
+// entries, then the managed `DSH_*` snapshot last, so a caller cannot displace
+// a harness-owned fact. Without the snapshot, `container_bash` would see a
+// different command-visible environment than the built-in `bash`, which
+// collects it through `ctx.shellEnv`.
+function managedEnv(
+  ctx: any,
+  exec: any,
+  env: unknown,
+): Record<string, string> {
+  const managed = ctx?.get?.("shellEnv")?.collect?.(exec) ?? {};
+  return { ...ENV_OVERRIDES, ...(env as Record<string, string> | undefined), ...managed };
+}
+
 // containerTarget resolves a container-scoped file target through the plugin's
 // own filesystem provider, so the container file tools share the harness's file
 // contracts (the read-before-write guard, the binary rejection, and the same
@@ -196,26 +221,26 @@ export const toolHandlers: Record<
     });
     return { removed: input.container };
   },
-  container_bash: async (resolver, input, exec) => {
+  container_bash: async (resolver, input, exec, ctx) => {
     const sessionCwd = currentCwd(exec);
     const binding = await resolveToolBinding(resolver, sessionCwd, input.container);
     return runExec(
       binding,
       ["bash", "-c", input.command],
       guestCwd(input.workdir, sessionCwd, binding),
-      input.env,
+      managedEnv(ctx, exec, input.env),
       input.timeoutMs,
       identityFromInput(input),
     );
   },
-  container_exec: async (resolver, input, exec) => {
+  container_exec: async (resolver, input, exec, ctx) => {
     const sessionCwd = currentCwd(exec);
     const binding = await resolveToolBinding(resolver, sessionCwd, input.container);
     return runExec(
       binding,
       input.argv,
       guestCwd(input.workdir, sessionCwd, binding),
-      input.env,
+      managedEnv(ctx, exec, input.env),
       input.timeoutMs,
       identityFromInput(input),
     );

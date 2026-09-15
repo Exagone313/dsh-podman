@@ -38,8 +38,9 @@ const RUNTIME_WITH_BUILTINS =
   "ones, and the container-scoped tools address them by logical name within " +
   "the current workspace. There is no host shell — never describe their " +
   "output as the host's — and host paths do not exist. Because `bash` and " +
-  "`container_bash` run in that one container, a command sees the same " +
-  "filesystem either way, and matching output is never evidence of a host " +
+  "`container_bash` run in that one container with the same command-visible " +
+  "environment, a command sees the same environment and filesystem either " +
+  "way, and matching output is never evidence of a host " +
   "shell. Containers share the host kernel, so `uname -a`, `uname -r`, and " +
   "`/proc/version` do report the host kernel; the " +
   "container's own identity shows in `hostname`, `/etc/os-release`, and " +

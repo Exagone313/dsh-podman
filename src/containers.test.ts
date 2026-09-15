@@ -348,6 +348,58 @@ test("container_bash enforces timeoutMs", async () => {
   assert.equal(signaled.signal, "SIGTERM");
 });
 
+test("container commands inherit the managed shell environment", async () => {
+  const exec = { agent: { session: { header: { cwd: "/projects/team" } } } };
+  const ctx = {
+    get: (name: string) =>
+      name === "shellEnv"
+        ? {
+            collect: () => ({
+              DSH_HOME: "/dsh",
+              DSH_SHELL: "1",
+              DSH_SESSION_ID: "s1",
+            }),
+          }
+        : undefined,
+  };
+  const bash = guestExecRecorder();
+  await toolHandlers.container_bash(
+    bash.resolver as never,
+    {
+      container: "default",
+      command: "env",
+      description: "x",
+      env: { TERM: "xterm", DSH_SESSION_ID: "spoofed" },
+    },
+    exec,
+    ctx,
+  );
+  assert.deepEqual(
+    bash.starts[0].env,
+    {
+      // The terminal overrides come first, the caller's entry beats them, and
+      // the managed DSH_* snapshot displaces the caller's spoofed session id.
+      NO_COLOR: "1",
+      TERM: "xterm",
+      PAGER: "cat",
+      GIT_PAGER: "cat",
+      DSH_HOME: "/dsh",
+      DSH_SHELL: "1",
+      DSH_SESSION_ID: "s1",
+    },
+  );
+
+  const run = guestExecRecorder();
+  await toolHandlers.container_exec(
+    run.resolver as never,
+    { container: "default", argv: ["env"], description: "x" },
+    exec,
+    ctx,
+  );
+  assert.equal(run.starts[0].env?.DSH_SESSION_ID, "s1");
+  assert.equal(run.starts[0].env?.TERM, "dumb");
+});
+
 test("container_grep resolves its search path like a shell would", async () => {
   const exec = { agent: { session: { header: { cwd: "/projects/team" } } } };
 
@@ -464,7 +516,7 @@ test("podmanRuntimeSection names only the tools the agent has", () => {
   // built-in shell and container_bash run in one container, and identical uname
   // output is the shared kernel, not a host shell.
   assert.match(full, /container: "default"/);
-  assert.match(full, /sees the same filesystem/);
+  assert.match(full, /sees the same environment and filesystem/);
   assert.match(full, /share the host kernel/);
   assert.match(full, /hostname/);
   assert.match(full, /\/etc\/os-release/);

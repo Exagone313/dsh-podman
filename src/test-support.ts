@@ -282,6 +282,7 @@ export function guestExecRecorder(defaultCwd?: string, stdout?: string) {
   const starts: {
     argv: string[];
     cwd?: string;
+    env?: Record<string, string>;
     uid?: number;
     gid?: number;
     groups?: number[];
@@ -297,6 +298,7 @@ export function guestExecRecorder(defaultCwd?: string, stdout?: string) {
           starts.push({
             argv: message.start.argv,
             cwd: message.start.cwd,
+            env: message.start.env,
             ...(message.start.uid !== undefined
               ? { uid: message.start.uid.value }
               : {}),

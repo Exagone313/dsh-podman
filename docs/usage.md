@@ -105,6 +105,13 @@ Environment variables are not treated as secrets, so the approval reason and
 reserved and rejected, since the orchestrator uses that namespace for
 guest-agent wiring.
 
+`container_bash` and `container_exec` run with the same command-visible
+environment as the built-in `bash`: the harness's managed `DSH_*` facts
+(`DSH_HOME`, `DSH_SHELL`, `DSH_SESSION_ID`, `DSH_WEB_URL`) and its
+non-interactive terminal overrides (`NO_COLOR`, `TERM=dumb`, `PAGER=cat`,
+`GIT_PAGER=cat`). A caller's `env` entry beats an override but cannot displace a
+managed `DSH_*` fact.
+
 ### Images
 
 | Tool                  | Params                          | Description                                                                                                                       |

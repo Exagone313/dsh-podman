@@ -206,7 +206,9 @@ test("command tools pass an optional uid, gid, and groups", async () => {
     { container: "default", command: "id", uid: 1000 },
     exec,
   );
-  assert.deepEqual(bash.starts[0], { argv: ["bash", "-c", "id"], cwd: "/projects/team", uid: 1000 });
+  // The managed environment is asserted separately; this pins the identity.
+  const { env: _bashEnv, ...bashStart } = bash.starts[0];
+  assert.deepEqual(bashStart, { argv: ["bash", "-c", "id"], cwd: "/projects/team", uid: 1000 });
 
   const run = guestExecRecorder("/projects/team");
   await toolHandlers.container_exec(
@@ -214,7 +216,8 @@ test("command tools pass an optional uid, gid, and groups", async () => {
     { container: "default", argv: ["id"], uid: 1000, gid: 2000, groups: [3000, 4000] },
     exec,
   );
-  assert.deepEqual(run.starts[0], {
+  const { env: _runEnv, ...runStart } = run.starts[0];
+  assert.deepEqual(runStart, {
     argv: ["id"],
     cwd: "/projects/team",
     uid: 1000,

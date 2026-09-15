@@ -79,6 +79,11 @@ bash 进程）的 `env` 映射；`container_exec` 和 `daemon_start` 已经接�
 `container_list` 显示变量的**键**。以 `DSH_PODMAN`
 开头的键被保留并被拒绝，因为编排器将该命名空间用于 guest-agent 接线。
 
+`container_bash` 和 `container_exec` 使用与内置 `bash`
+相同的命令可见环境运行：harness 托管的 `DSH_*`
+事实（`DSH_HOME`、`DSH_SHELL`、`DSH_SESSION_ID`、`DSH_WEB_URL`）及其非交互式终端覆盖项（`NO_COLOR`、`TERM=dumb`、`PAGER=cat`、`GIT_PAGER=cat`）。调用方的
+`env` 条目会覆盖终端覆盖项，但无法取代托管的 `DSH_*` 事实。
+
 ### 镜像
 
 | 工具                  | 参数                            | 描述                                                                                 |

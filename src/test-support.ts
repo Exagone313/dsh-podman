@@ -202,7 +202,7 @@ export function secretBearingResolver() {
 
 // Stubs the guest agent's streaming ReadFile/WriteFile calls, recording the
 // paths the tools ask for.
-export function guestFileRecorder(content = "hello") {
+export function guestFileRecorder(content = "hello", exists = true) {
   const reads: string[] = [];
   const writes: { path: string; content: string }[] = [];
   const mkdirs: string[] = [];
@@ -222,13 +222,18 @@ export function guestFileRecorder(content = "hello") {
       return { cancel() {} };
     },
     stat: (_request: any, _metadata: unknown, callback: any) => {
-      callback(null, {
-        exists: true,
-        isDir: false,
-        size: Buffer.byteLength(content),
-        modifiedAt: "1",
-        mode: 0o644,
-      });
+      callback(
+        null,
+        exists
+          ? {
+              exists: true,
+              isDir: false,
+              size: Buffer.byteLength(content),
+              modifiedAt: "1",
+              mode: 0o644,
+            }
+          : { exists: false },
+      );
       return { cancel() {} };
     },
     writeFile: (
@@ -260,11 +265,14 @@ export function guestFileRecorder(content = "hello") {
 }
 
 // fakeToolContext is the minimal cordis context the container file tools need:
-// the plugin's real filesystem provider over the given resolver, and the fs
-// observation waterfalls stubbed to "no intent" (an unconditional write).
+// the plugin's real filesystem provider over the given resolver, the fs
+// observation waterfalls stubbed to "no intent" (an unconditional write), and
+// an `emit` that records the `fs/observed` events the tools report.
 export function fakeToolContext(resolver: any): any {
+  const observed: { target: any; observation: any }[] = [];
   return {
     fs: createFilesystemProvider(resolver),
+    observed,
     async waterfall(
       _name: string,
       _target: any,
@@ -273,7 +281,9 @@ export function fakeToolContext(resolver: any): any {
     ) {
       return await next();
     },
-    emit() {},
+    emit(event: string, target: any, observation: any) {
+      if (event === "fs/observed") observed.push({ target, observation });
+    },
   };
 }
 

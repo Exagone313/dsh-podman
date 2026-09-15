@@ -6,6 +6,7 @@ import {
   type ExecIdentity,
   bytesText,
   currentCwd,
+  fsError,
   guestCwd,
   outputLines,
   resolveGuestPath,
@@ -247,7 +248,23 @@ export const toolHandlers: Record<
   },
   container_read: async (resolver, input, exec, ctx) => {
     const target = await containerTarget(ctx, input.file_path, input.container, exec);
+    // Mirror the harness's read tool: stat first so a miss is FS_NOT_FOUND and
+    // a directory is FS_NOT_REGULAR_FILE, then record the read. The observation
+    // is what satisfies the read-before-write guard for a later
+    // container_write/container_edit on the same path.
+    const info = await ctx.fs.stat(target, exec?.signal);
+    if (info === undefined) {
+      ctx.emit("fs/observed", target, { kind: "absent" }, exec);
+      throw fsError("FS_NOT_FOUND", `cannot read "${target.displayPath}": not found`);
+    }
+    if (info.type !== "file") {
+      throw fsError(
+        "FS_NOT_REGULAR_FILE",
+        `cannot read "${target.displayPath}": not a regular file`,
+      );
+    }
     const content = await ctx.fs.readText(target, exec?.signal);
+    ctx.emit("fs/observed", target, { kind: "present", version: info.version }, exec);
     return sliceLines(content, input.offset, input.limit);
   },
   container_write: async (resolver, input, exec, ctx) => {

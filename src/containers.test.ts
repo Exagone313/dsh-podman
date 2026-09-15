@@ -241,6 +241,42 @@ test("container_read applies offset and limit like the built-in read tool", asyn
   );
 });
 
+test("container_read records the read so a later write needs no re-read", async () => {
+  const exec = { agent: { session: { header: { cwd: "/projects/team" } } } };
+  const { resolver } = guestFileRecorder("hello\n");
+  const ctx = fakeToolContext(resolver);
+  assert.equal(
+    await toolHandlers.container_read(
+      resolver as never,
+      { container: "default", file_path: "f" },
+      exec,
+      ctx,
+    ),
+    "hello\n",
+  );
+  assert.equal(ctx.observed.length, 1, "a successful read reports one observation");
+  assert.equal(ctx.observed[0].target.displayPath, "/projects/team/f");
+  assert.equal(ctx.observed[0].observation.kind, "present");
+  assert.match(ctx.observed[0].observation.version, /^agent:/);
+});
+
+test("container_read reports a missing file and records it as absent", async () => {
+  const exec = { agent: { session: { header: { cwd: "/projects/team" } } } };
+  const { resolver } = guestFileRecorder("", false);
+  const ctx = fakeToolContext(resolver);
+  await assert.rejects(
+    () =>
+      toolHandlers.container_read(
+        resolver as never,
+        { container: "default", file_path: "gone" },
+        exec,
+        ctx,
+      ),
+    (error: any) => error.code === "FS_NOT_FOUND" && /not found/.test(error.message),
+  );
+  assert.deepEqual(ctx.observed[0].observation, { kind: "absent" });
+});
+
 test("container_edit requires a unique match unless replace_all is set", async () => {
   const exec = { agent: { session: { header: { cwd: "/projects/team" } } } };
 

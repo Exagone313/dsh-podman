@@ -147,10 +147,11 @@ harness's built-in `bash`/`read`/`write`/`edit`/`glob`/`grep` tools (plus the
 target through the same filesystem provider as the built-in file tools, so they
 share their behavior: binary files are refused with the same error, and the
 read-before-write guard (refusing to overwrite a file that was not read in the
-session) applies to them exactly as it does to the built-in `write` and `edit`.
-The plugin also registers a dedicated UI row for every one of its tools (icon,
-title, summary, and result body), so they render like the built-in tools rather
-than as a generic `Tool call` row.
+session) applies to them exactly as it does to the built-in `write` and `edit` —
+a `container_read` satisfies that guard for the path it read, just like the
+built-in `read`. The plugin also registers a dedicated UI row for every one of
+its tools (icon, title, summary, and result body), so they render like the
+built-in tools rather than as a generic `Tool call` row.
 
 Paths and working directories may be absolute or relative. A relative value is
 resolved against the session's working directory, which is also where the

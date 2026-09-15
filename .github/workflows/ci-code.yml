@@ -5,7 +5,10 @@
 name: CI (code)
 
 on:
+  # Branches only: a tag push runs the release workflow alone.
   push:
+    branches:
+      - "**"
     paths-ignore:
       - "**/*.md"
       - "Containerfile.dsh"

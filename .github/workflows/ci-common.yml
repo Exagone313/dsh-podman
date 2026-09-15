@@ -5,7 +5,10 @@
 name: CI (common)
 
 on:
+  # Branches only: a tag push runs the release workflow alone.
   push:
+    branches:
+      - "**"
   pull_request:
   workflow_dispatch:
 

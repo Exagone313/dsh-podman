@@ -5,7 +5,10 @@
 name: CI (docs)
 
 on:
+  # Branches only: a tag push runs the release workflow alone.
   push:
+    branches:
+      - "**"
     paths:
       - "**/*.md"
   pull_request:

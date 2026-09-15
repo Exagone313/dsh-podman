@@ -5,7 +5,10 @@
 name: CI (dsh image)
 
 on:
+  # Branches only: a tag push runs the release workflow alone.
   push:
+    branches:
+      - "**"
     paths:
       - "Containerfile.dsh"
   pull_request:

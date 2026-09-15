@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/Exagone313/dsh-podman/internal/guestagent/childenv"
+	"github.com/Exagone313/dsh-podman/internal/guestagent/identity"
 )
 
 var (
@@ -78,58 +79,9 @@ func NewManager(paths *childenv.Paths) *Manager {
 	return &Manager{daemons: make(map[string]*daemon), paths: paths}
 }
 
-// credentialFor returns the process credential described by opts, or nil when
-// no identity override was requested.
-func credentialFor(opts StartOptions) *syscall.Credential {
-	if opts.Uid == nil && opts.Gid == nil && len(opts.Groups) == 0 {
-		return nil
-	}
-	cred := &syscall.Credential{}
-	switch {
-	case opts.Uid != nil && opts.Gid != nil:
-		cred.Uid = *opts.Uid
-		cred.Gid = *opts.Gid
-	case opts.Uid != nil:
-		cred.Uid = *opts.Uid
-		cred.Gid = *opts.Uid
-	case opts.Gid != nil:
-		cred.Gid = *opts.Gid
-	}
-	if len(opts.Groups) > 0 {
-		cred.Groups = opts.Groups
-	}
-	return cred
-}
-
-// effectiveUid returns the uid the daemon will run as given opts.
-func effectiveUid(opts StartOptions) uint32 {
-	if opts.Uid != nil {
-		return *opts.Uid
-	}
-	return 0
-}
-
-// CanSwitchUser reports whether the current process can start commands as a
-// different uid/gid. It requires root with the setuid/setgid capabilities,
-// which sandboxes and some CI containers lack, so tests that exercise a real
-// identity switch skip when it is unavailable.
-func CanSwitchUser() bool {
-	if os.Geteuid() != 0 {
-		return false
-	}
-	cmd := exec.Command("true")
-	cmd.SysProcAttr = &syscall.SysProcAttr{Credential: &syscall.Credential{Uid: 1, Gid: 1}}
-	return cmd.Run() == nil
-}
-
-func effectiveGid(opts StartOptions) uint32 {
-	if opts.Gid != nil {
-		return *opts.Gid
-	}
-	if opts.Uid != nil {
-		return *opts.Uid
-	}
-	return 0
+// requestedIdentity returns the process identity opts describes.
+func (opts StartOptions) requestedIdentity() identity.Options {
+	return identity.Options{Uid: opts.Uid, Gid: opts.Gid, Groups: opts.Groups}
 }
 
 func (m *Manager) Start(name string, argv []string, cwd string, env map[string]string, opts StartOptions) (string, error) {
@@ -156,7 +108,8 @@ func (m *Manager) Start(name string, argv []string, cwd string, env map[string]s
 		cmd.Env = childenv.Build(m.paths, envCopy)
 	}
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
-	if cred := credentialFor(opts); cred != nil {
+	requested := opts.requestedIdentity()
+	if cred := identity.Credential(requested); cred != nil {
 		cmd.SysProcAttr.Credential = cred
 	}
 	registered := &daemon{
@@ -165,8 +118,8 @@ func (m *Manager) Start(name string, argv []string, cwd string, env map[string]s
 			Argv:      append([]string(nil), argv...),
 			Running:   true,
 			StartedAt: time.Now().UTC().Format(time.RFC3339),
-			Uid:       effectiveUid(opts),
-			Gid:       effectiveGid(opts),
+			Uid:       requested.EffectiveUid(),
+			Gid:       requested.EffectiveGid(),
 		},
 		cmd:         cmd,
 		cwd:         cwd,

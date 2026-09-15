@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/Exagone313/dsh-podman/internal/guestagent/childenv"
+	"github.com/Exagone313/dsh-podman/internal/guestagent/identity"
 )
 
 func findInfo(m *Manager, name string) *Daemon {
@@ -278,50 +279,8 @@ func TestListSortedByNames(t *testing.T) {
 	}
 }
 
-func TestCredentialFor(t *testing.T) {
-	uid1000 := uint32(1000)
-	gid2000 := uint32(2000)
-	cases := []struct {
-		name string
-		opts StartOptions
-		want *syscall.Credential
-	}{
-		{name: "neither", opts: StartOptions{}, want: nil},
-		{name: "groups only", opts: StartOptions{Groups: []uint32{3000}}, want: &syscall.Credential{Groups: []uint32{3000}}},
-		{name: "uid only", opts: StartOptions{Uid: &uid1000}, want: &syscall.Credential{Uid: 1000, Gid: 1000}},
-		{name: "gid only", opts: StartOptions{Gid: &gid2000}, want: &syscall.Credential{Uid: 0, Gid: 2000}},
-		{name: "both", opts: StartOptions{Uid: &uid1000, Gid: &gid2000}, want: &syscall.Credential{Uid: 1000, Gid: 2000}},
-		{name: "uid with groups", opts: StartOptions{Uid: &uid1000, Groups: []uint32{3000}}, want: &syscall.Credential{Uid: 1000, Gid: 1000, Groups: []uint32{3000}}},
-	}
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			got := credentialFor(tc.opts)
-			if tc.want == nil {
-				if got != nil {
-					t.Fatalf("credentialFor() = %+v, want nil", got)
-				}
-				return
-			}
-			if got == nil {
-				t.Fatalf("credentialFor() = nil, want %+v", tc.want)
-			}
-			if got.Uid != tc.want.Uid || got.Gid != tc.want.Gid {
-				t.Fatalf("credentialFor() = %+v, want uid=%d gid=%d", got, tc.want.Uid, tc.want.Gid)
-			}
-			if len(got.Groups) != len(tc.want.Groups) {
-				t.Fatalf("credentialFor() groups = %v, want %v", got.Groups, tc.want.Groups)
-			}
-			for i := range tc.want.Groups {
-				if got.Groups[i] != tc.want.Groups[i] {
-					t.Fatalf("credentialFor() groups = %v, want %v", got.Groups, tc.want.Groups)
-				}
-			}
-		})
-	}
-}
-
 func TestStartWithUidRunsAsUser(t *testing.T) {
-	if !CanSwitchUser() {
+	if !identity.CanSwitchUser() {
 		t.Skip("requires uid switching")
 	}
 	m := NewManager(childenv.NewPaths())
@@ -348,7 +307,7 @@ func TestStartWithUidRunsAsUser(t *testing.T) {
 }
 
 func TestStartUidOnlyDefaultsGid(t *testing.T) {
-	if !CanSwitchUser() {
+	if !identity.CanSwitchUser() {
 		t.Skip("requires uid switching")
 	}
 	m := NewManager(childenv.NewPaths())

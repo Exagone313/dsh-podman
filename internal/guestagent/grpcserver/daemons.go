@@ -26,6 +26,7 @@ func daemonInfoProto(d daemon.Daemon) *guest.DaemonInfo {
 		StoppedAt: d.StoppedAt,
 		Uid:       d.Uid,
 		Gid:       d.Gid,
+		Groups:    append([]uint32(nil), d.Groups...),
 	}
 }
 

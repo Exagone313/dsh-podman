@@ -42,6 +42,7 @@ type Daemon struct {
 	StoppedAt string
 	Uid       uint32
 	Gid       uint32
+	Groups    []uint32
 }
 
 // StartOptions carries optional process identity settings. When neither Uid
@@ -120,6 +121,7 @@ func (m *Manager) Start(name string, argv []string, cwd string, env map[string]s
 			StartedAt: time.Now().UTC().Format(time.RFC3339),
 			Uid:       requested.EffectiveUid(),
 			Gid:       requested.EffectiveGid(),
+			Groups:    append([]uint32(nil), opts.Groups...),
 		},
 		cmd:         cmd,
 		cwd:         cwd,
@@ -165,7 +167,9 @@ func (m *Manager) List() []Daemon {
 	defer m.mu.Unlock()
 	result := make([]Daemon, 0, len(m.daemons))
 	for _, d := range m.daemons {
-		result = append(result, d.info)
+		info := d.info
+		info.Groups = append([]uint32(nil), d.info.Groups...)
+		result = append(result, info)
 	}
 	sort.Slice(result, func(i, j int) bool { return result[i].Name < result[j].Name })
 	return result

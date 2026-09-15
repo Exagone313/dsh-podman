@@ -6,6 +6,7 @@ package grpcserver
 
 import (
 	"context"
+	"slices"
 	"strings"
 	"testing"
 
@@ -20,6 +21,33 @@ func TestStopDaemonRejectsUnknownSignal(t *testing.T) {
 	server := New()
 	if _, err := server.StopDaemon(context.Background(), &guest.StopDaemonRequest{Name: "any", Signal: "SIGBOGUS"}); status.Code(err) != codes.InvalidArgument {
 		t.Fatalf("expected InvalidArgument, got %v", err)
+	}
+}
+
+func TestStartDaemonReportsGroups(t *testing.T) {
+	server := New()
+	info, err := server.StartDaemon(context.Background(), &guest.StartDaemonRequest{
+		Name:   "web",
+		Argv:   []string{"sh", "-c", "sleep 30"},
+		Groups: []uint32{3000, 4000},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(info.Groups, []uint32{3000, 4000}) {
+		t.Fatalf("groups not reported: %#v", info.Groups)
+	}
+	response, err := server.ListDaemons(context.Background(), &guest.ListDaemonsRequest{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, d := range response.Daemons {
+		if d.Name == "web" && !slices.Equal(d.Groups, []uint32{3000, 4000}) {
+			t.Fatalf("groups not listed: %#v", d.Groups)
+		}
+	}
+	if _, err := server.StopDaemon(context.Background(), &guest.StopDaemonRequest{Name: "web", Signal: "SIGKILL"}); err != nil {
+		t.Fatal(err)
 	}
 }
 

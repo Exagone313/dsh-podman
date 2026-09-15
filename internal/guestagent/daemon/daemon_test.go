@@ -6,6 +6,7 @@ package daemon
 
 import (
 	"errors"
+	"slices"
 	"strings"
 	"syscall"
 	"testing"
@@ -276,6 +277,22 @@ func TestListSortedByNames(t *testing.T) {
 		if got[i].Name < got[i-1].Name {
 			t.Fatalf("list not sorted: %v", got)
 		}
+	}
+}
+
+func TestListReportsGroups(t *testing.T) {
+	m := NewManager(childenv.NewPaths())
+	if _, err := m.Start("web", []string{"true"}, "", nil, StartOptions{Groups: []uint32{3000, 4000}}); err != nil {
+		t.Fatal(err)
+	}
+	got := m.List()
+	if len(got) != 1 || !slices.Equal(got[0].Groups, []uint32{3000, 4000}) {
+		t.Fatalf("groups not reported: %#v", got)
+	}
+	// The snapshot must not alias the stored slice.
+	got[0].Groups[0] = 9999
+	if again := m.List(); again[0].Groups[0] != 3000 {
+		t.Fatalf("list aliases the stored groups: %#v", again)
 	}
 }
 

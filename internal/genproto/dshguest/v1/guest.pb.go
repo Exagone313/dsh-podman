@@ -1544,6 +1544,7 @@ type DaemonInfo struct {
 	StoppedAt     string                 `protobuf:"bytes,6,opt,name=stopped_at,json=stoppedAt,proto3" json:"stopped_at,omitempty"`
 	Uid           uint32                 `protobuf:"varint,7,opt,name=uid,proto3" json:"uid,omitempty"`
 	Gid           uint32                 `protobuf:"varint,8,opt,name=gid,proto3" json:"gid,omitempty"`
+	Groups        []uint32               `protobuf:"varint,9,rep,packed,name=groups,proto3" json:"groups,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1632,6 +1633,13 @@ func (x *DaemonInfo) GetGid() uint32 {
 		return x.Gid
 	}
 	return 0
+}
+
+func (x *DaemonInfo) GetGroups() []uint32 {
+	if x != nil {
+		return x.Groups
+	}
+	return nil
 }
 
 type ListDaemonsRequest struct {
@@ -2827,7 +2835,7 @@ const file_dshguest_v1_guest_proto_rawDesc = "" +
 	"inheritEnv\x1a6\n" +
 	"\bEnvEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xcd\x01\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xe5\x01\n" +
 	"\n" +
 	"DaemonInfo\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x12\n" +
@@ -2839,7 +2847,8 @@ const file_dshguest_v1_guest_proto_rawDesc = "" +
 	"\n" +
 	"stopped_at\x18\x06 \x01(\tR\tstoppedAt\x12\x10\n" +
 	"\x03uid\x18\a \x01(\rR\x03uid\x12\x10\n" +
-	"\x03gid\x18\b \x01(\rR\x03gid\"\x14\n" +
+	"\x03gid\x18\b \x01(\rR\x03gid\x12\x16\n" +
+	"\x06groups\x18\t \x03(\rR\x06groups\"\x14\n" +
 	"\x12ListDaemonsRequest\"H\n" +
 	"\x13ListDaemonsResponse\x121\n" +
 	"\adaemons\x18\x01 \x03(\v2\x17.dshguest.v1.DaemonInfoR\adaemons\"?\n" +

@@ -58,7 +58,7 @@ message SetPathsRequest { repeated string paths = 1; }
 message GetPathsRequest {}
 message PathsResponse { repeated string paths = 1; string default_path = 2; }
 message StartDaemonRequest { string name = 1; repeated string argv = 2; string cwd = 3; map<string, string> env = 4; google.protobuf.Int32Value uid = 5; google.protobuf.Int32Value gid = 6; repeated uint32 groups = 7; google.protobuf.BoolValue inherit_env = 8; }
-message DaemonInfo { string name = 1; repeated string argv = 2; bool running = 3; int32 exit_code = 4; string started_at = 5; string stopped_at = 6; uint32 uid = 7; uint32 gid = 8; }
+message DaemonInfo { string name = 1; repeated string argv = 2; bool running = 3; int32 exit_code = 4; string started_at = 5; string stopped_at = 6; uint32 uid = 7; uint32 gid = 8; repeated uint32 groups = 9; }
 message ListDaemonsRequest {}
 message ListDaemonsResponse { repeated DaemonInfo daemons = 1; }
 message StopDaemonRequest { string name = 1; string signal = 2; }

@@ -104,6 +104,25 @@ test("publicDaemon omits the exit code while the daemon runs", () => {
   assert.equal(exited.exitCode, 3);
 });
 
+test("publicDaemon reports supplementary groups", () => {
+  const withGroups = publicDaemon({
+    name: "web",
+    argv: ["sleep", "600"],
+    running: true,
+    uid: 1000,
+    gid: 1000,
+    groups: [3000, 4000],
+  });
+  assert.deepEqual(withGroups.groups, [3000, 4000]);
+  const without = publicDaemon({
+    name: "web",
+    argv: ["sleep", "600"],
+    running: true,
+    groups: [],
+  });
+  assert.equal("groups" in without, false);
+});
+
 test("daemon_start returns a daemon info object", async () => {
   const resolver = {
     resolve: async () => ({

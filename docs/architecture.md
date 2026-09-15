@@ -100,7 +100,9 @@ when every mount that carries a mode is `read_only`. Otherwise the plugin asks
 through the approval service under the reserved tool name
 `dsh_podman_builtin_remount_read_only` — which the browser half renders with its
 own **Remount & run** labels — and, on approval, recreates the container with
-the read-write mounts forced read-only before running the tool.
+the read-write mounts forced read-only before running the tool. The harness's
+`sandbox_permissions` escalation is granted without prompting for the same
+reason: the widening it asks for has no effect here.
 
 Recreating a container or shutting down the orchestrator first asks the
 container's guest agent to gracefully stop its daemons (SIGTERM, ~10s grace)

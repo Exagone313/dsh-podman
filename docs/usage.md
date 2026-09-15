@@ -78,6 +78,10 @@ policy):
   is available); `container_start` asks only when `mounts` is passed.
 - **Full access** — tools run without approval prompts.
 
+The harness's `sandbox_permissions` argument (a one-shot sandbox widening, e.g.
+on `bash`) is accepted but has no effect here: the sandbox is bypassed inside
+the container, so the plugin grants the escalation without prompting.
+
 The prompt's reason is a full sentence naming the action and the objects it
 touches, quoting every identifier — for example
 `Add mount to container "web": volume "data" (read-only)`. It covers the

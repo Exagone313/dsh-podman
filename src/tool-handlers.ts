@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: MIT
 
 import {
+  type ExecIdentity,
   bytesText,
   currentCwd,
   guestCwd,
@@ -35,6 +36,42 @@ const GLOB_MAX_RESULTS = 100;
 // VCS metadata directories ripgrep must never descend into for a discovery
 // listing (`--no-ignore --hidden` would otherwise surface them).
 const GLOB_VCS_EXCLUDES = [".git", ".svn", ".hg", ".bzr", ".jj", ".sl"];
+
+// identityFromInput validates the optional uid/gid/groups identity a tool
+// accepts and returns it, or undefined when none was requested. Values are
+// numeric only: the container's /etc/passwd is on the read-only rootfs, so
+// there are no names to resolve.
+function identityFromInput(input: any): ExecIdentity | undefined {
+  const identity: ExecIdentity = {};
+  if (input.uid !== undefined) {
+    if (!Number.isInteger(input.uid) || input.uid < 0) {
+      throw new Error("uid must be an integer >= 0");
+    }
+    identity.uid = input.uid;
+  }
+  if (input.gid !== undefined) {
+    if (!Number.isInteger(input.gid) || input.gid < 0) {
+      throw new Error("gid must be an integer >= 0");
+    }
+    identity.gid = input.gid;
+  }
+  if (input.groups !== undefined) {
+    if (
+      !Array.isArray(input.groups) ||
+      input.groups.some(
+        (group: unknown) => !Number.isInteger(group) || (group as number) < 0,
+      )
+    ) {
+      throw new Error("groups must be an array of integers >= 0");
+    }
+    identity.groups = input.groups;
+  }
+  return identity.uid === undefined &&
+    identity.gid === undefined &&
+    identity.groups === undefined
+    ? undefined
+    : identity;
+}
 
 export const toolHandlers: Record<
   string,
@@ -139,6 +176,7 @@ export const toolHandlers: Record<
       guestCwd(input.workdir, sessionCwd, binding),
       input.env,
       input.timeoutMs,
+      identityFromInput(input),
     );
   },
   container_exec: async (resolver, input, exec) => {
@@ -150,6 +188,7 @@ export const toolHandlers: Record<
       guestCwd(input.workdir, sessionCwd, binding),
       input.env,
       input.timeoutMs,
+      identityFromInput(input),
     );
   },
   container_read: async (resolver, input, exec) => {
@@ -443,30 +482,10 @@ export const toolHandlers: Record<
     const cwd = guestCwd(input.cwd, sessionCwd, binding);
     if (cwd !== undefined) request.cwd = cwd;
     if (input.env !== undefined) request.env = input.env;
-    if (input.uid !== undefined) {
-      if (!Number.isInteger(input.uid) || input.uid < 0) {
-        throw new Error("uid must be an integer >= 0");
-      }
-      request.uid = { value: input.uid };
-    }
-    if (input.gid !== undefined) {
-      if (!Number.isInteger(input.gid) || input.gid < 0) {
-        throw new Error("gid must be an integer >= 0");
-      }
-      request.gid = { value: input.gid };
-    }
-    if (input.groups !== undefined) {
-      if (
-        !Array.isArray(input.groups) ||
-        input.groups.some(
-          (group: unknown) =>
-            !Number.isInteger(group) || (group as number) < 0,
-        )
-      ) {
-        throw new Error("groups must be an array of integers >= 0");
-      }
-      request.groups = input.groups;
-    }
+    const identity = identityFromInput(input);
+    if (identity?.uid !== undefined) request.uid = { value: identity.uid };
+    if (identity?.gid !== undefined) request.gid = { value: identity.gid };
+    if (identity?.groups !== undefined) request.groups = identity.groups;
     const info = await unaryGuest({ binding }, "startDaemon", request);
     return publicDaemon(info);
   },

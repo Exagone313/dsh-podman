@@ -192,6 +192,54 @@ test("command tools resolve a relative working directory", async () => {
   assert.equal(up.starts[0].cwd, "/projects/sibling");
 });
 
+test("command tools pass an optional uid, gid, and groups", async () => {
+  const exec = { agent: { session: { header: { cwd: "/projects/team" } } } };
+
+  const bash = guestExecRecorder("/projects/team");
+  await toolHandlers.container_bash(
+    bash.resolver as never,
+    { container: "default", command: "id", uid: 1000 },
+    exec,
+  );
+  assert.deepEqual(bash.starts[0], { argv: ["bash", "-c", "id"], cwd: "/projects/team", uid: 1000 });
+
+  const run = guestExecRecorder("/projects/team");
+  await toolHandlers.container_exec(
+    run.resolver as never,
+    { container: "default", argv: ["id"], uid: 1000, gid: 2000, groups: [3000, 4000] },
+    exec,
+  );
+  assert.deepEqual(run.starts[0], {
+    argv: ["id"],
+    cwd: "/projects/team",
+    uid: 1000,
+    gid: 2000,
+    groups: [3000, 4000],
+  });
+
+  // No identity leaves the command as the container's default user.
+  const none = guestExecRecorder("/projects/team");
+  await toolHandlers.container_exec(none.resolver as never, { container: "default", argv: ["id"] }, exec);
+  assert.equal("uid" in none.starts[0], false);
+  assert.equal("groups" in none.starts[0], false);
+
+  for (const bad of [
+    { uid: -1 },
+    { gid: -1 },
+    { groups: [1, -2] },
+    { groups: "1" },
+    { uid: 1.5 },
+  ]) {
+    await assert.rejects(
+      toolHandlers.container_exec(
+        guestExecRecorder("/projects/team").resolver as never,
+        { container: "default", argv: ["id"], ...bad },
+        exec,
+      ),
+    );
+  }
+});
+
 test("withoutHarnessSourceSection drops only the harness checkout section", () => {
   const assembly = {
     sections: [

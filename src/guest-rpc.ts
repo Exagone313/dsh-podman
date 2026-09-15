@@ -277,12 +277,21 @@ export async function readGuestFile(
 
 const READ_LIMIT = 2000;
 
+// The optional process identity a command may run as. Omitted fields mean "no
+// override"; groups is the complete supplementary set.
+export interface ExecIdentity {
+  uid?: number;
+  gid?: number;
+  groups?: number[];
+}
+
 export async function runExec(
   binding: { guest: any; token: string },
   argv: readonly string[],
   cwd?: string,
   env?: Record<string, string>,
   timeoutMs?: number,
+  identity?: ExecIdentity,
 ): Promise<{
   exitCode: number;
   signal: string | null;
@@ -337,6 +346,9 @@ export async function runExec(
         argv: remoteArgv(argv),
         cwd,
         env: env ?? {},
+        ...(identity?.uid !== undefined ? { uid: { value: identity.uid } } : {}),
+        ...(identity?.gid !== undefined ? { gid: { value: identity.gid } } : {}),
+        ...(identity?.groups !== undefined ? { groups: identity.groups } : {}),
       },
     });
     stream.end();

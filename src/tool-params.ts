@@ -78,6 +78,28 @@ const pathsParam = {
     "Complete ordered list of PATH additions, highest priority first. Replaces the current list; an empty list clears it.",
 };
 
+// The optional process identity a tool may request, shared by the tools that
+// can run a process as another user.
+const uidParam = {
+  type: "integer",
+  minimum: 0,
+  description: "Run the process as this uid (defaults to the container user).",
+};
+
+const gidParam = {
+  type: "integer",
+  minimum: 0,
+  description:
+    "Run the process as this gid. Defaults to the uid when uid is set.",
+};
+
+const groupsParam = {
+  type: "array",
+  items: { type: "integer", minimum: 0 },
+  description:
+    "Supplementary group ids; replaces the process's whole supplementary set.",
+};
+
 const descriptionParam = {
   type: "string",
   description:
@@ -376,6 +398,9 @@ export const containerBashParameters = {
     workdir: { type: "string", description: "Working directory." },
     timeoutMs: timeoutMsParam,
     env: envParam,
+    uid: uidParam,
+    gid: gidParam,
+    groups: groupsParam,
   },
   required: ["container", "command", "description"],
 };
@@ -393,6 +418,9 @@ export const containerExecParameters = {
     workdir: { type: "string", description: "Working directory." },
     timeoutMs: timeoutMsParam,
     env: envParam,
+    uid: uidParam,
+    gid: gidParam,
+    groups: groupsParam,
   },
   required: ["container", "argv", "description"],
 };
@@ -501,21 +529,9 @@ export const daemonStartParameters = {
     },
     cwd: { type: "string", description: "Working directory." },
     env: envParam,
-    uid: {
-      type: "integer",
-      minimum: 0,
-      description: "Run the daemon as this uid (defaults to the container user).",
-    },
-    gid: {
-      type: "integer",
-      minimum: 0,
-      description: "Run the daemon as this gid. Defaults to the uid when uid is set.",
-    },
-    groups: {
-      type: "array",
-      items: { type: "integer", minimum: 0 },
-      description: "Supplementary group ids.",
-    },
+    uid: uidParam,
+    gid: gidParam,
+    groups: groupsParam,
     inheritEnv: {
       type: "boolean",
       description:

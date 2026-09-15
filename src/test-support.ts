@@ -249,7 +249,13 @@ export function guestFileRecorder(content = "hello") {
 
 // Stubs the guest agent's streaming Exec call, recording the start message.
 export function guestExecRecorder(defaultCwd?: string, stdout?: string) {
-  const starts: { argv: string[]; cwd?: string }[] = [];
+  const starts: {
+    argv: string[];
+    cwd?: string;
+    uid?: number;
+    gid?: number;
+    groups?: number[];
+  }[] = [];
   const guest = {
     exec: () => {
       const handlers: Record<string, ((value?: unknown) => void)[]> = {};
@@ -258,7 +264,19 @@ export function guestExecRecorder(defaultCwd?: string, stdout?: string) {
           (handlers[event] ??= []).push(handler);
         },
         write(message: any) {
-          starts.push({ argv: message.start.argv, cwd: message.start.cwd });
+          starts.push({
+            argv: message.start.argv,
+            cwd: message.start.cwd,
+            ...(message.start.uid !== undefined
+              ? { uid: message.start.uid.value }
+              : {}),
+            ...(message.start.gid !== undefined
+              ? { gid: message.start.gid.value }
+              : {}),
+            ...(message.start.groups !== undefined
+              ? { groups: message.start.groups }
+              : {}),
+          });
         },
         end() {
           for (const handler of handlers.data ?? []) {

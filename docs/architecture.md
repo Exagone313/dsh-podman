@@ -82,7 +82,10 @@ working directory rather than reading an empty pipe). `container_glob` and
 `container_grep` also pass their resolved path to ripgrep as the search
 directory, never as a `--glob` pattern (a path containing `/` would never match
 one), and a ripgrep failure (exit code 2) is reported as a tool error rather
-than an empty result.
+than an empty result. Ripgrep anchors a `--glob` pattern containing `/` to the
+process working directory, so a discovery listing the harness starts with an
+absolute search root runs from that root: `glob`'s `pattern` then anchors to its
+`path` while the printed paths stay absolute.
 
 Project mounts resolve through symlinks and are confined to the projects root,
 so a symlink inside a writable project cannot redirect the bind mount to a path

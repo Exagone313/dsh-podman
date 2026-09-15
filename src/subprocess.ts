@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: MIT
 
 import { discardUnneededSpill, outputReader, spillTargetFor, splitEnv } from "./output-reader.js";
-import { remoteArgv, unaryGuest } from "./guest-rpc.js";
+import { globCwd, remoteArgv, unaryGuest } from "./guest-rpc.js";
 import { type WorkspaceResolver, metadata } from "./workspace-binding.js";
 import { randomUUID } from "node:crypto";
 import { PassThrough } from "node:stream";
@@ -91,6 +91,10 @@ export function createSubprocessProvider(resolver: WorkspaceResolver): Subproces
           killTimer.unref?.();
         }
       };
+      // A ripgrep discovery listing runs from its search root, so a pattern
+      // containing "/" anchors to the path the harness passed; the workspace
+      // binding still resolves from the caller's cwd.
+      const runCwd = globCwd(spec.argv, spec.cwd) ?? spec.cwd;
       const done = resolver.resolve(spec.cwd).then(
         (binding) =>
           new Promise<any>((resolveDone, reject) => {
@@ -137,7 +141,7 @@ export function createSubprocessProvider(resolver: WorkspaceResolver): Subproces
             stream.write({
               start: {
                 argv: remoteArgv(spec.argv),
-                cwd: spec.cwd,
+                cwd: runCwd,
                 env: env.env,
                 unsetEnv: env.unsetEnv,
                 // A caller that will not send stdin leaves the child on

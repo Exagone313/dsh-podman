@@ -458,6 +458,26 @@ export async function unaryGuest(
   });
 }
 
+// globCwd returns the working directory a ripgrep discovery listing must run
+// in, or undefined to keep the caller's. The harness's glob tool passes its
+// search path as an absolute positional root, but ripgrep anchors a `--glob`
+// pattern containing "/" to the process cwd, so a pattern like "sub/b.txt"
+// could never match an absolute root. Running the listing from the root anchors
+// the pattern to `path` while keeping the printed paths absolute, which is what
+// the harness renders against the session working directory.
+export function globCwd(argv: readonly string[], cwd: unknown): string | undefined {
+  const runner = argv[0];
+  if (runner === undefined || !/(?:^|\/)rg(?:\.exe)?$/.test(runner)) return undefined;
+  if (!argv.includes("--files")) return undefined;
+  const separator = argv.indexOf("--");
+  if (separator < 0) return undefined;
+  const roots = argv.slice(separator + 1);
+  if (roots.length !== 1) return undefined;
+  const root = roots[0];
+  if (typeof cwd !== "string" || cwd === "" || !isAbsolute(root)) return undefined;
+  return root;
+}
+
 // remoteArgv rewrites an argv for the guest's execution world: the harness's
 // bundled ripgrep becomes the guest's /usr/bin/rg, and a landlock-run sandbox
 // wrapper is unwrapped to the command it guards.

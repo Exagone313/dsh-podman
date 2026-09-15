@@ -195,7 +195,7 @@ export {
   createReadOnlyShellGate,
 } from "./read-only-shell.js";
 export { FilesystemProvider, createFilesystemProvider } from "./fs-provider.js";
-export { resolveGuestCwd, resolveGuestPath, remoteArgv } from "./guest-rpc.js";
+export { resolveGuestCwd, resolveGuestPath, remoteArgv, globCwd } from "./guest-rpc.js";
 export {
   inferMountKind,
   projectMountDestinationReason,

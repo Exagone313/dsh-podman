@@ -5,7 +5,55 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { FakeTerminalCall, fakeTerminalResolver, spawnGuest, spawnSpec } from "./test-support.js";
-import { createSubprocessProvider, outputReader, remoteArgv } from "./index.js";
+import { createSubprocessProvider, globCwd, outputReader, remoteArgv } from "./index.js";
+
+test("globCwd runs a discovery listing from its absolute search root", () => {
+  assert.equal(
+    globCwd(["rg", "--files", "--glob=sub/b.txt", "--", "/tmp/globtest"], "/projects/team"),
+    "/tmp/globtest",
+  );
+  assert.equal(
+    globCwd(["rg", "--files", "--glob=a", "--", "sub"], "/projects/team"),
+    undefined,
+    "a relative root keeps the caller's cwd",
+  );
+  assert.equal(
+    globCwd(["rg", "--files", "--glob=a"], "/projects/team"),
+    undefined,
+    "no search root keeps the caller's cwd",
+  );
+  assert.equal(
+    globCwd(["rg", "-n", "x", "--", "/tmp/x"], "/projects/team"),
+    undefined,
+    "only a discovery listing is re-anchored",
+  );
+  assert.equal(globCwd(["bash", "-c", "rg"], "/projects/team"), undefined);
+  assert.equal(
+    globCwd(["rg", "--files", "--", "/a", "/b"], "/projects/team"),
+    undefined,
+    "several search roots keep the caller's cwd",
+  );
+});
+
+test("subprocess provider runs a glob listing from its search root", async () => {
+  const fake = spawnGuest();
+  const provider = createSubprocessProvider(fake.resolver as any);
+  const handle = provider.spawn(
+    spawnSpec({
+      argv: ["rg", "--files", "--glob=sub/b.txt", "--", "/tmp/globtest"],
+    }),
+  );
+  await handle.done;
+  const start = fake.starts[0].start;
+  assert.equal(start.cwd, "/tmp/globtest");
+  assert.deepEqual(start.argv, [
+    "/usr/bin/rg",
+    "--files",
+    "--glob=sub/b.txt",
+    "--",
+    "/tmp/globtest",
+  ]);
+});
 
 test("remoteArgv remaps ripgrep onto the guest path", () => {
   assert.deepEqual(remoteArgv(["rg", "-n", "foo"]), [

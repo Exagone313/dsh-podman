@@ -12,8 +12,10 @@ import (
 	"testing"
 
 	guest "github.com/Exagone313/dsh-podman/internal/genproto/dshguest/v1"
+	"github.com/Exagone313/dsh-podman/internal/guestagent/identity"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/wrapperspb"
 )
 
 func TestValidateProcessID(t *testing.T) {
@@ -68,7 +70,7 @@ func TestSignalForName(t *testing.T) {
 
 func TestSignalRejectsUnknownName(t *testing.T) {
 	server := New()
-	process, err := server.Processes.Start(context.Background(), []string{"sleep", "60"}, "", nil)
+	process, err := server.Processes.Start(context.Background(), []string{"sleep", "60"}, "", nil, identity.Options{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -97,7 +99,7 @@ func TestSignalUnknownProcess(t *testing.T) {
 // took the whole agent down with it.
 func TestSignalUnstartedProcess(t *testing.T) {
 	server := New()
-	process, err := server.Processes.Start(context.Background(), []string{"sleep", "60"}, "", nil)
+	process, err := server.Processes.Start(context.Background(), []string{"sleep", "60"}, "", nil, identity.Options{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -116,7 +118,7 @@ func TestSignalUnstartedProcess(t *testing.T) {
 // the map for the agent's lifetime.
 func TestExecDropsProcessesItCannotStart(t *testing.T) {
 	server := New()
-	process, err := server.Processes.Start(context.Background(), []string{filepath.Join(t.TempDir(), "missing")}, "", nil)
+	process, err := server.Processes.Start(context.Background(), []string{filepath.Join(t.TempDir(), "missing")}, "", nil, identity.Options{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -175,6 +177,21 @@ func TestExecDiscardsSpillPastTheCap(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(root, "spill.log")); !os.IsNotExist(err) {
 		t.Fatalf("spill file should have been removed: %v", err)
+	}
+}
+
+func TestExecRejectsNegativeUid(t *testing.T) {
+	server, root := newTestServer(t)
+	for _, start := range []*guest.ExecStart{
+		{Argv: []string{"true"}, Cwd: root, Uid: wrapperspb.Int32(-1)},
+		{Argv: []string{"true"}, Cwd: root, Gid: wrapperspb.Int32(-1)},
+	} {
+		stream := &execStream{inputs: []*guest.ExecInput{{
+			Payload: &guest.ExecInput_Start{Start: start},
+		}}}
+		if err := server.Exec(stream); status.Code(err) != codes.InvalidArgument {
+			t.Fatalf("expected InvalidArgument, got %v", err)
+		}
 	}
 }
 

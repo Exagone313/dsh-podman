@@ -16,6 +16,7 @@ import (
 	"syscall"
 
 	guest "github.com/Exagone313/dsh-podman/internal/genproto/dshguest/v1"
+	"github.com/Exagone313/dsh-podman/internal/guestagent/identity"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -35,7 +36,15 @@ func (s *Server) Exec(stream guest.WorkspaceGuestAgent_ExecServer) error {
 		argv0 = argv[0]
 	}
 	slog.Info("guest agent Exec started", "argv0", argv0, "argc", len(argv))
-	process, err := s.Processes.Start(stream.Context(), start.GetArgv(), start.GetCwd(), start.GetEnv(), start.GetUnsetEnv()...)
+	uid, err := optionalID(start.GetUid(), "uid")
+	if err != nil {
+		return err
+	}
+	gid, err := optionalID(start.GetGid(), "gid")
+	if err != nil {
+		return err
+	}
+	process, err := s.Processes.Start(stream.Context(), start.GetArgv(), start.GetCwd(), start.GetEnv(), identity.Options{Uid: uid, Gid: gid, Groups: start.GetGroups()}, start.GetUnsetEnv()...)
 	if err != nil {
 		return status.Error(codes.InvalidArgument, err.Error())
 	}

@@ -54,20 +54,13 @@ func (s *Server) StartDaemon(_ context.Context, request *guest.StartDaemonReques
 			return nil, status.Error(codes.Internal, err.Error())
 		}
 	}
-	var uid, gid *uint32
-	if request.GetUid() != nil {
-		value := request.GetUid().GetValue()
-		if value < 0 {
-			return nil, status.Error(codes.InvalidArgument, "uid must not be negative")
-		}
-		uid = uint32Ptr(uint32(value))
+	uid, err := optionalID(request.GetUid(), "uid")
+	if err != nil {
+		return nil, err
 	}
-	if request.GetGid() != nil {
-		value := request.GetGid().GetValue()
-		if value < 0 {
-			return nil, status.Error(codes.InvalidArgument, "gid must not be negative")
-		}
-		gid = uint32Ptr(uint32(value))
+	gid, err := optionalID(request.GetGid(), "gid")
+	if err != nil {
+		return nil, err
 	}
 	name, err := s.Daemons.Start(request.GetName(), request.GetArgv(), request.GetCwd(), request.GetEnv(), daemon.StartOptions{Uid: uid, Gid: gid, Groups: request.GetGroups(), IsolatedEnv: request.GetInheritEnv() != nil && !request.GetInheritEnv().GetValue()})
 	if err != nil {
@@ -81,8 +74,6 @@ func (s *Server) StartDaemon(_ context.Context, request *guest.StartDaemonReques
 	}
 	return nil, status.Error(codes.Internal, "daemon registered but not found")
 }
-
-func uint32Ptr(value uint32) *uint32 { return &value }
 
 func (s *Server) ListDaemons(_ context.Context, _ *guest.ListDaemonsRequest) (*guest.ListDaemonsResponse, error) {
 	slog.Info("guest agent ListDaemons requested")

@@ -10,8 +10,10 @@ import (
 	"os/exec"
 	"strconv"
 	"sync"
+	"syscall"
 
 	"github.com/Exagone313/dsh-podman/internal/guestagent/childenv"
+	"github.com/Exagone313/dsh-podman/internal/guestagent/identity"
 )
 
 type Process struct {
@@ -31,7 +33,7 @@ func NewManager(paths *childenv.Paths) *Manager {
 	return &Manager{processes: make(map[string]*Process), paths: paths}
 }
 
-func (m *Manager) Start(ctx context.Context, argv []string, cwd string, env map[string]string, unset ...string) (*Process, error) {
+func (m *Manager) Start(ctx context.Context, argv []string, cwd string, env map[string]string, opts identity.Options, unset ...string) (*Process, error) {
 	if len(argv) == 0 || argv[0] == "" {
 		return nil, fmt.Errorf("argv must contain a command")
 	}
@@ -40,6 +42,11 @@ func (m *Manager) Start(ctx context.Context, argv []string, cwd string, env map[
 	// Always set the environment explicitly: leaving cmd.Env nil would make
 	// the child inherit the agent's own, reserved variables included.
 	cmd.Env = childenv.Build(m.paths, env, unset...)
+	// A requested identity is applied through the process credential; with no
+	// override the child keeps the agent's own identity.
+	if cred := identity.Credential(opts); cred != nil {
+		cmd.SysProcAttr = &syscall.SysProcAttr{Credential: cred}
+	}
 	proc := &Process{Argv: append([]string(nil), argv...), Command: cmd}
 	m.mu.Lock()
 	m.nextID++

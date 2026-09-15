@@ -116,6 +116,9 @@ type ExecStart struct {
 	UnsetEnv      []string               `protobuf:"bytes,4,rep,name=unset_env,json=unsetEnv,proto3" json:"unset_env,omitempty"`
 	SpillStdout   *SpillTarget           `protobuf:"bytes,5,opt,name=spill_stdout,json=spillStdout,proto3" json:"spill_stdout,omitempty"`
 	SpillStderr   *SpillTarget           `protobuf:"bytes,6,opt,name=spill_stderr,json=spillStderr,proto3" json:"spill_stderr,omitempty"`
+	Uid           *wrapperspb.Int32Value `protobuf:"bytes,7,opt,name=uid,proto3" json:"uid,omitempty"`
+	Gid           *wrapperspb.Int32Value `protobuf:"bytes,8,opt,name=gid,proto3" json:"gid,omitempty"`
+	Groups        []uint32               `protobuf:"varint,9,rep,packed,name=groups,proto3" json:"groups,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -188,6 +191,27 @@ func (x *ExecStart) GetSpillStdout() *SpillTarget {
 func (x *ExecStart) GetSpillStderr() *SpillTarget {
 	if x != nil {
 		return x.SpillStderr
+	}
+	return nil
+}
+
+func (x *ExecStart) GetUid() *wrapperspb.Int32Value {
+	if x != nil {
+		return x.Uid
+	}
+	return nil
+}
+
+func (x *ExecStart) GetGid() *wrapperspb.Int32Value {
+	if x != nil {
+		return x.Gid
+	}
+	return nil
+}
+
+func (x *ExecStart) GetGroups() []uint32 {
+	if x != nil {
+		return x.Groups
 	}
 	return nil
 }
@@ -2703,14 +2727,17 @@ const file_dshguest_v1_guest_proto_rawDesc = "" +
 	"\x05start\x18\x01 \x01(\v2\x16.dshguest.v1.ExecStartH\x00R\x05start\x12!\n" +
 	"\vstdin_chunk\x18\x02 \x01(\fH\x00R\n" +
 	"stdinChunkB\t\n" +
-	"\apayload\"\xb3\x02\n" +
+	"\apayload\"\xa9\x03\n" +
 	"\tExecStart\x12\x12\n" +
 	"\x04argv\x18\x01 \x03(\tR\x04argv\x12\x10\n" +
 	"\x03cwd\x18\x02 \x01(\tR\x03cwd\x121\n" +
 	"\x03env\x18\x03 \x03(\v2\x1f.dshguest.v1.ExecStart.EnvEntryR\x03env\x12\x1b\n" +
 	"\tunset_env\x18\x04 \x03(\tR\bunsetEnv\x12;\n" +
 	"\fspill_stdout\x18\x05 \x01(\v2\x18.dshguest.v1.SpillTargetR\vspillStdout\x12;\n" +
-	"\fspill_stderr\x18\x06 \x01(\v2\x18.dshguest.v1.SpillTargetR\vspillStderr\x1a6\n" +
+	"\fspill_stderr\x18\x06 \x01(\v2\x18.dshguest.v1.SpillTargetR\vspillStderr\x12-\n" +
+	"\x03uid\x18\a \x01(\v2\x1b.google.protobuf.Int32ValueR\x03uid\x12-\n" +
+	"\x03gid\x18\b \x01(\v2\x1b.google.protobuf.Int32ValueR\x03gid\x12\x16\n" +
+	"\x06groups\x18\t \x03(\rR\x06groups\x1a6\n" +
 	"\bEnvEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xad\x01\n" +
@@ -2973,61 +3000,63 @@ var file_dshguest_v1_guest_proto_depIdxs = []int32{
 	44, // 1: dshguest.v1.ExecStart.env:type_name -> dshguest.v1.ExecStart.EnvEntry
 	4,  // 2: dshguest.v1.ExecStart.spill_stdout:type_name -> dshguest.v1.SpillTarget
 	4,  // 3: dshguest.v1.ExecStart.spill_stderr:type_name -> dshguest.v1.SpillTarget
-	3,  // 4: dshguest.v1.ExecOutput.exit:type_name -> dshguest.v1.ExecExit
-	10, // 5: dshguest.v1.WriteFileChunk.start:type_name -> dshguest.v1.WriteFileStart
-	16, // 6: dshguest.v1.ReadDirResponse.entries:type_name -> dshguest.v1.DirEntry
-	45, // 7: dshguest.v1.StartDaemonRequest.env:type_name -> dshguest.v1.StartDaemonRequest.EnvEntry
-	47, // 8: dshguest.v1.StartDaemonRequest.uid:type_name -> google.protobuf.Int32Value
-	47, // 9: dshguest.v1.StartDaemonRequest.gid:type_name -> google.protobuf.Int32Value
-	48, // 10: dshguest.v1.StartDaemonRequest.inherit_env:type_name -> google.protobuf.BoolValue
-	25, // 11: dshguest.v1.ListDaemonsResponse.daemons:type_name -> dshguest.v1.DaemonInfo
-	36, // 12: dshguest.v1.TerminalInput.start:type_name -> dshguest.v1.TerminalStart
-	37, // 13: dshguest.v1.TerminalInput.resize:type_name -> dshguest.v1.TerminalResize
-	38, // 14: dshguest.v1.TerminalInput.signal:type_name -> dshguest.v1.TerminalSignal
-	46, // 15: dshguest.v1.TerminalStart.env:type_name -> dshguest.v1.TerminalStart.EnvEntry
-	40, // 16: dshguest.v1.TerminalOutput.started:type_name -> dshguest.v1.TerminalStarted
-	41, // 17: dshguest.v1.TerminalOutput.exit:type_name -> dshguest.v1.TerminalExit
-	42, // 18: dshguest.v1.TerminalOutput.foreground:type_name -> dshguest.v1.TerminalForeground
-	43, // 19: dshguest.v1.TerminalOutput.signalled:type_name -> dshguest.v1.TerminalSignalled
-	0,  // 20: dshguest.v1.WorkspaceGuestAgent.Exec:input_type -> dshguest.v1.ExecInput
-	5,  // 21: dshguest.v1.WorkspaceGuestAgent.Signal:input_type -> dshguest.v1.SignalRequest
-	7,  // 22: dshguest.v1.WorkspaceGuestAgent.ReadFile:input_type -> dshguest.v1.ReadFileRequest
-	9,  // 23: dshguest.v1.WorkspaceGuestAgent.WriteFile:input_type -> dshguest.v1.WriteFileChunk
-	12, // 24: dshguest.v1.WorkspaceGuestAgent.Stat:input_type -> dshguest.v1.StatRequest
-	14, // 25: dshguest.v1.WorkspaceGuestAgent.ReadDir:input_type -> dshguest.v1.ReadDirRequest
-	17, // 26: dshguest.v1.WorkspaceGuestAgent.Mkdir:input_type -> dshguest.v1.MkdirRequest
-	19, // 27: dshguest.v1.WorkspaceGuestAgent.Delete:input_type -> dshguest.v1.DeleteRequest
-	21, // 28: dshguest.v1.WorkspaceGuestAgent.SetPaths:input_type -> dshguest.v1.SetPathsRequest
-	22, // 29: dshguest.v1.WorkspaceGuestAgent.GetPaths:input_type -> dshguest.v1.GetPathsRequest
-	24, // 30: dshguest.v1.WorkspaceGuestAgent.StartDaemon:input_type -> dshguest.v1.StartDaemonRequest
-	26, // 31: dshguest.v1.WorkspaceGuestAgent.ListDaemons:input_type -> dshguest.v1.ListDaemonsRequest
-	28, // 32: dshguest.v1.WorkspaceGuestAgent.StopDaemon:input_type -> dshguest.v1.StopDaemonRequest
-	30, // 33: dshguest.v1.WorkspaceGuestAgent.StopAllDaemons:input_type -> dshguest.v1.StopAllDaemonsRequest
-	32, // 34: dshguest.v1.WorkspaceGuestAgent.RestartDaemon:input_type -> dshguest.v1.RestartDaemonRequest
-	33, // 35: dshguest.v1.WorkspaceGuestAgent.DaemonLogs:input_type -> dshguest.v1.DaemonLogsRequest
-	35, // 36: dshguest.v1.WorkspaceGuestAgent.Terminal:input_type -> dshguest.v1.TerminalInput
-	2,  // 37: dshguest.v1.WorkspaceGuestAgent.Exec:output_type -> dshguest.v1.ExecOutput
-	6,  // 38: dshguest.v1.WorkspaceGuestAgent.Signal:output_type -> dshguest.v1.SignalResponse
-	8,  // 39: dshguest.v1.WorkspaceGuestAgent.ReadFile:output_type -> dshguest.v1.ReadFileChunk
-	11, // 40: dshguest.v1.WorkspaceGuestAgent.WriteFile:output_type -> dshguest.v1.WriteFileResponse
-	13, // 41: dshguest.v1.WorkspaceGuestAgent.Stat:output_type -> dshguest.v1.StatResponse
-	15, // 42: dshguest.v1.WorkspaceGuestAgent.ReadDir:output_type -> dshguest.v1.ReadDirResponse
-	18, // 43: dshguest.v1.WorkspaceGuestAgent.Mkdir:output_type -> dshguest.v1.MkdirResponse
-	20, // 44: dshguest.v1.WorkspaceGuestAgent.Delete:output_type -> dshguest.v1.DeleteResponse
-	23, // 45: dshguest.v1.WorkspaceGuestAgent.SetPaths:output_type -> dshguest.v1.PathsResponse
-	23, // 46: dshguest.v1.WorkspaceGuestAgent.GetPaths:output_type -> dshguest.v1.PathsResponse
-	25, // 47: dshguest.v1.WorkspaceGuestAgent.StartDaemon:output_type -> dshguest.v1.DaemonInfo
-	27, // 48: dshguest.v1.WorkspaceGuestAgent.ListDaemons:output_type -> dshguest.v1.ListDaemonsResponse
-	29, // 49: dshguest.v1.WorkspaceGuestAgent.StopDaemon:output_type -> dshguest.v1.StopDaemonResponse
-	31, // 50: dshguest.v1.WorkspaceGuestAgent.StopAllDaemons:output_type -> dshguest.v1.StopAllDaemonsResponse
-	25, // 51: dshguest.v1.WorkspaceGuestAgent.RestartDaemon:output_type -> dshguest.v1.DaemonInfo
-	34, // 52: dshguest.v1.WorkspaceGuestAgent.DaemonLogs:output_type -> dshguest.v1.DaemonLogsResponse
-	39, // 53: dshguest.v1.WorkspaceGuestAgent.Terminal:output_type -> dshguest.v1.TerminalOutput
-	37, // [37:54] is the sub-list for method output_type
-	20, // [20:37] is the sub-list for method input_type
-	20, // [20:20] is the sub-list for extension type_name
-	20, // [20:20] is the sub-list for extension extendee
-	0,  // [0:20] is the sub-list for field type_name
+	47, // 4: dshguest.v1.ExecStart.uid:type_name -> google.protobuf.Int32Value
+	47, // 5: dshguest.v1.ExecStart.gid:type_name -> google.protobuf.Int32Value
+	3,  // 6: dshguest.v1.ExecOutput.exit:type_name -> dshguest.v1.ExecExit
+	10, // 7: dshguest.v1.WriteFileChunk.start:type_name -> dshguest.v1.WriteFileStart
+	16, // 8: dshguest.v1.ReadDirResponse.entries:type_name -> dshguest.v1.DirEntry
+	45, // 9: dshguest.v1.StartDaemonRequest.env:type_name -> dshguest.v1.StartDaemonRequest.EnvEntry
+	47, // 10: dshguest.v1.StartDaemonRequest.uid:type_name -> google.protobuf.Int32Value
+	47, // 11: dshguest.v1.StartDaemonRequest.gid:type_name -> google.protobuf.Int32Value
+	48, // 12: dshguest.v1.StartDaemonRequest.inherit_env:type_name -> google.protobuf.BoolValue
+	25, // 13: dshguest.v1.ListDaemonsResponse.daemons:type_name -> dshguest.v1.DaemonInfo
+	36, // 14: dshguest.v1.TerminalInput.start:type_name -> dshguest.v1.TerminalStart
+	37, // 15: dshguest.v1.TerminalInput.resize:type_name -> dshguest.v1.TerminalResize
+	38, // 16: dshguest.v1.TerminalInput.signal:type_name -> dshguest.v1.TerminalSignal
+	46, // 17: dshguest.v1.TerminalStart.env:type_name -> dshguest.v1.TerminalStart.EnvEntry
+	40, // 18: dshguest.v1.TerminalOutput.started:type_name -> dshguest.v1.TerminalStarted
+	41, // 19: dshguest.v1.TerminalOutput.exit:type_name -> dshguest.v1.TerminalExit
+	42, // 20: dshguest.v1.TerminalOutput.foreground:type_name -> dshguest.v1.TerminalForeground
+	43, // 21: dshguest.v1.TerminalOutput.signalled:type_name -> dshguest.v1.TerminalSignalled
+	0,  // 22: dshguest.v1.WorkspaceGuestAgent.Exec:input_type -> dshguest.v1.ExecInput
+	5,  // 23: dshguest.v1.WorkspaceGuestAgent.Signal:input_type -> dshguest.v1.SignalRequest
+	7,  // 24: dshguest.v1.WorkspaceGuestAgent.ReadFile:input_type -> dshguest.v1.ReadFileRequest
+	9,  // 25: dshguest.v1.WorkspaceGuestAgent.WriteFile:input_type -> dshguest.v1.WriteFileChunk
+	12, // 26: dshguest.v1.WorkspaceGuestAgent.Stat:input_type -> dshguest.v1.StatRequest
+	14, // 27: dshguest.v1.WorkspaceGuestAgent.ReadDir:input_type -> dshguest.v1.ReadDirRequest
+	17, // 28: dshguest.v1.WorkspaceGuestAgent.Mkdir:input_type -> dshguest.v1.MkdirRequest
+	19, // 29: dshguest.v1.WorkspaceGuestAgent.Delete:input_type -> dshguest.v1.DeleteRequest
+	21, // 30: dshguest.v1.WorkspaceGuestAgent.SetPaths:input_type -> dshguest.v1.SetPathsRequest
+	22, // 31: dshguest.v1.WorkspaceGuestAgent.GetPaths:input_type -> dshguest.v1.GetPathsRequest
+	24, // 32: dshguest.v1.WorkspaceGuestAgent.StartDaemon:input_type -> dshguest.v1.StartDaemonRequest
+	26, // 33: dshguest.v1.WorkspaceGuestAgent.ListDaemons:input_type -> dshguest.v1.ListDaemonsRequest
+	28, // 34: dshguest.v1.WorkspaceGuestAgent.StopDaemon:input_type -> dshguest.v1.StopDaemonRequest
+	30, // 35: dshguest.v1.WorkspaceGuestAgent.StopAllDaemons:input_type -> dshguest.v1.StopAllDaemonsRequest
+	32, // 36: dshguest.v1.WorkspaceGuestAgent.RestartDaemon:input_type -> dshguest.v1.RestartDaemonRequest
+	33, // 37: dshguest.v1.WorkspaceGuestAgent.DaemonLogs:input_type -> dshguest.v1.DaemonLogsRequest
+	35, // 38: dshguest.v1.WorkspaceGuestAgent.Terminal:input_type -> dshguest.v1.TerminalInput
+	2,  // 39: dshguest.v1.WorkspaceGuestAgent.Exec:output_type -> dshguest.v1.ExecOutput
+	6,  // 40: dshguest.v1.WorkspaceGuestAgent.Signal:output_type -> dshguest.v1.SignalResponse
+	8,  // 41: dshguest.v1.WorkspaceGuestAgent.ReadFile:output_type -> dshguest.v1.ReadFileChunk
+	11, // 42: dshguest.v1.WorkspaceGuestAgent.WriteFile:output_type -> dshguest.v1.WriteFileResponse
+	13, // 43: dshguest.v1.WorkspaceGuestAgent.Stat:output_type -> dshguest.v1.StatResponse
+	15, // 44: dshguest.v1.WorkspaceGuestAgent.ReadDir:output_type -> dshguest.v1.ReadDirResponse
+	18, // 45: dshguest.v1.WorkspaceGuestAgent.Mkdir:output_type -> dshguest.v1.MkdirResponse
+	20, // 46: dshguest.v1.WorkspaceGuestAgent.Delete:output_type -> dshguest.v1.DeleteResponse
+	23, // 47: dshguest.v1.WorkspaceGuestAgent.SetPaths:output_type -> dshguest.v1.PathsResponse
+	23, // 48: dshguest.v1.WorkspaceGuestAgent.GetPaths:output_type -> dshguest.v1.PathsResponse
+	25, // 49: dshguest.v1.WorkspaceGuestAgent.StartDaemon:output_type -> dshguest.v1.DaemonInfo
+	27, // 50: dshguest.v1.WorkspaceGuestAgent.ListDaemons:output_type -> dshguest.v1.ListDaemonsResponse
+	29, // 51: dshguest.v1.WorkspaceGuestAgent.StopDaemon:output_type -> dshguest.v1.StopDaemonResponse
+	31, // 52: dshguest.v1.WorkspaceGuestAgent.StopAllDaemons:output_type -> dshguest.v1.StopAllDaemonsResponse
+	25, // 53: dshguest.v1.WorkspaceGuestAgent.RestartDaemon:output_type -> dshguest.v1.DaemonInfo
+	34, // 54: dshguest.v1.WorkspaceGuestAgent.DaemonLogs:output_type -> dshguest.v1.DaemonLogsResponse
+	39, // 55: dshguest.v1.WorkspaceGuestAgent.Terminal:output_type -> dshguest.v1.TerminalOutput
+	39, // [39:56] is the sub-list for method output_type
+	22, // [22:39] is the sub-list for method input_type
+	22, // [22:22] is the sub-list for extension type_name
+	22, // [22:22] is the sub-list for extension extendee
+	0,  // [0:22] is the sub-list for field type_name
 }
 
 func init() { file_dshguest_v1_guest_proto_init() }

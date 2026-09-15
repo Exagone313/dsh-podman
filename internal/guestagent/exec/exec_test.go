@@ -8,15 +8,17 @@ import (
 	"context"
 	"slices"
 	"strings"
+	"syscall"
 	"testing"
 
 	"github.com/Exagone313/dsh-podman/internal/guestagent/childenv"
+	"github.com/Exagone313/dsh-podman/internal/guestagent/identity"
 )
 
 func TestStartRejectsEmptyArgv(t *testing.T) {
 	manager := NewManager(childenv.NewPaths())
 	for _, argv := range [][]string{nil, {}, {""}} {
-		if _, err := manager.Start(context.Background(), argv, "", nil); err == nil {
+		if _, err := manager.Start(context.Background(), argv, "", nil, identity.Options{}); err == nil {
 			t.Fatalf("accepted argv %#v", argv)
 		}
 	}
@@ -24,11 +26,11 @@ func TestStartRejectsEmptyArgv(t *testing.T) {
 
 func TestStartAssignsSequentialIDs(t *testing.T) {
 	manager := NewManager(childenv.NewPaths())
-	first, err := manager.Start(context.Background(), []string{"echo", "hi"}, "/tmp", nil)
+	first, err := manager.Start(context.Background(), []string{"echo", "hi"}, "/tmp", nil, identity.Options{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	second, err := manager.Start(context.Background(), []string{"pwd"}, "/", nil)
+	second, err := manager.Start(context.Background(), []string{"pwd"}, "/", nil, identity.Options{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -42,7 +44,7 @@ func TestStartAssignsSequentialIDs(t *testing.T) {
 
 func TestListAndRemove(t *testing.T) {
 	manager := NewManager(childenv.NewPaths())
-	process, err := manager.Start(context.Background(), []string{"sleep", "1"}, "", nil)
+	process, err := manager.Start(context.Background(), []string{"sleep", "1"}, "", nil, identity.Options{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -58,7 +60,7 @@ func TestListAndRemove(t *testing.T) {
 
 func TestStartSetsEnv(t *testing.T) {
 	manager := NewManager(childenv.NewPaths())
-	process, err := manager.Start(context.Background(), []string{"env"}, "", map[string]string{"FOO": "bar"})
+	process, err := manager.Start(context.Background(), []string{"env"}, "", map[string]string{"FOO": "bar"}, identity.Options{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -82,7 +84,7 @@ func TestStartSetsEnv(t *testing.T) {
 func TestStartAlwaysSetsEnv(t *testing.T) {
 	t.Setenv("PATH", "/usr/bin")
 	manager := NewManager(childenv.NewPaths())
-	process, err := manager.Start(context.Background(), []string{"env"}, "", nil)
+	process, err := manager.Start(context.Background(), []string{"env"}, "", nil, identity.Options{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -102,7 +104,7 @@ func TestStartWithholdsReservedEnv(t *testing.T) {
 	t.Setenv("DSH_PODMAN_PROJECTS_ROOT", "/projects")
 	manager := NewManager(childenv.NewPaths())
 	for _, env := range []map[string]string{nil, {"FOO": "bar"}} {
-		process, err := manager.Start(context.Background(), []string{"env"}, "", env)
+		process, err := manager.Start(context.Background(), []string{"env"}, "", env, identity.Options{})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -116,7 +118,7 @@ func TestStartWithholdsReservedEnv(t *testing.T) {
 
 func TestListCopiesProcesses(t *testing.T) {
 	manager := NewManager(childenv.NewPaths())
-	if _, err := manager.Start(context.Background(), []string{"true"}, "", nil); err != nil {
+	if _, err := manager.Start(context.Background(), []string{"true"}, "", nil, identity.Options{}); err != nil {
 		t.Fatal(err)
 	}
 	got := manager.List()
@@ -129,7 +131,7 @@ func TestListCopiesProcesses(t *testing.T) {
 func TestStartCopiesArgv(t *testing.T) {
 	manager := NewManager(childenv.NewPaths())
 	argv := []string{"echo", "x"}
-	process, err := manager.Start(context.Background(), argv, "", nil)
+	process, err := manager.Start(context.Background(), argv, "", nil, identity.Options{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -141,7 +143,7 @@ func TestStartCopiesArgv(t *testing.T) {
 
 func TestStartUsesConfiguredWorkingDirectory(t *testing.T) {
 	manager := NewManager(childenv.NewPaths())
-	process, err := manager.Start(context.Background(), []string{"pwd"}, "/srv", nil)
+	process, err := manager.Start(context.Background(), []string{"pwd"}, "/srv", nil, identity.Options{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -150,9 +152,45 @@ func TestStartUsesConfiguredWorkingDirectory(t *testing.T) {
 	}
 }
 
+// TestStartAppliesIdentity pins that a requested identity becomes the child's
+// process credential, and that no override leaves the command without one.
+func TestStartAppliesIdentity(t *testing.T) {
+	uid := uint32(1000)
+	gid := uint32(2000)
+	cases := []struct {
+		name string
+		opts identity.Options
+		want *syscall.Credential
+	}{
+		{name: "none", opts: identity.Options{}, want: nil},
+		{name: "uid only", opts: identity.Options{Uid: &uid}, want: &syscall.Credential{Uid: 1000, Gid: 1000}},
+		{name: "both", opts: identity.Options{Uid: &uid, Gid: &gid}, want: &syscall.Credential{Uid: 1000, Gid: 2000}},
+		{name: "groups", opts: identity.Options{Groups: []uint32{3000, 4000}}, want: &syscall.Credential{Groups: []uint32{3000, 4000}}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			manager := NewManager(childenv.NewPaths())
+			process, err := manager.Start(context.Background(), []string{"true"}, "", nil, tc.opts)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if tc.want == nil {
+				if process.Command.SysProcAttr != nil && process.Command.SysProcAttr.Credential != nil {
+					t.Fatalf("unexpected credential: %#v", process.Command.SysProcAttr.Credential)
+				}
+				return
+			}
+			cred := process.Command.SysProcAttr.Credential
+			if cred == nil || cred.Uid != tc.want.Uid || cred.Gid != tc.want.Gid || !slices.Equal(cred.Groups, tc.want.Groups) {
+				t.Fatalf("credential = %#v, want %#v", cred, tc.want)
+			}
+		})
+	}
+}
+
 func TestStartPropagatesCommandInArgv(t *testing.T) {
 	manager := NewManager(childenv.NewPaths())
-	process, err := manager.Start(context.Background(), []string{"bash", "-c", "echo hi"}, "", nil)
+	process, err := manager.Start(context.Background(), []string{"bash", "-c", "echo hi"}, "", nil, identity.Options{})
 	if err != nil {
 		t.Fatal(err)
 	}

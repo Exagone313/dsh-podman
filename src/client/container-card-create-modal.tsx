@@ -61,6 +61,7 @@ export function CreateContainerModal(props: {
   const [paths, setPaths] = useState<PathEntry[]>([]);
   const [attachSecret, setAttachSecret] = useState("");
   const [attachVar, setAttachVar] = useState("");
+  const [submitting, setSubmitting] = useState(false);
   const imageLabel = useId();
   const nameLabel = useId();
   useEffect(() => {
@@ -82,6 +83,7 @@ export function CreateContainerModal(props: {
     setPaths([]);
     setAttachSecret("");
     setAttachVar("");
+    setSubmitting(false);
   }, [open, workspace, defaultImage]);
   const baseImages = images.filter((image) => image.isBase);
   const customImages = images.filter((image) => !image.isBase);
@@ -93,7 +95,8 @@ export function CreateContainerModal(props: {
   const validName = namePattern.test(name) && name !== "default" && !nameTaken;
   const canCreate = !named || validName;
   const submit = (): void => {
-    if (!canCreate) return;
+    if (!canCreate || submitting) return;
+    setSubmitting(true);
     onCreate(named ? name : "", {
       image,
       env,
@@ -126,7 +129,7 @@ export function CreateContainerModal(props: {
           <Button
             variant="primary"
             size="sm"
-            disabled={!canCreate}
+            disabled={!canCreate || submitting}
             onClick={submit}
           >
             {named ? t("addContainer") : t("createContainer")}

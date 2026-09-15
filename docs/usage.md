@@ -304,23 +304,27 @@ that opens a configuration modal — image, environment, mounts (project, tmpfs,
 volume, and secret), PATH additions, and secret environment variables — and
 workspaces that already have containers offer an **Add container** button for
 additional, named containers through the same modal, which is titled after the
-button that opened it. Container rows show their environment and
-secret-environment variables and their mounts, let you edit environment
-variables and add/remove mounts (each removal is confirmed), and attach/detach
-named secrets to a container's environment variables; each row also offers
-**Remove**, **Recreate** (same image), and **Recreate with image**. Every
-workspace row also offers **Remove pod**, which removes the workspace's pod, all
-of its containers, and the orchestrator's record for it (volumes, secrets, and
-project data are kept); removing a workspace's last container removes its pod as
-well, so an empty pod is never left behind. The card header has a **Reload this
-view** button. The images section can rebuild a single image or **rebuild all**
-in dependency order; **Build image** opens a popup with an image-id/base-image
-form and a chip input for the package list (type a name and press space/comma,
-or paste a list, to add removable chips). Volumes and secrets are listed as
-individual expandable rows, each with its own actions, and **Create volume** /
-**Create secret** open popup forms (the secret form takes an optional length; a
-secret's value can be overwritten, never read). Card actions are direct control
-calls and are not approval-gated.
+button that opened it. In that modal each mount's mode is a dropdown
+(read-only/read-write), so the workspace project mount can be created read-only
+in one step; tmpfs and secret mounts are fixed (read-write and read-only
+respectively) and show a disabled dropdown. Container rows show their
+environment and secret-environment variables and their mounts, let you edit
+environment variables and add/remove mounts (each removal is confirmed), and
+attach/detach named secrets to a container's environment variables; each row
+also offers **Remove**, **Recreate** (same image), and **Recreate with image**.
+Every workspace row also offers **Remove pod**, which removes the workspace's
+pod, all of its containers, and the orchestrator's record for it (volumes,
+secrets, and project data are kept); removing a workspace's last container
+removes its pod as well, so an empty pod is never left behind. The card re-reads
+the live state whenever the Plugins page is opened, and its header has a
+**Reload this view** button. The images section can rebuild a single image or
+**rebuild all** in dependency order; **Build image** opens a popup with an
+image-id/base-image form and a chip input for the package list (type a name and
+press space/comma, or paste a list, to add removable chips). Volumes and secrets
+are listed as individual expandable rows, each with its own actions, and
+**Create volume** / **Create secret** open popup forms (the secret form takes an
+optional length; a secret's value can be overwritten, never read). Card actions
+are direct control calls and are not approval-gated.
 
 A **Package caches** section reports the size of every configured build cache
 (`DSH_PODMAN_HOST_PACMAN_CACHE`, `DSH_PODMAN_HOST_APT_CACHE`,

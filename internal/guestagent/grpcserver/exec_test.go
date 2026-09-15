@@ -8,6 +8,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strings"
 	"syscall"
 	"testing"
 
@@ -177,6 +178,34 @@ func TestExecDiscardsSpillPastTheCap(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(root, "spill.log")); !os.IsNotExist(err) {
 		t.Fatalf("spill file should have been removed: %v", err)
+	}
+}
+
+// TestExecStdinIsNullUnlessRequested pins that a caller who sends no stdin
+// leaves the child on /dev/null: a pipe would be a non-TTY stdin, and a tool
+// like ripgrep then reads stdin instead of the working directory.
+func TestExecStdinIsNullUnlessRequested(t *testing.T) {
+	for _, tc := range []struct {
+		pipe bool
+		want string
+	}{
+		{pipe: false, want: "not-pipe"},
+		{pipe: true, want: "pipe"},
+	} {
+		server, root := newTestServer(t)
+		stream := &execStream{inputs: []*guest.ExecInput{{
+			Payload: &guest.ExecInput_Start{Start: &guest.ExecStart{
+				Argv:      []string{"sh", "-c", "if [ -p /dev/stdin ]; then echo pipe; else echo not-pipe; fi"},
+				Cwd:       root,
+				StdinPipe: tc.pipe,
+			}},
+		}}}
+		if err := server.Exec(stream); err != nil {
+			t.Fatal(err)
+		}
+		if got := strings.TrimSpace(stream.stdout()); got != tc.want {
+			t.Fatalf("stdinPipe=%v: stdout = %q, want %q", tc.pipe, got, tc.want)
+		}
 	}
 }
 

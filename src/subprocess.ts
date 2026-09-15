@@ -140,6 +140,10 @@ export function createSubprocessProvider(resolver: WorkspaceResolver): Subproces
                 cwd: spec.cwd,
                 env: env.env,
                 unsetEnv: env.unsetEnv,
+                // A caller that will not send stdin leaves the child on
+                // /dev/null: a pipe would be a non-TTY stdin, and tools like
+                // ripgrep then read stdin instead of the working directory.
+                stdinPipe: spec.stdio?.stdin === "pipe",
                 ...(stdoutSpill.target !== undefined
                   ? { spillStdout: stdoutSpill.target }
                   : {}),

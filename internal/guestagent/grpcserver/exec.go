@@ -66,9 +66,16 @@ func (s *Server) Exec(stream guest.WorkspaceGuestAgent_ExecServer) error {
 	if err != nil {
 		return status.Error(codes.Internal, err.Error())
 	}
-	stdin, err := process.Command.StdinPipe()
-	if err != nil {
-		return status.Error(codes.Internal, err.Error())
+	// Only a caller that will send stdin gets a pipe. Without one the child
+	// keeps Go's default stdin (/dev/null): a pipe is a non-TTY stdin, and a
+	// tool like ripgrep reads stdin instead of the working directory when it is
+	// given no path.
+	var stdin io.WriteCloser
+	if start.GetStdinPipe() {
+		stdin, err = process.Command.StdinPipe()
+		if err != nil {
+			return status.Error(codes.Internal, err.Error())
+		}
 	}
 	if err := process.Command.Start(); err != nil {
 		return status.Error(codes.InvalidArgument, err.Error())
@@ -118,13 +125,14 @@ func (s *Server) Exec(stream guest.WorkspaceGuestAgent_ExecServer) error {
 	go func() {
 		for {
 			input, recvErr := stream.Recv()
-			if errors.Is(recvErr, io.EOF) {
-				_ = stdin.Close()
+			if recvErr != nil {
+				if stdin != nil {
+					_ = stdin.Close()
+				}
 				return
 			}
-			if recvErr != nil {
-				_ = stdin.Close()
-				return
+			if stdin == nil {
+				continue
 			}
 			if chunk := input.GetStdinChunk(); len(chunk) > 0 {
 				if _, writeErr := stdin.Write(chunk); writeErr != nil {
@@ -187,8 +195,17 @@ func (s *Server) Signal(_ context.Context, request *guest.SignalRequest) (*guest
 		if err != nil {
 			return nil, status.Error(codes.InvalidArgument, err.Error())
 		}
-		if err := process.Command.Process.Signal(signal); err != nil {
-			return nil, status.Error(codes.Internal, err.Error())
+		sig, ok := signal.(syscall.Signal)
+		if !ok {
+			return nil, status.Error(codes.InvalidArgument, "unsupported signal")
+		}
+		// The command leads its own process group, so signal the group rather
+		// than the direct child: a shell defers a signal while its foreground
+		// child runs, and the caller's kill must reach that child too.
+		if err := syscall.Kill(-process.Command.Process.Pid, sig); err != nil {
+			if fallbackErr := process.Command.Process.Signal(signal); fallbackErr != nil {
+				return nil, status.Error(codes.Internal, err.Error())
+			}
 		}
 		return &guest.SignalResponse{}, nil
 	}

@@ -44,8 +44,14 @@ func (m *Manager) Start(ctx context.Context, argv []string, cwd string, env map[
 	cmd.Env = childenv.Build(m.paths, env, unset...)
 	// A requested identity is applied through the process credential; with no
 	// override the child keeps the agent's own identity.
+	//
+	// Every command also leads its own process group, so a signal (a caller's
+	// kill, or a timeout) reaches the whole command tree: a shell defers a
+	// signal while its foreground child runs, so signalling only the direct
+	// child would leave that child alive.
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	if cred := identity.Credential(opts); cred != nil {
-		cmd.SysProcAttr = &syscall.SysProcAttr{Credential: cred}
+		cmd.SysProcAttr.Credential = cred
 	}
 	proc := &Process{Argv: append([]string(nil), argv...), Command: cmd}
 	m.mu.Lock()

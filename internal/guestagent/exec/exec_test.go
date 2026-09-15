@@ -10,6 +10,7 @@ import (
 	"strings"
 	"syscall"
 	"testing"
+	"time"
 
 	"github.com/Exagone313/dsh-podman/internal/guestagent/childenv"
 	"github.com/Exagone313/dsh-podman/internal/guestagent/identity"
@@ -185,6 +186,34 @@ func TestStartAppliesIdentity(t *testing.T) {
 				t.Fatalf("credential = %#v, want %#v", cred, tc.want)
 			}
 		})
+	}
+}
+
+// TestProcessGroupReachesChildren pins that a command leads its own process
+// group: a shell defers a signal while its foreground child runs, so signalling
+// the group (not just the shell) is what stops the command.
+func TestProcessGroupReachesChildren(t *testing.T) {
+	manager := NewManager(childenv.NewPaths())
+	process, err := manager.Start(context.Background(), []string{"sh", "-c", "sleep 60"}, "", nil, identity.Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if process.Command.SysProcAttr == nil || !process.Command.SysProcAttr.Setpgid {
+		t.Fatalf("command must lead its own process group: %#v", process.Command.SysProcAttr)
+	}
+	if err := process.Command.Start(); err != nil {
+		t.Fatal(err)
+	}
+	waited := make(chan error, 1)
+	go func() { waited <- process.Command.Wait() }()
+	if err := syscall.Kill(-process.Command.Process.Pid, syscall.SIGTERM); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case <-waited:
+	case <-time.After(5 * time.Second):
+		_ = syscall.Kill(-process.Command.Process.Pid, syscall.SIGKILL)
+		t.Fatal("the command did not exit after SIGTERM to its process group")
 	}
 }
 

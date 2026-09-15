@@ -119,6 +119,7 @@ type ExecStart struct {
 	Uid           *wrapperspb.Int32Value `protobuf:"bytes,7,opt,name=uid,proto3" json:"uid,omitempty"`
 	Gid           *wrapperspb.Int32Value `protobuf:"bytes,8,opt,name=gid,proto3" json:"gid,omitempty"`
 	Groups        []uint32               `protobuf:"varint,9,rep,packed,name=groups,proto3" json:"groups,omitempty"`
+	StdinPipe     bool                   `protobuf:"varint,10,opt,name=stdin_pipe,json=stdinPipe,proto3" json:"stdin_pipe,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -214,6 +215,13 @@ func (x *ExecStart) GetGroups() []uint32 {
 		return x.Groups
 	}
 	return nil
+}
+
+func (x *ExecStart) GetStdinPipe() bool {
+	if x != nil {
+		return x.StdinPipe
+	}
+	return false
 }
 
 type ExecOutput struct {
@@ -2735,7 +2743,7 @@ const file_dshguest_v1_guest_proto_rawDesc = "" +
 	"\x05start\x18\x01 \x01(\v2\x16.dshguest.v1.ExecStartH\x00R\x05start\x12!\n" +
 	"\vstdin_chunk\x18\x02 \x01(\fH\x00R\n" +
 	"stdinChunkB\t\n" +
-	"\apayload\"\xa9\x03\n" +
+	"\apayload\"\xc8\x03\n" +
 	"\tExecStart\x12\x12\n" +
 	"\x04argv\x18\x01 \x03(\tR\x04argv\x12\x10\n" +
 	"\x03cwd\x18\x02 \x01(\tR\x03cwd\x121\n" +
@@ -2745,7 +2753,10 @@ const file_dshguest_v1_guest_proto_rawDesc = "" +
 	"\fspill_stderr\x18\x06 \x01(\v2\x18.dshguest.v1.SpillTargetR\vspillStderr\x12-\n" +
 	"\x03uid\x18\a \x01(\v2\x1b.google.protobuf.Int32ValueR\x03uid\x12-\n" +
 	"\x03gid\x18\b \x01(\v2\x1b.google.protobuf.Int32ValueR\x03gid\x12\x16\n" +
-	"\x06groups\x18\t \x03(\rR\x06groups\x1a6\n" +
+	"\x06groups\x18\t \x03(\rR\x06groups\x12\x1d\n" +
+	"\n" +
+	"stdin_pipe\x18\n" +
+	" \x01(\bR\tstdinPipe\x1a6\n" +
 	"\bEnvEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xad\x01\n" +

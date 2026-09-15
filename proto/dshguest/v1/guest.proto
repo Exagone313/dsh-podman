@@ -28,7 +28,7 @@ service WorkspaceGuestAgent {
   rpc Terminal(stream TerminalInput) returns (stream TerminalOutput);
 }
 message ExecInput { oneof payload { ExecStart start = 1; bytes stdin_chunk = 2; } }
-message ExecStart { repeated string argv = 1; string cwd = 2; map<string, string> env = 3; repeated string unset_env = 4; SpillTarget spill_stdout = 5; SpillTarget spill_stderr = 6; google.protobuf.Int32Value uid = 7; google.protobuf.Int32Value gid = 8; repeated uint32 groups = 9; }
+message ExecStart { repeated string argv = 1; string cwd = 2; map<string, string> env = 3; repeated string unset_env = 4; SpillTarget spill_stdout = 5; SpillTarget spill_stderr = 6; google.protobuf.Int32Value uid = 7; google.protobuf.Int32Value gid = 8; repeated uint32 groups = 9; bool stdin_pipe = 10; }
 message ExecOutput { oneof payload { bytes stdout_chunk = 1; bytes stderr_chunk = 2; ExecExit exit = 3; } string process_id = 4; }
 message ExecExit { int32 exit_code = 1; bool signaled = 2; string signal = 3; bool stdout_spill_valid = 4; bool stderr_spill_valid = 5; }
 // SpillTarget is a bounded full-stream copy of one output stream, written in

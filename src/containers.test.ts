@@ -461,10 +461,10 @@ test("podmanRuntimeSection names only the tools the agent has", () => {
   assert.match(full, /run in a Podman container/);
   assert.match(full, /There is no host shell/);
   // The facts that pre-empt the "bash runs on the host" hallucination: the
-  // built-in shell and container_bash use one container, and identical uname
+  // built-in shell and container_bash run in one container, and identical uname
   // output is the shared kernel, not a host shell.
   assert.match(full, /container: "default"/);
-  assert.match(full, /identical output by construction/);
+  assert.match(full, /sees the same filesystem/);
   assert.match(full, /share the host kernel/);
   assert.match(full, /hostname/);
   assert.match(full, /\/etc\/os-release/);
@@ -486,7 +486,7 @@ test("podmanRuntimeSection names only the tools the agent has", () => {
     assert.doesNotMatch(short, new RegExp("`" + tool + "`"));
   }
   assert.doesNotMatch(short, /container-backed/);
-  assert.doesNotMatch(short, /identical output by construction/);
+  assert.doesNotMatch(short, /sees the same/);
   assert.match(short, /run in a Podman container/);
   assert.match(short, /There is no host shell/);
   assert.match(short, /container: "default"/);

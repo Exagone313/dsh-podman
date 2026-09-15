@@ -43,6 +43,12 @@ export type ReasonFact =
   | { kind: "container_path_set"; container: string; paths: readonly string[] }
   | { kind: "container_path_add"; container: string; path: string }
   | { kind: "container_path_remove"; container: string; path: string }
+  | {
+      kind: "read_only_remount";
+      tool: string;
+      remount: readonly MountFact[];
+      keep: readonly MountFact[];
+    }
   | { kind: "volume_remove"; name: string }
   | { kind: "secret_remove"; name: string }
   | { kind: "container_secret_add"; container: string; secret: string; env: string }
@@ -65,6 +71,7 @@ export type ReasonFact =
 export type DenialFact =
   | { kind: "read_only"; tool: string }
   | { kind: "read_only_builtin"; tool: string }
+  | { kind: "read_only_remount_declined"; tool: string }
   | { kind: "project_destination"; source?: string; mirror?: string };
 
 // Settings namespace owned by the browser locale plugin; only read here.
@@ -321,6 +328,24 @@ export function renderReason(locale: ReasonLocale, fact: ReasonFact): string {
         `Remove ${quoted(locale, fact.path)} from the PATH of container ${quoted(locale, fact.container)}.`,
         `从容器 ${quoted(locale, fact.container)} 的 PATH 中移除 ${quoted(locale, fact.path)}。`,
       );
+    case "read_only_remount": {
+      const remount = fact.remount
+        .map((mount) => `- ${mountText(locale, mount)}`)
+        .join("\n");
+      const keep =
+        fact.keep.length === 0
+          ? ""
+          : pick(
+              locale,
+              `\n\nKept as-is: ${joinList(locale, fact.keep.map((mount) => mountText(locale, mount)))}.`,
+              `\n\n保持不变：${joinList(locale, fact.keep.map((mount) => mountText(locale, mount)))}。`,
+            );
+      return pick(
+        locale,
+        `Read-only mode blocks ${quoted(locale, fact.tool)} while a mount is read-write. Remount these mounts read-only to run it:\n\n${remount}${keep}`,
+        `只读模式在存在读写挂载时会阻止 ${quoted(locale, fact.tool)}。将这些挂载重新挂载为只读即可运行：\n\n${remount}${keep}`,
+      );
+    }
     case "volume_remove":
       return pick(locale, `Remove volume ${quoted(locale, fact.name)}.`, `移除卷 ${quoted(locale, fact.name)}。`);
     case "secret_remove":
@@ -410,6 +435,12 @@ export function renderDenial(locale: ReasonLocale, fact: DenialFact): string {
         locale,
         `Denied: the session is read-only, but ${quoted(locale, fact.tool)} can modify files.`,
         `已拒绝：当前会话为只读，而 ${quoted(locale, fact.tool)} 可能修改文件。`,
+      );
+    case "read_only_remount_declined":
+      return pick(
+        locale,
+        `Denied: read-only mode blocks ${quoted(locale, fact.tool)} and the mounts were not remounted.`,
+        `已拒绝：只读模式阻止 ${quoted(locale, fact.tool)}，且挂载未被重新挂载。`,
       );
     case "project_destination": {
       if (fact.mirror === undefined || fact.mirror === "") {

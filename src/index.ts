@@ -11,6 +11,7 @@ import {
   withoutHarnessSourceSection,
 } from "./prompts.js";
 import { createSubprocessProvider } from "./subprocess.js";
+import { createReadOnlyShellGate, REMOUNT_TOOL_NAME } from "./read-only-shell.js";
 import { toolHandlers } from "./tool-handlers.js";
 import { TOOLS, TOOL_DESCRIPTIONS, defineTool, toolOutput } from "./tool-schemas.js";
 import { toolCallView, toolResultView } from "./tool-views.js";
@@ -55,6 +56,33 @@ export function apply(ctx: any, config: PluginConfig = {}): void {
       ctx.get("sessionProjections")?.stateOf(session, "agentPreset") ??
       session?.header?.agentPreset,
   });
+  // The read-only shell gate needs the resolver, which is created below, so it
+  // is built on first use. Under read-only permission it re-checks the target
+  // container's mounts and, when a read-write mount would block the tool, asks
+  // the user (through the approval service) to remount them read-only.
+  let readOnlyShell: ReturnType<typeof createReadOnlyShellGate> | undefined;
+  const readOnlyShellGate = (): ReturnType<typeof createReadOnlyShellGate> =>
+    (readOnlyShell ??= createReadOnlyShellGate({
+      resolver,
+      approve: async (exec: any, reason: string): Promise<boolean> => {
+        const approval = ctx.get("approval");
+        if (approval === undefined || exec?.agent === undefined) return false;
+        try {
+          const outcome = await approval.request({
+            agent: exec.agent,
+            toolName: REMOUNT_TOOL_NAME,
+            ...(exec.callId !== undefined ? { callId: exec.callId } : {}),
+            ...(exec.signal !== undefined ? { signal: exec.signal } : {}),
+            reason,
+          });
+          return outcome === "allowed-once";
+        } catch {
+          // A request that cannot be raised (no open turn, no channel) fails
+          // closed, exactly like a rejection.
+          return false;
+        }
+      },
+    }));
   ctx.on(
     "tools/pre-execute",
     (exec: any, next: any) =>
@@ -64,6 +92,7 @@ export function apply(ctx: any, config: PluginConfig = {}): void {
         () => resolver.getConfig().projectsRoot,
         () => readLocale(),
         readSession,
+        readOnlyShellGate(),
       ),
   );
   ensurePodmanOpsPreset(ctx);
@@ -139,6 +168,11 @@ export {
   summarizeArgs,
 } from "./approval.js";
 export type { SessionFacts } from "./approval.js";
+export {
+  READ_ONLY_GATED_TOOLS,
+  REMOUNT_TOOL_NAME,
+  createReadOnlyShellGate,
+} from "./read-only-shell.js";
 export { FilesystemProvider, createFilesystemProvider } from "./fs-provider.js";
 export { resolveGuestCwd, resolveGuestPath, remoteArgv } from "./guest-rpc.js";
 export {

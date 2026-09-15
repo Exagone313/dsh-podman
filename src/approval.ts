@@ -5,6 +5,7 @@
 import { approvalPath, currentCwd } from "./guest-rpc.js";
 import { inferMountKind, projectMountDestinationReason } from "./mount-input.js";
 import { defaultMountMode } from "./mount-enums.js";
+import { type ReadOnlyShellDecision } from "./read-only-shell.js";
 import { TOOLS } from "./tool-schemas.js";
 import {
   renderDenial,
@@ -346,9 +347,9 @@ export interface SessionFacts {
 }
 
 // The `tools/pre-execute` policy, driven by the session's permission knobs:
-// - read-only sandbox: only READ_ONLY_TOOLS run among the plugin's tools, and
-//   the built-in file/shell tools (write, edit, bash, pwsh) are denied too,
-//   since their harness sandbox is bypassed. Every denial carries a reason.
+// - read-only sandbox: the built-in shell/file tools and their container
+//   counterparts run only when the read-only shell gate allows them (every
+//   mount is read-only); every other mutating tool is denied with a reason.
 // - approval policy "never" (Full access): run without asking.
 // - otherwise (Workspace Write): ask for the approval-gated tools, including
 //   the tools the Podman operator-mode preset gates per preset.
@@ -362,11 +363,21 @@ export async function preExecutePolicy(
   getProjectsRoot?: () => string,
   getLocale?: () => ReasonLocale,
   readSession?: (session: unknown) => SessionFacts,
+  readOnlyShell?: (
+    exec: unknown,
+    locale: ReasonLocale,
+  ) => Promise<ReadOnlyShellDecision>,
 ): Promise<unknown> {
   const name = exec.name;
   const locale = getLocale?.() ?? "en";
   const session = exec.agent?.session;
   const facts = session === undefined ? {} : readSession?.(session) ?? {};
+  if (facts.mode === "read-only" && readOnlyShell !== undefined) {
+    const gated = await readOnlyShell(exec, locale);
+    // `allow` delegates so the rest of the pre-execute waterfall still runs.
+    if (gated?.kind === "allow") return next();
+    if (gated !== undefined) return gated;
+  }
   if (facts.mode === "read-only" && BUILTIN_FILE_TOOLS.has(name)) {
     return {
       kind: "deny",

@@ -135,6 +135,41 @@ test("renderCacheCleanNotice reports the removed file count", () => {
   assert.equal(renderCacheCleanNotice("zh", 3), "已移除 3 个缓存文件");
 });
 
+test("renderReason renders the read-only remount plan", () => {
+  assert.equal(
+    renderReason("en", {
+      kind: "read_only_remount",
+      tool: "bash",
+      remount: [
+        { kind: "project", source: "team", readOnly: false },
+        { kind: "volume", source: "data", destination: "/data", readOnly: false },
+      ],
+      keep: [{ kind: "tmpfs", source: "", destination: "/scratch" }],
+    }),
+    'Read-only mode blocks "bash" while a mount is read-write. Remount these mounts read-only to run it:\n\n- project "team" (read-write)\n- volume "data" at "/data" (read-write)\n\nKept as-is: tmpfs at "/scratch".',
+  );
+  assert.equal(
+    renderReason("zh", {
+      kind: "read_only_remount",
+      tool: "bash",
+      remount: [{ kind: "project", source: "team", readOnly: false }],
+      keep: [],
+    }),
+    "只读模式在存在读写挂载时会阻止 “bash”。将这些挂载重新挂载为只读即可运行：\n\n- 项目 “team”（读写）",
+  );
+});
+
+test("renderDenial renders the declined remount", () => {
+  assert.equal(
+    renderDenial("en", { kind: "read_only_remount_declined", tool: "bash" }),
+    'Denied: read-only mode blocks "bash" and the mounts were not remounted.',
+  );
+  assert.equal(
+    renderDenial("zh", { kind: "read_only_remount_declined", tool: "bash" }),
+    "已拒绝：只读模式阻止 “bash”，且挂载未被重新挂载。",
+  );
+});
+
 test("preExecutePolicy renders a localized deny reason", async () => {
   const denied = (await preExecutePolicy(
     { name: "container_start", agent: { session: { facts: { mode: "read-only" } } } },

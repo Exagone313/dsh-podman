@@ -7,16 +7,27 @@ package grpcserver
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 	"os"
 	"path/filepath"
+	"syscall"
 	"time"
 
 	guest "github.com/Exagone313/dsh-podman/internal/genproto/dshguest/v1"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
+
+// writeErrorCode classifies a write failure: a read-only or unwritable target
+// is a permission problem, everything else is internal.
+func writeErrorCode(err error) codes.Code {
+	if errors.Is(err, syscall.EROFS) || errors.Is(err, syscall.EACCES) || errors.Is(err, syscall.EPERM) {
+		return codes.PermissionDenied
+	}
+	return codes.Internal
+}
 
 func (s *Server) ReadFile(request *guest.ReadFileRequest, stream guest.WorkspaceGuestAgent_ReadFileServer) error {
 	slog.Info("guest agent ReadFile requested", "path", request.GetPath())
@@ -77,21 +88,20 @@ func (s *Server) WriteFile(stream guest.WorkspaceGuestAgent_WriteFileServer) err
 	if err != nil {
 		return status.Error(codes.PermissionDenied, err.Error())
 	}
-	flags := os.O_WRONLY
-	if start.GetCreate() {
-		flags |= os.O_CREATE
-	}
-	if start.GetTruncate() {
-		flags |= os.O_TRUNC
-	}
 	if !start.GetCreate() {
 		if _, statErr := os.Stat(path); statErr != nil {
 			return status.Error(codes.NotFound, statErr.Error())
 		}
 	}
+	// The write replaces the file through a sibling temp file, so a missing
+	// parent is the failure worth naming: creating the temp file would
+	// otherwise leak its own ENOENT.
+	if _, statErr := os.Stat(filepath.Dir(path)); statErr != nil {
+		return status.Error(codes.FailedPrecondition, fmt.Sprintf("cannot write %q: parent directory does not exist", start.GetPath()))
+	}
 	temporary, err := os.CreateTemp(filepath.Dir(path), ".dsh-write-*")
 	if err != nil {
-		return status.Error(codes.Internal, err.Error())
+		return status.Error(writeErrorCode(err), err.Error())
 	}
 	temporaryName := temporary.Name()
 	defer os.Remove(temporaryName)
@@ -114,7 +124,7 @@ func (s *Server) WriteFile(stream guest.WorkspaceGuestAgent_WriteFileServer) err
 				return status.Error(codes.Internal, err.Error())
 			}
 			if err := os.Rename(temporaryName, path); err != nil {
-				return status.Error(codes.Internal, err.Error())
+				return status.Error(writeErrorCode(err), err.Error())
 			}
 			return stream.SendAndClose(&guest.WriteFileResponse{BytesWritten: written})
 		}

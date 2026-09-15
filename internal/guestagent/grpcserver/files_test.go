@@ -8,6 +8,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	guest "github.com/Exagone313/dsh-podman/internal/genproto/dshguest/v1"
@@ -283,5 +284,19 @@ func TestWriteFilePreservesMode(t *testing.T) {
 		t.Fatal(err)
 	} else if string(data) != "new" {
 		t.Fatalf("content = %q, want %q", data, "new")
+	}
+}
+
+func TestWriteFileNamesAMissingParent(t *testing.T) {
+	server, _ := newTestServer(t)
+	stream := &writeFileStream{chunks: []*guest.WriteFileChunk{
+		{Payload: &guest.WriteFileChunk_Start{Start: &guest.WriteFileStart{Path: "/workspace/missing/nested/x.txt", Create: true, Truncate: true}}},
+	}}
+	err := server.WriteFile(stream)
+	if status.Code(err) != codes.FailedPrecondition {
+		t.Fatalf("expected FailedPrecondition, got %v", err)
+	}
+	if !strings.Contains(err.Error(), "parent directory does not exist") {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }

@@ -5,6 +5,7 @@
 import { ConfirmButton, Field, emptyMount, mountLabel } from "./container-card-shared.js";
 import { greyId, imageSelect } from "./container-card-styles.js";
 import { type MountInput } from "./container-card-controller.js";
+import { forcedMountMode } from "../mount-enums.js";
 import { type ContainerPluginKey } from "./locales.js";
 import { Button, Input, Modal } from "@deepseek-ai/dsh-client-ui-primitives";
 import { type ReactNode, useId, useState } from "react";
@@ -96,12 +97,16 @@ export function MountsEditor(props: {
   busy: boolean;
   enabled: boolean;
   confirmRemove?: boolean;
+  // How each mount's mode is presented: the live-container remount control
+  // (with its confirmation), or an inline dropdown with no confirmation, used
+  // where the container does not exist yet (the create/add-container modal).
+  modeControl?: "remount" | "select";
   // The default container's primary project mount: it cannot be removed, so it
   // offers only the remount control.
   primaryProject?: string;
   onAdd: (mount: MountInput) => void;
   onRemove: (mount: MountInput) => void;
-  onUpdate?: (mount: MountInput) => void;
+  onUpdate?: (mount: MountInput, index: number) => void;
 }): ReactNode {
   const {
     t,
@@ -111,6 +116,7 @@ export function MountsEditor(props: {
     busy,
     enabled,
     confirmRemove,
+    modeControl = "remount",
     primaryProject = "",
     onAdd,
     onRemove,
@@ -250,9 +256,10 @@ export function MountsEditor(props: {
     );
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-      {mounts.map((mount) => {
+      {mounts.map((mount, index) => {
         const nextMode = mount.mode === "read_write" ? "read_only" : "read_write";
-        const remountable = mount.kind === "project" || mount.kind === "volume";
+        const forced = forcedMountMode(mount.kind);
+        const editable = mount.kind === "project" || mount.kind === "volume";
         const removable =
           mount.kind !== "project" ||
           primaryProject === "" ||
@@ -275,9 +282,31 @@ export function MountsEditor(props: {
                 color: "var(--dsw-alias-label-primary)",
               }}
             >
-              {mountLabel(t, mount)}
+              {mountLabel(t, mount, modeControl !== "select")}
             </code>
-            {remountable && onUpdate !== undefined && (
+            {modeControl === "select" && (editable || forced !== undefined) ? (
+              <select
+                style={imageSelect}
+                value={forced ?? mount.mode}
+                disabled={!enabled || forced !== undefined}
+                aria-label={t("mountMode")}
+                onChange={(event) =>
+                  onUpdate?.({ ...mount, mode: event.target.value }, index)
+                }
+              >
+                {forced !== undefined ? (
+                  <option value={forced}>
+                    {forced === "read_write" ? t("readWrite") : t("readOnly")}
+                  </option>
+                ) : (
+                  <>
+                    <option value="read_only">{t("readOnly")}</option>
+                    <option value="read_write">{t("readWrite")}</option>
+                  </>
+                )}
+              </select>
+            ) : null}
+            {modeControl === "remount" && editable && onUpdate !== undefined && (
               <ConfirmButton
                 t={t}
                 label={
@@ -292,7 +321,7 @@ export function MountsEditor(props: {
                     : t("confirmRemountReadWrite")
                 }
                 disabled={!enabled}
-                onConfirm={() => onUpdate({ ...mount, mode: nextMode })}
+                onConfirm={() => onUpdate({ ...mount, mode: nextMode }, index)}
               />
             )}
             {removable &&

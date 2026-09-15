@@ -46,6 +46,19 @@ export function defaultMountMode(kind: string | undefined): string {
   return kind === "tmpfs" ? "read_write" : "read_only";
 }
 
+/**
+ * The mode a mount kind is fixed to, or undefined when the caller chooses.
+ *
+ * A tmpfs is scratch space and the orchestrator rejects a read-only one; a
+ * secret is exposed read-only and carries no mode at all. Project and volume
+ * mounts are the ones a caller may switch.
+ */
+export function forcedMountMode(kind: string | undefined): string | undefined {
+  if (kind === "tmpfs") return "read_write";
+  if (kind === "secret") return "read_only";
+  return undefined;
+}
+
 export function mountModeToProto(mode: string | undefined): string {
   const proto =
     mode !== undefined && Object.prototype.hasOwnProperty.call(MOUNT_MODES, mode)

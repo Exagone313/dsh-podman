@@ -13,6 +13,7 @@ import {
   WORKSPACE_ID,
 } from "./test-support.js";
 import { TOOLS, approvalDecision, preExecutePolicy, summarizeArgs, toolHandlers } from "./index.js";
+import { forcedMountMode } from "./mount-enums.js";
 
 test("container_start approval depends on mounts being passed", () => {
   const tool = TOOLS.find((entry) => entry.name === "container_start");
@@ -658,4 +659,14 @@ test("command tools fall back to the guest cwd when the session directory is not
     exec,
   );
   assert.equal(explicit.starts[0].cwd, "/data");
+});
+
+test("forcedMountMode fixes tmpfs and secret and leaves project and volume editable", () => {
+  // The orchestrator rejects a read-only tmpfs and exposes secrets read-only,
+  // so the card shows those two as a fixed mode.
+  assert.equal(forcedMountMode("tmpfs"), "read_write");
+  assert.equal(forcedMountMode("secret"), "read_only");
+  assert.equal(forcedMountMode("project"), undefined);
+  assert.equal(forcedMountMode("volume"), undefined);
+  assert.equal(forcedMountMode(undefined), undefined);
 });

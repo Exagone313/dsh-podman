@@ -189,9 +189,13 @@ export function CreateContainerModal(props: {
           secrets={secrets}
           busy={busy}
           enabled={!busy}
+          modeControl="select"
           onAdd={(mount) => setMounts([...mounts, mount])}
           onRemove={(mount) =>
             setMounts(mounts.filter((item) => item !== mount))
+          }
+          onUpdate={(updated, index) =>
+            setMounts(mounts.map((item, at) => (at === index ? updated : item)))
           }
         />
         <div style={sectionTitle}>{t("pathsTitle")}</div>

@@ -141,6 +141,7 @@ export const mountViewToInput = (mount: ProjectMountView): MountInput => ({
 export const mountLabel = (
   t: (key: ContainerPluginKey) => string,
   mount: MountInput,
+  withMode = true,
 ): string => {
   if (mount.kind === "tmpfs") {
     return `tmpfs${mount.destination !== "" ? ` at ${mount.destination}` : ""}`;
@@ -151,7 +152,8 @@ export const mountLabel = (
   if (mount.kind === "secret") {
     return `secret ${mount.secret}${mount.destination !== "" ? ` → ${mount.destination}` : ""}`;
   }
-  return `${mount.project}${mount.destination !== "" ? ` → ${mount.destination}` : ""}${mount.mode === "read_only" ? " (ro)" : " (rw)"}`;
+  const mode = withMode ? (mount.mode === "read_only" ? " (ro)" : " (rw)") : "";
+  return `${mount.project}${mount.destination !== "" ? ` → ${mount.destination}` : ""}${mode}`;
 };
 
 // Adding a mount defaults to read-only, so granting write access is always a

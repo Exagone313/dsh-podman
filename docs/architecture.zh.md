@@ -114,13 +114,16 @@ API，因此构建不会向 orchestrator 的状态目录写入任何内容。
 
 ## 设置卡片传输
 
-设置卡片和 orchestrator 通过设置传输通信：
+卡片通过 harness API 路径（`/api/podman/card`）之下的一个已认证 fetch
+路由与主机通信；该路由注册在 connection 服务上，因此承载层会先应用其 Host/Origin
+校验和浏览器认证：
 
-- 主机半部分注册 `podman`
-  设置命名空间并保持其中的实时视图（`containers`、`images`、`volumes`、`secrets`、`notice`）。
-- 卡片将其当前语言记录为
-  `uiLocale`，以便主机以会话语言呈现审批文本（参见[审批](usage.zh.md#审批)）。
-- 卡片将操作写入 `command`（`refresh` / `remove` / `recreate` / `create` /
+- `GET` 返回 orchestrator
+  的实时快照（容器、镜像、工作区、卷、机密、缓存），每次请求都重新构建。
+- `POST` 针对 orchestrator 恰好执行一个命令（`remove` / `recreate` / `create` /
   `image_rebuild` / `image_rebuild_all` / volume / secret / secret-env / mount
-  操作）；主机的 `watch` 处理程序针对 orchestrator
-  执行该操作，并将刷新后的视图推回。
+  操作），并返回要显示的提示。
+
+因此设置命名空间中**只保留真正的偏好**：默认镜像、sockets
+根目录，以及卡片的当前语言（`uiLocale`，以便主机以会话语言呈现审批文本——参见[审批](usage.zh.md#审批)）。orchestrator
+派生的任何内容都不会被持久化，也不会有命令经由设置文档往返。

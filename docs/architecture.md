@@ -140,13 +140,18 @@ from under a running build.
 
 ## Settings card transport
 
-The settings card and the orchestrator talk over the settings transport:
+The card talks to the host over one authenticated fetch route below the harness
+API path (`/api/podman/card`), registered on the connection service so the
+carrier applies its Host/Origin fence and browser authentication first:
 
-- The host half registers the `podman` settings namespace and keeps a live view
-  (`containers`, `images`, `volumes`, `secrets`, `notice`) in it.
-- The card records its active locale as `uiLocale`, so the host can render
-  approval text in the session language (see [Approval](usage.md#approval)).
-- The card writes an action into `command` (`refresh` / `remove` / `recreate` /
-  `create` / `image_rebuild` / `image_rebuild_all` / volume / secret /
-  secret-env / mount ops); the host `watch` handler executes it against the
-  orchestrator and pushes the refreshed view back.
+- `GET` returns the live orchestrator snapshot (containers, images, workspaces,
+  volumes, secrets, caches), built fresh on every request.
+- `POST` runs exactly one command (`remove` / `recreate` / `create` /
+  `image_rebuild` / `image_rebuild_all` / volume / secret / secret-env / mount
+  ops) against the orchestrator and returns the notice to show.
+
+The settings namespace therefore holds **only real preferences**: the default
+image, the sockets root, and the card's active locale (`uiLocale`, so the host
+can render approval text in the session language — see
+[Approval](usage.md#approval)). Nothing derived from the orchestrator is
+persisted, and no command round-trips through the settings document.

@@ -70,7 +70,8 @@
   },
   "packageManager": "pnpm@12.4.1",
   "publishConfig": {
-    "access": "public"
+    "access": "public",
+    "provenance": true
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "^4.0.2",

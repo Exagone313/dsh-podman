@@ -205,6 +205,7 @@ export function secretBearingResolver() {
 export function guestFileRecorder(content = "hello") {
   const reads: string[] = [];
   const writes: { path: string; content: string }[] = [];
+  const mkdirs: string[] = [];
   const guest = {
     readFile: (request: any) => {
       reads.push(request.path);
@@ -214,6 +215,11 @@ export function guestFileRecorder(content = "hello") {
         },
         cancel() {},
       };
+    },
+    mkdir: (request: any, _metadata: unknown, callback: any) => {
+      mkdirs.push(request.path);
+      callback(null, {});
+      return { cancel() {} };
     },
     stat: (_request: any, _metadata: unknown, callback: any) => {
       callback(null, {
@@ -250,7 +256,7 @@ export function guestFileRecorder(content = "hello") {
     containerBinding: async () => binding,
     resolveForPath: async () => binding,
   };
-  return { reads, writes, resolver };
+  return { reads, writes, mkdirs, resolver };
 }
 
 // fakeToolContext is the minimal cordis context the container file tools need:

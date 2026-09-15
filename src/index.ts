@@ -5,6 +5,7 @@
 import { isSandboxEscalation, preExecutePolicy, type SessionFacts } from "./approval.js";
 import { resolveReasonLocale, type ReasonLocale } from "./approval-reasons.js";
 import { createFilesystemProvider } from "./fs-provider.js";
+import { createSpillStore } from "./spill-store.js";
 import {
   ensurePodmanOpsPreset,
   podmanRuntimeSection,
@@ -133,6 +134,10 @@ export function apply(ctx: any, config: PluginConfig = {}): void {
   ctx.provide("subprocess", subprocess);
   ctx.effect(() => () => subprocess.dispose(), "podman: subprocess cleanup");
   ctx.provide("fs", createFilesystemProvider(resolver));
+  // Oversized tool results spill inside the session's container, so the agent
+  // can read them back with the container file tools; the harness's local
+  // (host-filesystem) spill backend is disabled by the bundle patch.
+  ctx.provide("spillStore", createSpillStore(ctx, resolver));
   ctx.inject(["systemPrompt"], (promptCtx: any) => {
     promptCtx.systemPrompt.section(podmanRuntimeSection(promptCtx));
     promptCtx.on(

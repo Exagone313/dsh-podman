@@ -7,7 +7,7 @@ import { randomUUID } from "node:crypto";
 
 // The container-local directory the orchestrator mounts read-write for
 // command-output spill files. Must match the orchestrator's `spillRoot`.
-const SPILL_ROOT = "/tmp/dsh-podman";
+export const SPILL_ROOT = "/tmp/dsh-podman";
 
 // One bounded full-stream spill the guest writes for a collect-mode stream.
 interface SpillSpec {

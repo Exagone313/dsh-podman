@@ -3,12 +3,14 @@
 # SPDX-License-Identifier: MIT
 
 # dsh bundle patch: mounts the dsh-podman plugin into a profile's layer
-# stack. The subprocess/fs-sandbox rows are disabled because this plugin
-# provides the ctx.subprocess and ctx.fs providers backed by workspace
-# Podman containers instead.
+# stack. The subprocess/fs-sandbox/spill-local rows are disabled because this
+# plugin provides the ctx.subprocess, ctx.fs and ctx.spillStore providers backed
+# by workspace Podman containers instead.
 - id: subprocess
   disabled: true
 - id: fs-sandbox
+  disabled: true
+- id: spill-local
   disabled: true
 - insert:
     - id: podman

@@ -97,8 +97,10 @@ map applied to the container (or the bash process); `container_exec` and
 `daemon_start` already accept `env`, and `daemon_restart` reuses a daemon's
 stored environment. `container_start` and `container_recreate` also accept a
 `secretEnv` map (env var name → secret short name) that attaches existing
-secrets to the container's environment — see [Secrets](#secrets). Environment
-variables are not treated as secrets, so the approval reason and
+secrets to the container's environment — see [Secrets](#secrets). On
+`container_start` and `container_recreate`, an omitted `env` (or `secretEnv`)
+keeps the container's stored map, while a provided map replaces it entirely.
+Environment variables are not treated as secrets, so the approval reason and
 `container_list` show the variable **keys**. Keys starting with `DSH_PODMAN` are
 reserved and rejected, since the orchestrator uses that namespace for
 guest-agent wiring.
@@ -128,12 +130,17 @@ guest-agent wiring.
 | `container_recreate` ✱ | `container`, optional `image`, `mounts`, `env`, `secretEnv`, `paths`                                  | Recreate a container, keeping its current image when `image` is omitted, optionally with new project mounts, environment, or PATH additions |
 | `container_remove` ✱   | `container`                                                                                           | Remove a container (stops its daemons gracefully first)                                                                                     |
 | `container_start` ✱    | `container`, optional `image`, `mounts`, `env`, `secretEnv`, `paths`                                  | Start a container (default image when `image` is omitted); approval required only when `mounts` is passed                                   |
-| `container_write`      | `container`, `file_path`, `content`, optional `create`, `truncate`                                    | Write a file                                                                                                                                |
+| `container_write`      | `container`, `file_path`, `content`                                                                   | Write a file                                                                                                                                |
 
 The `container_bash`, `container_exec`, `container_read`, `container_write`,
 `container_edit`, `container_glob` and `container_grep` arguments mirror the
 harness's built-in `bash`/`read`/`write`/`edit`/`glob`/`grep` tools (plus the
 `container` target), so the same vocabulary works against a chosen container.
+`container_read`, `container_write` and `container_edit` also resolve their
+target through the same filesystem provider as the built-in file tools, so they
+share their behavior: binary files are refused with the same error, and the
+read-before-write guard (refusing to overwrite a file that was not read in the
+session) applies to them exactly as it does to the built-in `write` and `edit`.
 The plugin also registers a dedicated UI row for every one of its tools (icon,
 title, summary, and result body), so they render like the built-in tools rather
 than as a generic `Tool call` row.

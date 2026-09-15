@@ -73,7 +73,9 @@ harness 的 `sandbox_permissions` 参数（例如 `bash`
 bash 进程）的 `env` 映射；`container_exec` 和 `daemon_start` 已经接受 `env`，而
 `daemon_restart` 复用守护进程存储的环境。`container_start` 和
 `container_recreate` 还接受 `secretEnv` 映射（环境变量名 →
-机密短名称），将现有机密附加到容器的环境——参见[机密](#机密)。环境变量不被视为机密，因此审批原因和
+机密短名称），将现有机密附加到容器的环境——参见[机密](#机密)。在
+`container_start` 和 `container_recreate` 上，省略 `env`（或
+`secretEnv`）会保留容器存储的映射，而提供映射会完全替换它。环境变量不被视为机密，因此审批原因和
 `container_list` 显示变量的**键**。以 `DSH_PODMAN`
 开头的键被保留并被拒绝，因为编排器将该命名空间用于 guest-agent 接线。
 
@@ -102,12 +104,15 @@ bash 进程）的 `env` 映射；`container_exec` 和 `daemon_start` 已经接�
 | `container_recreate` ✱ | `container`, optional `image`, `mounts`, `env`, `secretEnv`, `paths`                                  | 重建容器，省略 `image` 时保留其当前镜像，可选地使用新的项目挂载、环境或 PATH 附加项 |
 | `container_remove` ✱   | `container`                                                                                           | 移除容器（先优雅地停止其守护进程）                                                  |
 | `container_start` ✱    | `container`, optional `image`, `mounts`, `env`, `secretEnv`, `paths`                                  | 启动容器（省略 `image` 时使用默认镜像）；仅在传入 `mounts` 时需要审批               |
-| `container_write`      | `container`, `file_path`, `content`, optional `create`, `truncate`                                    | 写入文件                                                                            |
+| `container_write`      | `container`, `file_path`, `content`                                                                   | 写入文件                                                                            |
 
 `container_bash`、`container_exec`、`container_read`、`container_write`、
 `container_edit`、`container_glob` 和 `container_grep` 的参数与 harness 内置的
 `bash`/`read`/`write`/`edit`/`glob`/`grep` 工具保持一致（外加 `container`
-目标），因此同一套参数可直接用于指定的容器。插件还为它的每个工具注册了专用的 UI
+目标），因此同一套参数可直接用于指定的容器。`container_read`、`container_write`
+和 `container_edit`
+还通过内置文件工具所用的同一文件系统提供者解析目标，因此行为一致：二进制文件会以相同的错误被拒绝，而先读后写保护（拒绝覆盖会话中未读取过的文件）对它们的作用与内置
+`write` 和 `edit` 完全相同。插件还为它的每个工具注册了专用的 UI
 行（图标、标题、摘要和结果正文），因此它们会像内置工具一样渲染，而不是显示为
 通用的 `Tool call` 行。
 

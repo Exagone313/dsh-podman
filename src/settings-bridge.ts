@@ -119,6 +119,12 @@ export function installContainerSettings(
     }) as ContainerSettingsScope;
 
     let refreshing = false;
+    // The command lives in the settings document until it is cleared, and the
+    // document is watched as a whole: any commit landing while a command is
+    // still crossing the wire (a view refresh, a field write, the command's own
+    // clear) re-delivers it. Claim the in-flight command by its timestamp so a
+    // re-delivery is a no-op while a genuinely new command still runs.
+    let activeCommand: number | null = null;
     const refresh = async (notice = ""): Promise<void> => {
       if (refreshing) return;
       refreshing = true;
@@ -169,6 +175,8 @@ export function installContainerSettings(
       });
       const command = next.command;
       if (command === null || command === undefined) return;
+      if (activeCommand === command.at) return;
+      activeCommand = command.at;
       let notice = "";
       try {
         switch (command.op) {
@@ -353,6 +361,10 @@ export function installContainerSettings(
           notice: error instanceof Error ? error.message : String(error),
           command: null,
         });
+      } finally {
+        // A new command may already have claimed the slot during the trailing
+        // refresh, so only release the claim this invocation owns.
+        if (activeCommand === command.at) activeCommand = null;
       }
     };
 

@@ -69,6 +69,12 @@ export interface CardState {
   socketsRoot: string;
   socketsRootDraft: string;
   projectsRoot: string;
+  // The harness's host-side directory picker, when this deployment mounts one;
+  // the card hides the project-mount browse affordance without it. Published
+  // through the store (not the slot inject face) because the slot renderer
+  // memoizes an entry's inject result for the registration's lifetime, so a
+  // value that arrives after the first render would otherwise never appear.
+  directoryPicker?: DirectoryPickerFace;
   workspaces: readonly WorkspaceView[];
   containers: readonly ContainerView[];
   images: readonly ImageView[];
@@ -112,9 +118,6 @@ export interface ContainerCardFace {
   editSocketsRoot: (text: string) => void;
   saveSocketsRoot: () => void;
   discardSocketsRoot: () => void;
-  // The harness's host-side directory picker, when this deployment mounts one;
-  // the card hides the project-mount browse affordance without it.
-  directoryPicker?: DirectoryPickerFace;
 }
 
 const EMPTY_SNAPSHOT: CardSnapshot = {
@@ -141,6 +144,7 @@ export class ContainerCardController {
   private snapshot: CardSnapshot = EMPTY_SNAPSHOT;
   private busy = false;
   private notice = "";
+  private directoryPicker: DirectoryPickerFace | undefined;
 
   constructor(
     private readonly scope: SettingsScope<ContainerSettings>,
@@ -173,6 +177,9 @@ export class ContainerCardController {
       socketsRoot: value?.socketsRoot ?? "",
       socketsRootDraft: this.draft("socketsRoot", value?.socketsRoot ?? ""),
       projectsRoot: this.snapshot.projectsRoot,
+      ...(this.directoryPicker === undefined
+        ? {}
+        : { directoryPicker: this.directoryPicker }),
       workspaces: this.snapshot.workspaces,
       containers: this.snapshot.containers,
       images: this.snapshot.images,
@@ -184,6 +191,13 @@ export class ContainerCardController {
 
   private publish(): void {
     this.store.set(this.project());
+  }
+
+  // setDirectoryPicker records the harness's directory picker (or clears it)
+  // and republishes, so the card shows or hides the browse affordance.
+  setDirectoryPicker(picker: DirectoryPickerFace | undefined): void {
+    this.directoryPicker = picker;
+    this.publish();
   }
 
   private command(

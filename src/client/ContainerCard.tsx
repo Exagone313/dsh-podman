@@ -121,7 +121,7 @@ export function ContainerCard(props: ContainerCardProps): ReactNode {
                 busy={state.busy}
                 defaultImage={state.defaultImage}
                 projectsRoot={state.projectsRoot}
-                directoryPicker={props.directoryPicker}
+                directoryPicker={state.directoryPicker}
                 onRemove={props.remove}
                 onRemoveWorkspace={props.removeWorkspace}
                 onRecreate={props.recreate}

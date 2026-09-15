@@ -9,10 +9,7 @@ import type {} from "@deepseek-ai/dsh-client-ui-conversation/client";
 import type {} from "@deepseek-ai/dsh-client-locale/client";
 import type {} from "@deepseek-ai/dsh-api-remotes/client";
 import type {} from "./slot-contract.js";
-import {
-  buildDirectoryPicker,
-  type DirectoryPickerFace,
-} from "./directory-picker.js";
+import { buildDirectoryPicker } from "./directory-picker.js";
 import { ContainerCard } from "./ContainerCard.js";
 import {
   BUILTIN_PROMPT_PREFIX,
@@ -68,13 +65,15 @@ export function apply(ctx: ClientContext): void {
   // The harness's own directory picker backs the project-mount browse dialog:
   // it lists directories on the dsh host, so a chosen project path is a host
   // path under the projects root — never a container path and never an
-  // orchestrator call. The service is optional: without it the card hides the
-  // browse affordance and the field stays a plain input.
-  let directoryPicker: DirectoryPickerFace | undefined;
-  ctx.inject(["remote.directoryPicker"], (pickerCtx: any) => {
-    directoryPicker = buildDirectoryPicker(pickerCtx.remote);
+  // orchestrator call. Both `remote` and its `directoryPicker` namespace are
+  // injected: the namespace is a child service, and reading `ctx.remote.<ns>`
+  // through the parent requires injecting the parent too. The face goes to the
+  // controller so the card republishes when the service mounts or unmounts; the
+  // service is optional, and without it the card hides the browse affordance.
+  ctx.inject(["remote", "remote.directoryPicker"], (pickerCtx: any) => {
+    controller.setDirectoryPicker(buildDirectoryPicker(pickerCtx.remote));
     pickerCtx.effect(() => () => {
-      directoryPicker = undefined;
+      controller.setDirectoryPicker(undefined);
     }, "podman: directory picker");
   });
 
@@ -84,10 +83,7 @@ export function apply(ctx: ClientContext): void {
         name: "settings.plugin.item",
         key: CONTAINER_NS,
         locale: NS,
-        inject: () => ({
-          ...controller.inject(),
-          directoryPicker,
-        }),
+        inject: () => controller.inject(),
       },
       ContainerCard,
     ),

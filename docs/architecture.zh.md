@@ -78,6 +78,14 @@ API 的 `SetPaths`/`GetPaths`），并添加到它启动的每个进程的 PATH 
 和文件系统工具也能看到它们。更改列表不会重建容器，因此先前启动的守护进程仍使用旧的
 PATH。
 
+在 `read-only` 权限下，harness 沙箱无法约束命令（插件替换了
+`ctx.subprocess`/`ctx.fs` 并解开了 `landlock-run`
+包装），因此由插件自行执行该模式：只有当所有带模式的挂载都是 `read_only`
+时，shell 或文件工具才能运行。否则插件会以保留的工具名
+`dsh_podman_builtin_remount_read_only` 通过审批服务询问——浏览器端会用其自己的
+**重新挂载并运行**
+按钮渲染该提示——并在获准后以强制只读的挂载重建容器，再运行该工具。
+
 重新创建容器或关闭 orchestrator 时，会先要求容器的 guest agent
 优雅地停止其守护进程（SIGTERM，约 10 秒宽限期），然后 podman 才会拆除该容器。
 

@@ -93,6 +93,15 @@ of every process it starts, including the plugin's `ctx.subprocess` provider, so
 the built-in shell and filesystem tools see them too. Changing the list does not
 recreate the container, so daemons started earlier keep their old PATH.
 
+Under `read-only` permission the harness sandbox cannot confine commands (the
+plugin replaces `ctx.subprocess`/`ctx.fs` and unwraps the `landlock-run`
+wrapper), so the plugin enforces the mode itself: a shell or file tool runs only
+when every mount that carries a mode is `read_only`. Otherwise the plugin asks
+through the approval service under the reserved tool name
+`dsh_podman_builtin_remount_read_only` — which the browser half renders with its
+own **Remount & run** labels — and, on approval, recreates the container with
+the read-write mounts forced read-only before running the tool.
+
 Recreating a container or shutting down the orchestrator first asks the
 container's guest agent to gracefully stop its daemons (SIGTERM, ~10s grace)
 before podman tears the container down.

@@ -63,9 +63,16 @@ policy):
   `container_list`, `container_read`, `container_glob`, `container_grep`,
   `container_mount_list`, `volume_list`, `secret_list`, `daemon_list`,
   `daemon_logs`); every other plugin tool is denied. The built-in file and shell
-  tools (`write`, `edit`, `bash`, and `pwsh` on Windows) are denied too, because
-  the harness sandbox that would confine them is bypassed inside the container;
-  `read`, `glob`, and `grep` still run.
+  tools (`write`, `edit`, `bash`, and `pwsh` on Windows) and their container
+  counterparts (`container_bash`, `container_exec`, `container_write`,
+  `container_edit`, `daemon_start`) run when every mount of the target container
+  that carries a mode (project and volume; tmpfs and secrets do not) is already
+  `read_only` — the harness sandbox that would confine them is bypassed inside
+  the container. When a read-write mount would block one of them, the plugin
+  asks through DSH's approval service with a prompt listing the mounts it would
+  remount `read_only` and those it keeps, then recreates the container with the
+  read-only list before running the tool; a rejected prompt denies the call.
+  `read`, `glob`, and `grep` always run.
 - **Workspace Write** — the `✱` tools ask through DSH's approval service (the
   call shows the standard approval prompt and is denied when no approval channel
   is available); `container_start` asks only when `mounts` is passed.

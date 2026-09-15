@@ -50,10 +50,14 @@ dsh-podman 将容器运行的镜像组织为三个层级：
 策略执行，该策略读取会话生效的权限旋钮（沙箱模式 + 审批策略）：
 
 - **Read Only** — 只有 get/list
-  类工具可以运行（`image_list`、`image_get`、`container_list`、`container_read`、`container_glob`、`container_grep`、`container_mount_list`、`volume_list`、`secret_list`、`daemon_list`、`daemon_logs`）；其他所有插件工具都被拒绝。内置的文件与
-  shell 工具（`write`、`edit`、`bash`，以及 Windows 上的
-  `pwsh`）也会被拒绝，因为本应约束它们的 harness
-  沙箱在容器内被绕过；`read`、`glob` 和 `grep` 仍可运行。
+  类工具可以运行（`image_list`、`image_get`、`container_list`、`container_read`、`container_glob`、`container_grep`、`container_mount_list`、`volume_list`、`secret_list`、`daemon_list`、`daemon_logs`）；其他所有插件工具都被拒绝。当目标容器中所有带模式的挂载（项目与卷；tmpfs
+  与机密不带模式）都已是 `read_only` 时，内置的文件与 shell
+  工具（`write`、`edit`、`bash`，以及 Windows 上的
+  `pwsh`）及其容器对应工具（`container_bash`、`container_exec`、`container_write`、`container_edit`、`daemon_start`）可以运行——本应约束它们的
+  harness 沙箱在容器内被绕过。当某个读写挂载会阻止这些工具时，插件会通过 DSH
+  的审批服务询问，提示中列出将被重新挂载为 `read_only`
+  的挂载与保持不变的挂载，然后以只读挂载列表重建容器再运行该工具；拒绝该提示会拒绝此次调用。`read`、`glob`
+  和 `grep` 始终可运行。
 - **Workspace Write** — 带 `✱` 的工具通过 DSH
   的审批服务询问（调用会显示标准审批提示，当没有可用的审批通道时被拒绝）；`container_start`
   仅在传入 `mounts` 时询问。

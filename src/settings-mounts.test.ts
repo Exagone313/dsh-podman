@@ -10,8 +10,8 @@ import {
   fakeScope,
   installedMountScope,
   mountCommand,
-} from "./settings-bridge-support.js";
-import { installContainerSettings } from "./settings-bridge.js";
+} from "./card-test-support.js";
+import { installCardCommandDriver } from "./card-test-support.js";
 
 test("create command drives createWorkspace with mounts and image", async () => {
   const scope = fakeScope(baseValue());
@@ -27,7 +27,7 @@ test("create command drives createWorkspace with mounts and image", async () => 
       return {};
     },
   };
-  installContainerSettings(fakeContext(scope), resolver);
+  await installCardCommandDriver(fakeContext(scope), resolver);
   await scope.update({
     command: {
       op: "create",
@@ -67,7 +67,7 @@ test("container_mount_add command drives addContainerMount for each kind", async
       return {};
     },
   };
-  installContainerSettings(fakeContext(scope), resolver);
+  await installCardCommandDriver(fakeContext(scope), resolver);
   await scope.update({
     command: {
       op: "container_mount_add",
@@ -189,7 +189,7 @@ test("container_mount_remove command drives removeContainerMount for each kind",
       return {};
     },
   };
-  installContainerSettings(fakeContext(scope), resolver);
+  await installCardCommandDriver(fakeContext(scope), resolver);
   await scope.update({
     command: {
       op: "container_mount_remove",
@@ -480,7 +480,7 @@ test("listContainers container mounts carry the raw proto fields", async () => {
       return {};
     },
   };
-  installContainerSettings(fakeContext(scope), resolver);
+  await installCardCommandDriver(fakeContext(scope), resolver);
   await scope.update({});
   assert.deepEqual((scope.value.containers as any[])[0].mounts[0], {
     projectName: "team/src",

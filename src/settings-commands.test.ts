@@ -10,8 +10,8 @@ import {
   baseValue,
   installedMountScope,
   mountCommand,
-} from "./settings-bridge-support.js";
-import { installContainerSettings } from "./settings-bridge.js";
+} from "./card-test-support.js";
+import { installCardCommandDriver } from "./card-test-support.js";
 
 test("remove command drives removeContainer and clears the command", async () => {
   const scope = fakeScope(baseValue());
@@ -26,7 +26,7 @@ test("remove command drives removeContainer and clears the command", async () =>
       return {};
     },
   };
-  installContainerSettings(fakeContext(scope), resolver);
+  await installCardCommandDriver(fakeContext(scope), resolver);
   await scope.update({
     command: { op: "remove", workspace: "w1", image: "", at: 1 },
   });
@@ -49,7 +49,7 @@ test("workspace_remove command drives removeWorkspace and clears the command", a
       return {};
     },
   };
-  installContainerSettings(fakeContext(scope), resolver);
+  await installCardCommandDriver(fakeContext(scope), resolver);
   await scope.update({
     command: { op: "workspace_remove", workspace: "w1", image: "", at: 2 },
   });
@@ -76,7 +76,7 @@ test("cache_clean command drives cleanCaches, maps the mode, and reports the res
       return {};
     },
   };
-  installContainerSettings(fakeContext(scope), resolver);
+  await installCardCommandDriver(fakeContext(scope), resolver);
   await scope.update({
     command: { op: "cache_clean", workspace: "", image: "", at: 3, cacheMode: "all" },
   });
@@ -113,7 +113,7 @@ test("volume_remove command drives removeVolume with the name", async () => {
       return {};
     },
   };
-  installContainerSettings(fakeContext(scope), resolver);
+  await installCardCommandDriver(fakeContext(scope), resolver);
   await scope.update({
     command: { op: "volume_remove", workspace: "cache", image: "", at: 4 },
   });
@@ -138,7 +138,7 @@ test("image_remove command drives removeImage with the imageId", async () => {
       return {};
     },
   };
-  installContainerSettings(fakeContext(scope), resolver);
+  await installCardCommandDriver(fakeContext(scope), resolver);
   await scope.update({
     command: { op: "image_remove", workspace: "valkey", image: "", at: 5 },
   });
@@ -164,7 +164,7 @@ test("secret_remove command drives removeSecret with the name", async () => {
       return {};
     },
   };
-  installContainerSettings(fakeContext(scope), resolver);
+  await installCardCommandDriver(fakeContext(scope), resolver);
   await scope.update({
     command: { op: "secret_remove", workspace: "db-pass", image: "", at: 7, mounts: [], value: "" },
   });
@@ -190,7 +190,7 @@ test("secret_set command drives writeSecretValue with the name and value", async
       return {};
     },
   };
-  installContainerSettings(fakeContext(scope), resolver);
+  await installCardCommandDriver(fakeContext(scope), resolver);
   await scope.update({
     command: { op: "secret_set", workspace: "db-pass", image: "", at: 8, mounts: [], value: "s3cr3t" },
   });
@@ -216,7 +216,7 @@ test("image_rebuild command drives rebuildImage with the imageId", async () => {
       return {};
     },
   };
-  installContainerSettings(fakeContext(scope), resolver);
+  await installCardCommandDriver(fakeContext(scope), resolver);
   await scope.update({
     command: { op: "image_rebuild", workspace: "valkey", image: "", at: 9 },
   });
@@ -242,7 +242,7 @@ test("image_rebuild_all command drives rebuildAllImages with an empty payload", 
       return {};
     },
   };
-  installContainerSettings(fakeContext(scope), resolver);
+  await installCardCommandDriver(fakeContext(scope), resolver);
   await scope.update({
     command: { op: "image_rebuild_all", workspace: "", image: "", at: 10 },
   });
@@ -268,7 +268,7 @@ test("image_base_rebuild command drives rebuildBaseImage with the name", async (
       return {};
     },
   };
-  installContainerSettings(fakeContext(scope), resolver);
+  await installCardCommandDriver(fakeContext(scope), resolver);
   await scope.update({
     command: { op: "image_base_rebuild", workspace: "archlinux", image: "", at: 21 },
   });
@@ -294,7 +294,7 @@ test("image_base_pull command drives pullBaseImage with the name", async () => {
       return {};
     },
   };
-  installContainerSettings(fakeContext(scope), resolver);
+  await installCardCommandDriver(fakeContext(scope), resolver);
   await scope.update({
     command: { op: "image_base_pull", workspace: "archlinux", image: "", at: 22 },
   });
@@ -320,7 +320,7 @@ test("image_build command drives buildImage with the imageId, parent and package
       return {};
     },
   };
-  installContainerSettings(fakeContext(scope), resolver);
+  await installCardCommandDriver(fakeContext(scope), resolver);
   await scope.update({
     command: {
       op: "image_build",
@@ -356,7 +356,7 @@ test("container_secret_add command drives addContainerSecret with env and secret
       return {};
     },
   };
-  installContainerSettings(fakeContext(scope), resolver);
+  await installCardCommandDriver(fakeContext(scope), resolver);
   await scope.update({
     command: {
       op: "container_secret_add",
@@ -395,7 +395,7 @@ test("container_secret_add command uses the default container when omitted", asy
       return {};
     },
   };
-  installContainerSettings(fakeContext(scope), resolver);
+  await installCardCommandDriver(fakeContext(scope), resolver);
   await scope.update({
     command: {
       op: "container_secret_add",
@@ -434,7 +434,7 @@ test("container_secret_remove command drives removeContainerSecret with the defa
       return {};
     },
   };
-  installContainerSettings(fakeContext(scope), resolver);
+  await installCardCommandDriver(fakeContext(scope), resolver);
   await scope.update({
     command: {
       op: "container_secret_remove",

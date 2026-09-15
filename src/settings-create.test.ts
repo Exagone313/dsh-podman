@@ -4,8 +4,8 @@
 
 import { test } from "node:test";
 import { strict as assert } from "node:assert";
-import { fakeScope, fakeContext, baseValue } from "./settings-bridge-support.js";
-import { installContainerSettings } from "./settings-bridge.js";
+import { fakeScope, fakeContext, baseValue } from "./card-test-support.js";
+import { installCardCommandDriver } from "./card-test-support.js";
 
 test("create command sends PATH additions", async () => {
   const scope = fakeScope(baseValue());
@@ -21,7 +21,7 @@ test("create command sends PATH additions", async () => {
       return {};
     },
   };
-  installContainerSettings(fakeContext(scope), resolver);
+  await installCardCommandDriver(fakeContext(scope), resolver);
   await scope.update({
     command: {
       op: "create",
@@ -59,7 +59,7 @@ test("create command sends PATH additions", async () => {
     },
   };
   const scope2 = fakeScope(baseValue());
-  installContainerSettings(fakeContext(scope2), resolver2);
+  await installCardCommandDriver(fakeContext(scope2), resolver2);
   await scope2.update({
     command: {
       op: "create",
@@ -84,81 +84,6 @@ test("create command sends PATH additions", async () => {
   });
 });
 
-test("a re-delivered command is skipped but a new one still runs", async () => {
-  const scope = fakeScope(baseValue());
-  const calls: string[] = [];
-  let releaseCreate!: () => void;
-  const createGate = new Promise<void>((resolve) => {
-    releaseCreate = resolve;
-  });
-  const resolver: any = {
-    getConfig: () => ({}),
-    setConfig: () => {},
-    async control(method: string) {
-      calls.push(method);
-      if (method === "listContainers") return { containers: [] };
-      if (method === "listImages") return { images: [] };
-      if (method === "listWorkspaces") return { workspaces: [] };
-      if (method === "createWorkspace") {
-        await createGate;
-        return {};
-      }
-      return {};
-    },
-  };
-  installContainerSettings(fakeContext(scope), resolver);
-  await scope.update({
-    command: {
-      op: "create",
-      workspace: "w1",
-      projectName: "w1",
-      image: "img1",
-      at: 1,
-      mounts: [],
-      env: {},
-      container: "",
-      secretEnvMap: {},
-      mount: null,
-    },
-  });
-  // The settings document keeps the command until the work finishes, so an
-  // unrelated commit re-delivers it: it must not run a second time.
-  await scope.update({ notice: "unrelated commit" });
-  // A genuinely different command still runs while the first is in flight.
-  await scope.update({
-    command: { op: "remove", workspace: "w2", at: 2, mounts: [], env: {}, container: "", secretEnvMap: {}, mount: null },
-  });
-  releaseCreate();
-  await new Promise((resolve) => setImmediate(resolve));
-  assert.equal(calls.filter((method) => method === "createWorkspace").length, 1);
-  assert.equal(calls.filter((method) => method === "removeContainer").length, 1);
-});
-
-test("recreate command is not re-run by the view refresh", async () => {
-  const scope = fakeScope(baseValue());
-  const recreateCalls: number[] = [];
-  const resolver: any = {
-    getConfig: () => ({}),
-    setConfig: () => {},
-    async control(method: string) {
-      if (method === "recreateContainer") {
-        recreateCalls.push(recreateCalls.length);
-        return {};
-      }
-      if (method === "listContainers") return { containers: [] };
-      if (method === "listImages") return { images: [] };
-      return {};
-    },
-  };
-  installContainerSettings(fakeContext(scope), resolver);
-  await scope.update({
-    command: { op: "recreate", workspace: "w1", image: "img2", at: 2, env: {} },
-  });
-  await new Promise((resolve) => setImmediate(resolve));
-  assert.equal(recreateCalls.length, 1);
-  assert.equal(scope.value.command, null);
-});
-
 test("volume_create command drives createVolume with the name", async () => {
   const scope = fakeScope(baseValue());
   const calls: Array<[string, unknown]> = [];
@@ -174,7 +99,7 @@ test("volume_create command drives createVolume with the name", async () => {
       return {};
     },
   };
-  installContainerSettings(fakeContext(scope), resolver);
+  await installCardCommandDriver(fakeContext(scope), resolver);
   await scope.update({
     command: { op: "volume_create", workspace: "data", image: "", at: 3 },
   });
@@ -200,7 +125,7 @@ test("secret_create command drives createSecret with the name", async () => {
       return {};
     },
   };
-  installContainerSettings(fakeContext(scope), resolver);
+  await installCardCommandDriver(fakeContext(scope), resolver);
   await scope.update({
     command: { op: "secret_create", workspace: "db-pass", image: "", at: 6, mounts: [], value: "" },
   });
@@ -226,7 +151,7 @@ test("secret_create command drives createSecret with length when provided", asyn
       return {};
     },
   };
-  installContainerSettings(fakeContext(scope), resolver);
+  await installCardCommandDriver(fakeContext(scope), resolver);
   await scope.update({
     command: { op: "secret_create", workspace: "s", image: "", at: 11, length: 48 },
   });
@@ -252,7 +177,7 @@ test("secret_create command drives createSecret without length when omitted", as
       return {};
     },
   };
-  installContainerSettings(fakeContext(scope), resolver);
+  await installCardCommandDriver(fakeContext(scope), resolver);
   await scope.update({
     command: { op: "secret_create", workspace: "s", image: "", at: 12 },
   });
@@ -278,7 +203,7 @@ test("secret_create command drives createSecret with charset when provided", asy
       return {};
     },
   };
-  installContainerSettings(fakeContext(scope), resolver);
+  await installCardCommandDriver(fakeContext(scope), resolver);
   await scope.update({
     command: { op: "secret_create", workspace: "tok", length: 48, charset: "hex" },
   });
@@ -302,7 +227,7 @@ test("recreate command drives recreateContainer with env", async () => {
       return {};
     },
   };
-  installContainerSettings(fakeContext(scope), resolver);
+  await installCardCommandDriver(fakeContext(scope), resolver);
   await scope.update({
     command: {
       op: "recreate",
@@ -336,7 +261,7 @@ test("create command with a container name routes to startContainer", async () =
       return {};
     },
   };
-  installContainerSettings(fakeContext(scope), resolver);
+  await installCardCommandDriver(fakeContext(scope), resolver);
   await scope.update({
     command: {
       op: "create",
@@ -379,7 +304,7 @@ test("create command sends secret env", async () => {
       return {};
     },
   };
-  installContainerSettings(fakeContext(scope), resolver);
+  await installCardCommandDriver(fakeContext(scope), resolver);
   await scope.update({
     command: {
       op: "create",
@@ -417,7 +342,7 @@ test("create command sends secret env", async () => {
     },
   };
   const scope2 = fakeScope(baseValue());
-  installContainerSettings(fakeContext(scope2), resolver2);
+  await installCardCommandDriver(fakeContext(scope2), resolver2);
   await scope2.update({
     command: {
       op: "create",

@@ -4,8 +4,8 @@
 
 import { test } from "node:test";
 import { strict as assert } from "node:assert";
-import { baseValue, fakeContext, fakeScope } from "./settings-bridge-support.js";
-import { installContainerSettings } from "./settings-bridge.js";
+import { baseValue, fakeContext, fakeScope } from "./card-test-support.js";
+import { installCardCommandDriver } from "./card-test-support.js";
 import { WORKSPACE_ID } from "./test-support.js";
 
 test("refresh on install publishes containers, images and workspaces", async () => {
@@ -38,7 +38,7 @@ test("refresh on install publishes containers, images and workspaces", async () 
       return {};
     },
   };
-  installContainerSettings(fakeContext(scope), resolver);
+  await installCardCommandDriver(fakeContext(scope), resolver);
   await scope.update({}); // settle the queued async refresh
   assert.deepEqual(
     calls.map(([method]) => method),
@@ -67,7 +67,7 @@ test("handle never writes projectsRoot into setConfig", async () => {
       return {};
     },
   };
-  installContainerSettings(fakeContext(scope), resolver);
+  await installCardCommandDriver(fakeContext(scope), resolver);
   await scope.update({});
   await new Promise((resolve) => setImmediate(resolve));
   assert.ok(setConfigCalls.length > 0, "handle must write resolver config");
@@ -79,7 +79,7 @@ test("handle never writes projectsRoot into setConfig", async () => {
   }
 });
 
-test("settings seed projectsRoot from the resolver config", async () => {
+test("settings seed the image and sockets root from the resolver config", async () => {
   let registeredBase: Record<string, unknown> | undefined;
   const scope = fakeScope(baseValue());
   const context: any = {
@@ -110,8 +110,9 @@ test("settings seed projectsRoot from the resolver config", async () => {
       return {};
     },
   };
-  installContainerSettings(context, resolver);
-  assert.equal(registeredBase?.projectsRoot, "/projects");
+  await installCardCommandDriver(context, resolver);
+  assert.equal(registeredBase?.defaultImage, "archlinux");
+  assert.equal(registeredBase?.socketsRoot, "/run/dsh-podman");
 });
 
 test("create command drives createWorkspace with env", async () => {
@@ -128,7 +129,7 @@ test("create command drives createWorkspace with env", async () => {
       return {};
     },
   };
-  installContainerSettings(fakeContext(scope), resolver);
+  await installCardCommandDriver(fakeContext(scope), resolver);
   await scope.update({
     command: {
       op: "create",
@@ -168,7 +169,7 @@ test("create command drives createWorkspace without env when empty", async () =>
       return {};
     },
   };
-  installContainerSettings(fakeContext(scope), resolver);
+  await installCardCommandDriver(fakeContext(scope), resolver);
   await scope.update({
     command: {
       op: "create",
@@ -213,7 +214,7 @@ test("workspace list comes from the dsh registry even without orchestrator state
       return {};
     },
   };
-  installContainerSettings(fakeContext(scope), resolver, registry);
+  await installCardCommandDriver(fakeContext(scope), resolver, registry);
   await scope.update({});
   const workspaces = scope.value.workspaces as any[];
   assert.equal(workspaces.length, 1);
@@ -256,7 +257,7 @@ test("dsh workspace layers orchestrator container info", async () => {
       return {};
     },
   };
-  installContainerSettings(fakeContext(scope), resolver, registry);
+  await installCardCommandDriver(fakeContext(scope), resolver, registry);
   await scope.update({});
   const workspaces = scope.value.workspaces as any[];
   assert.equal(workspaces.length, 1);

@@ -4,8 +4,8 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
-import { baseValue, fakeContext, fakeScope } from "./settings-bridge-support.js";
-import { installContainerSettings } from "./settings-bridge.js";
+import { baseValue, fakeContext, fakeScope } from "./card-test-support.js";
+import { installCardCommandDriver } from "./card-test-support.js";
 import { WORKSPACE_ID } from "./test-support.js";
 
 test("container_path_set command persists the list and pushes it to the guest", async () => {
@@ -36,7 +36,7 @@ test("container_path_set command persists the list and pushes it to the guest", 
       return {};
     },
   };
-  installContainerSettings(fakeContext(scope), resolver, {
+  await installCardCommandDriver(fakeContext(scope), resolver, {
     list: () => [{ id: WORKSPACE_ID, path: "/projects/team" }],
   });
   await scope.update({});

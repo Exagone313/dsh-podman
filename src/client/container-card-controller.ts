@@ -30,6 +30,7 @@ export interface ContainerCreateConfig {
   image?: string;
   env?: Record<string, string>;
   mounts?: readonly MountInput[];
+  paths?: readonly string[];
   secretEnv?: Record<string, string>;
 }
 export interface ContainerView {
@@ -287,6 +288,7 @@ export class ContainerCardController {
             projectName: workspace.projectName,
             ...(config?.mounts && config.mounts.length > 0 ? { mounts: config.mounts } : {}),
             ...(config?.env && Object.keys(config.env).length > 0 ? { env: config.env } : {}),
+            ...(config?.paths && config.paths.length > 0 ? { paths: config.paths } : {}),
             ...(config?.secretEnv && Object.keys(config.secretEnv).length > 0 ? { secretEnvMap: config.secretEnv } : {}),
           },
         ),
@@ -299,6 +301,7 @@ export class ContainerCardController {
             container,
             ...(config?.mounts && config.mounts.length > 0 ? { mounts: config.mounts } : {}),
             ...(config?.env && Object.keys(config.env).length > 0 ? { env: config.env } : {}),
+            ...(config?.paths && config.paths.length > 0 ? { paths: config.paths } : {}),
             ...(config?.secretEnv && Object.keys(config.secretEnv).length > 0 ? { secretEnvMap: config.secretEnv } : {}),
           },
         ),

@@ -9,6 +9,7 @@ import {
   type WorkspaceView,
 } from "./container-card-controller.js";
 import { EnvEditor, MountsEditor } from "./container-card-editors.js";
+import { PathsList, type PathEntry } from "./container-card-paths.js";
 import { Field, namePattern, sanitizeName } from "./container-card-shared.js";
 import { greyId, hint, imageSelect, sectionTitle } from "./container-card-styles.js";
 import { type ContainerPluginKey } from "./locales.js";
@@ -57,6 +58,7 @@ export function CreateContainerModal(props: {
     },
   ]);
   const [secretEnv, setSecretEnv] = useState<Record<string, string>>({});
+  const [paths, setPaths] = useState<PathEntry[]>([]);
   const [attachSecret, setAttachSecret] = useState("");
   const [attachVar, setAttachVar] = useState("");
   const imageLabel = useId();
@@ -77,6 +79,7 @@ export function CreateContainerModal(props: {
       },
     ]);
     setSecretEnv({});
+    setPaths([]);
     setAttachSecret("");
     setAttachVar("");
   }, [open, workspace, defaultImage]);
@@ -95,6 +98,7 @@ export function CreateContainerModal(props: {
       image,
       env,
       mounts,
+      paths: paths.map((entry) => entry.path).filter((path) => path !== ""),
       secretEnv,
     });
   };
@@ -187,6 +191,8 @@ export function CreateContainerModal(props: {
             setMounts(mounts.filter((item) => item !== mount))
           }
         />
+        <div style={sectionTitle}>{t("pathsTitle")}</div>
+        <PathsList t={t} entries={paths} busy={busy} onChange={setPaths} />
         <div style={sectionTitle}>{t("containerSecretsTitle")}</div>
         {Object.entries(secretEnv).map(([envVar, secretName]) => (
           <div

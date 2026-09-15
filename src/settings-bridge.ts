@@ -183,6 +183,7 @@ export function installContainerSettings(
             if (mounts.length > 0) payload.mounts = mounts;
             if (Object.keys(command.env).length > 0) payload.env = command.env;
             if (Object.keys(command.secretEnvMap).length > 0) payload.secretEnv = command.secretEnvMap;
+            if (command.paths !== undefined && command.paths.length > 0) payload.paths = [...command.paths];
             if (command.container !== "") {
               await resolver.control("startContainer", { ...payload, container: command.container });
             } else {

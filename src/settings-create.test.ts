@@ -7,6 +7,83 @@ import { strict as assert } from "node:assert";
 import { fakeScope, fakeContext, baseValue } from "./settings-bridge-support.js";
 import { installContainerSettings } from "./settings-bridge.js";
 
+test("create command sends PATH additions", async () => {
+  const scope = fakeScope(baseValue());
+  const calls: Array<[string, unknown]> = [];
+  const resolver: any = {
+    getConfig: () => ({}),
+    setConfig: () => {},
+    async control(method: string, request: unknown) {
+      calls.push([method, request]);
+      if (method === "listContainers") return { containers: [] };
+      if (method === "listImages") return { images: [] };
+      if (method === "listWorkspaces") return { workspaces: [] };
+      return {};
+    },
+  };
+  installContainerSettings(fakeContext(scope), resolver);
+  await scope.update({
+    command: {
+      op: "create",
+      workspace: "w1",
+      projectName: "w1",
+      image: "img1",
+      at: 1,
+      mounts: [],
+      paths: ["/opt/bin"],
+      env: {},
+      container: "",
+      secretEnvMap: {},
+      mount: null,
+    },
+  });
+  await new Promise((resolve) => setImmediate(resolve));
+  const createCall = calls.find(([method]) => method === "createWorkspace");
+  assert.deepEqual(createCall?.[1], {
+    workspaceSlug: "w1",
+    projectName: "w1",
+    imageId: "img1",
+    paths: ["/opt/bin"],
+  });
+
+  const calls2: Array<[string, unknown]> = [];
+  const resolver2: any = {
+    getConfig: () => ({}),
+    setConfig: () => {},
+    async control(method: string, request: unknown) {
+      calls2.push([method, request]);
+      if (method === "listContainers") return { containers: [] };
+      if (method === "listImages") return { images: [] };
+      if (method === "listWorkspaces") return { workspaces: [] };
+      return {};
+    },
+  };
+  const scope2 = fakeScope(baseValue());
+  installContainerSettings(fakeContext(scope2), resolver2);
+  await scope2.update({
+    command: {
+      op: "create",
+      workspace: "w1",
+      container: "dev",
+      image: "img1",
+      at: 2,
+      mounts: [],
+      paths: ["/opt/bin", "/usr/local/bin"],
+      env: {},
+      secretEnvMap: {},
+      mount: null,
+    },
+  });
+  await new Promise((resolve) => setImmediate(resolve));
+  const startCall = calls2.find(([method]) => method === "startContainer");
+  assert.deepEqual(startCall?.[1], {
+    workspaceSlug: "w1",
+    imageId: "img1",
+    container: "dev",
+    paths: ["/opt/bin", "/usr/local/bin"],
+  });
+});
+
 test("recreate command is not re-run by the view refresh", async () => {
   const scope = fakeScope(baseValue());
   const recreateCalls: number[] = [];

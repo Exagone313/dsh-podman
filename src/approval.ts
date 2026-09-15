@@ -437,3 +437,23 @@ export function mountDestinationsReason(
   }
   return undefined;
 }
+
+// The harness's sandbox-escalation reason prefix. `approveEscalation` builds it
+// as `escalate sandbox to <mode>: <justification>` in English regardless of the
+// UI language (it is the asker's audit reason, not localized copy), and every
+// escalating tool (bash, pwsh, the fs tools) goes through that one helper.
+export const SANDBOX_ESCALATION_REASON_PREFIX = "escalate sandbox to ";
+
+// Whether an approval request is the harness asking to widen the sandbox mode
+// for one call. In this deployment the sandbox is bypassed inside the container
+// (the plugin replaces ctx.subprocess/ctx.fs and unwraps the landlock-run
+// fence), so the grant changes nothing and the prompt is noise. Matching the
+// reason rather than the tool name keeps a real approval for the same tool
+// from ever being claimed: if the wording changes, the prompt simply returns.
+export function isSandboxEscalation(request: unknown): boolean {
+  const reason = (request as { reason?: unknown } | undefined)?.reason;
+  return (
+    typeof reason === "string" &&
+    reason.startsWith(SANDBOX_ESCALATION_REASON_PREFIX)
+  );
+}

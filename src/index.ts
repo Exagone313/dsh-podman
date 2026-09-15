@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: MIT
 
-import { preExecutePolicy, type SessionFacts } from "./approval.js";
+import { isSandboxEscalation, preExecutePolicy, type SessionFacts } from "./approval.js";
 import { resolveReasonLocale, type ReasonLocale } from "./approval-reasons.js";
 import { createFilesystemProvider } from "./fs-provider.js";
 import {
@@ -95,6 +95,18 @@ export function apply(ctx: any, config: PluginConfig = {}): void {
         readOnlyShellGate(),
       ),
   );
+  // The harness asks the user to widen the sandbox before a confined call (for
+  // example `bash` with `sandbox_permissions`). This deployment bypasses the
+  // sandbox inside the container, so the grant changes nothing: claim the
+  // request so a stray `sandbox_permissions` argument raises no prompt. The
+  // listener is prepended so it runs before the bridge that forwards approvals
+  // to the browser, and it delegates everything else.
+  ctx.on(
+    "approval/request",
+    (request: any, next: any) =>
+      isSandboxEscalation(request) ? Promise.resolve("allowed-once") : next(),
+    { prepend: true },
+  );
   ensurePodmanOpsPreset(ctx);
   const imagePrefix = withTrailingSlash(
     config.imagePrefix ?? process.env.DSH_PODMAN_IMAGE_PREFIX ?? "localhost/dsh-podman/",
@@ -162,7 +174,9 @@ export {
   PODMAN_OPS_APPROVAL_TOOLS,
   PODMAN_OPS_PRESET,
   READ_ONLY_TOOLS,
+  SANDBOX_ESCALATION_REASON_PREFIX,
   approvalDecision,
+  isSandboxEscalation,
   mountDestinationsReason,
   preExecutePolicy,
   summarizeArgs,

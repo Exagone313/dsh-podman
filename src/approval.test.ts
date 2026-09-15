@@ -12,12 +12,51 @@ import {
   PODMAN_OPS_AGENT_CORDIS_YML,
   PODMAN_OPS_PRESET_YML,
   READ_ONLY_TOOLS,
+  SANDBOX_ESCALATION_REASON_PREFIX,
   TOOLS,
   approvalDecision,
   ensurePodmanOpsPreset,
+  isSandboxEscalation,
   preExecutePolicy,
   summarizeArgs,
 } from "./index.js";
+
+test("isSandboxEscalation claims only the harness's sandbox escalation", () => {
+  assert.equal(SANDBOX_ESCALATION_REASON_PREFIX, "escalate sandbox to ");
+  assert.equal(
+    isSandboxEscalation({
+      toolName: "bash",
+      reason: "escalate sandbox to workspace-write: the user asked to write",
+    }),
+    true,
+  );
+  assert.equal(
+    isSandboxEscalation({
+      toolName: "pwsh",
+      reason: "escalate sandbox to danger-full-access: install a package",
+    }),
+    true,
+  );
+  // The plugin's own prompts never match, so they keep prompting.
+  assert.equal(
+    isSandboxEscalation({
+      toolName: "container_bash",
+      reason: 'Run a shell command in container "c": ls',
+    }),
+    false,
+  );
+  assert.equal(
+    isSandboxEscalation({
+      toolName: "dsh_podman_builtin_remount_read_only",
+      reason: 'Read-only mode blocks "bash" while a mount is read-write.',
+    }),
+    false,
+  );
+  // A real approval for the same tool must not be claimed.
+  assert.equal(isSandboxEscalation({ toolName: "bash" }), false);
+  assert.equal(isSandboxEscalation({ toolName: "bash", reason: 42 }), false);
+  assert.equal(isSandboxEscalation(undefined), false);
+});
 
 test("the destructive mutations require approval", () => {
   const approval = TOOLS.filter((tool) => tool.approval)

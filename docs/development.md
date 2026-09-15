@@ -94,14 +94,19 @@ systemctl --user restart dsh
 
 ## Continuous integration
 
-CI (`.github/workflows/ci.yml`) runs on every branch push and pull request:
+CI runs on every **branch** push and pull request, split across
+`.github/workflows/ci-common.yml` (REUSE lint and zizmor), `ci-code.yml` (Go,
+JS, images, Trivy), `ci-docs.yml` (Deno fmt) and `ci-dsh-image.yml`. A **tag**
+push runs only `release.yml`, which repeats the build, vet and tests itself:
 
 - **actions-lint** — zizmor scans the workflows for insecure practices.
+- **reuse** — REUSE license compliance.
 - **go** — build, vet, tests, and govulncheck (Go vulnerabilities). Unfixed
   findings don't fail the job; fixable ones do.
 - **js** — install, typecheck, build, tests, and `pnpm audit`.
+- **docs** — `deno fmt --check` on the Markdown.
 - **images** — builds the orchestrator and guest-agent images (runs only after
-  the test jobs pass).
+  the test jobs pass); **dsh image** builds `Containerfile.dsh`.
 - **trivy** — filesystem vulnerability scan (unfixed ignored) and container
   misconfiguration scan (DS-0002 excluded via `.trivyignore.yaml`).
 
@@ -115,9 +120,12 @@ pre-releases like `1.0.0-rc.1` also work). The release workflow
 
 1. Runs the tests, then builds both binaries for `linux/amd64` and
    `linux/arm64`.
-2. Pushes the **orchestrator** and **guest-agent** images to GHCR
-   (`ghcr.io/exagone313/dsh-podman/{orchestrator,guest-agent}`), tagged with the
-   version plus `latest` for stable releases (pre-releases never get `latest`).
+2. Pushes the **dsh**, **orchestrator** and **guest-agent** images to GHCR
+   (`ghcr.io/exagone313/dsh-podman/{dsh,orchestrator,guest-agent}`). Every
+   release is tagged with its version; a **stable** release — `1.0.0` or above
+   with no pre-release suffix — is also tagged with its major version (`1`) and
+   `latest`. A `0.x` release and any hyphenated tag are pre-releases: they get
+   the version tag only.
 3. Publishes the plugin to **npm** (`@exagone313/dsh-podman`) with provenance;
    pre-releases are published under the `next` dist-tag.
 4. Creates a **GitHub release** with auto-generated notes and attaches the

@@ -92,13 +92,20 @@ systemctl --user restart dsh
 
 ## 持续集成
 
-CI（`.github/workflows/ci.yml`）在每次分支推送和拉取请求时运行：
+CI 在每次**分支**推送和拉取请求时运行，分散在
+`.github/workflows/ci-common.yml`（REUSE lint 与
+zizmor）、`ci-code.yml`（Go、JS、镜像、Trivy）、`ci-docs.yml`（Deno fmt）和
+`ci-dsh-image.yml` 中。推送**标签**时只运行 `release.yml`，它自身会重复构建、vet
+和测试：
 
 - **actions-lint** — zizmor 扫描工作流是否存在不安全实践。
+- **reuse** — REUSE 许可证合规检查。
 - **go** — 构建、vet、测试和 govulncheck（Go 漏洞）。未修复的
   发现不会导致任务失败；可修复的会导致失败。
 - **js** — 安装、类型检查、构建、测试和 `pnpm audit`。
-- **images** — 构建 orchestrator 和 guest-agent 镜像（仅在测试任务通过后运行）。
+- **docs** — 对 Markdown 运行 `deno fmt --check`。
+- **images** — 构建 orchestrator 和 guest-agent
+  镜像（仅在测试任务通过后运行）；**dsh image** 构建 `Containerfile.dsh`。
 - **trivy** — 文件系统漏洞扫描（未修复的被忽略）和容器 错误配置扫描（DS-0002
   通过 `.trivyignore.yaml` 排除）。
 
@@ -110,9 +117,10 @@ CI（`.github/workflows/ci.yml`）在每次分支推送和拉取请求时运行�
 这样的预发布同样有效）触发。发布工作流 （`.github/workflows/release.yml`）：
 
 1. 运行测试，然后为 `linux/amd64` 和 `linux/arm64` 构建两个二进制文件。
-2. 将 **orchestrator** 和 **guest-agent** 镜像推送到 GHCR
-   （`ghcr.io/exagone313/dsh-podman/{orchestrator,guest-agent}`），并打上
-   版本号以及稳定版的 `latest` 标签（预发布永远不会获得 `latest`）。
+2. 将 **dsh**、**orchestrator** 和 **guest-agent** 镜像推送到 GHCR
+   （`ghcr.io/exagone313/dsh-podman/{dsh,orchestrator,guest-agent}`）。每个发布都打上其版本标签；**稳定**发布——`1.0.0`
+   及以上且不带预发布后缀——还会打上其主版本号（`1`）和 `latest`。`0.x`
+   发布以及任何带连字符的标签都属于预发布：只打版本标签。
 3. 将插件发布到 **npm**（`@exagone313/dsh-podman`），附带来源证明； 预发布在
    `next` dist-tag 下发布。
 4. 创建带有自动生成说明的 **GitHub release**，并附上 二进制文件和 npm tarball。

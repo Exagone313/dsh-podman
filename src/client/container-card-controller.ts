@@ -7,8 +7,28 @@ import type {
   SettingsScope,
   SettingsScopeSnapshot,
 } from "@deepseek-ai/dsh-client-ui-settings/client";
+import type {
+  CacheView,
+  CardSnapshot,
+  CommandOp,
+  CommandRequest,
+  ContainerView,
+  ImageView,
+  MountInput,
+  SecretView,
+  VolumeView,
+  WorkspaceView,
+} from "./card-protocol.js";
+import { createCardClient, type CardClient } from "./card-client.js";
 
 export const CONTAINER_NS = "podman";
+
+// The preferences the card edits, mirroring the host's settings namespace.
+export interface ContainerSettings {
+  defaultImage: string;
+  socketsRoot: string;
+  uiLocale?: string;
+}
 
 export interface ProjectMountView {
   projectName: string;
@@ -18,14 +38,6 @@ export interface ProjectMountView {
   volume: string;
   secret: string;
 }
-export interface MountInput {
-  kind: string;      // "project" | "tmpfs" | "volume" | "secret"
-  project: string;   // project path under the projects root (kind=project)
-  destination: string; // destination path inside the container
-  mode: string;      // "read_only" | "read_write"
-  volume: string;    // volume short name (kind=volume)
-  secret: string;    // secret short name (kind=secret)
-}
 export interface ContainerCreateConfig {
   image?: string;
   env?: Record<string, string>;
@@ -33,84 +45,16 @@ export interface ContainerCreateConfig {
   paths?: readonly string[];
   secretEnv?: Record<string, string>;
 }
-export interface ContainerView {
-  containerName: string;
-  workspaceSlug: string;
-  imageId: string;
-  status: string;
-  createdAt: string;
-  mounts: readonly ProjectMountView[];
-  paths: readonly string[];
-  env: Record<string, string>;
-  secretEnv: Record<string, string>;
-}
-export interface ImageView {
-  imageId: string;
-  parent: string;
-  packages: readonly string[];
-  imageTag: string;
-  builtAt: string;
-  isBase: boolean;
-  status: string;
-  primitive: string;
-  packageManager: string;
-  basePublic: boolean;
-}
-export interface VolumeView {
-  name: string;
-}
-export interface SecretView {
-  name: string;
-}
-export interface CacheView {
-  manager: string;
-  path: string;
-  files: number;
-  bytes: number;
-}
-export interface WorkspaceView {
-  workspaceSlug: string;
-  projectName: string;
-  containerName: string;
-  imageId: string;
-  status: string;
-  createdAt: string;
-  mounts: readonly { projectName: string; mode: string }[];
-}
-export interface CommandRequest {
-  op: "refresh" | "remove" | "workspace_remove" | "recreate" | "create" | "volume_create" | "volume_remove" | "image_remove" | "secret_create" | "secret_remove" | "secret_set" | "image_rebuild" | "image_rebuild_all" | "container_secret_add" | "container_secret_remove" | "image_build" | "image_base_rebuild" | "image_base_pull" | "container_mount_add" | "container_mount_remove" | "container_mount_update" | "container_path_set" | "cache_clean";
-  workspace: string;
-  image: string;
-  at: number;
-  mounts: readonly MountInput[];
-  value: string;
-  env: Record<string, string>;
-  container: string;
-  secret: string;
-  secretEnv: string;
-  length: number;
-  charset: string;
-  packages: string[];
-  secretEnvMap: Record<string, string>;
-  cacheMode: string;
-  mount: MountInput | null;
-}
-export interface ContainerSettings {
-  version: string;
-  commit: string;
-  defaultImage: string;
-  socketsRoot: string;
-  projectsRoot: string;
-  notice: string;
-  uiLocale?: string;
-  workspaces: readonly WorkspaceView[];
-  containers: readonly ContainerView[];
-  images: readonly ImageView[];
-  volumes: readonly VolumeView[];
-  secrets: readonly SecretView[];
-  caches: readonly CacheView[];
-  command: CommandRequest | null;
-}
+
+export type {
+  CacheView,
+  ContainerView,
+  ImageView,
+  MountInput,
+  SecretView,
+  VolumeView,
+  WorkspaceView,
+};
 
 export interface CardState {
   available: boolean;
@@ -169,17 +113,41 @@ export interface ContainerCardFace {
   discardSocketsRoot: () => void;
 }
 
+const EMPTY_SNAPSHOT: CardSnapshot = {
+  version: "",
+  commit: "",
+  projectsRoot: "",
+  workspaces: [],
+  containers: [],
+  images: [],
+  volumes: [],
+  secrets: [],
+  caches: [],
+};
+
 type DraftableField = "defaultImage" | "socketsRoot";
 
+// The card reads its live state from the host route and its preferences from
+// the settings namespace. A command is one request, so nothing is re-delivered
+// and no document round-trip is involved.
 export class ContainerCardController {
   private readonly store: SnapshotStore<CardState>;
   private readonly drafts = new Map<DraftableField, string>();
+  private readonly client: CardClient;
+  private snapshot: CardSnapshot = EMPTY_SNAPSHOT;
+  private busy = false;
+  private notice = "";
 
-  constructor(private readonly scope: SettingsScope<ContainerSettings>) {
+  constructor(
+    private readonly scope: SettingsScope<ContainerSettings>,
+    client: CardClient = createCardClient(),
+  ) {
+    this.client = client;
     this.store = createSnapshotStore(this.project());
     scope.subscribe(() => {
       this.publish();
     });
+    void this.reload();
   }
 
   private draft(field: DraftableField, current: string): string {
@@ -192,21 +160,21 @@ export class ContainerCardController {
     return {
       available: snapshot.status === "ready" && value !== undefined,
       writable: snapshot.writable,
-      busy: value?.command !== null && value?.command !== undefined,
-      notice: value?.notice ?? "",
-      version: value?.version ?? "",
-      commit: value?.commit ?? "",
+      busy: this.busy,
+      notice: this.notice,
+      version: this.snapshot.version,
+      commit: this.snapshot.commit,
       defaultImage: value?.defaultImage ?? "",
       defaultImageDraft: this.draft("defaultImage", value?.defaultImage ?? ""),
       socketsRoot: value?.socketsRoot ?? "",
       socketsRootDraft: this.draft("socketsRoot", value?.socketsRoot ?? ""),
-      projectsRoot: value?.projectsRoot ?? "",
-      workspaces: value?.workspaces ?? [],
-      containers: value?.containers ?? [],
-      images: value?.images ?? [],
-      volumes: value?.volumes ?? [],
-      secrets: value?.secrets ?? [],
-      caches: value?.caches ?? [],
+      projectsRoot: this.snapshot.projectsRoot,
+      workspaces: this.snapshot.workspaces,
+      containers: this.snapshot.containers,
+      images: this.snapshot.images,
+      volumes: this.snapshot.volumes,
+      secrets: this.snapshot.secrets,
+      caches: this.snapshot.caches,
     };
   }
 
@@ -215,7 +183,7 @@ export class ContainerCardController {
   }
 
   private command(
-    op: CommandRequest["op"],
+    op: CommandOp,
     workspace: string,
     image: string,
     extra: {
@@ -235,8 +203,10 @@ export class ContainerCardController {
       mount?: MountInput | null;
     } = {},
   ): void {
-    void this.scope.set("command", {
-      op, workspace, image, at: Date.now(),
+    void this.dispatch({
+      op,
+      workspace,
+      image,
       projectName: extra.projectName ?? "",
       mounts: extra.mounts ?? [],
       paths: extra.paths ?? [],
@@ -252,6 +222,31 @@ export class ContainerCardController {
       cacheMode: extra.cacheMode ?? "",
       mount: extra.mount ?? null,
     });
+  }
+
+  private async dispatch(request: CommandRequest): Promise<void> {
+    this.busy = true;
+    this.notice = "";
+    this.publish();
+    try {
+      const result = await this.client.command(request);
+      this.notice = result.notice ?? "";
+      this.snapshot = await this.client.snapshot();
+    } catch (error) {
+      this.notice = error instanceof Error ? error.message : String(error);
+    } finally {
+      this.busy = false;
+      this.publish();
+    }
+  }
+
+  private async reload(): Promise<void> {
+    try {
+      this.snapshot = await this.client.snapshot();
+    } catch (error) {
+      this.notice = error instanceof Error ? error.message : String(error);
+    }
+    this.publish();
   }
 
   private edit(field: DraftableField, text: string): void {
@@ -273,7 +268,9 @@ export class ContainerCardController {
   inject(): ContainerCardFace {
     return {
       hooks: { containerCard: this.store },
-      reload: () => this.command("refresh", "", ""),
+      reload: () => {
+        void this.reload();
+      },
       remove: (workspace) => this.command("remove", workspace, ""),
       cleanCaches: (mode) => this.command("cache_clean", "", "", { cacheMode: mode }),
       removeWorkspace: (workspace) => this.command("workspace_remove", workspace, ""),
@@ -283,7 +280,7 @@ export class ContainerCardController {
         this.command(
           "create",
           workspace.workspaceSlug,
-          config?.image ?? (workspace.imageId || this.scope.getSnapshot().value?.defaultImage || ""),
+          config?.image ?? (workspace.imageId || this.defaultImage() || ""),
           {
             projectName: workspace.projectName,
             ...(config?.mounts && config.mounts.length > 0 ? { mounts: config.mounts } : {}),
@@ -296,7 +293,7 @@ export class ContainerCardController {
         this.command(
           "create",
           workspace.workspaceSlug,
-          config?.image ?? (workspace.imageId || this.scope.getSnapshot().value?.defaultImage || ""),
+          config?.image ?? (workspace.imageId || this.defaultImage() || ""),
           {
             container,
             ...(config?.mounts && config.mounts.length > 0 ? { mounts: config.mounts } : {}),
@@ -352,6 +349,10 @@ export class ContainerCardController {
       saveSocketsRoot: () => this.save("socketsRoot"),
       discardSocketsRoot: () => this.discard("socketsRoot"),
     };
+  }
+
+  private defaultImage(): string {
+    return this.scope.getSnapshot().value?.defaultImage ?? "";
   }
 }
 

@@ -15,7 +15,8 @@ import { createReadOnlyShellGate, REMOUNT_TOOL_NAME } from "./read-only-shell.js
 import { toolHandlers } from "./tool-handlers.js";
 import { TOOLS, TOOL_DESCRIPTIONS, defineTool, toolOutput } from "./tool-schemas.js";
 import { toolCallView, toolResultView } from "./tool-views.js";
-import { installContainerSettings } from "./settings-bridge.js";
+import { installContainerPreferences } from "./preferences.js";
+import { registerCardRoute } from "./card-route.js";
 import { WorkspaceResolver, normalizeToolError } from "./workspace-binding.js";
 
 function withTrailingSlash(value: string): string {
@@ -142,7 +143,8 @@ export function apply(ctx: any, config: PluginConfig = {}): void {
     );
   });
   registerTools(ctx, resolver);
-  installContainerSettings(ctx, resolver, ctx.workspaceRegistry);
+  installContainerPreferences(ctx, resolver);
+  registerCardRoute(ctx, resolver, ctx.workspaceRegistry);
 }
 
 function registerTools(ctx: any, resolver: WorkspaceResolver): void {

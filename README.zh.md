@@ -22,7 +22,7 @@ dsh-podman 将所有的 shell 执行与文件访问都路由到一次性、按�
 
 ## 文档
 
-- **[使用 Podman rootless 安装 DeepSeek Harness 与 dsh-podman](docs/install-dsh-and-dsh-podman.zh.md)**
+- **[使用 rootless Podman 安装 DeepSeek Harness 与 dsh-podman](docs/install-dsh-and-dsh-podman.zh.md)**
 - [架构](docs/architecture.zh.md)
 - [配置](docs/configuration.zh.md)
 - [使用](docs/usage.zh.md)

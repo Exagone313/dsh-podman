@@ -4,7 +4,7 @@ SPDX-FileCopyrightText: 2026 Elouan Martinet <exa@elou.world>
 SPDX-License-Identifier: MIT
 -->
 
-# 使用 Podman rootless 安装 DeepSeek Harness 与 dsh-podman
+# 使用 rootless Podman 安装 DeepSeek Harness 与 dsh-podman
 
 ## 目标
 

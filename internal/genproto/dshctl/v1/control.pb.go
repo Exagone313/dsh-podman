@@ -402,6 +402,7 @@ type CreateWorkspaceRequest struct {
 	Env           map[string]string      `protobuf:"bytes,4,rep,name=env,proto3" json:"env,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	SecretEnv     map[string]string      `protobuf:"bytes,5,rep,name=secret_env,json=secretEnv,proto3" json:"secret_env,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	ProjectName   string                 `protobuf:"bytes,6,opt,name=project_name,json=projectName,proto3" json:"project_name,omitempty"`
+	Paths         []string               `protobuf:"bytes,7,rep,name=paths,proto3" json:"paths,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -476,6 +477,13 @@ func (x *CreateWorkspaceRequest) GetProjectName() string {
 		return x.ProjectName
 	}
 	return ""
+}
+
+func (x *CreateWorkspaceRequest) GetPaths() []string {
+	if x != nil {
+		return x.Paths
+	}
+	return nil
 }
 
 type DescribeWorkspaceRequest struct {
@@ -1886,6 +1894,7 @@ type StartContainerRequest struct {
 	Mounts        []*ProjectMount        `protobuf:"bytes,4,rep,name=mounts,proto3" json:"mounts,omitempty"`
 	Env           map[string]string      `protobuf:"bytes,5,rep,name=env,proto3" json:"env,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	SecretEnv     map[string]string      `protobuf:"bytes,6,rep,name=secret_env,json=secretEnv,proto3" json:"secret_env,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	Paths         []string               `protobuf:"bytes,7,rep,name=paths,proto3" json:"paths,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1962,6 +1971,13 @@ func (x *StartContainerRequest) GetSecretEnv() map[string]string {
 	return nil
 }
 
+func (x *StartContainerRequest) GetPaths() []string {
+	if x != nil {
+		return x.Paths
+	}
+	return nil
+}
+
 type RecreateContainerRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	WorkspaceSlug string                 `protobuf:"bytes,1,opt,name=workspace_slug,json=workspaceSlug,proto3" json:"workspace_slug,omitempty"`
@@ -1969,6 +1985,7 @@ type RecreateContainerRequest struct {
 	Container     string                 `protobuf:"bytes,3,opt,name=container,proto3" json:"container,omitempty"`
 	Mounts        []*ProjectMount        `protobuf:"bytes,4,rep,name=mounts,proto3" json:"mounts,omitempty"`
 	Env           map[string]string      `protobuf:"bytes,5,rep,name=env,proto3" json:"env,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	Paths         []string               `protobuf:"bytes,6,rep,name=paths,proto3" json:"paths,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2034,6 +2051,13 @@ func (x *RecreateContainerRequest) GetMounts() []*ProjectMount {
 func (x *RecreateContainerRequest) GetEnv() map[string]string {
 	if x != nil {
 		return x.Env
+	}
+	return nil
+}
+
+func (x *RecreateContainerRequest) GetPaths() []string {
+	if x != nil {
+		return x.Paths
 	}
 	return nil
 }
@@ -3187,7 +3211,7 @@ const file_dshctl_v1_control_proto_rawDesc = "" +
 	"\vdestination\x18\x04 \x01(\tR\vdestination\x12(\n" +
 	"\x04kind\x18\x05 \x01(\x0e2\x14.dshctl.v1.MountKindR\x04kind\x12\x16\n" +
 	"\x06volume\x18\x06 \x01(\tR\x06volume\x12\x16\n" +
-	"\x06secret\x18\a \x01(\tR\x06secretJ\x04\b\x03\x10\x04\"\xb3\x03\n" +
+	"\x06secret\x18\a \x01(\tR\x06secretJ\x04\b\x03\x10\x04\"\xc9\x03\n" +
 	"\x16CreateWorkspaceRequest\x12%\n" +
 	"\x0eworkspace_slug\x18\x01 \x01(\tR\rworkspaceSlug\x12\x19\n" +
 	"\bimage_id\x18\x02 \x01(\tR\aimageId\x12/\n" +
@@ -3195,7 +3219,8 @@ const file_dshctl_v1_control_proto_rawDesc = "" +
 	"\x03env\x18\x04 \x03(\v2*.dshctl.v1.CreateWorkspaceRequest.EnvEntryR\x03env\x12O\n" +
 	"\n" +
 	"secret_env\x18\x05 \x03(\v20.dshctl.v1.CreateWorkspaceRequest.SecretEnvEntryR\tsecretEnv\x12!\n" +
-	"\fproject_name\x18\x06 \x01(\tR\vprojectName\x1a6\n" +
+	"\fproject_name\x18\x06 \x01(\tR\vprojectName\x12\x14\n" +
+	"\x05paths\x18\a \x03(\tR\x05paths\x1a6\n" +
 	"\bEnvEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\x1a<\n" +
@@ -3312,7 +3337,7 @@ const file_dshctl_v1_control_proto_rawDesc = "" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\x1a<\n" +
 	"\x0eSecretEnvEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xab\x03\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xc1\x03\n" +
 	"\x15StartContainerRequest\x12%\n" +
 	"\x0eworkspace_slug\x18\x01 \x01(\tR\rworkspaceSlug\x12\x1c\n" +
 	"\tcontainer\x18\x02 \x01(\tR\tcontainer\x12\x19\n" +
@@ -3320,19 +3345,21 @@ const file_dshctl_v1_control_proto_rawDesc = "" +
 	"\x06mounts\x18\x04 \x03(\v2\x17.dshctl.v1.ProjectMountR\x06mounts\x12;\n" +
 	"\x03env\x18\x05 \x03(\v2).dshctl.v1.StartContainerRequest.EnvEntryR\x03env\x12N\n" +
 	"\n" +
-	"secret_env\x18\x06 \x03(\v2/.dshctl.v1.StartContainerRequest.SecretEnvEntryR\tsecretEnv\x1a6\n" +
+	"secret_env\x18\x06 \x03(\v2/.dshctl.v1.StartContainerRequest.SecretEnvEntryR\tsecretEnv\x12\x14\n" +
+	"\x05paths\x18\a \x03(\tR\x05paths\x1a6\n" +
 	"\bEnvEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\x1a<\n" +
 	"\x0eSecretEnvEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xa3\x02\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xb9\x02\n" +
 	"\x18RecreateContainerRequest\x12%\n" +
 	"\x0eworkspace_slug\x18\x01 \x01(\tR\rworkspaceSlug\x12\x19\n" +
 	"\bimage_id\x18\x02 \x01(\tR\aimageId\x12\x1c\n" +
 	"\tcontainer\x18\x03 \x01(\tR\tcontainer\x12/\n" +
 	"\x06mounts\x18\x04 \x03(\v2\x17.dshctl.v1.ProjectMountR\x06mounts\x12>\n" +
-	"\x03env\x18\x05 \x03(\v2,.dshctl.v1.RecreateContainerRequest.EnvEntryR\x03env\x1a6\n" +
+	"\x03env\x18\x05 \x03(\v2,.dshctl.v1.RecreateContainerRequest.EnvEntryR\x03env\x12\x14\n" +
+	"\x05paths\x18\x06 \x03(\tR\x05paths\x1a6\n" +
 	"\bEnvEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"]\n" +

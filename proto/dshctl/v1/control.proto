@@ -55,7 +55,7 @@ message ProjectMount {
   string volume = 6;
   string secret = 7;
 }
-message CreateWorkspaceRequest { string workspace_slug = 1; string image_id = 2; repeated ProjectMount mounts = 3; map<string, string> env = 4; map<string, string> secret_env = 5; string project_name = 6; }
+message CreateWorkspaceRequest { string workspace_slug = 1; string image_id = 2; repeated ProjectMount mounts = 3; map<string, string> env = 4; map<string, string> secret_env = 5; string project_name = 6; repeated string paths = 7; }
 message DescribeWorkspaceRequest { string workspace_slug = 1; }
 message RemoveWorkspaceRequest { string workspace_slug = 1; }
 message RemoveWorkspaceResponse {}
@@ -108,8 +108,8 @@ message Container {
   map<string, string> secret_env = 11;
   repeated string paths = 12;
 }
-message StartContainerRequest { string workspace_slug = 1; string container = 2; string image_id = 3; repeated ProjectMount mounts = 4; map<string, string> env = 5; map<string, string> secret_env = 6; }
-message RecreateContainerRequest { string workspace_slug = 1; string image_id = 2; string container = 3; repeated ProjectMount mounts = 4; map<string, string> env = 5; }
+message StartContainerRequest { string workspace_slug = 1; string container = 2; string image_id = 3; repeated ProjectMount mounts = 4; map<string, string> env = 5; map<string, string> secret_env = 6; repeated string paths = 7; }
+message RecreateContainerRequest { string workspace_slug = 1; string image_id = 2; string container = 3; repeated ProjectMount mounts = 4; map<string, string> env = 5; repeated string paths = 6; }
 message RemoveContainerRequest { string workspace_slug = 1; string container = 2; }
 message RemoveContainerResponse {}
 message AddContainerMountRequest { string workspace_slug = 1; string container = 2; string project = 3; reserved 4; string destination = 5; MountMode mode = 6; MountKind kind = 7; string volume = 8; string secret = 9; }

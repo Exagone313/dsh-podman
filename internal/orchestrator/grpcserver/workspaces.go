@@ -226,6 +226,15 @@ func (s *Server) CreateWorkspace(ctx context.Context, request *ctl.CreateWorkspa
 			}
 		}
 	}
+	// A create request may set the container's PATH additions; without them a
+	// replaced default container keeps the list it had.
+	if len(request.GetPaths()) > 0 {
+		paths, pathErr := validPathAdditions(request.GetPaths())
+		if pathErr != nil {
+			return nil, status.Error(codes.InvalidArgument, pathErr.Error())
+		}
+		defaultPaths = paths
+	}
 	defaultMounts = ensureWorkspaceProjectMount(defaultMounts, state.Workspace{ProjectName: projectName})
 	podmanMounts, mountErr := s.podmanMounts(defaultMounts)
 	if mountErr != nil {

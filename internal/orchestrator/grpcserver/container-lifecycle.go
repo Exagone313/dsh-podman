@@ -170,6 +170,15 @@ func (s *Server) RecreateContainer(ctx context.Context, request *ctl.RecreateCon
 	if len(request.GetEnv()) > 0 {
 		record.Env = cloneMap(request.GetEnv())
 	}
+	// A recreate request may replace the PATH additions; without them the
+	// container keeps the list it had.
+	if len(request.GetPaths()) > 0 {
+		paths, pathErr := validPathAdditions(request.GetPaths())
+		if pathErr != nil {
+			return nil, status.Error(codes.InvalidArgument, pathErr.Error())
+		}
+		record.Paths = paths
+	}
 	if len(request.GetMounts()) > 0 {
 		mounts, mountErr := stateMounts(request.GetMounts())
 		if mountErr != nil {
@@ -264,6 +273,15 @@ func (s *Server) StartContainer(ctx context.Context, request *ctl.StartContainer
 	if existing, ok := containerByLogical(&workspace, container); ok {
 		// Replacing a container keeps its PATH additions.
 		record.Paths = append([]string(nil), existing.Paths...)
+	}
+	// A start request may replace the PATH additions; without them a replaced
+	// container keeps the list it had.
+	if len(request.GetPaths()) > 0 {
+		paths, pathErr := validPathAdditions(request.GetPaths())
+		if pathErr != nil {
+			return nil, status.Error(codes.InvalidArgument, pathErr.Error())
+		}
+		record.Paths = paths
 	}
 	podmanMounts, err := s.podmanMounts(containerMounts(workspace, record))
 	if err != nil {

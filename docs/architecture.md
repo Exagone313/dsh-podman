@@ -49,7 +49,10 @@ tmpfs on `/tmp`, `/var/tmp`, and `/run` (and `/dev` and `/dev/shm` left
 writable). All other writable state lives in the project bind mount, named
 volumes, or tmpfs mounts. `/tmp` and `/var/tmp` are reachable through the guest
 file API, and the guest agent spills oversized command output under
-`/tmp/dsh-podman`.
+`/tmp/dsh-podman`. Oversized tool results are spilled there too, under
+`/tmp/dsh-podman/spill/<session>/`, by the plugin's `ctx.spillStore` — so the
+model reads the artifact back with the container file tools instead of a host
+path the container cannot reach.
 
 A workspace's pod is torn down when its last container is removed, or directly
 through `RemoveWorkspace` (the settings card's **Remove pod** action), which

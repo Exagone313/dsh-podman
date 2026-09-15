@@ -456,11 +456,6 @@ export const containerWriteParameters = {
       description: "Path to write, resolved against the session working directory.",
     },
     content: { type: "string", description: "Content to write." },
-    create: { type: "boolean", description: "Create if absent (default true)." },
-    truncate: {
-      type: "boolean",
-      description: "Truncate before writing (default true).",
-    },
   },
   required: ["container", "file_path", "content"],
 };

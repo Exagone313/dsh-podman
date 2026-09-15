@@ -181,6 +181,33 @@ func TestExecDiscardsSpillPastTheCap(t *testing.T) {
 	}
 }
 
+// TestExecReportsTheProcessIdBeforeOutput pins that the caller learns the
+// process id before any output: a silent background command produces no output
+// until it exits, so a caller that must cancel it (job_kill, a timed-out exec)
+// can only signal an id it was told.
+func TestExecReportsTheProcessIdBeforeOutput(t *testing.T) {
+	server, root := newTestServer(t)
+	stream := &execStream{inputs: []*guest.ExecInput{{
+		Payload: &guest.ExecInput_Start{Start: &guest.ExecStart{
+			Argv: []string{"sh", "-c", "sleep 1"},
+			Cwd:  root,
+		}},
+	}}}
+	if err := server.Exec(stream); err != nil {
+		t.Fatal(err)
+	}
+	if len(stream.outputs) == 0 {
+		t.Fatal("expected the guest to report the process id")
+	}
+	first := stream.outputs[0]
+	if first.GetProcessId() == "" {
+		t.Fatalf("first message must carry the process id, got %#v", first)
+	}
+	if first.GetStdoutChunk() != nil || first.GetStderrChunk() != nil {
+		t.Fatalf("the process id must precede any output, got %#v", first)
+	}
+}
+
 // TestExecStdinIsNullUnlessRequested pins that a caller who sends no stdin
 // leaves the child on /dev/null: a pipe would be a non-TTY stdin, and a tool
 // like ripgrep then reads stdin instead of the working directory.

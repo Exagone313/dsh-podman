@@ -90,6 +90,13 @@ func (s *Server) Exec(stream guest.WorkspaceGuestAgent_ExecServer) error {
 		defer sendMu.Unlock()
 		return stream.Send(output)
 	}
+	// Report the process id before any output. A caller that must cancel a
+	// silent command (a background job, a timed-out exec) can only signal an id
+	// it has been told, and a command that produces no output until it exits
+	// would otherwise leave that caller unable to signal it at all.
+	if err := send(&guest.ExecOutput{}); err != nil {
+		return err
+	}
 	errCh := make(chan error, 2)
 	var copies sync.WaitGroup
 	copyOutput := func(reader io.Reader, stderr bool, spill *spillWriter) {

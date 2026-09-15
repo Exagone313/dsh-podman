@@ -4,7 +4,7 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
-import { guestExecRecorder, guestFileRecorder } from "./test-support.js";
+import { fakeToolContext, guestExecRecorder, guestFileRecorder } from "./test-support.js";
 import {
   HARNESS_SOURCE_SECTION,
   TOOLS,
@@ -41,6 +41,7 @@ test("file tools resolve relative paths against the session cwd", async () => {
     read.resolver as never,
     { container: "default", file_path: "README.md" },
     exec,
+    fakeToolContext(read.resolver),
   );
   assert.deepEqual(read.reads, ["/projects/team/README.md"]);
 
@@ -49,6 +50,7 @@ test("file tools resolve relative paths against the session cwd", async () => {
     absolute.resolver as never,
     { container: "default", file_path: "/etc/hosts" },
     exec,
+    fakeToolContext(absolute.resolver),
   );
   assert.deepEqual(absolute.reads, ["/etc/hosts"], "absolute paths pass through");
 
@@ -57,6 +59,7 @@ test("file tools resolve relative paths against the session cwd", async () => {
     write.resolver as never,
     { container: "default", file_path: "out.txt", content: "x" },
     exec,
+    fakeToolContext(write.resolver),
   );
   assert.deepEqual(write.writes.map((entry) => entry.path), ["/projects/team/out.txt"]);
 
@@ -65,6 +68,7 @@ test("file tools resolve relative paths against the session cwd", async () => {
     edit.resolver as never,
     { container: "default", file_path: "a.txt", old_string: "hello", new_string: "bye" },
     exec,
+    fakeToolContext(edit.resolver),
   );
   assert.deepEqual(edit.reads, ["/projects/team/a.txt"]);
   assert.deepEqual(edit.writes.map((entry) => entry.path), ["/projects/team/a.txt"]);
@@ -75,7 +79,7 @@ test("file tools refuse traversal before reaching the guest", async () => {
   const { reads, writes, resolver } = guestFileRecorder();
   for (const path of ["../escape", "a/../../b"]) {
     await assert.rejects(
-      () => toolHandlers.container_read(resolver as never, { container: "default", file_path: path }, exec),
+      () => toolHandlers.container_read(resolver as never, { container: "default", file_path: path }, exec, fakeToolContext(resolver)),
       /must not escape/,
     );
   }
@@ -85,6 +89,7 @@ test("file tools refuse traversal before reaching the guest", async () => {
         resolver as never,
         { container: "default", file_path: "../escape", content: "x" },
         exec,
+        fakeToolContext(resolver),
       ),
     /must not escape/,
   );

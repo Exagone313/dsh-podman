@@ -8,7 +8,6 @@ import {
   currentCwd,
   guestCwd,
   outputLines,
-  readGuestFile,
   resolveGuestPath,
   resolveToolBinding,
   runExec,
@@ -46,6 +45,23 @@ function failOnSearchError(
   if (result.exitCode !== 2) return;
   const detail = result.stderr.trim();
   throw new Error(detail === "" ? `${tool} search failed (ripgrep exit code 2)` : detail);
+}
+
+// containerTarget resolves a container-scoped file target through the plugin's
+// own filesystem provider, so the container file tools share the harness's file
+// contracts (the read-before-write guard, the binary rejection, and the same
+// diagnostics) instead of calling the guest directly.
+async function containerTarget(
+  ctx: any,
+  path: string,
+  container: string,
+  exec: any,
+): Promise<any> {
+  return await ctx.fs.resolve(path, {
+    cwd: currentCwd(exec),
+    container: container ?? "",
+    signal: exec?.signal,
+  });
 }
 
 // identityFromInput validates the optional uid/gid/groups identity a tool
@@ -86,7 +102,12 @@ function identityFromInput(input: any): ExecIdentity | undefined {
 
 export const toolHandlers: Record<
   string,
-  (resolver: WorkspaceResolver, input: any, exec: any) => Promise<unknown>
+  (
+    resolver: WorkspaceResolver,
+    input: any,
+    exec: any,
+    ctx?: any,
+  ) => Promise<unknown>
 > = {
   image_list: async (resolver) => {
     const result = await resolver.control<{ images?: any[] }>("listImages", {});
@@ -199,48 +220,37 @@ export const toolHandlers: Record<
       identityFromInput(input),
     );
   },
-  container_read: async (resolver, input, exec) => {
-    const sessionCwd = currentCwd(exec);
-    const binding = await resolveToolBinding(resolver, sessionCwd, input.container);
-    const content = await readGuestFile(
-      binding,
-      resolveGuestPath(input.file_path, sessionCwd),
-    );
+  container_read: async (resolver, input, exec, ctx) => {
+    const target = await containerTarget(ctx, input.file_path, input.container, exec);
+    const content = await ctx.fs.readText(target, exec?.signal);
     return sliceLines(content, input.offset, input.limit);
   },
-  container_write: async (resolver, input, exec) => {
-    const sessionCwd = currentCwd(exec);
-    const binding = await resolveToolBinding(resolver, sessionCwd, input.container);
-    const path = resolveGuestPath(input.file_path, sessionCwd);
-    const bytesWritten = await writeGuestFile(binding, path, input.content, {
-      create: input.create ?? true,
-      truncate: input.truncate ?? true,
-    });
-    return { bytesWritten };
+  container_write: async (resolver, input, exec, ctx) => {
+    const target = await containerTarget(ctx, input.file_path, input.container, exec);
+    // The harness's write tool computes the intent through this waterfall and
+    // the provider enforces it, so the container tool shares the same
+    // read-before-write guard and diagnostics.
+    const intent = await ctx.waterfall("fs/write-intent", target, exec, () => undefined);
+    const content = String(input.content ?? "");
+    const outcome = await ctx.fs.writeText(target, content, intent, exec?.signal);
+    ctx.emit("fs/observed", target, { kind: "present", version: outcome.version }, exec);
+    return { bytesWritten: Buffer.byteLength(content, "utf8") };
   },
-  container_edit: async (resolver, input, exec) => {
-    const sessionCwd = currentCwd(exec);
-    const binding = await resolveToolBinding(resolver, sessionCwd, input.container);
-    const path = resolveGuestPath(input.file_path, sessionCwd);
-    const before = await readGuestFile(binding, path);
-    if (typeof input.old_string !== "string" || input.old_string.length === 0) {
-      throw new Error("old_string must be a non-empty string");
-    }
-    const occurrences = before.split(input.old_string).length - 1;
-    if (occurrences === 0) throw new Error("old_string was not found");
-    if (!input.replace_all && occurrences > 1) {
-      throw new Error(
-        "old_string appears more than once; set replace_all to replace every occurrence",
-      );
-    }
-    const after = input.replace_all
-      ? before.split(input.old_string).join(input.new_string)
-      : before.replace(input.old_string, input.new_string);
-    await writeGuestFile(binding, path, after, {
-      create: true,
-      truncate: true,
-    });
-    return { before, after };
+  container_edit: async (resolver, input, exec, ctx) => {
+    const target = await containerTarget(ctx, input.file_path, input.container, exec);
+    const intent = await ctx.waterfall("fs/edit-intent", target, exec, () => undefined);
+    const outcome = await ctx.fs.editText(
+      target,
+      {
+        oldString: input.old_string,
+        newString: input.new_string,
+        replaceAll: input.replace_all === true,
+      },
+      intent,
+      exec?.signal,
+    );
+    ctx.emit("fs/observed", target, { kind: "present", version: outcome.version }, exec);
+    return { before: outcome.before, after: outcome.after };
   },
   container_glob: async (resolver, input, exec) => {
     const sessionCwd = currentCwd(exec);

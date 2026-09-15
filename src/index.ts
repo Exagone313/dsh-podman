@@ -162,7 +162,7 @@ function registerTools(ctx: any, resolver: WorkspaceResolver): void {
         output: toolOutput,
         execute: async (input: any, exec: any) => {
           try {
-            return JSON.stringify(await handler(resolver, input, exec));
+            return JSON.stringify(await handler(resolver, input, exec, ctx));
           } catch (error) {
             throw normalizeToolError(error);
           }

@@ -5,7 +5,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { join } from "node:path";
-import { WORKSPACE_ID, guestExecRecorder, guestFileRecorder, secretBearingResolver } from "./test-support.js";
+import { WORKSPACE_ID, fakeToolContext, guestExecRecorder, guestFileRecorder, secretBearingResolver } from "./test-support.js";
 import {
   TOOLS,
   podmanRuntimeSection,
@@ -225,6 +225,7 @@ test("container_read applies offset and limit like the built-in read tool", asyn
       resolver as never,
       { container: "default", file_path: "f" },
       exec,
+      fakeToolContext(resolver),
     ),
     "l1\nl2\nl3\nl4\n",
     "no offset/limit returns the whole content",
@@ -234,6 +235,7 @@ test("container_read applies offset and limit like the built-in read tool", asyn
       resolver as never,
       { container: "default", file_path: "f", offset: 2, limit: 2 },
       exec,
+      fakeToolContext(resolver),
     ),
     "l2\nl3",
   );
@@ -249,8 +251,9 @@ test("container_edit requires a unique match unless replace_all is set", async (
         duplicate.resolver as never,
         { container: "default", file_path: "f", old_string: "a", new_string: "b" },
         exec,
+        fakeToolContext(duplicate.resolver),
       ),
-    /more than once/,
+    /matched 3 times/,
   );
   assert.deepEqual(duplicate.writes, [], "a non-unique match must not be written");
 
@@ -259,6 +262,7 @@ test("container_edit requires a unique match unless replace_all is set", async (
     all.resolver as never,
     { container: "default", file_path: "f", old_string: "a", new_string: "b", replace_all: true },
     exec,
+    fakeToolContext(all.resolver),
   );
   assert.equal(all.writes[0].content, "b b b");
 });

@@ -69,10 +69,17 @@ export function createFilesystemProvider(resolver: WorkspaceResolver): Filesyste
     resolve: async (path: string, opts?: any) => {
       throwIfAborted(opts?.signal, "resolve");
       const resolved = resolveGuestPath(path, opts?.cwd);
+      // An explicit container targets that container's guest; the harness's own
+      // tools never pass one and keep the session workspace's default.
+      const container = typeof opts?.container === "string" ? opts.container : "";
+      const binding =
+        container !== "" && container !== "default"
+          ? await resolver.containerBinding(opts?.cwd, container)
+          : await resolver.resolveForPath(resolved, opts?.cwd);
       return {
         targetKey: resolved,
         displayPath: resolved,
-        binding: await resolver.resolveForPath(resolved, opts?.cwd),
+        binding,
       };
     },
     processPath: (target: any) => target.targetKey,

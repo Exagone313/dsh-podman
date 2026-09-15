@@ -208,18 +208,22 @@ export function guestFileRecorder(content = "hello") {
   const guest = {
     readFile: (request: any) => {
       reads.push(request.path);
-      const handlers: Record<string, ((value?: unknown) => void)[]> = {};
-      queueMicrotask(() => {
-        for (const handler of handlers.data ?? []) {
-          handler({ data: Buffer.from(content) });
-        }
-        for (const handler of handlers.end ?? []) handler();
-      });
       return {
-        on(event: string, handler: (value?: unknown) => void) {
-          (handlers[event] ??= []).push(handler);
+        async *[Symbol.asyncIterator]() {
+          yield { data: Buffer.from(content) };
         },
+        cancel() {},
       };
+    },
+    stat: (_request: any, _metadata: unknown, callback: any) => {
+      callback(null, {
+        exists: true,
+        isDir: false,
+        size: Buffer.byteLength(content),
+        modifiedAt: "1",
+        mode: 0o644,
+      });
+      return { cancel() {} };
     },
     writeFile: (
       _metadata: unknown,
@@ -240,11 +244,31 @@ export function guestFileRecorder(content = "hello") {
       };
     },
   };
+  const binding = { guest, token: "t", socket: "/run/x.sock" };
   const resolver = {
-    resolve: async () => ({ guest, token: "t", socket: "/run/x.sock" }),
-    containerBinding: async () => ({ guest, token: "t", socket: "/run/x.sock" }),
+    resolve: async () => binding,
+    containerBinding: async () => binding,
+    resolveForPath: async () => binding,
   };
   return { reads, writes, resolver };
+}
+
+// fakeToolContext is the minimal cordis context the container file tools need:
+// the plugin's real filesystem provider over the given resolver, and the fs
+// observation waterfalls stubbed to "no intent" (an unconditional write).
+export function fakeToolContext(resolver: any): any {
+  return {
+    fs: createFilesystemProvider(resolver),
+    async waterfall(
+      _name: string,
+      _target: any,
+      _actor: any,
+      next: () => unknown,
+    ) {
+      return await next();
+    },
+    emit() {},
+  };
 }
 
 // Stubs the guest agent's streaming Exec call, recording the start message.

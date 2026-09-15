@@ -90,19 +90,19 @@ bash 进程）的 `env` 映射；`container_exec` 和 `daemon_start` 已经接�
 
 ### 容器
 
-| 工具                   | 参数                                                                          | 描述                                                                                |
-| ---------------------- | ----------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
-| `container_bash`       | `container`, `command`, `description`, optional `workdir`, `timeoutMs`, `env` | 运行 shell 命令                                                                     |
-| `container_edit`       | `container`, `file_path`, `old_string`, `new_string`, optional `replace_all`  | 编辑文件                                                                            |
-| `container_exec`       | `container`, `argv`, `description`, optional `workdir`, `timeoutMs`, `env`    | 运行程序                                                                            |
-| `container_glob`       | `container`, `pattern`, optional `path`                                       | 列出匹配模式的文件                                                                  |
-| `container_grep`       | `container`, `pattern`, optional `path`, `include`                            | 按正则表达式搜索文件                                                                |
-| `container_list`       | —                                                                             | 列出当前工作区的容器                                                                |
-| `container_read`       | `container`, `file_path`, optional `offset`, `limit`                          | 读取文件                                                                            |
-| `container_recreate` ✱ | `container`, optional `image`, `mounts`, `env`, `secretEnv`, `paths`          | 重建容器，省略 `image` 时保留其当前镜像，可选地使用新的项目挂载、环境或 PATH 附加项 |
-| `container_remove` ✱   | `container`                                                                   | 移除容器（先优雅地停止其守护进程）                                                  |
-| `container_start` ✱    | `container`, optional `image`, `mounts`, `env`, `secretEnv`, `paths`          | 启动容器（省略 `image` 时使用默认镜像）；仅在传入 `mounts` 时需要审批               |
-| `container_write`      | `container`, `file_path`, `content`, optional `create`, `truncate`            | 写入文件                                                                            |
+| 工具                   | 参数                                                                                                  | 描述                                                                                |
+| ---------------------- | ----------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| `container_bash`       | `container`, `command`, `description`, optional `workdir`, `timeoutMs`, `env`, `uid`, `gid`, `groups` | 运行 shell 命令                                                                     |
+| `container_edit`       | `container`, `file_path`, `old_string`, `new_string`, optional `replace_all`                          | 编辑文件                                                                            |
+| `container_exec`       | `container`, `argv`, `description`, optional `workdir`, `timeoutMs`, `env`, `uid`, `gid`, `groups`    | 运行程序                                                                            |
+| `container_glob`       | `container`, `pattern`, optional `path`                                                               | 列出匹配模式的文件                                                                  |
+| `container_grep`       | `container`, `pattern`, optional `path`, `include`                                                    | 按正则表达式搜索文件                                                                |
+| `container_list`       | —                                                                                                     | 列出当前工作区的容器                                                                |
+| `container_read`       | `container`, `file_path`, optional `offset`, `limit`                                                  | 读取文件                                                                            |
+| `container_recreate` ✱ | `container`, optional `image`, `mounts`, `env`, `secretEnv`, `paths`                                  | 重建容器，省略 `image` 时保留其当前镜像，可选地使用新的项目挂载、环境或 PATH 附加项 |
+| `container_remove` ✱   | `container`                                                                                           | 移除容器（先优雅地停止其守护进程）                                                  |
+| `container_start` ✱    | `container`, optional `image`, `mounts`, `env`, `secretEnv`, `paths`                                  | 启动容器（省略 `image` 时使用默认镜像）；仅在传入 `mounts` 时需要审批               |
+| `container_write`      | `container`, `file_path`, `content`, optional `create`, `truncate`                                    | 写入文件                                                                            |
 
 `container_bash`、`container_exec`、`container_read`、`container_write`、
 `container_edit`、`container_glob` 和 `container_grep` 的参数与 harness 内置的
@@ -120,6 +120,13 @@ bash 进程）的 `env` 映射；`container_exec` 和 `daemon_start` 已经接�
 工具一致），`container_glob`/`container_grep`
 默认也在其中搜索。该目录必须已挂载到容器中——否则将使用 guest agent
 自身的工作目录。显式的 `workdir`（或 `path`）始终优先。
+
+`container_bash` 和 `container_exec` 接受可选的 `uid`、`gid` 和 `groups`
+以其他用户身份运行命令。这些值只能是数字：容器的 `/etc/passwd` 和 `/etc/group`
+位于只读根文件系统上，因此名称无法解析。`groups`
+会替换进程的整个附加组集合，而应用任何身份都要求 guest agent 以 root
+运行——它正是如此。`HOME` 不受管理，因此以其他 uid 运行的命令会继承容器的
+`HOME`（只读的 `/root`）；请通过 `env` 将其指向可写目录。
 
 文件工具（`container_read`、`container_write`、`container_edit`）可以访问
 工作区的挂载：projects 根目录下的项目目录，以及任何 `volume` 和 `tmpfs`
@@ -219,7 +226,7 @@ UI 使用短名称。`secret_create` 的值由服务端用 `crypto/rand`
 
 | 工具             | 参数                                                                                     | 描述                                                               |
 | ---------------- | ---------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
-| `daemon_list`    | `container`                                                                              | 列出守护进程（包括其有效 `uid`/`gid`）                             |
+| `daemon_list`    | `container`                                                                              | 列出守护进程（包括其有效 `uid`/`gid` 和 `groups`）                 |
 | `daemon_logs`    | `container`, `name`, optional `tailBytes`                                                | 查看守护进程 stdout/stderr 的尾部                                  |
 | `daemon_restart` | `container`, `name`                                                                      | 使用相同的命令、环境、用户重启守护进程                             |
 | `daemon_start`   | `container`, `name`, `argv`, optional `cwd`, `env`, `inheritEnv`, `uid`, `gid`, `groups` | 启动后台守护进程；可选的 `uid`/`gid`/`groups` 以其他用户身份运行它 |
@@ -227,7 +234,8 @@ UI 使用短名称。`secret_create` 的值由服务端用 `crypto/rand`
 
 守护进程默认以容器用户身份运行。当只设置 `uid` 时，`gid`
 默认为相同值；两者都未设置时，守护进程在没有任何 uid/gid
-覆盖的情况下运行。`daemon_list` 报告每个守护进程的有效 `uid`/`gid`。
+覆盖的情况下运行。`groups` 会替换进程的整个附加组集合。`daemon_list`
+报告每个守护进程的有效 `uid`/`gid` 和附加组 `groups`。
 使用已存在的名称启动守护进程时，会先停止该守护进程（如果它仍在运行）并将其替换；
 已停止的守护进程仍会列出，以便其日志仍可读取。守护进程位于容器的 guest agent
 中，不会在容器重建后保留（参见[挂载与卷](#挂载与卷)）。

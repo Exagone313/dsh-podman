@@ -116,19 +116,19 @@ guest-agent wiring.
 
 ### Containers
 
-| Tool                   | Params                                                                        | Description                                                                                                                                 |
-| ---------------------- | ----------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| `container_bash`       | `container`, `command`, `description`, optional `workdir`, `timeoutMs`, `env` | Run a shell command                                                                                                                         |
-| `container_edit`       | `container`, `file_path`, `old_string`, `new_string`, optional `replace_all`  | Edit a file                                                                                                                                 |
-| `container_exec`       | `container`, `argv`, `description`, optional `workdir`, `timeoutMs`, `env`    | Run a program                                                                                                                               |
-| `container_glob`       | `container`, `pattern`, optional `path`                                       | List files matching a pattern                                                                                                               |
-| `container_grep`       | `container`, `pattern`, optional `path`, `include`                            | Search files for a regex                                                                                                                    |
-| `container_list`       | —                                                                             | List the containers of the current workspace                                                                                                |
-| `container_read`       | `container`, `file_path`, optional `offset`, `limit`                          | Read a file                                                                                                                                 |
-| `container_recreate` ✱ | `container`, optional `image`, `mounts`, `env`, `secretEnv`, `paths`          | Recreate a container, keeping its current image when `image` is omitted, optionally with new project mounts, environment, or PATH additions |
-| `container_remove` ✱   | `container`                                                                   | Remove a container (stops its daemons gracefully first)                                                                                     |
-| `container_start` ✱    | `container`, optional `image`, `mounts`, `env`, `secretEnv`, `paths`          | Start a container (default image when `image` is omitted); approval required only when `mounts` is passed                                   |
-| `container_write`      | `container`, `file_path`, `content`, optional `create`, `truncate`            | Write a file                                                                                                                                |
+| Tool                   | Params                                                                                                | Description                                                                                                                                 |
+| ---------------------- | ----------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `container_bash`       | `container`, `command`, `description`, optional `workdir`, `timeoutMs`, `env`, `uid`, `gid`, `groups` | Run a shell command                                                                                                                         |
+| `container_edit`       | `container`, `file_path`, `old_string`, `new_string`, optional `replace_all`                          | Edit a file                                                                                                                                 |
+| `container_exec`       | `container`, `argv`, `description`, optional `workdir`, `timeoutMs`, `env`, `uid`, `gid`, `groups`    | Run a program                                                                                                                               |
+| `container_glob`       | `container`, `pattern`, optional `path`                                                               | List files matching a pattern                                                                                                               |
+| `container_grep`       | `container`, `pattern`, optional `path`, `include`                                                    | Search files for a regex                                                                                                                    |
+| `container_list`       | —                                                                                                     | List the containers of the current workspace                                                                                                |
+| `container_read`       | `container`, `file_path`, optional `offset`, `limit`                                                  | Read a file                                                                                                                                 |
+| `container_recreate` ✱ | `container`, optional `image`, `mounts`, `env`, `secretEnv`, `paths`                                  | Recreate a container, keeping its current image when `image` is omitted, optionally with new project mounts, environment, or PATH additions |
+| `container_remove` ✱   | `container`                                                                                           | Remove a container (stops its daemons gracefully first)                                                                                     |
+| `container_start` ✱    | `container`, optional `image`, `mounts`, `env`, `secretEnv`, `paths`                                  | Start a container (default image when `image` is omitted); approval required only when `mounts` is passed                                   |
+| `container_write`      | `container`, `file_path`, `content`, optional `create`, `truncate`                                    | Write a file                                                                                                                                |
 
 The `container_bash`, `container_exec`, `container_read`, `container_write`,
 `container_edit`, `container_glob` and `container_grep` arguments mirror the
@@ -149,6 +149,15 @@ When no working directory is given, `container_bash`, `container_exec` and
 tool), and `container_glob`/`container_grep` search it by default. That
 directory must be mounted in the container — otherwise the guest agent's own
 working directory is used. An explicit `workdir` (or `path`) takes precedence.
+
+`container_bash` and `container_exec` accept an optional `uid`, `gid` and
+`groups` to run the command as another user. The values are numeric only: the
+container's `/etc/passwd` and `/etc/group` live on the read-only rootfs, so
+names never resolve. `groups` replaces the process's whole supplementary set,
+and applying any identity requires the guest agent to run as root, which it
+does. `HOME` is not managed, so a command run as another uid inherits the
+container's `HOME` (the read-only `/root`); pass `env` to point it at a writable
+directory.
 
 The file tools (`container_read`, `container_write`, `container_edit`) can reach
 the workspace's mounts: the project directory under the projects root, as well
@@ -262,7 +271,7 @@ every process the agent starts unless the daemon is started with
 
 | Tool             | Params                                                                                   | Description                                                                     |
 | ---------------- | ---------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
-| `daemon_list`    | `container`                                                                              | List the daemons (including their effective `uid`/`gid`)                        |
+| `daemon_list`    | `container`                                                                              | List the daemons (including their effective `uid`/`gid` and `groups`)           |
 | `daemon_logs`    | `container`, `name`, optional `tailBytes`                                                | Tail a daemon's stdout/stderr                                                   |
 | `daemon_restart` | `container`, `name`                                                                      | Restart a daemon with the same command, environment, and user                   |
 | `daemon_start`   | `container`, `name`, `argv`, optional `cwd`, `env`, `inheritEnv`, `uid`, `gid`, `groups` | Start a background daemon; optional `uid`/`gid`/`groups` run it as another user |
@@ -270,8 +279,9 @@ every process the agent starts unless the daemon is started with
 
 Daemons run as the container user by default. When only `uid` is set, `gid`
 defaults to the same value; when neither is set, the daemon runs without any
-uid/gid override. `daemon_list` reports the effective `uid`/`gid` of each
-daemon. Starting a daemon with a name that already exists stops that daemon
+uid/gid override. `groups` replaces the process's whole supplementary set.
+`daemon_list` reports the effective `uid`/`gid` and supplementary `groups` of
+each daemon. Starting a daemon with a name that already exists stops that daemon
 first (when it is still running) and replaces it; stopped daemons stay listed so
 their logs remain readable. Daemons live in the container's guest agent and do
 not survive a container recreate (see

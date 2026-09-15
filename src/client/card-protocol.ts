@@ -2,13 +2,14 @@
 //
 // SPDX-License-Identifier: MIT
 
-// The settings card talks to the host over one authenticated route below the
-// harness API path: the browser fetches `"/api" + CARD_ROUTE`. These shapes are
-// shared by both halves, and neither the snapshot nor the commands touch the
-// persisted settings document.
+// The settings card talks to the host over one authenticated route on the
+// harness's connection service. These shapes are shared by both halves, and
+// neither the snapshot nor the commands touch the persisted settings document.
 
-/** Route path below the harness API path (`/api`). */
-export const CARD_ROUTE = "/podman/card";
+// The full route path, harness API prefix included: the connection service
+// registers and matches the whole pathname (a path outside `/api/` is refused
+// at registration).
+export const CARD_PATH = "/api/podman/card";
 
 export interface MountInput {
   kind: string;

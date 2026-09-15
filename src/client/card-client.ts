@@ -2,18 +2,20 @@
 //
 // SPDX-License-Identifier: MIT
 
-// The card's browser half of the host route. The route sits below the harness
-// API path, so a same-origin fetch carries the browser session the harness
-// issued for `/api`.
+// The card's browser half of the host route. The route is served on the
+// harness API channel, so a same-origin fetch carries the browser session the
+// harness issued for it.
 
 import {
-  CARD_ROUTE,
+  CARD_PATH,
   type CardCommandResult,
   type CardSnapshot,
   type CommandRequest,
 } from "./card-protocol.js";
 
-const CARD_URL = `/api${CARD_ROUTE}`;
+// The route path already carries the harness API prefix, and a same-origin
+// fetch carries the browser session the harness issued for it.
+const CARD_URL = CARD_PATH;
 
 export interface CardClient {
   snapshot(): Promise<CardSnapshot>;

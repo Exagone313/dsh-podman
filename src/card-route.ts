@@ -8,7 +8,7 @@
 // settings document.
 
 import {
-  CARD_ROUTE,
+  CARD_PATH,
   type CardCommandResult,
   type CardSnapshot,
   type CommandOp,
@@ -517,7 +517,7 @@ export function registerCardRoute(
 ): void {
   ctx.inject(["connection", "settings"], (connectionCtx: any) => {
     connectionCtx.connection.fetch.register({
-      path: CARD_ROUTE,
+      path: CARD_PATH,
       methods: ["GET", "POST"],
       requestBody: "buffered",
       fetch: (request: Request) =>

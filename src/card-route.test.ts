@@ -4,7 +4,7 @@
 
 import { test } from "node:test";
 import { strict as assert } from "node:assert";
-import { CARD_ROUTE } from "./client/card-protocol.js";
+import { CARD_PATH } from "./client/card-protocol.js";
 import { registerCardRoute } from "./card-route.js";
 import { installContainerPreferences } from "./preferences.js";
 
@@ -42,6 +42,11 @@ function fakeRouteContext(): { ctx: any; routes: any[] } {
         connection: {
           fetch: {
             register(route: any) {
+              // Mirror the harness's assertFetchRoute: the route must live
+              // under the API channel, or the registration is refused.
+              if (!route.path.startsWith("/api/")) {
+                throw new Error(`connection: invalid exact Fetch route ${JSON.stringify(route.path)}`);
+              }
               routes.push(route);
               return async () => {};
             },
@@ -58,15 +63,16 @@ function fakeRouteContext(): { ctx: any; routes: any[] } {
 }
 
 function cardRequest(init?: RequestInit): Request {
-  return new Request(`http://dsh.test/api${CARD_ROUTE}`, init);
+  return new Request(`http://dsh.test${CARD_PATH}`, init);
 }
 
 test("registerCardRoute registers the card's exact fetch route", () => {
+  assert.ok(CARD_PATH.startsWith("/api/"), "the route must live under the API channel");
   const { resolver } = fakeResolver();
   const { ctx, routes } = fakeRouteContext();
   registerCardRoute(ctx, resolver);
   assert.equal(routes.length, 1);
-  assert.equal(routes[0].path, CARD_ROUTE);
+  assert.equal(routes[0].path, CARD_PATH);
   assert.deepEqual(routes[0].methods, ["GET", "POST"]);
   assert.equal(routes[0].requestBody, "buffered");
 });

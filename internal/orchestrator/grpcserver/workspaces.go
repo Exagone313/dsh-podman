@@ -213,10 +213,12 @@ func (s *Server) CreateWorkspace(ctx context.Context, request *ctl.CreateWorkspa
 	}
 	defaultMounts := mounts
 	var defaultPaths []string
+	storedDefault := false
 	if existing, storeErr := s.Store.Workspaces(); storeErr == nil {
 		for _, workspace := range existing {
 			if workspace.WorkspaceSlug == request.GetWorkspaceSlug() {
 				if record, ok := containerByLogical(&workspace, "default"); ok {
+					storedDefault = true
 					if len(record.Mounts) > 0 {
 						defaultMounts = record.Mounts
 					}
@@ -270,6 +272,26 @@ func (s *Server) CreateWorkspace(ctx context.Context, request *ctl.CreateWorkspa
 		return nil, status.Error(codes.NotFound, fmt.Sprintf("image %q not found", imageID))
 	}
 	name := podmanContainerName(request.GetWorkspaceSlug(), "default")
+	// A stored default container whose podman container still exists means the
+	// workspace is already created; report that clearly instead of letting
+	// podman fail with a duplicate-name error. A container without a stored
+	// record is an untracked leftover (an earlier create failed after making
+	// it, or it was removed outside dsh-podman): drop it so the create below is
+	// not blocked, mirroring StartContainer.
+	containerExists, existsErr := s.Podman.ContainerExists(name)
+	if existsErr != nil {
+		return nil, status.Error(codes.Internal, existsErr.Error())
+	}
+	if containerExists {
+		if storedDefault {
+			s.log().Warn("control request failed", "method", "CreateWorkspace", "workspace_slug", request.GetWorkspaceSlug(), "reason", "default container already exists")
+			return nil, status.Error(codes.AlreadyExists, fmt.Sprintf("workspace %q already has a default container", request.GetWorkspaceSlug()))
+		}
+		s.log().Warn("CreateWorkspace removing untracked container", "workspace_slug", request.GetWorkspaceSlug(), "container_name", name)
+		if removeErr := s.Podman.Remove(name); removeErr != nil {
+			return nil, status.Error(codes.Internal, removeErr.Error())
+		}
+	}
 	if err := s.Podman.CreateWorkspace(podNameFor(request.GetWorkspaceSlug()), name, imageTag, secret, podmanMounts, secrets, envSecrets, userEnv, defaultPaths); err != nil {
 		s.log().Error("control request failed", "method", "CreateWorkspace", "workspace_slug", request.GetWorkspaceSlug(), "error", err)
 		return nil, status.Error(codes.Internal, err.Error())

@@ -157,6 +157,9 @@ func pathServer(t *testing.T, slug string, paths []string) (*Server, *fakePodman
 // default container's PATH additions.
 func TestCreateWorkspaceSetsPathAdditions(t *testing.T) {
 	server, fake, store := pathServer(t, testWorkspaceSlug, []string{"/old/bin"})
+	// The stored default container is gone (for example its pod was removed),
+	// so the create must build it rather than report it as already existing.
+	fake.exists = map[string]bool{}
 	if _, err := server.CreateWorkspace(context.Background(), &ctl.CreateWorkspaceRequest{
 		WorkspaceSlug: testWorkspaceSlug, ProjectName: "team", ImageId: "arch",
 		Paths: []string{"/opt/bin", "/opt/bin", "/usr/local/bin"},

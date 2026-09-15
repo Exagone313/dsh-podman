@@ -278,3 +278,40 @@ func TestSyncDefaultFieldsTracksDefaultMounts(t *testing.T) {
 		t.Fatalf("removing the default container must keep the last-known mounts, got %#v", removed.Mounts)
 	}
 }
+
+// TestCreateWorkspaceRejectsAnExistingDefaultContainer pins that a create for a
+// workspace whose default container is already running reports AlreadyExists
+// instead of a podman duplicate-name failure.
+func TestCreateWorkspaceRejectsAnExistingDefaultContainer(t *testing.T) {
+	server, fake, _ := pathServer(t, testWorkspaceSlug, nil)
+	_, err := server.CreateWorkspace(context.Background(), &ctl.CreateWorkspaceRequest{
+		WorkspaceSlug: testWorkspaceSlug, ProjectName: "team", ImageId: "arch",
+	})
+	if status.Code(err) != codes.AlreadyExists {
+		t.Fatalf("expected AlreadyExists, got %v", err)
+	}
+	if len(fake.created) != 0 {
+		t.Fatalf("no container should be created: %#v", fake.created)
+	}
+}
+
+// TestCreateWorkspaceRemovesUntrackedContainer pins that a leftover podman
+// container with the derived name is dropped before the create, so an
+// untracked container cannot block it.
+func TestCreateWorkspaceRemovesUntrackedContainer(t *testing.T) {
+	server, fake, store := pathServer(t, testWorkspaceSlug, nil)
+	if err := store.SaveWorkspaces([]state.Workspace{{WorkspaceSlug: testWorkspaceSlug, ProjectName: "team"}}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := server.CreateWorkspace(context.Background(), &ctl.CreateWorkspaceRequest{
+		WorkspaceSlug: testWorkspaceSlug, ProjectName: "team", ImageId: "arch",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if len(fake.removed) != 1 || fake.removed[0] != testDefaultContainer {
+		t.Fatalf("untracked container not removed: %#v", fake.removed)
+	}
+	if len(fake.created) != 1 || fake.created[0] != testDefaultContainer {
+		t.Fatalf("expected one create, got %#v", fake.created)
+	}
+}

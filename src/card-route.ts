@@ -461,16 +461,6 @@ function normalizeCommand(raw: Record<string, unknown>): CommandRequest {
   };
 }
 
-async function errorMessage(response: Response): Promise<string> {
-  try {
-    const body = (await response.json()) as { error?: unknown };
-    if (typeof body.error === "string" && body.error !== "") return body.error;
-  } catch {
-    // A non-JSON body falls through to the status text.
-  }
-  return `card request failed (${response.status})`;
-}
-
 async function handleCardRequest(
   request: Request,
   ctx: any,
@@ -535,5 +525,3 @@ export function registerCardRoute(
     });
   });
 }
-
-export { errorMessage };

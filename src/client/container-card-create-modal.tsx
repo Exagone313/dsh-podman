@@ -9,6 +9,7 @@ import {
   type WorkspaceView,
 } from "./container-card-controller.js";
 import { EnvEditor, MountsEditor } from "./container-card-editors.js";
+import { type DirectoryPickerFace } from "./directory-picker.js";
 import { PathsList, type PathEntry } from "./container-card-paths.js";
 import { Field, namePattern, sanitizeName } from "./container-card-shared.js";
 import { greyId, hint, imageSelect, sectionTitle } from "./container-card-styles.js";
@@ -24,6 +25,8 @@ export function CreateContainerModal(props: {
   secrets: readonly { name: string }[];
   busy: boolean;
   defaultImage: string;
+  projectsRoot: string;
+  directoryPicker?: DirectoryPickerFace;
   named: boolean;
   existing: readonly string[];
   open: boolean;
@@ -38,6 +41,8 @@ export function CreateContainerModal(props: {
     secrets,
     busy,
     defaultImage,
+    projectsRoot,
+    directoryPicker,
     named,
     existing,
     open,
@@ -189,6 +194,8 @@ export function CreateContainerModal(props: {
           secrets={secrets}
           busy={busy}
           enabled={!busy}
+          projectsRoot={projectsRoot}
+          directoryPicker={directoryPicker}
           modeControl="select"
           onAdd={(mount) => setMounts([...mounts, mount])}
           onRemove={(mount) =>

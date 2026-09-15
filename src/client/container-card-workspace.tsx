@@ -12,6 +12,7 @@ import {
   type MountInput,
   type WorkspaceView,
 } from "./container-card-controller.js";
+import { type DirectoryPickerFace } from "./directory-picker.js";
 import { type ContainerPluginKey } from "./locales.js";
 import { Button, DisclosureRow, StateDot } from "@deepseek-ai/dsh-client-ui-primitives";
 import { type ReactNode, useState } from "react";
@@ -25,6 +26,8 @@ export function WorkspaceSection(props: {
   secrets: readonly { name: string }[];
   busy: boolean;
   defaultImage: string;
+  projectsRoot: string;
+  directoryPicker?: DirectoryPickerFace;
   onRemove: (workspace: string) => void;
   onRemoveWorkspace: (workspace: string) => void;
   onRecreate: (
@@ -70,6 +73,8 @@ export function WorkspaceSection(props: {
     secrets,
     busy,
     defaultImage,
+    projectsRoot,
+    directoryPicker,
     onRemove,
     onRemoveWorkspace,
     onRecreate,
@@ -133,6 +138,8 @@ export function WorkspaceSection(props: {
                 onUpdateContainerMount={onUpdateContainerMount}
                 onSetContainerPaths={onSetContainerPaths}
                 projectName={workspace.projectName}
+                projectsRoot={projectsRoot}
+                directoryPicker={directoryPicker}
                 onAddContainerSecret={onAddContainerSecret}
                 onRemoveContainerSecret={onRemoveContainerSecret}
               />
@@ -168,6 +175,8 @@ export function WorkspaceSection(props: {
         secrets={secrets}
         busy={busy}
         defaultImage={defaultImage}
+        projectsRoot={projectsRoot}
+        directoryPicker={directoryPicker}
         named={createOpen === "named"}
         existing={containers.map((container) => container.containerName)}
         open={createOpen !== null}

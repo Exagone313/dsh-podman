@@ -4,6 +4,7 @@
 
 import { type ContainerView, type MountInput } from "./container-card-controller.js";
 import { EnvEditor, MountsEditor } from "./container-card-editors.js";
+import { type DirectoryPickerFace } from "./directory-picker.js";
 import { PathsEditor } from "./container-card-paths.js";
 import { ConfirmButton, mountViewToInput } from "./container-card-shared.js";
 import {
@@ -45,6 +46,8 @@ export function ContainerRow(props: {
   onAddContainerSecret: (workspace: string, envVar: string, secret: string) => void;
   onRemoveContainerSecret: (workspace: string, envVar: string) => void;
   projectName: string;
+  projectsRoot: string;
+  directoryPicker?: DirectoryPickerFace;
 }): ReactNode {
   const {
     t,
@@ -62,6 +65,8 @@ export function ContainerRow(props: {
     onAddContainerSecret,
     onRemoveContainerSecret,
     projectName,
+    projectsRoot,
+    directoryPicker,
   } = props;
   const [selected, setSelected] = useState(container.imageId);
   const [env, setEnv] = useState<Record<string, string>>(container.env);
@@ -195,6 +200,8 @@ export function ContainerRow(props: {
             secrets={secrets}
             busy={busy}
             enabled={enabled}
+            projectsRoot={projectsRoot}
+            directoryPicker={directoryPicker}
             confirmRemove
             primaryProject={
               container.containerName === "default" ? projectName : ""

@@ -5,7 +5,10 @@
 import { ConfirmButton, Field, emptyMount, mountLabel } from "./container-card-shared.js";
 import { greyId, imageSelect } from "./container-card-styles.js";
 import { type MountInput } from "./container-card-controller.js";
+import { DirectoryPickerModal } from "./container-card-directory.js";
+import { type DirectoryPickerFace } from "./directory-picker.js";
 import { forcedMountMode } from "../mount-enums.js";
+import { hostPathForProjectName, projectNameFromHostPath } from "../project-path.js";
 import { type ContainerPluginKey } from "./locales.js";
 import { Button, Input, Modal } from "@deepseek-ai/dsh-client-ui-primitives";
 import { type ReactNode, useId, useState } from "react";
@@ -96,6 +99,12 @@ export function MountsEditor(props: {
   secrets: readonly { name: string }[];
   busy: boolean;
   enabled: boolean;
+  // The host projects root, so a project path can be browsed for and stored
+  // relative to it.
+  projectsRoot: string;
+  // The harness's host-side directory picker; absent in deployments that mount
+  // none, which hides the browse affordance.
+  directoryPicker?: DirectoryPickerFace;
   confirmRemove?: boolean;
   // How each mount's mode is presented: the live-container remount control
   // (with its confirmation), or an inline dropdown with no confirmation, used
@@ -115,6 +124,8 @@ export function MountsEditor(props: {
     secrets,
     busy,
     enabled,
+    projectsRoot,
+    directoryPicker,
     confirmRemove,
     modeControl = "remount",
     primaryProject = "",
@@ -123,6 +134,8 @@ export function MountsEditor(props: {
     onUpdate,
   } = props;
   const [adding, setAdding] = useState(false);
+  const [browsing, setBrowsing] = useState(false);
+  const [browseError, setBrowseError] = useState("");
   const [draft, setDraft] = useState<MountInput>(emptyMount());
   const mountKindId = useId();
   const mountProjectId = useId();
@@ -143,6 +156,7 @@ export function MountsEditor(props: {
           : true;
   const openAdd = (): void => {
     setDraft(emptyMount());
+    setBrowseError("");
     setAdding(true);
   };
   const submit = (): void => {
@@ -233,13 +247,33 @@ export function MountsEditor(props: {
     ) : (
       <>
         <Field label={t("mountProjectPath")} htmlFor={mountProjectId}>
-          <Input
-            id={mountProjectId}
-            value={draft.project}
-            disabled={busy}
-            onChange={(event) => updateDraft({ project: event.target.value })}
-          />
+          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            <Input
+              id={mountProjectId}
+              value={draft.project}
+              disabled={busy}
+              onChange={(event) => updateDraft({ project: event.target.value })}
+            />
+            {directoryPicker !== undefined ? (
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={busy}
+                onClick={() => {
+                  setBrowseError("");
+                  setBrowsing(true);
+                }}
+              >
+                {t("browse")}
+              </Button>
+            ) : null}
+          </div>
         </Field>
+        {browseError === "" ? null : (
+          <p style={{ margin: 0, fontSize: "13px" }} role="alert">
+            {browseError}
+          </p>
+        )}
         <Field label={t("mountMode")} htmlFor={mountModeId}>
           <select
             id={mountModeId}
@@ -406,6 +440,26 @@ export function MountsEditor(props: {
           {kindField}
         </div>
       </Modal>
+      {directoryPicker === undefined ? null : (
+        <DirectoryPickerModal
+          t={t}
+          open={browsing}
+          root={projectsRoot}
+          start={hostPathForProjectName(projectsRoot, draft.project)}
+          picker={directoryPicker}
+          onSelect={(path) => {
+            const project = projectNameFromHostPath(projectsRoot, path);
+            if (project === undefined) {
+              setBrowseError(t("browseOutsideRoot"));
+              return;
+            }
+            updateDraft({ project });
+            setBrowseError("");
+            setBrowsing(false);
+          }}
+          onClose={() => setBrowsing(false)}
+        />
+      )}
     </div>
   );
 }

@@ -33,3 +33,49 @@ export function hostPathForProjectName(
 function stripTrailingSlash(value: string): string {
   return String(value ?? "").replace(/\/+$/, "");
 }
+
+// confineToRoot clamps a directory to the projects root subtree, so a stale or
+// hand-edited project path can never open a browser outside it.
+export function confineToRoot(root: string, path: string): string {
+  const normalizedRoot = stripTrailingSlash(root);
+  const normalizedPath = stripTrailingSlash(path);
+  if (normalizedRoot === "" || normalizedPath === normalizedRoot) {
+    return normalizedRoot;
+  }
+  return normalizedPath.startsWith(`${normalizedRoot}/`)
+    ? normalizedPath
+    : normalizedRoot;
+}
+
+// parentDirectory is the directory one level above `path`, never above the
+// projects root.
+export function parentDirectory(root: string, path: string): string {
+  const normalizedRoot = stripTrailingSlash(root);
+  const index = path.lastIndexOf("/");
+  if (index <= 0) return normalizedRoot;
+  const parent = stripTrailingSlash(path.slice(0, index));
+  return parent.length < normalizedRoot.length ? normalizedRoot : parent;
+}
+
+// rootCrumbs returns the cumulative paths from the projects root down to `path`
+// inclusive, so a breadcrumb trail never renders a segment above the root.
+export function rootCrumbs(root: string, path: string): string[] {
+  const normalizedRoot = stripTrailingSlash(root);
+  const prefix = `${normalizedRoot}/`;
+  if (normalizedRoot === "" || !path.startsWith(prefix)) return [];
+  const crumbs: string[] = [];
+  let accumulated = normalizedRoot;
+  for (const segment of path.slice(prefix.length).split("/")) {
+    if (segment === "") continue;
+    accumulated = `${accumulated}/${segment}`;
+    crumbs.push(accumulated);
+  }
+  return crumbs;
+}
+
+// crumbLabel is the display name of one crumb path.
+export function crumbLabel(path: string): string {
+  const trimmed = stripTrailingSlash(path);
+  const name = trimmed.slice(trimmed.lastIndexOf("/") + 1);
+  return name === "" ? trimmed : name;
+}

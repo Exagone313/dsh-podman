@@ -138,9 +138,9 @@ export const TOOL_DESCRIPTIONS: Record<string, string> = {
   container_list:
     "List the containers of the current workspace, including the default container that is started on demand.",
   container_start:
-    "Start a container in the current workspace. Named containers are created with exactly the mounts you pass — the project directory is not mounted automatically. The default container always keeps its workspace project mount.",
+    "Start a container in the current workspace. Named containers are created with exactly the mounts you pass — the project directory is not mounted automatically. The default container always keeps its workspace project mount. Pass paths to replace the container's PATH additions.",
   container_recreate:
-    "Recreate a container in the current workspace, keeping its current image when no image is given, optionally with new project mounts. Requires approval: recreating replaces the running container.",
+    "Recreate a container in the current workspace, keeping its current image when no image is given, optionally with new project mounts. Pass paths to replace the container's PATH additions. Requires approval: recreating replaces the running container.",
   container_remove: "Remove a container from the current workspace.",
   container_bash:
     "Run a shell command inside a container of the current workspace. Defaults to the session working directory when it is mounted; pass workdir to override.",

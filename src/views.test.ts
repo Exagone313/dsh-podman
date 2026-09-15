@@ -14,6 +14,7 @@ test("publicContainer rebuilds a safe object from an API row", () => {
     "env",
     "imageId",
     "mounts",
+    "paths",
     "secretEnv",
     "status",
   ]);

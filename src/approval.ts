@@ -120,12 +120,14 @@ export function reasonFact(
       const image = str("image");
       const mounts = mountItems();
       const env = envKeys();
+      const paths = listOf("paths");
       return {
         kind: name,
         container,
         ...(image === undefined ? {} : { image }),
         ...(mounts === undefined ? {} : { mounts }),
         ...(env === undefined ? {} : { env }),
+        ...(paths === undefined ? {} : { paths }),
       };
     }
     case "container_remove": {

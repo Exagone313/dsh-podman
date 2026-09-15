@@ -25,6 +25,7 @@ export function publicContainer(row: any): Record<string, unknown> {
     status: row?.status ?? "",
     ...(row?.imageId ? { imageId: row.imageId } : {}),
     mounts: (row?.mounts ?? []).map(publicMount),
+    paths: row?.paths ?? [],
     env: row?.env ?? {},
     secretEnv: row?.secretEnv ?? {},
   };

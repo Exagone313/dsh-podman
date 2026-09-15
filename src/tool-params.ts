@@ -66,6 +66,18 @@ export const envParam = {
   description: "Environment variables.",
 };
 
+// The complete PATH-addition list, shared by the tools that set it outright.
+const pathsParam = {
+  type: "array",
+  items: {
+    type: "string",
+    description:
+      "Absolute directory to prepend to the container's PATH (no ':', NUL, or newline).",
+  },
+  description:
+    "Complete ordered list of PATH additions, highest priority first. Replaces the current list; an empty list clears it.",
+};
+
 const descriptionParam = {
   type: "string",
   description:
@@ -139,6 +151,7 @@ export const containerStartParameters = {
     mounts: mountsParam,
     env: envParam,
     secretEnv: { type: "object", additionalProperties: { type: "string" }, description: "Secret environment variables (env var name to secret short name)." },
+    paths: pathsParam,
   },
   required: ["container"],
 };
@@ -155,6 +168,7 @@ export const containerRecreateParameters = {
     mounts: mountsParam,
     env: envParam,
     secretEnv: { type: "object", additionalProperties: { type: "string" }, description: "Secret environment variables (env var name to secret short name)." },
+    paths: pathsParam,
   },
   required: ["container"],
 };
@@ -249,16 +263,7 @@ export const containerPathSetParameters = {
   type: "object",
   properties: {
     container: containerParam,
-    paths: {
-      type: "array",
-      items: {
-        type: "string",
-        description:
-          "Absolute directory to prepend to the container's PATH (no ':', NUL, or newline).",
-      },
-      description:
-        "Complete ordered list of PATH additions, highest priority first. Replaces the current list; an empty list clears it.",
-    },
+    paths: pathsParam,
   },
   required: ["container", "paths"],
 };

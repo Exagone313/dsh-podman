@@ -181,6 +181,7 @@ test("container_list returns secret_env maps on container rows", async () => {
       status: "running",
       imageId: "img-1",
       mounts: [],
+      paths: [],
       env: {},
       secretEnv: { REDIS_PASSWORD: "db-pass" },
     },
@@ -188,6 +189,7 @@ test("container_list returns secret_env maps on container rows", async () => {
       containerName: "db",
       status: "running",
       mounts: [],
+      paths: [],
       env: {},
       secretEnv: {
         A: "a",
@@ -206,6 +208,7 @@ test("container_list returns secret_env maps on container rows", async () => {
       containerName: "worker",
       status: "stopped",
       mounts: [],
+      paths: [],
       env: {},
       secretEnv: {},
     },

@@ -35,6 +35,7 @@ export type ReasonFact =
       image?: string;
       mounts?: readonly MountFact[];
       env?: readonly string[];
+      paths?: readonly string[];
     }
   | { kind: "container_remove"; container: string }
   | { kind: "container_mount_add"; container: string; mount: MountFact }
@@ -228,14 +229,22 @@ function containerRun(
           ` with env: ${joinList(locale, fact.env)}`,
           `，环境变量：${joinList(locale, fact.env)}`,
         );
+  const paths =
+    fact.paths === undefined || fact.paths.length === 0
+      ? ""
+      : pick(
+          locale,
+          ` with PATH additions: ${joinList(locale, fact.paths.map((path) => quoted(locale, path)))}`,
+          `，PATH 附加项：${joinList(locale, fact.paths.map((path) => quoted(locale, path)))}`,
+        );
   const verb =
     fact.kind === "container_start"
       ? pick(locale, "Start", "启动")
       : pick(locale, "Recreate", "重建");
   return pick(
     locale,
-    `${verb} container ${quoted(locale, fact.container)}${image}${mounts}${env}.`,
-    `${verb}容器 ${quoted(locale, fact.container)}${image}${mounts}${env}。`,
+    `${verb} container ${quoted(locale, fact.container)}${image}${mounts}${env}${paths}.`,
+    `${verb}容器 ${quoted(locale, fact.container)}${image}${mounts}${env}${paths}。`,
   );
 }
 

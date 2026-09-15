@@ -73,6 +73,7 @@ test("container_list returns sanitized container objects with env values", async
       status: "running",
       imageId: "img-1",
       mounts: [],
+      paths: [],
       env: { PATH: "/bin", HOME: "/root" },
       secretEnv: {},
     },
@@ -80,6 +81,7 @@ test("container_list returns sanitized container objects with env values", async
       containerName: "db",
       status: "running",
       mounts: [],
+      paths: [],
       env: { PORT: "5432", DB: "main", X: "1", Y: "2" },
       secretEnv: {},
     },
@@ -87,6 +89,7 @@ test("container_list returns sanitized container objects with env values", async
       containerName: "worker",
       status: "stopped",
       mounts: [],
+      paths: [],
       env: {},
       secretEnv: {},
     },
@@ -161,6 +164,35 @@ test("container_recreate returns the logical container name", async () => {
     exec,
   )) as any;
   assert.equal(named.containerName, "db");
+});
+
+test("container start and recreate forward PATH additions", async () => {
+  const calls: Array<[string, any]> = [];
+  const resolver = {
+    registry: {
+      resolveByPath: async () => ({ id: WORKSPACE_ID }),
+    },
+    getConfig: () => ({ projectsRoot: "/projects" }),
+    control: async (method: string, request: unknown) => {
+      calls.push([method, request]);
+      return { containerName: "default", status: "running", paths: ["/opt/bin"] };
+    },
+  } as never;
+  const exec = { agent: { session: { header: { cwd: "/projects/team" } } } };
+  const started = (await toolHandlers.container_start(
+    resolver,
+    { container: "default", paths: ["/opt/bin"] },
+    exec,
+  )) as any;
+  assert.deepEqual(calls[0][1].paths, ["/opt/bin"]);
+  assert.deepEqual(started.paths, ["/opt/bin"]);
+  const recreated = (await toolHandlers.container_recreate(
+    resolver,
+    { container: "default", paths: ["/usr/local/bin"] },
+    exec,
+  )) as any;
+  assert.deepEqual(calls[1][1].paths, ["/usr/local/bin"]);
+  assert.deepEqual(recreated.paths, ["/opt/bin"]);
 });
 
 test("resolveGuestPath resolves relative paths and refuses traversal", () => {

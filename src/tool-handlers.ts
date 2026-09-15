@@ -103,6 +103,7 @@ export const toolHandlers: Record<
       ...(mounts === undefined ? {} : { mounts }),
       ...(input.env !== undefined ? { env: input.env } : {}),
       ...(input.secretEnv !== undefined ? { secretEnv: input.secretEnv } : {}),
+      ...(input.paths !== undefined ? { paths: input.paths } : {}),
     });
     return publicContainer(row);
   },
@@ -115,6 +116,7 @@ export const toolHandlers: Record<
       ...(mounts === undefined ? {} : { mounts }),
       ...(input.env !== undefined ? { env: input.env } : {}),
       ...(input.secretEnv !== undefined ? { secretEnv: input.secretEnv } : {}),
+      ...(input.paths !== undefined ? { paths: input.paths } : {}),
     });
     return {
       ...publicContainer(row),

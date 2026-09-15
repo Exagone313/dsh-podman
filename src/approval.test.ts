@@ -577,6 +577,26 @@ test("Podman-ops preset writer overwrites existing content", () => {
   );
 });
 
+test("summarizeArgs includes PATH additions for container start/recreate", () => {
+  assert.equal(
+    summarizeArgs("container_start", { container: "web", paths: ["/opt/bin"] }),
+    'Start container "web" with PATH additions: "/opt/bin".',
+  );
+  assert.equal(
+    summarizeArgs("container_recreate", {
+      container: "c",
+      image: "img",
+      paths: ["/opt/bin", "/usr/local/bin"],
+    }),
+    'Recreate container "c" from image "img" with PATH additions: "/opt/bin", "/usr/local/bin".',
+  );
+  // An empty list is not worth naming.
+  assert.equal(
+    summarizeArgs("container_start", { container: "web", paths: [] }),
+    'Start container "web".',
+  );
+});
+
 test("an approval ask omits the reason when no summary can be derived", () => {
   assert.deepEqual(approvalDecision("container_mount_remove", { container: "c" }), {
     kind: "ask",

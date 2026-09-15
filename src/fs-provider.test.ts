@@ -216,6 +216,20 @@ test("filesystem provider writeText reports the harness error codes", async () =
   );
 });
 
+test("filesystem provider writeText creates a file that was removed", async () => {
+  // A read-then-removed path is a new file: creating it destroys nothing, so
+  // the write must succeed instead of reporting a stale version.
+  const gone = editProvider(editGuest({ exists: false }));
+  const target = await gone.resolve("/a", { cwd: "/x" });
+  const outcome = await gone.writeText(target, "fresh", {
+    kind: "replaceIfVersion",
+    version: "agent:1:5:-rw-r--r--",
+  });
+  assert.equal(outcome.operation, "create");
+  assert.equal(outcome.before, null);
+  assert.equal(outcome.after, "fresh");
+});
+
 test("filesystem provider rejects a pre-aborted signal with FS_ABORTED", async () => {
   const provider = editProvider(editGuest({}, Buffer.from("hello")));
   const target = await provider.resolve("/a", { cwd: "/x" });

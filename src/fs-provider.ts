@@ -171,13 +171,11 @@ export function createFilesystemProvider(resolver: WorkspaceResolver): Filesyste
       }
       const currentVersion = current.exists ? guestVersion(current) : undefined;
       if (expected?.kind === "replaceIfVersion") {
-        if (!current.exists) {
-          throw fsError(
-            "FS_STALE_VERSION",
-            `cannot write "${target.displayPath}": file no longer exists`,
-          );
-        }
-        if (currentVersion !== expected.version) {
+        // A file that is gone is a new file: creating it destroys nothing, so
+        // this backend creates it. (The harness's fs-local reports
+        // FS_STALE_VERSION here; a path the session read and something else
+        // removed must stay writable, so the container tools create it.)
+        if (current.exists && currentVersion !== expected.version) {
           throw fsError(
             "FS_STALE_VERSION",
             `cannot write "${target.displayPath}": file changed since it was read`,

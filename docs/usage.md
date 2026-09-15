@@ -149,9 +149,11 @@ share their behavior: binary files are refused with the same error, and the
 read-before-write guard (refusing to overwrite a file that was not read in the
 session) applies to them exactly as it does to the built-in `write` and `edit` —
 a `container_read` satisfies that guard for the path it read, just like the
-built-in `read`. The plugin also registers a dedicated UI row for every one of
-its tools (icon, title, summary, and result body), so they render like the
-built-in tools rather than as a generic `Tool call` row.
+built-in `read`. A path that was read and has since been removed is a new file:
+writing it creates it again instead of reporting a stale version. The plugin
+also registers a dedicated UI row for every one of its tools (icon, title,
+summary, and result body), so they render like the built-in tools rather than as
+a generic `Tool call` row.
 
 Paths and working directories may be absolute or relative. A relative value is
 resolved against the session's working directory, which is also where the

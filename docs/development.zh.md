@@ -19,7 +19,7 @@ SPDX-License-Identifier: MIT
 
 ## 构建
 
-前置要求：Go 1.27、Node ≥ 22、pnpm 10，以及（浏览器端所需的）发布在 npm 上的
+前置要求：Go 1.27、Node ≥ 22、pnpm 12，以及（浏览器端所需的）发布在 npm 上的
 `@deepseek-ai/dsh-client-*` 包。
 
 ```sh
@@ -117,11 +117,19 @@ CI（`.github/workflows/ci.yml`）在每次分支推送和拉取请求时运行�
    `next` dist-tag 下发布。
 4. 创建带有自动生成说明的 **GitHub release**，并附上 二进制文件和 npm tarball。
 
-使用以下命令推送标签：
+标签必须与 `package.json`
+中的版本一致——否则工作流会失败——因此请用版本脚本同时更新两者：
 
 ```sh
-git tag 0.1.1
-git push origin 0.1.1
+pnpm bump-version 0.1.1            # 加上 --dry-run 则仅校验
+git push origin master 0.1.1
 ```
+
+`scripts/bump-version.mjs` 会检查版本是否为递增的 Semver
+正式版或预发布版，将其写入 `package.json`，提交
+`chore: bump version to X`，并创建标签；它不会推送，且要求处于 `master`
+分支且工作区干净。标签同时也是构建出的插件与二进制文件所报告的版本，因为
+`scripts/generate-version.mjs` 从 `git describe --tags`
+推导嵌入的版本。预发布版（`1.0.0-rc.1`）也用同样的方式递增。
 
 npm 步骤要求仓库配置 `NPM_TOKEN` 密钥。

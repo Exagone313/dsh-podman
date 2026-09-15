@@ -20,7 +20,7 @@ This page is for **contributors** building the plugin from this repository.
 
 ## Building
 
-Prerequisites: Go 1.27, Node ≥ 22, pnpm 10, and (for the browser half) the
+Prerequisites: Go 1.27, Node ≥ 22, pnpm 12, and (for the browser half) the
 `@deepseek-ai/dsh-client-*` packages published on npm.
 
 ```sh
@@ -123,11 +123,20 @@ pre-releases like `1.0.0-rc.1` also work). The release workflow
 4. Creates a **GitHub release** with auto-generated notes and attaches the
    binaries and the npm tarball.
 
-Push a tag with:
+The tag must match `package.json`'s version — the workflow fails otherwise — so
+bump both with the version script:
 
 ```sh
-git tag 0.1.1
-git push origin 0.1.1
+pnpm bump-version 0.1.1            # add --dry-run to validate only
+git push origin master 0.1.1
 ```
+
+`scripts/bump-version.mjs` checks that the version is a semver release or
+pre-release that increases the current one, writes it to `package.json`, commits
+`chore: bump version to X`, and creates the tag; it pushes nothing, and it
+requires the `master` branch with a clean working tree. The tag is also what the
+built plugin and binaries report, since `scripts/generate-version.mjs` derives
+the embedded version from `git describe --tags`. Pre-releases (`1.0.0-rc.1`) are
+bumped the same way.
 
 The `NPM_TOKEN` secret must be configured on the repository for the npm step.

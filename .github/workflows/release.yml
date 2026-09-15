@@ -25,6 +25,10 @@ jobs:
       contents: write # create the GitHub release
       packages: write # push container images to GHCR
       id-token: write # sign the npm package with provenance
+    env:
+      # A 0.x release and any hyphenated tag are pre-releases: they get the
+      # version tag only, never `major` or `latest`.
+      STABLE: ${{ !contains(github.ref_name, '-') && !startsWith(github.ref, 'refs/tags/0.') }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -98,24 +102,36 @@ jobs:
         uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
         with:
           images: ghcr.io/exagone313/dsh-podman/dsh
+          flavor: |
+            latest=false
           tags: |
             type=semver,pattern={{version}}
+            type=semver,pattern={{major}},enable=${{ env.STABLE }}
+            type=raw,value=latest,enable=${{ env.STABLE }}
 
       - name: Metadata (orchestrator)
         id: meta-orchestrator
         uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
         with:
           images: ghcr.io/exagone313/dsh-podman/orchestrator
+          flavor: |
+            latest=false
           tags: |
             type=semver,pattern={{version}}
+            type=semver,pattern={{major}},enable=${{ env.STABLE }}
+            type=raw,value=latest,enable=${{ env.STABLE }}
 
       - name: Metadata (guest-agent)
         id: meta-guestagent
         uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
         with:
           images: ghcr.io/exagone313/dsh-podman/guest-agent
+          flavor: |
+            latest=false
           tags: |
             type=semver,pattern={{version}}
+            type=semver,pattern={{major}},enable=${{ env.STABLE }}
+            type=raw,value=latest,enable=${{ env.STABLE }}
 
       - name: Build and push dsh image
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
@@ -152,7 +168,7 @@ jobs:
 
       - name: Publish to npm
         run: |
-          args="--access public --no-git-checks"
+          args="--access public"
           if [[ "$VERSION" == *-* ]]; then args="$args --tag next"; fi
           npm publish $args
 

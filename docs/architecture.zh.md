@@ -37,8 +37,11 @@ pod 中创建或替换容器；空的 `container`
 每个工作区映射到一个 **podman pod**（`dsh-podman-<slug>`，其中 `<slug>` 是工作区
 UUID），因此其容器共享一个网络命名空间。每个工作区都有一个
 **默认容器**（`dsh-podman-<slug>-default`）；可以在同一个 pod
-内创建额外的、命名的容器（`dsh-podman-<slug>-<name>`）。容器的根文件系统以只读方式挂载；所有可写状态都存在于项目绑定挂载、命名卷或
-tmpfs 挂载中。
+内创建额外的、命名的容器（`dsh-podman-<slug>-<name>`）。容器的根文件系统以只读方式挂载，`/tmp`、`/var/tmp`
+和 `/run` 上是 podman 的可写 tmpfs（`/dev` 和 `/dev/shm`
+保持可写）。所有其他可写状态都存在于项目绑定挂载、命名卷或 tmpfs 挂载中。guest
+文件 API 可以访问 `/tmp`，而 guest agent 会把超出上限的命令输出写入
+`/tmp/dsh-podman` 下的溢出文件。
 
 工作区的 Pod 会在其最后一个容器被移除时拆除，也可直接通过
 `RemoveWorkspace`（设置卡片中的 **移除 Pod**
@@ -51,7 +54,9 @@ tmpfs 挂载中。
 
 - `DSH_PODMAN_PROJECTS_ROOT`，保留给项目挂载；
 - `DSH_PODMAN_SOCKETS_ROOT`，承载 guest agent 的 socket；
-- `DSH_PODMAN_GUEST_AGENT_IMAGE_MOUNT`，容器从其运行入口点。
+- `DSH_PODMAN_GUEST_AGENT_IMAGE_MOUNT`，容器从其运行入口点；
+- `/tmp`，podman 在其中挂载 guest 文件 API 可访问的可写
+  tmpfs，命令输出也溢出写入其中。
 
 包含保留路径的目标会被拒绝，位于其内部的目标同样会被拒绝，因为它会隐藏其下的所有内容。
 

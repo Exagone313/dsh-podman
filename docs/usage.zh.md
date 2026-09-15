@@ -141,7 +141,7 @@ bash 进程）的 `env` 映射；`container_exec` 和 `daemon_start` 已经接�
 `project` 挂载将 projects 根目录下的一个路径绑定到容器（`team`，或项目内的目录
 `team/src`）；`tmpfs` 挂载可写的内存文件系统，`volume` 挂载 podman
 命名卷（首次使用时自动创建）——两者都位于任意绝对容器路径，绝不位于 projects
-根目录或其他保留路径之下。`secret`
+根目录、`/tmp` 或其他保留路径之下。`secret`
 挂载将受管理的机密作为只读文件暴露在绝对容器路径（参见[机密](#机密)）。
 
 `project` 挂载不接受 `destination`：项目目录始终挂载在 projects

@@ -171,9 +171,9 @@ by processes running inside the container.
 A `project` mount binds a path under the projects root (`team`, or `team/src`
 for a directory inside it); `tmpfs` mounts a writable in-memory filesystem and
 `volume` mounts a podman named volume (auto-created on first use) — both at an
-arbitrary absolute container path, never under the projects root or another
-reserved path. A `secret` mount exposes a managed secret as a read-only file at
-an absolute container path (see [Secrets](#secrets)).
+arbitrary absolute container path, never under the projects root, `/tmp`, or
+another reserved path. A `secret` mount exposes a managed secret as a read-only
+file at an absolute container path (see [Secrets](#secrets)).
 
 Project mounts do not take a `destination`: a project directory is always
 mounted at its mirrored path under the projects root. `destination` applies only

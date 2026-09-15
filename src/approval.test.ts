@@ -539,6 +539,38 @@ test("summarizeArgs renders reasons for the podman-ops gated tools", () => {
   );
 });
 
+test("summarizeArgs names the process identity and groups", () => {
+  assert.equal(
+    summarizeArgs("container_bash", {
+      container: "c",
+      command: "id",
+      uid: 1000,
+      gid: 1000,
+      groups: [3000, 4000],
+    }),
+    'Run a shell command in container "c": id (uid 1000, gid 1000, groups 3000, 4000)',
+  );
+  assert.equal(
+    summarizeArgs("container_exec", { container: "c", argv: ["id"], gid: 2000 }),
+    'Run a command in container "c": id (gid 2000)',
+  );
+  assert.equal(
+    summarizeArgs("daemon_start", {
+      container: "c",
+      name: "web",
+      argv: ["nginx"],
+      uid: 1000,
+      groups: [3000],
+    }),
+    'Start daemon "web" in container "c": nginx (uid 1000, groups 3000)',
+  );
+  // An empty groups list is not worth naming.
+  assert.equal(
+    summarizeArgs("container_exec", { container: "c", argv: ["id"], groups: [] }),
+    'Run a command in container "c": id',
+  );
+});
+
 test("Podman-ops preset content covers the recent tools", () => {
   for (const tool of [
     "image_rebuild_all",

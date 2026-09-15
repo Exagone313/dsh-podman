@@ -108,6 +108,16 @@ test("renderReason covers the remaining reason kinds in both languages", () => {
     "在容器 “c” 中启动守护进程：x（uid 1）",
   );
   assert.equal(
+    renderReason("zh", {
+      kind: "container_bash",
+      container: "c",
+      command: "id",
+      uid: 1,
+      groups: [3, 4],
+    }),
+    "在容器 “c” 中运行 shell 命令：id（uid 1、groups 3、4）",
+  );
+  assert.equal(
     renderReason("zh", { kind: "container_secret_add", container: "c", secret: "s", env: "E" }),
     "将机密 “s” 作为 “E” 注入容器 “c”。",
   );

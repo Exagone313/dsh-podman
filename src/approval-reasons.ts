@@ -54,8 +54,24 @@ export type ReasonFact =
   | { kind: "secret_remove"; name: string }
   | { kind: "container_secret_add"; container: string; secret: string; env: string }
   | { kind: "container_secret_remove"; container: string; env: string }
-  | { kind: "container_bash"; container: string; command: string; cwd?: string }
-  | { kind: "container_exec"; container: string; argv: readonly string[]; cwd?: string }
+  | {
+      kind: "container_bash";
+      container: string;
+      command: string;
+      cwd?: string;
+      uid?: number;
+      gid?: number;
+      groups?: readonly number[];
+    }
+  | {
+      kind: "container_exec";
+      container: string;
+      argv: readonly string[];
+      cwd?: string;
+      uid?: number;
+      gid?: number;
+      groups?: readonly number[];
+    }
   | { kind: "container_write"; container: string; path: string }
   | { kind: "container_edit"; container: string; path: string }
   | {
@@ -65,6 +81,7 @@ export type ReasonFact =
       name?: string;
       uid?: number;
       gid?: number;
+      groups?: readonly number[];
     };
 
 // A policy denial. These surface as tool errors (not approval prompts) and stay
@@ -202,6 +219,24 @@ function mountText(locale: ReasonLocale, mount: MountFact): string {
 function argvText(argv: readonly string[]): string {
   const shown = argv.slice(0, 8).join(" ");
   return argv.length > 8 ? `${shown} …` : shown;
+}
+
+// identityText renders the process identity a call requests as a parenthesized
+// suffix, or "" when it requests none. Shared by every tool that can run a
+// process as another user.
+function identityText(
+  locale: ReasonLocale,
+  fact: { uid?: number; gid?: number; groups?: readonly number[] },
+): string {
+  const ids: string[] = [];
+  if (fact.uid !== undefined) ids.push(`uid ${fact.uid}`);
+  if (fact.gid !== undefined) ids.push(`gid ${fact.gid}`);
+  if (fact.groups !== undefined && fact.groups.length > 0) {
+    ids.push(
+      `groups ${joinList(locale, fact.groups.map((group) => String(group)))}`,
+    );
+  }
+  return ids.length === 0 ? "" : pick(locale, ` (${ids.join(", ")})`, `（${ids.join("、")}）`);
 }
 
 // Start/recreate share one shape; only the verb differs.
@@ -376,10 +411,11 @@ export function renderReason(locale: ReasonLocale, fact: ReasonFact): string {
         fact.cwd === undefined
           ? ""
           : pick(locale, ` (cwd ${quoted(locale, fact.cwd)})`, `（工作目录 ${quoted(locale, fact.cwd)}）`);
+      const identity = identityText(locale, fact);
       return pick(
         locale,
-        `Run a shell command in container ${quoted(locale, fact.container)}${cwd}: ${fact.command}`,
-        `在容器 ${quoted(locale, fact.container)}${cwd} 中运行 shell 命令：${fact.command}`,
+        `Run a shell command in container ${quoted(locale, fact.container)}${cwd}: ${fact.command}${identity}`,
+        `在容器 ${quoted(locale, fact.container)}${cwd} 中运行 shell 命令：${fact.command}${identity}`,
       );
     }
     case "container_exec": {
@@ -387,10 +423,11 @@ export function renderReason(locale: ReasonLocale, fact: ReasonFact): string {
         fact.cwd === undefined
           ? ""
           : pick(locale, ` (cwd ${quoted(locale, fact.cwd)})`, `（工作目录 ${quoted(locale, fact.cwd)}）`);
+      const identity = identityText(locale, fact);
       return pick(
         locale,
-        `Run a command in container ${quoted(locale, fact.container)}${cwd}: ${argvText(fact.argv)}`,
-        `在容器 ${quoted(locale, fact.container)}${cwd} 中运行命令：${argvText(fact.argv)}`,
+        `Run a command in container ${quoted(locale, fact.container)}${cwd}: ${argvText(fact.argv)}${identity}`,
+        `在容器 ${quoted(locale, fact.container)}${cwd} 中运行命令：${argvText(fact.argv)}${identity}`,
       );
     }
     case "container_write":
@@ -407,10 +444,7 @@ export function renderReason(locale: ReasonLocale, fact: ReasonFact): string {
       );
     case "daemon_start": {
       const named = fact.name === undefined ? "" : ` ${quoted(locale, fact.name)}`;
-      const ids: string[] = [];
-      if (fact.uid !== undefined) ids.push(`uid ${fact.uid}`);
-      if (fact.gid !== undefined) ids.push(`gid ${fact.gid}`);
-      const suffix = ids.length === 0 ? "" : pick(locale, ` (${ids.join(", ")})`, `（${ids.join("、")}）`);
+      const suffix = identityText(locale, fact);
       return pick(
         locale,
         `Start daemon${named} in container ${quoted(locale, fact.container)}: ${argvText(fact.argv)}${suffix}`,

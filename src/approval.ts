@@ -89,6 +89,24 @@ export function reasonFact(
     const keys = Object.keys(value);
     return keys.length === 0 ? undefined : keys;
   };
+  const numberListOf = (key: string): number[] | undefined => {
+    const value = args[key];
+    return Array.isArray(value) && value.length > 0
+      ? value.map((item) => Number(item))
+      : undefined;
+  };
+  // The optional process identity a tool may carry, shared by the tools that
+  // can run a process as another user.
+  const identityFact = (): { uid?: number; gid?: number; groups?: number[] } => {
+    const uid = typeof args.uid === "number" ? args.uid : undefined;
+    const gid = typeof args.gid === "number" ? args.gid : undefined;
+    const groups = numberListOf("groups");
+    return {
+      ...(uid === undefined ? {} : { uid }),
+      ...(gid === undefined ? {} : { gid }),
+      ...(groups === undefined ? {} : { groups }),
+    };
+  };
 
   switch (name) {
     case "image_build": {
@@ -199,6 +217,7 @@ export function reasonFact(
         container,
         command,
         ...(cwd === undefined ? {} : { cwd }),
+        ...identityFact(),
       };
     }
     case "container_exec": {
@@ -211,6 +230,7 @@ export function reasonFact(
         container,
         argv,
         ...(cwd === undefined ? {} : { cwd }),
+        ...identityFact(),
       };
     }
     case "container_write":
@@ -225,15 +245,12 @@ export function reasonFact(
       const argv = listOf("argv");
       if (container === undefined || argv === undefined) return undefined;
       const daemon = str("name");
-      const uid = typeof args.uid === "number" ? args.uid : undefined;
-      const gid = typeof args.gid === "number" ? args.gid : undefined;
       return {
         kind: "daemon_start",
         container,
         argv,
         ...(daemon === undefined ? {} : { name: daemon }),
-        ...(uid === undefined ? {} : { uid }),
-        ...(gid === undefined ? {} : { gid }),
+        ...identityFact(),
       };
     }
     default:

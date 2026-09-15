@@ -102,6 +102,8 @@ orchestrator 通过 Podman 构建工作区镜像（有关原始/基础/自定义
 `DSH_PODMAN_BASE_IMAGE_PREFIX` 指向注册表时拉取），不包含任何 guest-agent
 二进制。guest agent 在创建容器时通过将其自身镜像只读挂载到容器中来提供（请参阅
 [配置](configuration.zh.md)）。自定义镜像在父镜像之上分层并添加额外的软件包。
+每次构建都会以包含所生成 Containerfile 的 tar 形式将构建上下文流式传输给 Podman
+API，因此构建不会向 orchestrator 的状态目录写入任何内容。
 
 `image_rebuild_all` 首先确保每个基础镜像（根据 `DSH_PODMAN_BASE_IMAGE_PREFIX`
 在本地构建或从公共注册表拉取），然后**按依赖顺序**重建存储的自定义镜像——每个父镜像都在从它派生的镜像之前。重建失败的镜像以及依赖它的每个镜像都会被报告在

@@ -121,7 +121,9 @@ are built locally from their primitive reference (or pulled when
 `DSH_PODMAN_BASE_IMAGE_PREFIX` points at a registry) without any guest-agent
 binary. The guest agent is provided at container creation by mounting its own
 image read-only into the container (see [Configuration](configuration.md)).
-Custom images are layered on top of a parent image and add extra packages.
+Custom images are layered on top of a parent image and add extra packages. Every
+build streams its context to the Podman API as a tar holding the generated
+Containerfile, so a build writes nothing to the orchestrator's state directory.
 
 `image_rebuild_all` first ensures every base image (building locally or pulling
 from a public registry per `DSH_PODMAN_BASE_IMAGE_PREFIX`), then rebuilds the

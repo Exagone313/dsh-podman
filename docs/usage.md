@@ -209,8 +209,10 @@ In the settings card, the project path field of the add-mount and
 create-container dialogs has a **Browse…** button. It opens a directory picker
 that reads the projects root through dsh's own host-side directory listing — the
 same service behind dsh's workspace directory selection — not through the
-orchestrator or a container. The dialog is confined to the projects root, and
-the path it produces is stored relative to that root.
+orchestrator or a container. Its layout follows dsh's own directory browser: two
+columns, chevron breadcrumbs, folder icons, and a hidden-entry toggle. The
+dialog is confined to the projects root, and the path it produces is stored
+relative to that root.
 
 Removing a mount names it by `kind` plus that mount's own handle: `project` for
 a project mount, `volume` for a named volume, `secret` for a secret, and

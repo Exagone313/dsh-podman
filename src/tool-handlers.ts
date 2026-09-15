@@ -155,10 +155,7 @@ export const toolHandlers: Record<
       ...(input.secretEnv !== undefined ? { secretEnv: input.secretEnv } : {}),
       ...(input.paths !== undefined ? { paths: input.paths } : {}),
     });
-    return {
-      ...publicContainer(row),
-      containerName: input.container || "default",
-    };
+    return publicContainer(row);
   },
   container_remove: async (resolver, input, exec) => {
     await resolver.control("removeContainer", {

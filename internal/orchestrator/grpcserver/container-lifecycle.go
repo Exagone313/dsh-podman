@@ -145,7 +145,7 @@ func (s *Server) StopAllContainerDaemons(ctx context.Context) {
 	wg.Wait()
 }
 
-func (s *Server) RecreateContainer(ctx context.Context, request *ctl.RecreateContainerRequest) (*ctl.Workspace, error) {
+func (s *Server) RecreateContainer(ctx context.Context, request *ctl.RecreateContainerRequest) (*ctl.Container, error) {
 	s.log().Info("control request", "method", "RecreateContainer", "workspace_slug", request.GetWorkspaceSlug(), "image_id", request.GetImageId(), "container", request.GetContainer())
 	container := request.GetContainer()
 	if container == "" {
@@ -230,7 +230,7 @@ func (s *Server) RecreateContainer(ctx context.Context, request *ctl.RecreateCon
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 	s.log().Info("control request completed", "method", "RecreateContainer", "workspace_slug", request.GetWorkspaceSlug(), "container", container, "image_id", imageID)
-	return toProto(updated), nil
+	return containerProto(updated, *record), nil
 }
 
 func (s *Server) StartContainer(ctx context.Context, request *ctl.StartContainerRequest) (*ctl.Container, error) {
@@ -271,8 +271,11 @@ func (s *Server) StartContainer(ctx context.Context, request *ctl.StartContainer
 	}
 	record := state.Container{Name: container, PodmanName: podmanContainerName(workspace.WorkspaceSlug, container), ImageID: imageID, Mounts: recordMounts}
 	if existing, ok := containerByLogical(&workspace, container); ok {
-		// Replacing a container keeps its PATH additions.
+		// Replacing a container keeps its PATH additions, environment, and
+		// secret environment; an omitted map cannot express a clear.
 		record.Paths = append([]string(nil), existing.Paths...)
+		record.Env = cloneMap(existing.Env)
+		record.SecretEnv = cloneMap(existing.SecretEnv)
 	}
 	// A start request may replace the PATH additions; without them a replaced
 	// container keeps the list it had.
@@ -293,7 +296,12 @@ func (s *Server) StartContainer(ctx context.Context, request *ctl.StartContainer
 		s.log().Error("StartContainer secret validation failed", "workspace_slug", workspace.WorkspaceSlug, "error", err)
 		return nil, err
 	}
-	record.SecretEnv = cloneMap(request.GetSecretEnv())
+	// A start request may replace the environment and secret environment;
+	// without them the replaced container keeps what it had, matching mounts
+	// and PATH additions.
+	if len(request.GetSecretEnv()) > 0 {
+		record.SecretEnv = cloneMap(request.GetSecretEnv())
+	}
 	if err := validateSecretEnv(record.SecretEnv); err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
@@ -301,7 +309,9 @@ func (s *Server) StartContainer(ctx context.Context, request *ctl.StartContainer
 	if err := validateEnv(request.GetEnv()); err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
-	record.Env = cloneMap(request.GetEnv())
+	if len(request.GetEnv()) > 0 {
+		record.Env = cloneMap(request.GetEnv())
+	}
 	imageTag, err := s.resolveImageTag(imageID)
 	if err != nil {
 		return nil, err

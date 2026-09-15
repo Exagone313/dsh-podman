@@ -24,7 +24,7 @@ service OrchestratorControl {
   rpc CleanCaches(CleanCachesRequest) returns (CleanCachesResponse);
   rpc ListContainers(ListContainersRequest) returns (ListContainersResponse);
   rpc StartContainer(StartContainerRequest) returns (Container);
-  rpc RecreateContainer(RecreateContainerRequest) returns (Workspace);
+  rpc RecreateContainer(RecreateContainerRequest) returns (Container);
   rpc RemoveContainer(RemoveContainerRequest) returns (RemoveContainerResponse);
   rpc AddContainerMount(AddContainerMountRequest) returns (Container);
   rpc RemoveContainerMount(RemoveContainerMountRequest) returns (Container);

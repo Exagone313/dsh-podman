@@ -202,13 +202,16 @@ func spillMount() specs.Mount {
 }
 
 // guestFileMounts is the mount list the guest file API is told about: the
-// container's mounts plus /tmp, which podman mounts through its read-only
-// tmpfs but the API must be told about to read and write there. No caller
-// mount can target /tmp (it is a reserved destination), so there is never a
-// duplicate.
+// container's mounts plus the writable scratch tmpfs podman mounts through its
+// read-only tmpfs (/tmp and /var/tmp), which the API must be told about to read
+// and write there. No caller mount can target /tmp (it is a reserved
+// destination), so there is never a duplicate.
 func guestFileMounts(mounts []specs.Mount) []specs.Mount {
-	return append(append([]specs.Mount(nil), mounts...),
-		specs.Mount{Type: "tmpfs", Destination: "/tmp", Options: []string{"rw"}})
+	scratch := []specs.Mount{
+		{Type: "tmpfs", Destination: "/tmp", Options: []string{"rw"}},
+		{Type: "tmpfs", Destination: "/var/tmp", Options: []string{"rw"}},
+	}
+	return append(append([]specs.Mount(nil), mounts...), scratch...)
 }
 
 // guestAgentMounts returns the socket bind mount and, when a host guest-agent

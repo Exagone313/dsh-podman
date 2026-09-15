@@ -137,33 +137,31 @@ test("container tools never expose internal fields in their results", async () =
   }
 });
 
-test("container_recreate returns the logical container name", async () => {
+test("container_recreate reports the recreated container", async () => {
   const resolver = {
     registry: {
       resolveByPath: async () => ({ id: WORKSPACE_ID }),
     },
     getConfig: () => ({ projectsRoot: "/projects" }),
+    // The control plane answers with the container it recreated: its logical
+    // name, and its own mounts and env rather than the default container's.
     control: async () => ({
       workspaceSlug: WORKSPACE_ID,
-      containerName: `dsh-podman-${WORKSPACE_ID}-default`,
+      containerName: "db",
       imageId: "img-1",
       status: "running",
       mounts: [],
+      env: { APP_ENV: "probe" },
     }),
   } as never;
   const exec = { agent: { session: { header: { cwd: "/projects/team" } } } };
-  const def = (await toolHandlers.container_recreate(
-    resolver,
-    { container: "default", image: "img-1" },
-    exec,
-  )) as any;
-  assert.equal(def.containerName, "default");
   const named = (await toolHandlers.container_recreate(
     resolver,
     { container: "db", image: "img-1" },
     exec,
   )) as any;
   assert.equal(named.containerName, "db");
+  assert.deepEqual(named.env, { APP_ENV: "probe" });
 });
 
 test("container start and recreate forward PATH additions", async () => {

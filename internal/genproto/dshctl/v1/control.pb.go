@@ -3466,7 +3466,7 @@ const file_dshctl_v1_control_proto_rawDesc = "" +
 	"\vCleanCaches\x12\x1d.dshctl.v1.CleanCachesRequest\x1a\x1e.dshctl.v1.CleanCachesResponse\x12U\n" +
 	"\x0eListContainers\x12 .dshctl.v1.ListContainersRequest\x1a!.dshctl.v1.ListContainersResponse\x12H\n" +
 	"\x0eStartContainer\x12 .dshctl.v1.StartContainerRequest\x1a\x14.dshctl.v1.Container\x12N\n" +
-	"\x11RecreateContainer\x12#.dshctl.v1.RecreateContainerRequest\x1a\x14.dshctl.v1.Workspace\x12X\n" +
+	"\x11RecreateContainer\x12#.dshctl.v1.RecreateContainerRequest\x1a\x14.dshctl.v1.Container\x12X\n" +
 	"\x0fRemoveContainer\x12!.dshctl.v1.RemoveContainerRequest\x1a\".dshctl.v1.RemoveContainerResponse\x12N\n" +
 	"\x11AddContainerMount\x12#.dshctl.v1.AddContainerMountRequest\x1a\x14.dshctl.v1.Container\x12T\n" +
 	"\x14RemoveContainerMount\x12&.dshctl.v1.RemoveContainerMountRequest\x1a\x14.dshctl.v1.Container\x12T\n" +
@@ -3645,7 +3645,7 @@ var file_dshctl_v1_control_proto_depIdxs = []int32{
 	30, // 77: dshctl.v1.OrchestratorControl.CleanCaches:output_type -> dshctl.v1.CleanCachesResponse
 	32, // 78: dshctl.v1.OrchestratorControl.ListContainers:output_type -> dshctl.v1.ListContainersResponse
 	33, // 79: dshctl.v1.OrchestratorControl.StartContainer:output_type -> dshctl.v1.Container
-	13, // 80: dshctl.v1.OrchestratorControl.RecreateContainer:output_type -> dshctl.v1.Workspace
+	33, // 80: dshctl.v1.OrchestratorControl.RecreateContainer:output_type -> dshctl.v1.Container
 	37, // 81: dshctl.v1.OrchestratorControl.RemoveContainer:output_type -> dshctl.v1.RemoveContainerResponse
 	33, // 82: dshctl.v1.OrchestratorControl.AddContainerMount:output_type -> dshctl.v1.Container
 	33, // 83: dshctl.v1.OrchestratorControl.RemoveContainerMount:output_type -> dshctl.v1.Container

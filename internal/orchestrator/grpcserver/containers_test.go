@@ -701,3 +701,39 @@ func TestRemoveContainerRemovesLastContainerAndPod(t *testing.T) {
 		t.Fatalf("legacy fields kept a phantom container: %#v", workspaces[0])
 	}
 }
+
+// TestStartContainerKeepsOmittedEnv pins that an omitted env keeps the stored
+// environment instead of clearing it, matching mounts and PATH additions.
+func TestStartContainerKeepsOmittedEnv(t *testing.T) {
+	server, _, store := pathServer(t, "proj", nil)
+	if err := store.SaveWorkspaces([]state.Workspace{{
+		WorkspaceSlug: "proj", ProjectName: "team",
+		Mounts: []state.Mount{{ProjectName: "team", Mode: "read_write"}},
+		Containers: []state.Container{{
+			Name: "default", PodmanName: testDefaultContainer, ImageID: "arch", Status: "running",
+			Mounts: []state.Mount{{ProjectName: "team", Mode: "read_write"}},
+			Env:    map[string]string{"KEEP": "1"},
+		}},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := server.StartContainer(context.Background(), &ctl.StartContainerRequest{WorkspaceSlug: "proj", Container: "default"}); err != nil {
+		t.Fatal(err)
+	}
+	stored, err := store.Workspaces()
+	if err != nil {
+		t.Fatal(err)
+	}
+	record, ok := containerByLogical(&stored[0], "default")
+	if !ok || record.Env["KEEP"] != "1" {
+		t.Fatalf("omitted env must be kept: %#v", record)
+	}
+	if _, err := server.StartContainer(context.Background(), &ctl.StartContainerRequest{WorkspaceSlug: "proj", Container: "default", Env: map[string]string{"NEW": "2"}}); err != nil {
+		t.Fatal(err)
+	}
+	stored, _ = store.Workspaces()
+	record, _ = containerByLogical(&stored[0], "default")
+	if len(record.Env) != 1 || record.Env["NEW"] != "2" {
+		t.Fatalf("a provided env must replace the stored one: %#v", record.Env)
+	}
+}

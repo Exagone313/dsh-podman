@@ -78,7 +78,7 @@ type OrchestratorControlClient interface {
 	CleanCaches(ctx context.Context, in *CleanCachesRequest, opts ...grpc.CallOption) (*CleanCachesResponse, error)
 	ListContainers(ctx context.Context, in *ListContainersRequest, opts ...grpc.CallOption) (*ListContainersResponse, error)
 	StartContainer(ctx context.Context, in *StartContainerRequest, opts ...grpc.CallOption) (*Container, error)
-	RecreateContainer(ctx context.Context, in *RecreateContainerRequest, opts ...grpc.CallOption) (*Workspace, error)
+	RecreateContainer(ctx context.Context, in *RecreateContainerRequest, opts ...grpc.CallOption) (*Container, error)
 	RemoveContainer(ctx context.Context, in *RemoveContainerRequest, opts ...grpc.CallOption) (*RemoveContainerResponse, error)
 	AddContainerMount(ctx context.Context, in *AddContainerMountRequest, opts ...grpc.CallOption) (*Container, error)
 	RemoveContainerMount(ctx context.Context, in *RemoveContainerMountRequest, opts ...grpc.CallOption) (*Container, error)
@@ -273,9 +273,9 @@ func (c *orchestratorControlClient) StartContainer(ctx context.Context, in *Star
 	return out, nil
 }
 
-func (c *orchestratorControlClient) RecreateContainer(ctx context.Context, in *RecreateContainerRequest, opts ...grpc.CallOption) (*Workspace, error) {
+func (c *orchestratorControlClient) RecreateContainer(ctx context.Context, in *RecreateContainerRequest, opts ...grpc.CallOption) (*Container, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(Workspace)
+	out := new(Container)
 	err := c.cc.Invoke(ctx, OrchestratorControl_RecreateContainer_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
@@ -444,7 +444,7 @@ type OrchestratorControlServer interface {
 	CleanCaches(context.Context, *CleanCachesRequest) (*CleanCachesResponse, error)
 	ListContainers(context.Context, *ListContainersRequest) (*ListContainersResponse, error)
 	StartContainer(context.Context, *StartContainerRequest) (*Container, error)
-	RecreateContainer(context.Context, *RecreateContainerRequest) (*Workspace, error)
+	RecreateContainer(context.Context, *RecreateContainerRequest) (*Container, error)
 	RemoveContainer(context.Context, *RemoveContainerRequest) (*RemoveContainerResponse, error)
 	AddContainerMount(context.Context, *AddContainerMountRequest) (*Container, error)
 	RemoveContainerMount(context.Context, *RemoveContainerMountRequest) (*Container, error)
@@ -520,7 +520,7 @@ func (UnimplementedOrchestratorControlServer) ListContainers(context.Context, *L
 func (UnimplementedOrchestratorControlServer) StartContainer(context.Context, *StartContainerRequest) (*Container, error) {
 	return nil, status.Error(codes.Unimplemented, "method StartContainer not implemented")
 }
-func (UnimplementedOrchestratorControlServer) RecreateContainer(context.Context, *RecreateContainerRequest) (*Workspace, error) {
+func (UnimplementedOrchestratorControlServer) RecreateContainer(context.Context, *RecreateContainerRequest) (*Container, error) {
 	return nil, status.Error(codes.Unimplemented, "method RecreateContainer not implemented")
 }
 func (UnimplementedOrchestratorControlServer) RemoveContainer(context.Context, *RemoveContainerRequest) (*RemoveContainerResponse, error) {

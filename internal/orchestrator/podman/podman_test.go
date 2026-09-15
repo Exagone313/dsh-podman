@@ -234,8 +234,8 @@ func TestSpillMountIsWritableTmpfs(t *testing.T) {
 func TestGuestFileMountsAddsTmp(t *testing.T) {
 	project := specs.Mount{Type: "bind", Source: "/host/proj", Destination: "/projects/proj", Options: []string{"rw"}}
 	fileMounts := guestFileMounts([]specs.Mount{project, spillMount()})
-	if len(fileMounts) != 3 {
-		t.Fatalf("expected the mounts plus /tmp, got %#v", fileMounts)
+	if len(fileMounts) != 4 {
+		t.Fatalf("expected the mounts plus the scratch tmpfs, got %#v", fileMounts)
 	}
 	if fileMounts[0].Destination != "/projects/proj" || fileMounts[1].Destination != spillRoot {
 		t.Fatalf("caller mounts must come first and unchanged: %#v", fileMounts)
@@ -243,10 +243,13 @@ func TestGuestFileMountsAddsTmp(t *testing.T) {
 	if fileMounts[2].Type != "tmpfs" || fileMounts[2].Destination != "/tmp" || !hasOption(fileMounts[2].Options, "rw") {
 		t.Fatalf("unexpected /tmp mount: %#v", fileMounts[2])
 	}
+	if fileMounts[3].Type != "tmpfs" || fileMounts[3].Destination != "/var/tmp" || !hasOption(fileMounts[3].Options, "rw") {
+		t.Fatalf("unexpected /var/tmp mount: %#v", fileMounts[3])
+	}
 	// Bind mounts are covered by the projects root and never reach the guest
 	// file API, so only the tmpfs mounts are encoded.
 	encoded := guestMountsEnv(fileMounts)
-	if encoded != `[{"path":"/tmp/dsh-podman","read_only":false},{"path":"/tmp","read_only":false}]` {
+	if encoded != `[{"path":"/tmp/dsh-podman","read_only":false},{"path":"/tmp","read_only":false},{"path":"/var/tmp","read_only":false}]` {
 		t.Fatalf("guest file mounts must reach the guest file API: %q", encoded)
 	}
 }

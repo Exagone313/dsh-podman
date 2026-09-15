@@ -20,11 +20,17 @@ func TestGuestPodSpecCarriesRestartPolicy(t *testing.T) {
 	}
 }
 
-func TestGuestContainerPolicyCarriesRestartPolicy(t *testing.T) {
+func TestGuestContainerPolicy(t *testing.T) {
 	generator := specgen.NewSpecGenerator("img", false)
 	applyGuestContainerPolicy(generator)
 	if generator.RestartPolicy != "unless-stopped" {
 		t.Fatalf("unexpected restart policy: %q", generator.RestartPolicy)
+	}
+	if generator.ReadOnlyFilesystem == nil || !*generator.ReadOnlyFilesystem {
+		t.Fatalf("root filesystem must be read-only: %#v", generator.ReadOnlyFilesystem)
+	}
+	if generator.ReadWriteTmpfs == nil || !*generator.ReadWriteTmpfs {
+		t.Fatalf("read-write tmpfs must be requested: %#v", generator.ReadWriteTmpfs)
 	}
 }
 
@@ -220,8 +226,28 @@ func TestSpillMountIsWritableTmpfs(t *testing.T) {
 		t.Fatalf("spill mount must be read-write: %#v", mount.Options)
 	}
 	encoded := guestMountsEnv([]specs.Mount{mount})
-	if encoded != `[{"path":"/var/tmp/dsh-podman","read_only":false}]` {
+	if encoded != `[{"path":"/tmp/dsh-podman","read_only":false}]` {
 		t.Fatalf("spill mount must reach the guest file API: %q", encoded)
+	}
+}
+
+func TestGuestFileMountsAddsTmp(t *testing.T) {
+	project := specs.Mount{Type: "bind", Source: "/host/proj", Destination: "/projects/proj", Options: []string{"rw"}}
+	fileMounts := guestFileMounts([]specs.Mount{project, spillMount()})
+	if len(fileMounts) != 3 {
+		t.Fatalf("expected the mounts plus /tmp, got %#v", fileMounts)
+	}
+	if fileMounts[0].Destination != "/projects/proj" || fileMounts[1].Destination != spillRoot {
+		t.Fatalf("caller mounts must come first and unchanged: %#v", fileMounts)
+	}
+	if fileMounts[2].Type != "tmpfs" || fileMounts[2].Destination != "/tmp" || !hasOption(fileMounts[2].Options, "rw") {
+		t.Fatalf("unexpected /tmp mount: %#v", fileMounts[2])
+	}
+	// Bind mounts are covered by the projects root and never reach the guest
+	// file API, so only the tmpfs mounts are encoded.
+	encoded := guestMountsEnv(fileMounts)
+	if encoded != `[{"path":"/tmp/dsh-podman","read_only":false},{"path":"/tmp","read_only":false}]` {
+		t.Fatalf("guest file mounts must reach the guest file API: %q", encoded)
 	}
 }
 

@@ -64,7 +64,7 @@ test("outputReader reads appended output", () => {
 });
 
 test("outputReader advertises a valid spill only for a lossy read", () => {
-  const spill = { path: "/var/tmp/dsh-podman/x.stdout", maxBytes: 64 };
+  const spill = { path: "/tmp/dsh-podman/x.stdout", maxBytes: 64 };
   const reader = outputReader({ maxBytes: 4 }, spill)!;
   reader.append(Buffer.from("abcdefgh"));
   assert.equal(reader.spillNeeded, true);
@@ -223,7 +223,7 @@ test("subprocess provider forwards env tombstones and spills", async () => {
   assert.deepEqual(start.env, { KEEP: "1" });
   assert.deepEqual(start.unsetEnv, ["DROP"]);
   assert.equal(start.spillStdout.maxBytes, 64);
-  assert.match(start.spillStdout.path, /^\/var\/tmp\/dsh-podman\/.+\.stdout$/);
+  assert.match(start.spillStdout.path, /^\/tmp\/dsh-podman\/.+\.stdout$/);
   assert.equal(start.spillStderr, undefined);
   // No output was emitted, so the in-memory tail covered everything and the
   // unneeded spill is discarded.

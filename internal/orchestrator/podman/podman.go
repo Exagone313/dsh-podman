@@ -36,10 +36,17 @@ func newGuestPodSpec(name string) *entities.PodSpec {
 	}
 }
 
-// applyGuestContainerPolicy stamps the guest restart policy onto a container
-// spec generator.
+// applyGuestContainerPolicy stamps the guest container policy onto a spec
+// generator.
 func applyGuestContainerPolicy(generator *specgen.SpecGenerator) {
 	generator.RestartPolicy = guestRestartPolicy
+	// The root filesystem is read-only, so the container needs writable
+	// scratch space. Podman's CLI defaults --read-only-tmpfs to true, but the
+	// specgen API does not: without it no tmpfs is mounted and /tmp, /var/tmp
+	// and /run stay on the read-only rootfs. It also leaves /dev and /dev/shm
+	// writable instead of applying the read-only dev profile.
+	generator.ReadOnlyFilesystem = boolPtr(true)
+	generator.ReadWriteTmpfs = boolPtr(true)
 }
 
 type Client struct {
@@ -131,11 +138,10 @@ func (c *Client) CreateWorkspace(pod, name, image, token string, mounts []specs.
 	generator.Pod = pod
 	generator.Command = []string{binaryDest}
 	containerMounts := append(append([]specs.Mount(nil), mounts...), spillMount())
-	generator.Env = containerEnv(c.socketRoot, name, c.projectRoot, token, env, containerMounts, paths)
+	generator.Env = containerEnv(c.socketRoot, name, c.projectRoot, token, env, guestFileMounts(containerMounts), paths)
 	generator.EnvSecrets = envSecrets
 	generator.Secrets = append(generator.Secrets, secrets...)
 	generator.Init = &init
-	generator.ReadOnlyFilesystem = boolPtr(true)
 	applyGuestContainerPolicy(generator)
 	ociMounts, volumes := classifyMounts(containerMounts)
 	for _, volume := range volumes {
@@ -187,12 +193,22 @@ func classifyMounts(mounts []specs.Mount) (oci []specs.Mount, volumes []*specgen
 // command-output spill files. It is mounted read-write into every guest
 // container and exposed to the guest file API so a caller can read a spill
 // after the in-memory tail truncates. The plugin must use the same path.
-const spillRoot = "/var/tmp/dsh-podman"
+const spillRoot = "/tmp/dsh-podman"
 
 // spillMount is the container-local tmpfs backing spillRoot. The mode keeps it
 // writable by the agent regardless of the container user.
 func spillMount() specs.Mount {
 	return specs.Mount{Type: "tmpfs", Destination: spillRoot, Options: []string{"rw", "mode=1777"}}
+}
+
+// guestFileMounts is the mount list the guest file API is told about: the
+// container's mounts plus /tmp, which podman mounts through its read-only
+// tmpfs but the API must be told about to read and write there. No caller
+// mount can target /tmp (it is a reserved destination), so there is never a
+// duplicate.
+func guestFileMounts(mounts []specs.Mount) []specs.Mount {
+	return append(append([]specs.Mount(nil), mounts...),
+		specs.Mount{Type: "tmpfs", Destination: "/tmp", Options: []string{"rw"}})
 }
 
 // guestAgentMounts returns the socket bind mount and, when a host guest-agent

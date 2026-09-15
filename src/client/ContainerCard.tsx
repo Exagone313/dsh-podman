@@ -31,7 +31,7 @@ import {
   type PropsLocale,
   type PropsRuntime,
 } from "@deepseek-ai/dsh-client-ui-slots";
-import { type ReactNode, useId, useState } from "react";
+import { type ReactNode, useEffect, useId, useState } from "react";
 
 export type ContainerCardProps = PropsRuntime<"settings.plugin.item"> &
   PropsLocale<typeof NS> &
@@ -49,6 +49,13 @@ export function ContainerCard(props: ContainerCardProps): ReactNode {
   const [defaultOpen, setDefaultOpen] = useState(false);
   const [defaultImage, setDefaultImage] = useState(state.defaultImage);
   const projectsRootId = useId();
+  // The card mounts with the settings panel, so this re-reads the live state
+  // every time the Plugins section is opened: a workspace created since the
+  // last read shows up without pressing Reload this view.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: mount-only refresh
+  useEffect(() => {
+    props.reload();
+  }, []);
   const baseImages = state.images.filter((image) => image.isBase);
   const customImages = state.images.filter((image) => !image.isBase);
   const defaultCandidates = [

@@ -243,6 +243,9 @@ export class ContainerCardController {
   private async reload(): Promise<void> {
     try {
       this.snapshot = await this.client.snapshot();
+      // A refresh clears the previous action's notice, so reopening the
+      // settings does not replay feedback from an earlier session.
+      this.notice = "";
     } catch (error) {
       this.notice = error instanceof Error ? error.message : String(error);
     }

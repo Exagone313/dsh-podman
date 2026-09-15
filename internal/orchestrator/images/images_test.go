@@ -157,7 +157,7 @@ func TestBuildRejectsInvalidImageID(t *testing.T) {
 
 func TestBuildCachesAreOptional(t *testing.T) {
 	for _, pm := range []string{"pacman", "apt", "apk"} {
-		builder := Builder{Context: context.Background(), StateDir: t.TempDir()}
+		builder := Builder{Context: context.Background()}
 		_, err := builder.Build(BuildSpec{ImageID: "dev", From: "arch", PackageManager: pm})
 		if err == nil {
 			t.Fatalf("%s build with no cache should fail (no podman connection)", pm)
@@ -178,7 +178,7 @@ func TestBuildRejectsRelativeCachePath(t *testing.T) {
 		{"apk", func(b *Builder) { b.HostApkCache = "relative/path" }},
 	}
 	for _, tc := range cases {
-		builder := Builder{Context: context.Background(), StateDir: t.TempDir()}
+		builder := Builder{Context: context.Background()}
 		tc.set(&builder)
 		_, err := builder.Build(BuildSpec{ImageID: "dev", From: "arch", PackageManager: tc.pm})
 		if err == nil {

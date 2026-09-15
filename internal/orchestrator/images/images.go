@@ -8,15 +8,10 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
 	"sync"
-
-	"go.podman.io/buildah/define"
-	"go.podman.io/podman/v6/pkg/bindings/images"
-	entities "go.podman.io/podman/v6/pkg/domain/entities/types"
 )
 
 var packageName = regexp.MustCompile(`^[A-Za-z0-9@+._:][A-Za-z0-9@+._:-]*$`)
@@ -158,7 +153,6 @@ func Containerfile(spec BuildSpec) (string, error) {
 
 type Builder struct {
 	Context         context.Context
-	StateDir        string
 	HostPacmanCache string
 	HostAptCache    string
 	HostApkCache    string
@@ -170,6 +164,14 @@ type Builder struct {
 	// still run concurrently) and a cache cleanup takes it for writing, so a
 	// cleanup never deletes a package out from under a running build.
 	mu sync.RWMutex
+}
+
+// logger returns the builder's logger, defaulting to the process logger.
+func (b *Builder) logger() *slog.Logger {
+	if b.Logger != nil {
+		return b.Logger
+	}
+	return slog.Default()
 }
 
 // cacheMount returns the host cache directory and its container mount target
@@ -216,31 +218,14 @@ func (b *Builder) Build(spec BuildSpec) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	if err := os.MkdirAll(b.StateDir, 0700); err != nil {
-		return "", err
-	}
-	dir := filepath.Join(b.StateDir, spec.ImageID)
-	if err := os.MkdirAll(dir, 0700); err != nil {
-		return "", err
-	}
-	file := filepath.Join(dir, "Containerfile")
-	if err := os.WriteFile(file, []byte(contents), 0600); err != nil {
-		return "", err
-	}
 	tag := b.tagFor(spec.ImageID, spec.IsBase)
-	options := entities.BuildOptions{ContainerFiles: []string{file}, BuildOptions: define.BuildOptions{CommonBuildOpts: &define.CommonBuildOptions{}}}
-	options.ContextDirectory = dir
-	options.AdditionalTags = []string{tag}
+	cacheVolume := ""
 	if cacheConfigured {
-		options.CommonBuildOpts.Volumes = []string{hostCache + ":" + cacheTarget}
+		cacheVolume = hostCache + ":" + cacheTarget
 	}
-	logger := b.Logger
-	if logger == nil {
-		logger = slog.Default()
-	}
-	logger.Info("building workspace image", "image_id", spec.ImageID, "from", spec.From, "package_manager", spec.PackageManager, "is_base", spec.IsBase, "packages", spec.Packages, "context_directory", dir, "container_files", options.ContainerFiles, "tags", options.AdditionalTags, "build_volumes", options.CommonBuildOpts.Volumes, "host_package_cache", hostCache)
-	_, err = images.Build(b.Context, []string{file}, options)
-	if err != nil {
+	logger := b.logger()
+	logger.Info("building workspace image", "image_id", spec.ImageID, "from", spec.From, "package_manager", spec.PackageManager, "is_base", spec.IsBase, "packages", spec.Packages, "tag", tag, "build_volume", cacheVolume, "host_package_cache", hostCache)
+	if err := b.requestBuild(buildRequest{ImageID: spec.ImageID, Tag: tag, Containerfile: contents, CacheVolume: cacheVolume}); err != nil {
 		logger.Error("workspace image build failed", "image_id", spec.ImageID, "error", err)
 		return "", err
 	}

@@ -5,9 +5,14 @@
 import type { Context as ClientContext } from "@deepseek-ai/cordis";
 import type {} from "@deepseek-ai/dsh-client-ui-renderer/client";
 import type {} from "@deepseek-ai/dsh-client-ui-settings/client";
+import type {} from "@deepseek-ai/dsh-client-ui-conversation/client";
 import type {} from "@deepseek-ai/dsh-client-locale/client";
 import type {} from "./slot-contract.js";
 import { ContainerCard } from "./ContainerCard.js";
+import {
+  BUILTIN_PROMPT_PREFIX,
+  ReadOnlyApprovalPanel,
+} from "./read-only-approval.js";
 import { PodmanToolRow, TOOL_VIEW_KEYS } from "./tool-views.js";
 import { installTerminalStyles } from "./terminal-styles.js";
 import {
@@ -77,4 +82,26 @@ export function apply(ctx: ClientContext): void {
       ),
     );
   }
+
+  // Take over the composer for this plugin's read-only remount prompts only:
+  // "Remount & run" reads correctly there, while the harness's "Allow once"
+  // would not. A lower priority renders before the harness's approval panel.
+  ctx.slots.inject("conversation.composer", () =>
+    ctx.slots.register(
+      {
+        name: "conversation.composer",
+        priority: 0,
+        locale: NS,
+        select: ({ pendingInteraction }: any) => {
+          const pending = pendingInteraction as any;
+          return pending?.kind === "approval" &&
+            typeof pending.toolName === "string" &&
+            pending.toolName.startsWith(BUILTIN_PROMPT_PREFIX)
+            ? pending
+            : null;
+        },
+      },
+      ReadOnlyApprovalPanel,
+    ),
+  );
 }

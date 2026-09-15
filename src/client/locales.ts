@@ -108,6 +108,9 @@ export type ContainerPluginKey =
   | "moveDown"
   | "apply"
   | "dragToReorder"
+  | "remountWaiting"
+  | "remountApprove"
+  | "remountReject"
   | "mountVolume"
   | "mountSecret"
   | "mountMode"
@@ -286,6 +289,9 @@ export const en: Record<ContainerPluginKey, string> = {
   moveDown: "Move down",
   apply: "Apply",
   dragToReorder: "Drag to reorder",
+  remountWaiting: "Waiting for approval",
+  remountApprove: "Remount & run",
+  remountReject: "Reject",
   mountVolume: "Volume",
   mountSecret: "Secret",
   mountMode: "Mode",
@@ -465,6 +471,9 @@ export const zh: Record<ContainerPluginKey, string> = {
   moveDown: "下移",
   apply: "应用",
   dragToReorder: "拖动以重新排序",
+  remountWaiting: "等待审批",
+  remountApprove: "重新挂载并运行",
+  remountReject: "拒绝",
   mountVolume: "卷",
   mountSecret: "机密",
   mountMode: "模式",

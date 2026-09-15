@@ -47,8 +47,9 @@ containers (`dsh-podman-<slug>-<name>`) can be created inside the same pod.
 Containers' root filesystems are mounted read-only, with podman's read-write
 tmpfs on `/tmp`, `/var/tmp`, and `/run` (and `/dev` and `/dev/shm` left
 writable). All other writable state lives in the project bind mount, named
-volumes, or tmpfs mounts. `/tmp` is reachable through the guest file API, and
-the guest agent spills oversized command output under `/tmp/dsh-podman`.
+volumes, or tmpfs mounts. `/tmp` and `/var/tmp` are reachable through the guest
+file API, and the guest agent spills oversized command output under
+`/tmp/dsh-podman`.
 
 A workspace's pod is torn down when its last container is removed, or directly
 through `RemoveWorkspace` (the settings card's **Remove pod** action), which

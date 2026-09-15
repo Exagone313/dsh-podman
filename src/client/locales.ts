@@ -100,9 +100,7 @@ export type ContainerPluginKey =
   | "mountProjectPath"
   | "browse"
   | "browseTitle"
-  | "browseUp"
   | "browseSelect"
-  | "browseEmpty"
   | "browseLoading"
   | "browseError"
   | "browseUnavailable"
@@ -291,14 +289,12 @@ export const en: Record<ContainerPluginKey, string> = {
   mountProjectPath: "Project path",
   browse: "Browse…",
   browseTitle: "Select a project directory",
-  browseUp: "Up",
   browseSelect: "Select this directory",
-  browseEmpty: "No subdirectories.",
   browseLoading: "Loading…",
   browseError: "Could not read this directory.",
   browseUnavailable: "This deployment has no directory picker.",
   browseHidden: "Show hidden",
-  browseTruncated: "This directory has more subdirectories than are shown.",
+  browseTruncated: "Too many folders to list; only the beginning is shown.",
   browseOutsideRoot: "Choose a directory inside the projects root.",
   mountDestination: "Destination",
   pathsTitle: "PATH additions",
@@ -483,14 +479,12 @@ export const zh: Record<ContainerPluginKey, string> = {
   mountProjectPath: "项目路径",
   browse: "浏览…",
   browseTitle: "选择项目目录",
-  browseUp: "上一级",
   browseSelect: "选择此目录",
-  browseEmpty: "没有子目录。",
   browseLoading: "加载中…",
   browseError: "无法读取此目录。",
   browseUnavailable: "此部署没有目录选择器。",
   browseHidden: "显示隐藏项",
-  browseTruncated: "此目录的子目录多于所示数量。",
+  browseTruncated: "文件夹过多，仅显示开头部分。",
   browseOutsideRoot: "请选择项目根目录内的目录。",
   mountDestination: "目标路径",
   pathsTitle: "PATH 附加项",

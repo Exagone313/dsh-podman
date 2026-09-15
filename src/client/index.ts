@@ -17,6 +17,7 @@ import {
 } from "./read-only-approval.js";
 import { PodmanToolRow, TOOL_VIEW_KEYS } from "./tool-views.js";
 import { installTerminalStyles } from "./terminal-styles.js";
+import { installDirectoryStyles } from "./container-card-directory-styles.js";
 import {
   CONTAINER_NS,
   ContainerCardController,
@@ -32,6 +33,7 @@ export const inject = ["slots", "locale", "settingsScope"];
 
 export function apply(ctx: ClientContext): void {
   installTerminalStyles(ctx);
+  installDirectoryStyles(ctx);
   ctx.effect(
     () => ctx.locale.register(NS, { en, zh }),
     "podman: dictionaries",

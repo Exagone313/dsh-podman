@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	guest "github.com/Exagone313/dsh-podman/internal/genproto/dshguest/v1"
+	"github.com/Exagone313/dsh-podman/internal/guestagent/daemon"
 	"github.com/Exagone313/dsh-podman/internal/guestagent/identity"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -24,7 +25,21 @@ func TestStopDaemonRejectsUnknownSignal(t *testing.T) {
 	}
 }
 
+// TestDaemonInfoProtoCarriesGroups pins the proto mapping for a daemon's
+// supplementary groups.
+func TestDaemonInfoProtoCarriesGroups(t *testing.T) {
+	info := daemonInfoProto(daemon.Daemon{Name: "web", Groups: []uint32{3000, 4000}})
+	if !slices.Equal(info.Groups, []uint32{3000, 4000}) {
+		t.Fatalf("groups not carried: %#v", info.Groups)
+	}
+}
+
+// TestStartDaemonReportsGroups covers the request-to-proto path end to end. It
+// needs CAP_SETGID, so it skips where identity switching is unavailable.
 func TestStartDaemonReportsGroups(t *testing.T) {
+	if !identity.CanSwitchUser() {
+		t.Skip("requires group switching")
+	}
 	server := New()
 	info, err := server.StartDaemon(context.Background(), &guest.StartDaemonRequest{
 		Name:   "web",

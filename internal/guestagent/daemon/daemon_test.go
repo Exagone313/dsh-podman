@@ -280,11 +280,13 @@ func TestListSortedByNames(t *testing.T) {
 	}
 }
 
+// TestListReportsGroups pins that List surfaces a daemon's supplementary groups
+// and copies them, so a caller cannot mutate the manager's own state. The
+// daemon is registered directly because starting one with groups needs
+// CAP_SETGID, which CI lacks.
 func TestListReportsGroups(t *testing.T) {
 	m := NewManager(childenv.NewPaths())
-	if _, err := m.Start("web", []string{"true"}, "", nil, StartOptions{Groups: []uint32{3000, 4000}}); err != nil {
-		t.Fatal(err)
-	}
+	m.daemons["web"] = &daemon{info: Daemon{Name: "web", Running: true, Groups: []uint32{3000, 4000}}}
 	got := m.List()
 	if len(got) != 1 || !slices.Equal(got[0].Groups, []uint32{3000, 4000}) {
 		t.Fatalf("groups not reported: %#v", got)

@@ -108,7 +108,7 @@ export function CreateContainerModal(props: {
     <Modal
       open={open}
       onClose={onClose}
-      title={t("createContainerTitle")}
+      title={named ? t("addContainer") : t("createContainer")}
       closeLabel={t("cancel")}
       footer={
         <>
@@ -125,7 +125,7 @@ export function CreateContainerModal(props: {
             disabled={!canCreate}
             onClick={submit}
           >
-            {t("createContainer")}
+            {named ? t("addContainer") : t("createContainer")}
           </Button>
         </>
       }

@@ -128,7 +128,6 @@ export type ContainerPluginKey =
   | "confirmCacheKeepLatest"
   | "cacheRemoveAll"
   | "confirmCacheRemoveAll"
-  | "createContainerTitle"
   | "addContainer"
   | "invalidContainerName"
   | "containerNameTaken"
@@ -313,7 +312,6 @@ export const en: Record<ContainerPluginKey, string> = {
   cacheRemoveAll: "Remove all",
   confirmCacheRemoveAll:
     "Remove every cached package? The next build re-downloads what it needs.",
-  createContainerTitle: "Create container",
   addContainer: "Add container",
   invalidContainerName: "Invalid container name",
   containerNameTaken: "Container name already exists",
@@ -491,7 +489,6 @@ export const zh: Record<ContainerPluginKey, string> = {
   confirmCacheKeepLatest: "移除较旧的缓存软件包版本？当前版本会保留。",
   cacheRemoveAll: "全部移除",
   confirmCacheRemoveAll: "移除所有缓存的软件包？下次构建会重新下载所需内容。",
-  createContainerTitle: "创建容器",
   addContainer: "添加容器",
   invalidContainerName: "容器名称无效",
   containerNameTaken: "容器名称已存在",

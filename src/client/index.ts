@@ -7,7 +7,12 @@ import type {} from "@deepseek-ai/dsh-client-ui-renderer/client";
 import type {} from "@deepseek-ai/dsh-client-ui-settings/client";
 import type {} from "@deepseek-ai/dsh-client-ui-conversation/client";
 import type {} from "@deepseek-ai/dsh-client-locale/client";
+import type {} from "@deepseek-ai/dsh-api-remotes/client";
 import type {} from "./slot-contract.js";
+import {
+  buildDirectoryPicker,
+  type DirectoryPickerFace,
+} from "./directory-picker.js";
 import { ContainerCard } from "./ContainerCard.js";
 import {
   BUILTIN_PROMPT_PREFIX,
@@ -60,13 +65,29 @@ export function apply(ctx: ClientContext): void {
 
   const controller = new ContainerCardController(scope);
 
+  // The harness's own directory picker backs the project-mount browse dialog:
+  // it lists directories on the dsh host, so a chosen project path is a host
+  // path under the projects root — never a container path and never an
+  // orchestrator call. The service is optional: without it the card hides the
+  // browse affordance and the field stays a plain input.
+  let directoryPicker: DirectoryPickerFace | undefined;
+  ctx.inject(["remote.directoryPicker"], (pickerCtx: any) => {
+    directoryPicker = buildDirectoryPicker(pickerCtx.remote);
+    pickerCtx.effect(() => () => {
+      directoryPicker = undefined;
+    }, "podman: directory picker");
+  });
+
   ctx.slots.inject("settings.plugin.item", () =>
     ctx.slots.register(
       {
         name: "settings.plugin.item",
         key: CONTAINER_NS,
         locale: NS,
-        inject: () => controller.inject(),
+        inject: () => ({
+          ...controller.inject(),
+          directoryPicker,
+        }),
       },
       ContainerCard,
     ),

@@ -20,6 +20,7 @@ import type {
   WorkspaceView,
 } from "./card-protocol.js";
 import { createCardClient, type CardClient } from "./card-client.js";
+import { type DirectoryPickerFace } from "./directory-picker.js";
 
 export const CONTAINER_NS = "podman";
 
@@ -111,6 +112,9 @@ export interface ContainerCardFace {
   editSocketsRoot: (text: string) => void;
   saveSocketsRoot: () => void;
   discardSocketsRoot: () => void;
+  // The harness's host-side directory picker, when this deployment mounts one;
+  // the card hides the project-mount browse affordance without it.
+  directoryPicker?: DirectoryPickerFace;
 }
 
 const EMPTY_SNAPSHOT: CardSnapshot = {

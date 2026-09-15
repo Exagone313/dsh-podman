@@ -48,6 +48,8 @@
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "^4.0.2",
+    "@deepseek-ai/dsh-api-remotes": "0.1.5-rc.2",
+    "@deepseek-ai/dsh-api-workspace-controller": "0.1.5-rc.2",
     "@deepseek-ai/dsh-client-locale": "^0.1.5-rc.2",
     "@deepseek-ai/dsh-client-store": "^0.1.5-rc.2",
     "@deepseek-ai/dsh-client-ui-approval": "0.1.5-rc.2",

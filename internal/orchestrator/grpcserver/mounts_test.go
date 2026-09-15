@@ -601,7 +601,7 @@ func TestCreateWorkspacePreservesDefaultContainerMounts(t *testing.T) {
 func TestNonProjectDestination(t *testing.T) {
 	root := filepath.Join(t.TempDir(), "projects")
 	server := &Server{ProjectsRoot: root, Logger: silentLogger()}
-	if err := server.nonProjectDestination("/tmp/work"); err != nil {
+	if err := server.nonProjectDestination("/scratch/work"); err != nil {
 		t.Fatalf("valid destination rejected: %v", err)
 	}
 	for _, destination := range []string{"relative", "/a/../b", "/a/", root, filepath.Join(root, "x"), filepath.Join(root, "x", "y")} {
@@ -612,8 +612,10 @@ func TestNonProjectDestination(t *testing.T) {
 }
 
 // TestNonProjectDestinationReservedPaths covers the paths a mount must not
-// shadow beyond the projects root: the guest socket directory and the guest
-// agent mount, which the container executes its entry point from.
+// shadow beyond the projects root: the guest socket directory, the guest agent
+// mount, which the container executes its entry point from, and /tmp, which
+// podman mounts as the writable tmpfs the guest file API and the output spill
+// rely on.
 func TestNonProjectDestinationReservedPaths(t *testing.T) {
 	server := &Server{
 		ProjectsRoot:    "/projects",
@@ -626,6 +628,9 @@ func TestNonProjectDestinationReservedPaths(t *testing.T) {
 		"/run/dsh-podman/dsh-podman-x-default",
 		"/opt/dsh-podman/guest-agent",
 		"/opt/dsh-podman/guest-agent/bin",
+		"/tmp",
+		"/tmp/dsh-podman",
+		"/tmp/dsh-podman/spill.stdout",
 		// Ancestors hide every reserved path beneath them.
 		"/",
 		"/run",
@@ -638,7 +643,7 @@ func TestNonProjectDestinationReservedPaths(t *testing.T) {
 			t.Errorf("accepted reserved destination %q", destination)
 		}
 	}
-	for _, destination := range []string{"/data", "/var/cache", "/run/other", "/opt/tools"} {
+	for _, destination := range []string{"/data", "/var/cache", "/run/other", "/opt/tools", "/tmp2", "/var/tmp"} {
 		if err := server.nonProjectDestination(destination); err != nil {
 			t.Errorf("rejected usable destination %q: %v", destination, err)
 		}

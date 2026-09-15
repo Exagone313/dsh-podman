@@ -74,11 +74,12 @@ func resolveDirUnderRoot(root, rel string) (resolvedRoot, resolved string, err e
 
 // reservedDestinations lists the container paths a mount must not shadow: the
 // projects root, which is reserved for project mounts; the socket directory,
-// which carries the guest agent's socket; and the directory the guest agent
-// binary is mounted at, whose contents the container executes as its entry
-// point.
+// which carries the guest agent's socket; the directory the guest agent binary
+// is mounted at, whose contents the container executes as its entry point; and
+// /tmp, which podman mounts as the writable tmpfs the guest file API reaches
+// and where command output is spilled.
 func (s *Server) reservedDestinations() []string {
-	return []string{s.ProjectsRoot, s.SocketsRoot, s.GuestAgentMount}
+	return []string{s.ProjectsRoot, s.SocketsRoot, s.GuestAgentMount, "/tmp"}
 }
 
 // withSeparator returns path with a trailing separator, so that prefix

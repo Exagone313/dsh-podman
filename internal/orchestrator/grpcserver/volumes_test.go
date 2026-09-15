@@ -96,11 +96,11 @@ func TestPodmanMountsTmpfsAndVolume(t *testing.T) {
 	root := tempRoot(t)
 	server := &Server{ProjectsRoot: root, VolumePrefix: "dsh-podman-", Logger: silentLogger()}
 
-	mounts, err := server.podmanMounts([]state.Mount{{Kind: "tmpfs", Destination: "/tmp/work", Mode: "read_write"}})
+	mounts, err := server.podmanMounts([]state.Mount{{Kind: "tmpfs", Destination: "/scratch/work", Mode: "read_write"}})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(mounts) != 1 || mounts[0].Type != "tmpfs" || mounts[0].Source != "" || mounts[0].Destination != "/tmp/work" || len(mounts[0].Options) != 1 || mounts[0].Options[0] != "rw" {
+	if len(mounts) != 1 || mounts[0].Type != "tmpfs" || mounts[0].Source != "" || mounts[0].Destination != "/scratch/work" || len(mounts[0].Options) != 1 || mounts[0].Options[0] != "rw" {
 		t.Fatalf("unexpected tmpfs mount: %#v", mounts)
 	}
 
@@ -198,11 +198,11 @@ func TestAddContainerMountTmpfsAndVolume(t *testing.T) {
 	if status.Code(err) != codes.InvalidArgument {
 		t.Fatalf("invalid volume name: expected InvalidArgument, got %v", err)
 	}
-	_, err = server.AddContainerMount(context.Background(), &ctl.AddContainerMountRequest{WorkspaceSlug: "proj", Container: "dev", Kind: ctl.MountKind_MOUNT_KIND_TMPFS, Destination: "/tmp/x", Mode: ctl.MountMode_MOUNT_MODE_READ_ONLY})
+	_, err = server.AddContainerMount(context.Background(), &ctl.AddContainerMountRequest{WorkspaceSlug: "proj", Container: "dev", Kind: ctl.MountKind_MOUNT_KIND_TMPFS, Destination: "/scratch/x", Mode: ctl.MountMode_MOUNT_MODE_READ_ONLY})
 	if status.Code(err) != codes.InvalidArgument {
 		t.Fatalf("read-only tmpfs: expected InvalidArgument, got %v", err)
 	}
-	_, err = server.AddContainerMount(context.Background(), &ctl.AddContainerMountRequest{WorkspaceSlug: "proj", Container: "dev", Kind: ctl.MountKind(99), Destination: "/tmp/x", Mode: ctl.MountMode_MOUNT_MODE_READ_WRITE})
+	_, err = server.AddContainerMount(context.Background(), &ctl.AddContainerMountRequest{WorkspaceSlug: "proj", Container: "dev", Kind: ctl.MountKind(99), Destination: "/scratch/x", Mode: ctl.MountMode_MOUNT_MODE_READ_WRITE})
 	if status.Code(err) != codes.InvalidArgument {
 		t.Fatalf("unknown kind: expected InvalidArgument, got %v", err)
 	}
@@ -210,7 +210,7 @@ func TestAddContainerMountTmpfsAndVolume(t *testing.T) {
 	if status.Code(err) != codes.FailedPrecondition {
 		t.Fatalf("valid volume add: expected FailedPrecondition, got %v", err)
 	}
-	_, err = server.AddContainerMount(context.Background(), &ctl.AddContainerMountRequest{WorkspaceSlug: "proj", Container: "dev", Kind: ctl.MountKind_MOUNT_KIND_TMPFS, Destination: "/tmp/x", Mode: ctl.MountMode_MOUNT_MODE_READ_WRITE})
+	_, err = server.AddContainerMount(context.Background(), &ctl.AddContainerMountRequest{WorkspaceSlug: "proj", Container: "dev", Kind: ctl.MountKind_MOUNT_KIND_TMPFS, Destination: "/scratch/x", Mode: ctl.MountMode_MOUNT_MODE_READ_WRITE})
 	if status.Code(err) != codes.FailedPrecondition {
 		t.Fatalf("valid tmpfs add: expected FailedPrecondition, got %v", err)
 	}
@@ -231,7 +231,7 @@ func TestAddContainerMountDuplicateTmpfsAndVolume(t *testing.T) {
 		WorkspaceSlug: "proj",
 		Containers: []state.Container{{
 			Name: "dev", PodmanName: "dsh-podman-proj-dev", ImageID: "arch", Status: "running",
-			Mounts: []state.Mount{{Kind: "volume", Volume: "data", Destination: "/data", Mode: "read_write"}, {Kind: "tmpfs", Destination: "/tmp/x", Mode: "read_write"}},
+			Mounts: []state.Mount{{Kind: "volume", Volume: "data", Destination: "/data", Mode: "read_write"}, {Kind: "tmpfs", Destination: "/scratch/x", Mode: "read_write"}},
 		}},
 	}}); err != nil {
 		t.Fatal(err)
@@ -241,7 +241,7 @@ func TestAddContainerMountDuplicateTmpfsAndVolume(t *testing.T) {
 	if status.Code(err) != codes.AlreadyExists {
 		t.Fatalf("duplicate volume: expected AlreadyExists, got %v", err)
 	}
-	_, err = server.AddContainerMount(context.Background(), &ctl.AddContainerMountRequest{WorkspaceSlug: "proj", Container: "dev", Kind: ctl.MountKind_MOUNT_KIND_TMPFS, Destination: "/tmp/x", Mode: ctl.MountMode_MOUNT_MODE_READ_WRITE})
+	_, err = server.AddContainerMount(context.Background(), &ctl.AddContainerMountRequest{WorkspaceSlug: "proj", Container: "dev", Kind: ctl.MountKind_MOUNT_KIND_TMPFS, Destination: "/scratch/x", Mode: ctl.MountMode_MOUNT_MODE_READ_WRITE})
 	if status.Code(err) != codes.AlreadyExists {
 		t.Fatalf("duplicate tmpfs: expected AlreadyExists, got %v", err)
 	}
@@ -324,7 +324,7 @@ func TestContainerProtoProjectsTmpfsAndVolumeKinds(t *testing.T) {
 		Containers: []state.Container{{
 			Name: "dev",
 			Mounts: []state.Mount{
-				{Kind: "tmpfs", Destination: "/tmp/work", Mode: "read_write"},
+				{Kind: "tmpfs", Destination: "/scratch/work", Mode: "read_write"},
 				{Kind: "volume", Volume: "data", Destination: "/data", Mode: "read_only"},
 				{ProjectName: "team", Mode: "read_write"},
 			},
@@ -334,7 +334,7 @@ func TestContainerProtoProjectsTmpfsAndVolumeKinds(t *testing.T) {
 	if len(row.Mounts) != 3 {
 		t.Fatalf("unexpected mounts: %#v", row.Mounts)
 	}
-	if row.Mounts[0].Kind != ctl.MountKind_MOUNT_KIND_TMPFS || row.Mounts[0].Destination != "/tmp/work" || row.Mounts[0].Mode != ctl.MountMode_MOUNT_MODE_READ_WRITE {
+	if row.Mounts[0].Kind != ctl.MountKind_MOUNT_KIND_TMPFS || row.Mounts[0].Destination != "/scratch/work" || row.Mounts[0].Mode != ctl.MountMode_MOUNT_MODE_READ_WRITE {
 		t.Fatalf("tmpfs not projected: %#v", row.Mounts[0])
 	}
 	if row.Mounts[1].Kind != ctl.MountKind_MOUNT_KIND_VOLUME || row.Mounts[1].Volume != "data" || row.Mounts[1].Destination != "/data" || row.Mounts[1].Mode != ctl.MountMode_MOUNT_MODE_READ_ONLY {

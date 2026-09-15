@@ -75,6 +75,15 @@ would overlap a reserved path:
 A destination that contains a reserved path is refused as well as one that sits
 inside it, since it would hide everything beneath it.
 
+Commands run through the guest exec API get `/dev/null` on stdin unless the
+caller explicitly asks for a pipe, so a command that reads stdin sees EOF
+instead of blocking (a bare `rg`/`grep` with no path therefore searches the
+working directory rather than reading an empty pipe). `container_glob` and
+`container_grep` also pass their resolved path to ripgrep as the search
+directory, never as a `--glob` pattern (a path containing `/` would never match
+one), and a ripgrep failure (exit code 2) is reported as a tool error rather
+than an empty result.
+
 Project mounts resolve through symlinks and are confined to the projects root,
 so a symlink inside a writable project cannot redirect the bind mount to a path
 outside it. Symlinks with absolute targets are never followed; name the other

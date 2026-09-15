@@ -372,7 +372,10 @@ test("container_grep resolves its search path like a shell would", async () => {
     { container: "default", pattern: "TODO" },
     exec,
   );
-  assert.deepEqual(none.starts[0].argv, ["/usr/bin/rg", "-n", "TODO"]);
+  // No path searches the session workspace explicitly: ripgrep would otherwise
+  // read its (non-TTY) stdin instead of the working directory.
+  assert.deepEqual(none.starts[0].argv, ["/usr/bin/rg", "-n", "TODO", "/projects/team"]);
+  assert.equal(none.starts[0].cwd, "/projects/team");
 });
 
 test("container_glob passes the pattern as a glob and scopes the search", async () => {
@@ -487,4 +490,37 @@ test("podmanRuntimeSection names only the tools the agent has", () => {
   assert.match(short, /container_\*/);
   assert.match(short, /daemon_\*/);
   assert.match(short, /share the host kernel/);
+});
+
+test("container_grep fails loudly when ripgrep reports an error", async () => {
+  const guest = {
+    exec: () => {
+      const handlers: Record<string, ((value?: unknown) => void)[]> = {};
+      return {
+        on(event: string, handler: (value?: unknown) => void) {
+          (handlers[event] ??= []).push(handler);
+        },
+        write() {},
+        end() {
+          for (const handler of handlers.data ?? []) {
+            handler({ stderrChunk: Buffer.from("rg: error parsing glob '[bad'\n") });
+            handler({ exit: { exitCode: 2, signaled: false } });
+          }
+        },
+      };
+    },
+  };
+  const resolver = {
+    resolve: async () => ({ guest, token: "t" }),
+    containerBinding: async () => ({ guest, token: "t" }),
+  } as never;
+  const exec = { agent: { session: { header: { cwd: "/projects/team" } } } };
+  await assert.rejects(
+    toolHandlers.container_grep(
+      resolver,
+      { container: "default", pattern: "TODO", include: "[bad" },
+      exec,
+    ),
+    /error parsing glob/,
+  );
 });

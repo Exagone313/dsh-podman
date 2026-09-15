@@ -9,7 +9,6 @@ import {
   guestCwd,
   outputLines,
   readGuestFile,
-  resolveGuestCwd,
   resolveGuestPath,
   resolveToolBinding,
   runExec,
@@ -36,6 +35,18 @@ const GLOB_MAX_RESULTS = 100;
 // VCS metadata directories ripgrep must never descend into for a discovery
 // listing (`--no-ignore --hidden` would otherwise surface them).
 const GLOB_VCS_EXCLUDES = [".git", ".svn", ".hg", ".bzr", ".jj", ".sl"];
+
+// failOnSearchError turns a ripgrep failure into a tool error: exit code 2 means
+// ripgrep rejected the pattern or could not read the tree, and returning an
+// empty result would present that as a successful search.
+function failOnSearchError(
+  tool: string,
+  result: { exitCode: number; stderr: string },
+): void {
+  if (result.exitCode !== 2) return;
+  const detail = result.stderr.trim();
+  throw new Error(detail === "" ? `${tool} search failed (ripgrep exit code 2)` : detail);
+}
 
 // identityFromInput validates the optional uid/gid/groups identity a tool
 // accepts and returns it, or undefined when none was requested. Values are
@@ -251,6 +262,7 @@ export const toolHandlers: Record<
       argv,
       guestCwd(input.path, sessionCwd, binding),
     );
+    failOnSearchError("glob", result);
     const files = outputLines(result.stdout);
     const capped = files.length > GLOB_MAX_RESULTS;
     return {
@@ -260,24 +272,26 @@ export const toolHandlers: Record<
             note: `showing ${GLOB_MAX_RESULTS} of ${files.length} files in modification-time order; narrow pattern or path to see more`,
           }
         : {}),
-      ...(result.stderr ? { stderr: result.stderr.trim() } : {}),
     };
   },
   container_grep: async (resolver, input, exec) => {
     const sessionCwd = currentCwd(exec);
     const binding = await resolveToolBinding(resolver, sessionCwd, input.container);
-    const cwd = binding.defaultCwd;
-    const path = resolveGuestCwd(input.path, cwd ?? sessionCwd);
+    const cwd = guestCwd(undefined, sessionCwd, binding);
+    // The search root: the requested path, else the container's default (the
+    // session workspace when it is mounted). Ripgrep reads stdin instead of the
+    // working directory when it is given no path, so it is always explicit.
+    const root = guestCwd(input.path, sessionCwd, binding) ?? cwd;
     const argv = ["rg", "-n"];
     if (typeof input.include === "string" && input.include !== "") {
       argv.push("--glob", input.include);
     }
     argv.push(input.pattern);
-    if (path) argv.push(path);
+    if (root !== undefined) argv.push(root);
     const result = await runExec(binding, argv, cwd);
+    failOnSearchError("grep", result);
     return {
       matches: outputLines(result.stdout),
-      ...(result.stderr ? { stderr: result.stderr.trim() } : {}),
     };
   },
   container_mount_list: async (resolver, input, exec) => {

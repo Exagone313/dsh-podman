@@ -27,13 +27,13 @@ token (`DSH_PODMAN_ORCHESTRATOR_TOKEN`) as an `authorization: bearer` header.
 The orchestrator service exposes these gRPC methods (backing both the UI and the
 tools): `ListContainers` (returns only the guest containers the orchestrator
 created — containers it does not own are never exposed),
-`StartContainer{workspace_slug, container, image_id, mounts, env, secret_env}`
+`StartContainer{workspace_slug, container, image_id, mounts, env, secret_env,
+paths}`
 (creates or replaces a container in the workspace's pod; an empty `container`
 targets the default container and other names are validated),
-`RecreateContainer{workspace_slug, container, image_id, mounts, env,
-secret_env}`
+`RecreateContainer{workspace_slug, container, image_id, mounts, env, paths}`
 (stops, removes, and recreates a container, optionally with a new image, project
-mounts, environment, or secret environment; an empty `image_id` keeps the
+mounts, environment, or PATH additions; an empty `image_id` keeps the
 workspace's current image), `RemoveContainer`, `AddContainerMount`,
 `RemoveContainerMount`, `SetContainerPaths`, `AddContainerSecret`, and
 `RemoveContainerSecret`.

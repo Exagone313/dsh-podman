@@ -116,19 +116,19 @@ guest-agent wiring.
 
 ### Containers
 
-| Tool                   | Params                                                                        | Description                                                                                                                |
-| ---------------------- | ----------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| `container_bash`       | `container`, `command`, `description`, optional `workdir`, `timeoutMs`, `env` | Run a shell command                                                                                                        |
-| `container_edit`       | `container`, `file_path`, `old_string`, `new_string`, optional `replace_all`  | Edit a file                                                                                                                |
-| `container_exec`       | `container`, `argv`, `description`, optional `workdir`, `timeoutMs`, `env`    | Run a program                                                                                                              |
-| `container_glob`       | `container`, `pattern`, optional `path`                                       | List files matching a pattern                                                                                              |
-| `container_grep`       | `container`, `pattern`, optional `path`, `include`                            | Search files for a regex                                                                                                   |
-| `container_list`       | —                                                                             | List the containers of the current workspace                                                                               |
-| `container_read`       | `container`, `file_path`, optional `offset`, `limit`                          | Read a file                                                                                                                |
-| `container_recreate` ✱ | `container`, optional `image`, `mounts`, `env`, `secretEnv`                   | Recreate a container, keeping its current image when `image` is omitted, optionally with new project mounts or environment |
-| `container_remove` ✱   | `container`                                                                   | Remove a container (stops its daemons gracefully first)                                                                    |
-| `container_start` ✱    | `container`, optional `image`, `mounts`, `env`, `secretEnv`                   | Start a container (default image when `image` is omitted); approval required only when `mounts` is passed                  |
-| `container_write`      | `container`, `file_path`, `content`, optional `create`, `truncate`            | Write a file                                                                                                               |
+| Tool                   | Params                                                                        | Description                                                                                                                                 |
+| ---------------------- | ----------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `container_bash`       | `container`, `command`, `description`, optional `workdir`, `timeoutMs`, `env` | Run a shell command                                                                                                                         |
+| `container_edit`       | `container`, `file_path`, `old_string`, `new_string`, optional `replace_all`  | Edit a file                                                                                                                                 |
+| `container_exec`       | `container`, `argv`, `description`, optional `workdir`, `timeoutMs`, `env`    | Run a program                                                                                                                               |
+| `container_glob`       | `container`, `pattern`, optional `path`                                       | List files matching a pattern                                                                                                               |
+| `container_grep`       | `container`, `pattern`, optional `path`, `include`                            | Search files for a regex                                                                                                                    |
+| `container_list`       | —                                                                             | List the containers of the current workspace                                                                                                |
+| `container_read`       | `container`, `file_path`, optional `offset`, `limit`                          | Read a file                                                                                                                                 |
+| `container_recreate` ✱ | `container`, optional `image`, `mounts`, `env`, `secretEnv`, `paths`          | Recreate a container, keeping its current image when `image` is omitted, optionally with new project mounts, environment, or PATH additions |
+| `container_remove` ✱   | `container`                                                                   | Remove a container (stops its daemons gracefully first)                                                                                     |
+| `container_start` ✱    | `container`, optional `image`, `mounts`, `env`, `secretEnv`, `paths`          | Start a container (default image when `image` is omitted); approval required only when `mounts` is passed                                   |
+| `container_write`      | `container`, `file_path`, `content`, optional `create`, `truncate`            | Write a file                                                                                                                                |
 
 The `container_bash`, `container_exec`, `container_read`, `container_write`,
 `container_edit`, `container_glob` and `container_grep` arguments mirror the
@@ -226,7 +226,10 @@ the running guest agent sees it) for every command the agent starts: the
 built-in `bash`/`read`/`write`/`edit` tools, `container_bash`, `container_exec`,
 the terminal, and daemons started afterwards. Nothing is recreated — the running
 guest agent receives the new list immediately, so daemons already running keep
-their old `PATH`. A recreated container restores the persisted list.
+their old `PATH`. A recreated container restores the persisted list. The list
+can also be set when a container is created, started, or recreated, through the
+settings modal or the `paths` argument of `container_start` and
+`container_recreate`.
 
 ### Secrets
 
@@ -288,9 +291,10 @@ The plugin ships a browser half that registers a card in the dsh **Settings →
 Plugins** page. The card lists the orchestrator-created guest containers and the
 built images. A workspace with no container gets a **Create container** button
 that opens a configuration modal — image, environment, mounts (project, tmpfs,
-volume, and secret), and secret environment variables — and workspaces that
-already have containers offer an **Add container** button for additional, named
-containers through the same modal. Container rows show their environment and
+volume, and secret), PATH additions, and secret environment variables — and
+workspaces that already have containers offer an **Add container** button for
+additional, named containers through the same modal, which is titled after the
+button that opened it. Container rows show their environment and
 secret-environment variables and their mounts, let you edit environment
 variables and add/remove mounts (each removal is confirmed), and attach/detach
 named secrets to a container's environment variables; each row also offers

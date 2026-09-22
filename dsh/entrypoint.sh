@@ -60,7 +60,7 @@ else
   fi
   if [ "$installed" != "$DSH_PODMAN_PLUGIN_VERSION" ] || [ "$declared" != "$DSH_PODMAN_PLUGIN_VERSION" ]; then
     if ! dsh plugin --profile web add "@exagone313/dsh-podman@$DSH_PODMAN_PLUGIN_VERSION" --save-exact --allow-build=protobufjs; then
-      printf 'error: cannot install @exagone313/dsh-podman@%s; wait if it was just released, or downgrade the dsh image\n' \
+      printf 'error: cannot install @exagone313/dsh-podman@%s; wait if it was just released, or downgrade both the dsh and orchestrator images\n' \
         "$DSH_PODMAN_PLUGIN_VERSION" >&2
       exit 1
     fi

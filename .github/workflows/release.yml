@@ -58,8 +58,13 @@ jobs:
           cache: false
 
       - name: Verify the version matches the tag
+        env:
+          # Passed through the environment, not interpolated into the script,
+          # so a crafted input or ref cannot inject shell code.
+          INPUT_VERSION: ${{ inputs.version }}
+          REF_NAME: ${{ github.ref_name }}
         run: |
-          VERSION="${{ inputs.version || github.ref_name }}"
+          VERSION="${INPUT_VERSION:-$REF_NAME}"
           PKG_VERSION="$(node -p "require('./package.json').version")"
           if [ "$VERSION" != "$PKG_VERSION" ]; then
             echo "::error::release '$VERSION' does not match package.json version '$PKG_VERSION'"

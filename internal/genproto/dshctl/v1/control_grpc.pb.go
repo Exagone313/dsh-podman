@@ -23,6 +23,7 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
+	OrchestratorControl_GetVersion_FullMethodName            = "/dshctl.v1.OrchestratorControl/GetVersion"
 	OrchestratorControl_ListProjects_FullMethodName          = "/dshctl.v1.OrchestratorControl/ListProjects"
 	OrchestratorControl_CreateWorkspace_FullMethodName       = "/dshctl.v1.OrchestratorControl/CreateWorkspace"
 	OrchestratorControl_DescribeWorkspace_FullMethodName     = "/dshctl.v1.OrchestratorControl/DescribeWorkspace"
@@ -61,6 +62,7 @@ const (
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type OrchestratorControlClient interface {
+	GetVersion(ctx context.Context, in *GetVersionRequest, opts ...grpc.CallOption) (*GetVersionResponse, error)
 	ListProjects(ctx context.Context, in *ListProjectsRequest, opts ...grpc.CallOption) (*ListProjectsResponse, error)
 	CreateWorkspace(ctx context.Context, in *CreateWorkspaceRequest, opts ...grpc.CallOption) (*Workspace, error)
 	DescribeWorkspace(ctx context.Context, in *DescribeWorkspaceRequest, opts ...grpc.CallOption) (*Workspace, error)
@@ -101,6 +103,16 @@ type orchestratorControlClient struct {
 
 func NewOrchestratorControlClient(cc grpc.ClientConnInterface) OrchestratorControlClient {
 	return &orchestratorControlClient{cc}
+}
+
+func (c *orchestratorControlClient) GetVersion(ctx context.Context, in *GetVersionRequest, opts ...grpc.CallOption) (*GetVersionResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetVersionResponse)
+	err := c.cc.Invoke(ctx, OrchestratorControl_GetVersion_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 func (c *orchestratorControlClient) ListProjects(ctx context.Context, in *ListProjectsRequest, opts ...grpc.CallOption) (*ListProjectsResponse, error) {
@@ -427,6 +439,7 @@ func (c *orchestratorControlClient) RemoveContainerSecret(ctx context.Context, i
 // All implementations must embed UnimplementedOrchestratorControlServer
 // for forward compatibility.
 type OrchestratorControlServer interface {
+	GetVersion(context.Context, *GetVersionRequest) (*GetVersionResponse, error)
 	ListProjects(context.Context, *ListProjectsRequest) (*ListProjectsResponse, error)
 	CreateWorkspace(context.Context, *CreateWorkspaceRequest) (*Workspace, error)
 	DescribeWorkspace(context.Context, *DescribeWorkspaceRequest) (*Workspace, error)
@@ -469,6 +482,9 @@ type OrchestratorControlServer interface {
 // pointer dereference when methods are called.
 type UnimplementedOrchestratorControlServer struct{}
 
+func (UnimplementedOrchestratorControlServer) GetVersion(context.Context, *GetVersionRequest) (*GetVersionResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetVersion not implemented")
+}
 func (UnimplementedOrchestratorControlServer) ListProjects(context.Context, *ListProjectsRequest) (*ListProjectsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListProjects not implemented")
 }
@@ -584,6 +600,24 @@ func RegisterOrchestratorControlServer(s grpc.ServiceRegistrar, srv Orchestrator
 		t.testEmbeddedByValue()
 	}
 	s.RegisterService(&OrchestratorControl_ServiceDesc, srv)
+}
+
+func _OrchestratorControl_GetVersion_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetVersionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(OrchestratorControlServer).GetVersion(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: OrchestratorControl_GetVersion_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(OrchestratorControlServer).GetVersion(ctx, req.(*GetVersionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
 }
 
 func _OrchestratorControl_ListProjects_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
@@ -1169,6 +1203,10 @@ var OrchestratorControl_ServiceDesc = grpc.ServiceDesc{
 	ServiceName: "dshctl.v1.OrchestratorControl",
 	HandlerType: (*OrchestratorControlServer)(nil),
 	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "GetVersion",
+			Handler:    _OrchestratorControl_GetVersion_Handler,
+		},
 		{
 			MethodName: "ListProjects",
 			Handler:    _OrchestratorControl_ListProjects_Handler,

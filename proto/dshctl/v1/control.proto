@@ -7,6 +7,7 @@ package dshctl.v1;
 option go_package = "github.com/Exagone313/dsh-podman/internal/genproto/dshctl/v1;dshctlv1";
 
 service OrchestratorControl {
+  rpc GetVersion(GetVersionRequest) returns (GetVersionResponse);
   rpc ListProjects(ListProjectsRequest) returns (ListProjectsResponse);
   rpc CreateWorkspace(CreateWorkspaceRequest) returns (Workspace);
   rpc DescribeWorkspace(DescribeWorkspaceRequest) returns (Workspace);
@@ -41,6 +42,8 @@ service OrchestratorControl {
   rpc RemoveContainerSecret(RemoveContainerSecretRequest) returns (Container);
 }
 
+message GetVersionRequest {}
+message GetVersionResponse { string version = 1; string commit = 2; }
 message ListProjectsRequest {}
 message ListProjectsResponse { repeated Project projects = 1; }
 message Project { string name = 1; string host_path = 2; }

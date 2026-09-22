@@ -66,8 +66,9 @@ func main() {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
 	logger.Info("dsh-podman-orchestrator starting", "version", version.Version, "commit", version.Commit)
 	// Authentication runs first so a rejected call is never logged as a
-	// request nor able to panic a handler; recovery runs innermost, closest
-	// to the handler it protects.
+	// request nor able to panic a handler; the plugin version check runs next,
+	// so an incompatible plugin is refused before any handler sees it; recovery
+	// runs innermost, closest to the handler it protects.
 	unary := []grpc.UnaryServerInterceptor{}
 	if controlToken != "" {
 		logger.Info("control-plane authentication enabled")
@@ -75,7 +76,7 @@ func main() {
 	} else {
 		logger.Warn("control-plane authentication is disabled; set DSH_PODMAN_ORCHESTRATOR_TOKEN")
 	}
-	unary = append(unary, grpcserver.UnaryLogger(logger), recovery.Unary(logger))
+	unary = append(unary, grpcserver.UnaryVersion(logger), grpcserver.UnaryLogger(logger), recovery.Unary(logger))
 	server := grpc.NewServer(grpc.ChainUnaryInterceptor(unary...))
 	var podmanClient *podman.Client
 	var imageBuilder *images.Builder

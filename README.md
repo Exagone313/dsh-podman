@@ -32,9 +32,9 @@ per-project Podman containers.
 
 This repository was written in major parts using AI models:
 
+- DeepSeek Flash
 - early commits using OpenAI GPT-5.6 Luna
-- DeepSeek V4 Flash
-- source code weakness fixes by Anthropic Claude Opus 5
+- a few fixes using Anthropic Claude Opus 5
 
 ## License
 

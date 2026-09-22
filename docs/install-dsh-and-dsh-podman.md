@@ -95,11 +95,12 @@ could be added in the future.
 
 ## Installation
 
-### dsh setup
-
 This installation uses
 [Podman Quadlet](https://docs.podman.io/en/latest/markdown/podman-systemd.unit.5.html),
 which adds Podman integration into systemd.
+
+Note that the dsh-podman plugin will be installed at dsh container startup,
+which requires online access.
 
 1. Create the Quadlet directory for your user:
    ```bash
@@ -136,17 +137,6 @@ which adds Podman integration into systemd.
    dsh.
 9. Once your web browser has saved this token, you'll be able to access dsh with
    the URL [http://127.0.0.1:3080/](http://127.0.0.1:3080/).
-
-### dsh-podman plugin installation
-
-1. Run this command to install the dsh-podman plugin:
-   ```bash
-   podman exec dsh dsh plugin --profile web add @exagone313/dsh-podman --allow-build=protobufjs
-   ```
-2. Restart dsh to complete the installation:
-   ```bash
-   systemctl --user restart dsh
-   ```
 
 ## Verification
 

@@ -81,16 +81,38 @@ make image  # build images
 systemctl --user restart dsh dsh-podman-orchestrator
 ```
 
-### Update plugin
+### Install a local plugin build
+
+The dsh image installs the plugin itself at container start, so a development
+build is served by pointing that install at a bind-mounted package. Build the
+plugin and pack it:
 
 ```bash
-npm pack
-v="$(jq -r .version package.json)"
-podman cp ./exagone313-dsh-podman-"${v}".tgz dsh:/tmp/
-podman exec -it dsh dsh plugin --profile web remove @exagone313/dsh-podman  # necessary, to force reinstall if the same version
-podman exec -it dsh dsh plugin --profile web add /tmp/exagone313-dsh-podman-"${v}".tgz --allow-build=protobufjs
-systemctl --user restart dsh
+pnpm build
+npm pack          # writes exagone313-dsh-podman-<version>.tgz
 ```
+
+Then add one of these to the dsh container unit and restart it:
+
+```
+# the repository directory, which must contain the packed archive
+Volume=/path/to/repo:/mnt/dsh-podman:ro
+Environment=DSH_PODMAN_PLUGIN_SOURCE=/mnt/dsh-podman
+```
+
+```
+# or the archive itself
+Volume=/path/to/exagone313-dsh-podman-0.2.0-rc.3.tgz:/mnt/dsh-podman.tgz:ro
+Environment=DSH_PODMAN_PLUGIN_SOURCE=/mnt/dsh-podman.tgz
+```
+
+The entrypoint installs that package on every start and never falls back to the
+registry — a missing package is an error. Re-run `pnpm build && npm pack` and
+restart dsh to pick up changes.
+
+Without `DSH_PODMAN_PLUGIN_SOURCE`, the entrypoint installs
+`@exagone313/dsh-podman@$DSH_PODMAN_PLUGIN_VERSION` (the version baked into the
+image) exactly, upgrading or downgrading the profile's copy to match.
 
 ## Continuous integration
 
@@ -146,5 +168,10 @@ requires the `master` branch with a clean working tree. The tag is also what the
 built plugin and binaries report, since `scripts/generate-version.mjs` derives
 the embedded version from `git describe --tags`. Pre-releases (`1.0.0-rc.1`) are
 bumped the same way.
+
+A release can also be triggered, or a failed one re-run, from the Actions tab
+with `workflow_dispatch`, which takes the version as input. Already-published
+steps are skipped (npm skips a version it already has, and an existing GitHub
+release is left alone), so a retry never republishes.
 
 The `NPM_TOKEN` secret must be configured on the repository for the npm step.

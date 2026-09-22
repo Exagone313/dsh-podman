@@ -79,16 +79,35 @@ make image  # build images
 systemctl --user restart dsh dsh-podman-orchestrator
 ```
 
-### 更新插件
+### 安装本地插件构建
+
+dsh 镜像会在容器启动时自行安装插件，因此本地开发构建通过将安装源指向 bind mount
+的包来使用。先构建并打包插件：
 
 ```bash
-npm pack
-v="$(jq -r .version package.json)"
-podman cp ./exagone313-dsh-podman-"${v}".tgz dsh:/tmp/
-podman exec -it dsh dsh plugin --profile web remove @exagone313/dsh-podman  # necessary, to force reinstall if the same version
-podman exec -it dsh dsh plugin --profile web add /tmp/exagone313-dsh-podman-"${v}".tgz --allow-build=protobufjs
-systemctl --user restart dsh
+pnpm build
+npm pack          # 生成 exagone313-dsh-podman-<version>.tgz
 ```
+
+然后在 dsh 容器单元中加入以下之一并重启：
+
+```
+# 仓库目录，其中必须包含已打包的归档
+Volume=/path/to/repo:/mnt/dsh-podman:ro
+Environment=DSH_PODMAN_PLUGIN_SOURCE=/mnt/dsh-podman
+```
+
+```
+# 或者归档本身
+Volume=/path/to/exagone313-dsh-podman-0.2.0-rc.3.tgz:/mnt/dsh-podman.tgz:ro
+Environment=DSH_PODMAN_PLUGIN_SOURCE=/mnt/dsh-podman.tgz
+```
+
+入口脚本会在每次启动时安装该包，且绝不会回退到注册表——找不到包即为错误。重新运行
+`pnpm build && npm pack` 并重启 dsh 即可生效。
+
+未设置 `DSH_PODMAN_PLUGIN_SOURCE` 时，入口脚本会精确安装
+`@exagone313/dsh-podman@$DSH_PODMAN_PLUGIN_VERSION`（镜像构建时写入的版本），并相应升级或降级配置中的副本。
 
 ## 持续集成
 
@@ -139,5 +158,9 @@ git push origin master 0.1.1
 分支且工作区干净。标签同时也是构建出的插件与二进制文件所报告的版本，因为
 `scripts/generate-version.mjs` 从 `git describe --tags`
 推导嵌入的版本。预发布版（`1.0.0-rc.1`）也用同样的方式递增。
+
+也可以在 Actions 页面通过 `workflow_dispatch`
+触发发布，或重新运行失败的发布，版本作为输入传入。已完成的步骤会被跳过（npm
+会跳过已存在的版本，已有的 GitHub release 不会被改动），因此重试不会重复发布。
 
 npm 步骤要求仓库配置 `NPM_TOKEN` 密钥。

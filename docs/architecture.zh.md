@@ -23,6 +23,12 @@ dsh-podman 由三个组件组成：
 orchestrator（编排器）并通信 gRPC。请求携带共享
 token（`DSH_PODMAN_ORCHESTRATOR_TOKEN`）作为 `authorization: bearer` 标头。
 
+请求还会在 `x-dsh-podman-plugin-version` 标头中携带插件版本。插件与 orchestrator
+分别部署（前者是 dsh 镜像中的 npm 包，后者是此二进制文件），因此 orchestrator
+会拒绝来自**主版本**不同的插件的控制调用，并指出两者的版本以及哪一方更旧——不同步的部署会明确失败，而不会被误读。缺失或无法解析的版本同样会被拒绝。次版本或修订版本不同是兼容的：调用照常进行，orchestrator
+会按插件版本记录一次警告，设置卡片也会显示。`GetVersion`
+不受该检查约束，因此插件始终可以获知 orchestrator 的版本。
+
 orchestrator 服务公开以下 gRPC 方法（同时支撑 UI
 和工具）：`ListContainers`（仅返回 orchestrator 创建的 guest
 容器——它不拥有的容器永远不会被暴露）、`StartContainer{workspace_slug, container, image_id, mounts, env, secret_env, paths}`（在工作区的

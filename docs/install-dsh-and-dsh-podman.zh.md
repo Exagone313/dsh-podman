@@ -77,11 +77,11 @@ SPDX-License-Identifier: MIT
 
 ## 安装
 
-### dsh 配置
-
 本次安装使用
 [Podman Quadlet](https://docs.podman.io/en/latest/markdown/podman-systemd.unit.5.html)，
 它为 systemd 增加了 Podman 集成。
+
+注意，dsh-podman 插件会在 dsh 容器启动时安装，这需要联网。
 
 1. 为你的用户创建 Quadlet 目录：
    ```bash
@@ -117,17 +117,6 @@ SPDX-License-Identifier: MIT
 8. 访问形如 `http://127.0.0.1:3080/?token=xxx` 的给定 URL 以使用 dsh。
 9. 浏览器保存该令牌后，即可通过 [http://127.0.0.1:3080/](http://127.0.0.1:3080/)
    访问 dsh。
-
-### dsh-podman 插件安装
-
-1. 运行以下命令安装 dsh-podman 插件：
-   ```bash
-   podman exec dsh dsh plugin --profile web add @exagone313/dsh-podman --allow-build=protobufjs
-   ```
-2. 重启 dsh 以完成安装：
-   ```bash
-   systemctl --user restart dsh
-   ```
 
 ## 验证
 

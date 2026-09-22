@@ -24,6 +24,16 @@ The plugin connects to the orchestrator over a Unix socket at
 `<socketsRoot>/orchestrator.sock` and talks gRPC. Requests carry the shared
 token (`DSH_PODMAN_ORCHESTRATOR_TOKEN`) as an `authorization: bearer` header.
 
+Requests also carry the plugin's version in an `x-dsh-podman-plugin-version`
+header. The plugin and the orchestrator are deployed separately (an npm package
+inside the dsh image, and this binary), so the orchestrator refuses a control
+call from a plugin whose **major** version differs, naming both versions and
+which side is behind — an out-of-sync deployment fails loudly instead of being
+misread. A missing or unparseable version is refused as well. A minor or patch
+difference is compatible: the call proceeds, the orchestrator logs it once per
+plugin version, and the settings card shows it. `GetVersion` is exempt from the
+check, so a plugin can always learn the orchestrator's version.
+
 The orchestrator service exposes these gRPC methods (backing both the UI and the
 tools): `ListContainers` (returns only the guest containers the orchestrator
 created — containers it does not own are never exposed),

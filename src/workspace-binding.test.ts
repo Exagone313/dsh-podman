@@ -19,6 +19,7 @@ import {
   containerNotFound,
   normalizeToolError,
 } from "./workspace-binding.js";
+import { VERSION } from "./generated/version.js";
 
 const SLUG = "2c573001-4171-4900-904b-12a5cc02737a";
 const SLUG_SUB = "3d684112-5282-4a11-a15c-23b6dd13848b";
@@ -60,6 +61,13 @@ test("metadata omits the header when the token is empty", () => {
   const result = metadata("");
   assert.ok(result instanceof grpc.Metadata);
   assert.equal(result.get("authorization").length, 0);
+});
+
+test("metadata carries the plugin version only when one is given", () => {
+  const withVersion = metadata("token-1", "1.2.3");
+  assert.equal(withVersion.get("x-dsh-podman-plugin-version")[0], "1.2.3");
+  // Guest calls pass no version, and the guest agent does not check it.
+  assert.equal(metadata("token-1").get("x-dsh-podman-plugin-version").length, 0);
 });
 
 test("normalizeToolError strips the grpc prefix and names the code", () => {
@@ -118,6 +126,7 @@ async function startControlServer(
 ): Promise<{
   socketsRoot: string;
   received: string[];
+  versions: Array<string | undefined>;
   createRequests: any[];
   recreateRequests: any[];
   stop: () => void;
@@ -134,11 +143,13 @@ async function startControlServer(
   const loaded = grpc.loadPackageDefinition(definition) as any;
   const server = new grpc.Server();
   const received: string[] = [];
+  const versions: Array<string | undefined> = [];
   const createRequests: any[] = [];
   const recreateRequests: any[] = [];
   server.addService(loaded.dshctl.v1.OrchestratorControl.service, {
     listWorkspaces: (call: any, callback: any) => {
       received.push(call.metadata.get("authorization")[0]);
+      versions.push(call.metadata.get("x-dsh-podman-plugin-version")[0]);
       callback(null, { workspaces: [] });
     },
     describeWorkspace: (_call: any, callback: any) => {
@@ -193,6 +204,7 @@ async function startControlServer(
   return {
     socketsRoot,
     received,
+    versions,
     createRequests,
     recreateRequests,
     stop: () => server.forceShutdown(),
@@ -200,7 +212,7 @@ async function startControlServer(
 }
 
 test("control calls carry the bearer token", async () => {
-  const { socketsRoot, received, stop } = await startControlServer();
+  const { socketsRoot, received, versions, stop } = await startControlServer();
   try {
     const resolver = new WorkspaceResolver(
       {
@@ -213,13 +225,14 @@ test("control calls carry the bearer token", async () => {
     );
     await resolver.control("listWorkspaces", {});
     assert.equal(received[0], "bearer tok-1");
+    assert.equal(versions[0], VERSION, "control calls report the plugin version");
   } finally {
     stop();
   }
 });
 
 test("control calls omit the token when unset", async () => {
-  const { socketsRoot, received, stop } = await startControlServer();
+  const { socketsRoot, received, versions, stop } = await startControlServer();
   try {
     const resolver = new WorkspaceResolver(
       {

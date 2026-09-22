@@ -20,6 +20,7 @@ test("refresh on install publishes containers, images and workspaces", async () 
     setConfig: () => {},
     async control(method: string, request: unknown) {
       calls.push([method, request]);
+      if (method === "getVersion") return { version: "0.2.0", commit: "abc" };
       if (method === "listContainers") {
         return { containers: [{ containerName: "c1", workspaceSlug: "w1" }] };
       }
@@ -42,7 +43,7 @@ test("refresh on install publishes containers, images and workspaces", async () 
   await scope.update({}); // settle the queued async refresh
   assert.deepEqual(
     calls.map(([method]) => method),
-    ["listContainers", "listImages", "listWorkspaces", "listVolumes", "listSecrets", "listCaches"],
+    ["getVersion", "listContainers", "listImages", "listWorkspaces", "listVolumes", "listSecrets", "listCaches"],
   );
   assert.equal((scope.value.containers as any[]).length, 1);
   assert.equal((scope.value.images as any[]).length, 1);

@@ -125,6 +125,9 @@ export interface WorkspaceView {
 export interface CardSnapshot {
   version: string;
   commit: string;
+  // The orchestrator's version, or "" when it predates the handshake.
+  orchestratorVersion: string;
+  versionState: "ok" | "minor-mismatch" | "major-mismatch";
   projectsRoot: string;
   workspaces: readonly WorkspaceView[];
   containers: readonly ContainerView[];

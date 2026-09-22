@@ -9,6 +9,8 @@ export const NS = "podman";
 export type ContainerPluginKey =
   | "cardTitle"
   | "cardDescription"
+  | "versionMismatchMajor"
+  | "versionMismatchMinor"
   | "reload"
   | "reloading"
   | "notice"
@@ -192,6 +194,10 @@ export type ContainerPluginKey =
 export const en: Record<ContainerPluginKey, string> = {
   cardTitle: "dsh-podman",
   cardDescription: "Manage the guest containers and their images.",
+  versionMismatchMajor:
+    "This plugin's major version differs from the orchestrator's; update the dsh image or the orchestrator image so both match.",
+  versionMismatchMinor:
+    "This plugin and the orchestrator have compatible but different versions; consider updating both images.",
   reload: "Reload this view",
   reloading: "Reloading…",
   notice: "Notice",
@@ -388,6 +394,10 @@ export const en: Record<ContainerPluginKey, string> = {
 export const zh: Record<ContainerPluginKey, string> = {
   cardTitle: "dsh-podman",
   cardDescription: "管理工作区容器及其镜像。",
+  versionMismatchMajor:
+    "此插件与 orchestrator 的主版本不同；请更新 dsh 镜像或 orchestrator 镜像，使两者一致。",
+  versionMismatchMinor:
+    "此插件与 orchestrator 的版本不同但兼容；建议同时更新两个镜像。",
   reload: "刷新此视图",
   reloading: "刷新中…",
   notice: "提示",

@@ -22,6 +22,18 @@ import { defaultMountMode, mountKindToProto, mountModeToProto } from "./mount-en
 import { unaryGuest } from "./guest-rpc.js";
 import { type WorkspaceResolver, workspaceSlug } from "./workspace-binding.js";
 import { GIT_COMMIT, VERSION } from "./generated/version.js";
+import { versionState as pluginVersionState } from "./version-compat.js";
+
+// readOrchestratorVersion asks the orchestrator for its version, or returns ""
+// when the call fails (an orchestrator predating the handshake).
+async function readOrchestratorVersion(resolver: WorkspaceResolver): Promise<string> {
+  try {
+    const response: any = await resolver.control("getVersion", {});
+    return String(response?.version ?? "");
+  } catch {
+    return "";
+  }
+}
 
 // The cache clean modes the settings card can request, mapped to the control
 // plane's enum names.
@@ -128,17 +140,44 @@ export async function cardSnapshot(
   resolver: WorkspaceResolver,
   workspaceRegistry: any,
 ): Promise<CardSnapshot> {
-  const [containers, images, workspaces, volumes, secrets, caches] = await Promise.all([
-    resolver.control("listContainers", {}),
-    resolver.control("listImages", {}),
-    resolver.control("listWorkspaces", {}),
-    resolver.control("listVolumes", {}),
-    resolver.control("listSecrets", {}),
-    resolver.control("listCaches", {}),
-  ]);
+  // The handshake RPC is exempt from the orchestrator's version check, so it
+  // succeeds even when the rest is refused; an older orchestrator that has no
+  // GetVersion yet leaves the version unknown.
+  const orchestratorVersion = await readOrchestratorVersion(resolver);
+  let listings: readonly unknown[];
+  try {
+    listings = await Promise.all([
+      resolver.control("listContainers", {}),
+      resolver.control("listImages", {}),
+      resolver.control("listWorkspaces", {}),
+      resolver.control("listVolumes", {}),
+      resolver.control("listSecrets", {}),
+      resolver.control("listCaches", {}),
+    ]);
+  } catch (error: unknown) {
+    // An incompatible plugin is refused before any handler runs, so the card
+    // reports the mismatch instead of an unexplained empty snapshot.
+    if ((error as { code?: unknown })?.code !== "FailedPrecondition") throw error;
+    return {
+      version: VERSION,
+      commit: GIT_COMMIT,
+      orchestratorVersion,
+      versionState: "major-mismatch",
+      projectsRoot: resolver.getConfig().projectsRoot,
+      workspaces: [],
+      containers: [],
+      images: [],
+      volumes: [],
+      secrets: [],
+      caches: [],
+    };
+  }
+  const [containers, images, workspaces, volumes, secrets, caches] = listings;
   return {
     version: VERSION,
     commit: GIT_COMMIT,
+    orchestratorVersion,
+    versionState: pluginVersionState(VERSION, orchestratorVersion),
     projectsRoot: resolver.getConfig().projectsRoot,
     workspaces: mergeWorkspaceViews(
       dshWorkspaceViews(workspaceRegistry, resolver.getConfig().projectsRoot),

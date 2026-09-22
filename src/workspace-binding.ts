@@ -9,6 +9,7 @@ import {
   unary,
 } from "./grpc/runtime-client.js";
 import { isAbsolute, join } from "node:path";
+import { VERSION } from "./generated/version.js";
 
 export interface WorkspaceBinding {
   guest: grpc.Client;
@@ -202,7 +203,7 @@ export class WorkspaceResolver {
     const control = controlClient(
       join(this.config.socketsRoot, "orchestrator.sock"),
     );
-    const controlMetadata = metadata(this.config.controlToken);
+    const controlMetadata = metadata(this.config.controlToken, VERSION);
     let workspace: any;
     try {
       workspace = await unary<any>(control, "describeWorkspace", {
@@ -229,7 +230,7 @@ export class WorkspaceResolver {
       controlClient(join(this.config.socketsRoot, "orchestrator.sock")),
       method,
       request,
-      metadata(this.config.controlToken),
+      metadata(this.config.controlToken, VERSION),
     );
   }
 }
@@ -306,10 +307,16 @@ export function containerRowFor(
       row.workspaceSlug === slug && row.containerName === container,
   );
 }
-export function metadata(token: string): grpc.Metadata {
+// metadata builds the call metadata. The plugin version is sent on control
+// calls so the orchestrator can refuse an incompatible plugin; guest calls omit
+// it, since the guest agent does not check it.
+export function metadata(token: string, pluginVersion?: string): grpc.Metadata {
   const result = new grpc.Metadata();
   if (token !== "") {
     result.set("authorization", `bearer ${token}`);
+  }
+  if (pluginVersion !== undefined && pluginVersion !== "") {
+    result.set("x-dsh-podman-plugin-version", pluginVersion);
   }
   return result;
 }

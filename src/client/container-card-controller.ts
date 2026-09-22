@@ -64,6 +64,8 @@ export interface CardState {
   notice: string;
   version: string;
   commit: string;
+  orchestratorVersion: string;
+  versionState: "ok" | "minor-mismatch" | "major-mismatch";
   defaultImage: string;
   defaultImageDraft: string;
   socketsRoot: string;
@@ -123,6 +125,8 @@ export interface ContainerCardFace {
 const EMPTY_SNAPSHOT: CardSnapshot = {
   version: "",
   commit: "",
+  orchestratorVersion: "",
+  versionState: "ok",
   projectsRoot: "",
   workspaces: [],
   containers: [],
@@ -172,6 +176,8 @@ export class ContainerCardController {
       notice: this.notice,
       version: this.snapshot.version,
       commit: this.snapshot.commit,
+      orchestratorVersion: this.snapshot.orchestratorVersion,
+      versionState: this.snapshot.versionState,
       defaultImage: value?.defaultImage ?? "",
       defaultImageDraft: this.draft("defaultImage", value?.defaultImage ?? ""),
       socketsRoot: value?.socketsRoot ?? "",

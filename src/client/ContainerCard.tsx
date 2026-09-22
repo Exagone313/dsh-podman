@@ -90,6 +90,9 @@ export function ContainerCard(props: ContainerCardProps): ReactNode {
             {t("cardTitle")}
             {state.version ? ` ${state.version}` : ""}
             {state.commit ? ` · ${state.commit}` : ""}
+            {state.orchestratorVersion
+              ? ` · orchestrator ${state.orchestratorVersion}`
+              : ""}
           </span>
           <span style={cardDescriptionStyle}>{t("cardDescription")}</span>
         </span>
@@ -100,6 +103,22 @@ export function ContainerCard(props: ContainerCardProps): ReactNode {
           {state.notice === "" ? null : (
             <div style={banner} role="status">
               {t("notice")}: {state.notice}
+            </div>
+          )}
+          {state.versionState === "ok" ? null : (
+            <div
+              style={
+                state.versionState === "major-mismatch"
+                  ? { ...banner, borderColor: "var(--dsw-alias-state-error-primary)" }
+                  : banner
+              }
+              role={state.versionState === "major-mismatch" ? "alert" : "status"}
+            >
+              {t(
+                state.versionState === "major-mismatch"
+                  ? "versionMismatchMajor"
+                  : "versionMismatchMinor",
+              )}
             </div>
           )}
           <div style={sectionTitle}>{t("workspacesTitle")}</div>

@@ -19,6 +19,7 @@ function fakeResolver(): { resolver: any; calls: Array<[string, unknown]> } {
     setConfig: () => {},
     async control(method: string, request: unknown) {
       calls.push([method, request]);
+      if (method === "getVersion") return { version: "9.9.9", commit: "abc" };
       if (method === "listContainers") return { containers: [{ containerName: "c1" }] };
       if (method === "listImages") return { images: [{ imageId: "img1" }] };
       if (method === "listWorkspaces") return { workspaces: [] };
@@ -92,8 +93,33 @@ test("the card route serves the live snapshot on GET", async () => {
   assert.equal(snapshot.caches[0].bytes, 1024);
   assert.deepEqual(
     calls.map(([method]) => method),
-    ["listContainers", "listImages", "listWorkspaces", "listVolumes", "listSecrets", "listCaches"],
+    ["getVersion", "listContainers", "listImages", "listWorkspaces", "listVolumes", "listSecrets", "listCaches"],
   );
+  assert.equal(snapshot.orchestratorVersion, "9.9.9");
+  assert.equal(
+    snapshot.versionState,
+    "major-mismatch",
+    "a differing major is surfaced on the card",
+  );
+});
+
+test("a refused control call reports the version mismatch instead of an empty snapshot", async () => {
+  const { resolver } = fakeResolver();
+  const refusal = new Error("plugin is incompatible");
+  (refusal as { code?: string }).code = "FailedPrecondition";
+  resolver.control = async (method: string) => {
+    if (method === "getVersion") return { version: "9.9.9", commit: "abc" };
+    throw refusal;
+  };
+  const { ctx, routes } = fakeRouteContext();
+  registerCardRoute(ctx, resolver);
+  const response = await routes[0].fetch(cardRequest());
+  assert.equal(response.status, 200);
+  const snapshot = (await response.json()) as any;
+  assert.equal(snapshot.orchestratorVersion, "9.9.9");
+  assert.equal(snapshot.versionState, "major-mismatch");
+  assert.deepEqual(snapshot.containers, []);
+  assert.deepEqual(snapshot.workspaces, []);
 });
 
 test("the card route runs one command per POST and returns its notice", async () => {

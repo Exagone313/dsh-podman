@@ -47,7 +47,7 @@ image-guestagent: $(BIN_DIR)/$(GOOS)-$(GOARCH)/dsh-podman-guest-agent LICENSE.pk
 	$(CONTAINER) build --build-arg TARGETOS=$(GOOS) --build-arg TARGETARCH=$(GOARCH) -f Containerfile.guestagent -t $(IMAGE_PREFIX)guest-agent:$(IMAGE_TAG) .
 
 image-dsh:
-	$(CONTAINER) build -f Containerfile.dsh -t $(IMAGE_PREFIX)dsh:$(IMAGE_TAG) .
+	$(CONTAINER) build --build-arg DSH_PODMAN_PLUGIN_VERSION=$$(node -p "require('./package.json').version") -f Containerfile.dsh -t $(IMAGE_PREFIX)dsh:$(IMAGE_TAG) .
 
 # LICENSE.pkg combines the project license with the licenses and notices of
 # every third-party Go module; it is generated, gitignored, and baked into the

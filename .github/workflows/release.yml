@@ -138,6 +138,8 @@ jobs:
         with:
           context: .
           file: Containerfile.dsh
+          build-args: |
+            DSH_PODMAN_PLUGIN_VERSION=${{ github.ref_name }}
           platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ steps.meta-dsh.outputs.tags }}

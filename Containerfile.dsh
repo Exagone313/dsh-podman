@@ -14,14 +14,23 @@ ENV DSH_TELEMETRY_MODE=DISABLED
 ENV DSH_TELEMETRY_OTLP_URL=https://dsh-telemetry-disabled.invalid/v1/logs
 
 ARG DSH_VERSION=0.1.5-rc.2
+# The dsh-podman plugin version this image ships; the entrypoint installs it
+# into the profile at container start. Release builds pass the tag.
+ARG DSH_PODMAN_PLUGIN_VERSION
 # Keep in sync with package.json's packageManager field: the profiles dsh
 # manages install their plugins with this pnpm.
 ARG PNPM_VERSION=12.4.1
 RUN npm install -g pnpm@${PNPM_VERSION} @deepseek-ai/dsh@${DSH_VERSION} \
     && npm cache clean --force
 
+RUN test -n "$DSH_PODMAN_PLUGIN_VERSION" \
+    || { echo "error: build with --build-arg DSH_PODMAN_PLUGIN_VERSION=<version>" >&2; exit 1; }
+ENV DSH_PODMAN_PLUGIN_VERSION=${DSH_PODMAN_PLUGIN_VERSION}
+
 RUN mkdir -p /opt/dsh
 COPY ./dsh/defaults.cordis.patch.yml /opt/dsh/
-COPY ./dsh/pnpm-config.yaml /root/.config/pnpm/config.yaml
+COPY ./dsh/entrypoint.sh /opt/dsh/entrypoint.sh
+RUN chmod 0755 /opt/dsh/entrypoint.sh
 
+ENTRYPOINT ["/opt/dsh/entrypoint.sh"]
 CMD ["dsh", "--profile", "web", "--patch", "/opt/dsh/defaults.cordis.patch.yml", "--no-open"]

@@ -294,9 +294,12 @@ func boolPtr(value bool) *bool {
 	return &value
 }
 
+// Remove deletes the named guest container, tolerating an already-absent one
+// (a container removed outside dsh-podman must not block a replace or a
+// recreate). It mirrors RemovePod's tolerance of an absent pod.
 func (c *Client) Remove(name string) error {
 	c.log().Info("removing guest container", "container_name", name)
-	_, err := containers.Remove(c.ctx, name, &containers.RemoveOptions{Force: boolPtr(true)})
+	_, err := containers.Remove(c.ctx, name, &containers.RemoveOptions{Force: boolPtr(true), Ignore: boolPtr(true)})
 	if err != nil {
 		c.log().Error("guest container removal failed", "container_name", name, "error", err)
 	} else {

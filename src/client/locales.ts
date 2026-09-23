@@ -11,6 +11,9 @@ export type ContainerPluginKey =
   | "cardDescription"
   | "versionMismatchMajor"
   | "versionMismatchMinor"
+  | "versionsTitle"
+  | "orchestrator"
+  | "versionUnknown"
   | "reload"
   | "reloading"
   | "notice"
@@ -198,6 +201,9 @@ export const en: Record<ContainerPluginKey, string> = {
     "This plugin's major version differs from the orchestrator's; update the dsh image or the orchestrator image so both match.",
   versionMismatchMinor:
     "This plugin and the orchestrator have compatible but different versions; consider updating both images.",
+  versionsTitle: "Versions",
+  orchestrator: "dsh-podman-orchestrator",
+  versionUnknown: "unknown",
   reload: "Reload this view",
   reloading: "Reloading…",
   notice: "Notice",
@@ -398,6 +404,9 @@ export const zh: Record<ContainerPluginKey, string> = {
     "此插件与 orchestrator 的主版本不同；请更新 dsh 镜像或 orchestrator 镜像，使两者一致。",
   versionMismatchMinor:
     "此插件与 orchestrator 的版本不同但兼容；建议同时更新两个镜像。",
+  versionsTitle: "版本",
+  orchestrator: "dsh-podman-orchestrator",
+  versionUnknown: "未知",
   reload: "刷新此视图",
   reloading: "刷新中…",
   notice: "提示",

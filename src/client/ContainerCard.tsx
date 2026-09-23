@@ -86,14 +86,7 @@ export function ContainerCard(props: ContainerCardProps): ReactNode {
         onClick={() => setOpen(!open)}
       >
         <span style={cardHeadTextStyle}>
-          <span style={cardNameStyle}>
-            {t("cardTitle")}
-            {state.version ? ` ${state.version}` : ""}
-            {state.commit ? ` · ${state.commit}` : ""}
-            {state.orchestratorVersion
-              ? ` · orchestrator ${state.orchestratorVersion}`
-              : ""}
-          </span>
+          <span style={cardNameStyle}>{t("cardTitle")}</span>
           <span style={cardDescriptionStyle}>{t("cardDescription")}</span>
         </span>
         <CardChevron open={open} />
@@ -353,6 +346,37 @@ export function ContainerCard(props: ContainerCardProps): ReactNode {
             onSave={props.saveSocketsRoot}
             onDiscard={props.discardSocketsRoot}
           />
+          <div style={sectionTitle}>{t("versionsTitle")}</div>
+          <div
+            style={{
+              ...hint,
+              display: "flex",
+              flexDirection: "column",
+              gap: "2px",
+              margin: 0,
+            }}
+          >
+            <span>
+              {t("cardTitle")}
+              {state.version ? ` ${state.version}` : ""}
+              {state.commit ? ` · ${state.commit}` : ""}
+            </span>
+            <span>
+              {t("orchestrator")}
+              {state.orchestratorVersion ? (
+                ` ${state.orchestratorVersion}`
+              ) : (
+                <>
+                  {" "}
+                  <span
+                    style={{ color: "var(--dsw-alias-state-error-primary)" }}
+                  >
+                    {t("versionUnknown")}
+                  </span>
+                </>
+              )}
+            </span>
+          </div>
           <div style={footerRow}>
             <Button
               variant="outline"

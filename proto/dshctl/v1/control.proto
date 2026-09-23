@@ -11,6 +11,7 @@ service OrchestratorControl {
   rpc ListProjects(ListProjectsRequest) returns (ListProjectsResponse);
   rpc CreateWorkspace(CreateWorkspaceRequest) returns (Workspace);
   rpc DescribeWorkspace(DescribeWorkspaceRequest) returns (Workspace);
+  rpc EnsureContainer(EnsureContainerRequest) returns (Container);
   rpc ListWorkspaces(ListWorkspacesRequest) returns (ListWorkspacesResponse);
   rpc RemoveWorkspace(RemoveWorkspaceRequest) returns (RemoveWorkspaceResponse);
   rpc ListImages(ListImagesRequest) returns (ListImagesResponse);
@@ -112,6 +113,7 @@ message Container {
   repeated string paths = 12;
 }
 message StartContainerRequest { string workspace_slug = 1; string container = 2; string image_id = 3; repeated ProjectMount mounts = 4; map<string, string> env = 5; map<string, string> secret_env = 6; repeated string paths = 7; }
+message EnsureContainerRequest { string workspace_slug = 1; string container = 2; }
 message RecreateContainerRequest { string workspace_slug = 1; string image_id = 2; string container = 3; repeated ProjectMount mounts = 4; map<string, string> env = 5; repeated string paths = 6; }
 message RemoveContainerRequest { string workspace_slug = 1; string container = 2; }
 message RemoveContainerResponse {}

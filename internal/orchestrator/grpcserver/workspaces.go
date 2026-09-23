@@ -33,6 +33,9 @@ func (s *Server) ListProjects(context.Context, *ctl.ListProjectsRequest) (*ctl.L
 	return result, nil
 }
 
+// DescribeWorkspace reports a stored workspace. It is a pure read: it never
+// probes podman nor recreates anything, so a caller cannot change state by
+// describing. Making a container usable is EnsureContainer's job.
 func (s *Server) DescribeWorkspace(_ context.Context, request *ctl.DescribeWorkspaceRequest) (*ctl.Workspace, error) {
 	s.log().Info("control request", "method", "DescribeWorkspace", "workspace_slug", request.GetWorkspaceSlug())
 	workspaces, err := s.Store.Workspaces()
@@ -45,31 +48,6 @@ func (s *Server) DescribeWorkspace(_ context.Context, request *ctl.DescribeWorks
 				s.log().Warn("DescribeWorkspace found invalid container name", "workspace_slug", workspace.WorkspaceSlug, "container_name", workspace.ContainerName)
 				return nil, status.Error(codes.NotFound, fmt.Sprintf("workspace %q not found", request.GetWorkspaceSlug()))
 			}
-			if s.Podman != nil {
-				exists, containerErr := s.Podman.ContainerExists(workspace.ContainerName)
-				if containerErr != nil {
-					return nil, status.Error(codes.Internal, containerErr.Error())
-				}
-				if !exists {
-					s.log().Warn("DescribeWorkspace found stale state", "workspace_slug", workspace.WorkspaceSlug, "container_name", workspace.ContainerName)
-					return nil, status.Error(codes.NotFound, fmt.Sprintf("guest container %q not found", workspace.ContainerName))
-				}
-				running, runningErr := s.Podman.ContainerRunning(workspace.ContainerName)
-				if runningErr != nil {
-					return nil, status.Error(codes.Internal, runningErr.Error())
-				}
-				if !running {
-					// A stopped container (podman/host restart, manual stop,
-					// crash) would otherwise leave every resolve waiting on a
-					// socket nobody listens on. Recreate it so the guest agent
-					// comes back before the socket is handed out.
-					refreshed, recreateErr := s.recreateStoppedContainer(workspace)
-					if recreateErr != nil {
-						return nil, recreateErr
-					}
-					workspace = refreshed
-				}
-			}
 			s.log().Info("control request completed", "method", "DescribeWorkspace", "workspace_slug", workspace.WorkspaceSlug, "status", workspace.Status)
 			return toProto(workspace), nil
 		}
@@ -78,15 +56,12 @@ func (s *Server) DescribeWorkspace(_ context.Context, request *ctl.DescribeWorks
 	return nil, status.Error(codes.NotFound, fmt.Sprintf("workspace %q not found", request.GetWorkspaceSlug()))
 }
 
-// recreateStoppedContainer recreates a workspace's stopped default container
-// (podman/host restart, manual stop, or crash) so its guest agent comes back,
-// and returns the refreshed workspace. Only called from DescribeWorkspace,
-// which has already established that the container exists but is not running.
-func (s *Server) recreateStoppedContainer(workspace state.Workspace) (state.Workspace, error) {
-	record, ok := containerByLogical(&workspace, "default")
-	if !ok {
-		return workspace, status.Error(codes.NotFound, fmt.Sprintf("guest container %q not found", workspace.ContainerName))
-	}
+// refreshContainer recreates a container that cannot be reused — stopped, or
+// carrying an agent from an outdated guest-agent image — and returns the
+// refreshed workspace. The guest-agent image is pulled only when it is absent
+// (podman.Client.CreateWorkspace's ensureImage), so a local development image
+// is never pulled.
+func (s *Server) refreshContainer(workspace state.Workspace, record *state.Container) (state.Workspace, error) {
 	imageTag, err := s.resolveImageTag(record.ImageID)
 	if err != nil {
 		return workspace, err
@@ -96,7 +71,7 @@ func (s *Server) recreateStoppedContainer(workspace state.Workspace) (state.Work
 		return workspace, status.Error(codes.Internal, err.Error())
 	}
 	if err := s.recreateContainer(workspace, record, imageTag, token, record.Env); err != nil {
-		s.log().Error("recreating stopped guest container failed", "workspace_slug", workspace.WorkspaceSlug, "container", record.Name, "error", err)
+		s.log().Error("recreating guest container failed", "workspace_slug", workspace.WorkspaceSlug, "container", record.Name, "error", err)
 		return workspace, status.Error(codes.Internal, err.Error())
 	}
 	record.Status = "running"
@@ -105,7 +80,7 @@ func (s *Server) recreateStoppedContainer(workspace state.Workspace) (state.Work
 	if err != nil {
 		return workspace, status.Error(codes.Internal, err.Error())
 	}
-	s.log().Info("recreated stopped guest container", "workspace_slug", workspace.WorkspaceSlug, "container", record.Name)
+	s.log().Info("recreated guest container", "workspace_slug", workspace.WorkspaceSlug, "container", record.Name)
 	return updated, nil
 }
 

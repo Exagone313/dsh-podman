@@ -60,6 +60,7 @@ func tempRoot(t *testing.T) string {
 type fakePodman struct {
 	exists            map[string]bool
 	running           map[string]bool
+	agentStale        map[string]bool
 	secretMissing     map[string]bool
 	removed           []string
 	removedPods       []string
@@ -72,7 +73,7 @@ type fakePodman struct {
 }
 
 func newFakePodman() *fakePodman {
-	return &fakePodman{exists: map[string]bool{}, running: map[string]bool{}, secretMissing: map[string]bool{}}
+	return &fakePodman{exists: map[string]bool{}, running: map[string]bool{}, agentStale: map[string]bool{}, secretMissing: map[string]bool{}}
 }
 
 const (

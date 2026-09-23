@@ -94,6 +94,105 @@ func TestListContainersIsReadOnly(t *testing.T) {
 	}
 }
 
+func TestEnsureContainerLeavesAUsableContainer(t *testing.T) {
+	server, fake := ensureContainerServer(t)
+	fake.exists[testDefaultContainer] = true
+	fake.running[testDefaultContainer] = true
+	row, err := server.EnsureContainer(context.Background(), &ctl.EnsureContainerRequest{WorkspaceSlug: testWorkspaceSlug})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if row.ContainerName != "default" || row.Status != "running" {
+		t.Fatalf("unexpected row: %#v", row)
+	}
+	if len(fake.recreated) != 0 {
+		t.Fatalf("a usable container must not be recreated: %v", fake.recreated)
+	}
+}
+
+// TestEnsureContainerRecreatesAnOutdatedAgent pins that a running container
+// whose agent comes from an outdated guest-agent image is recreated.
+func TestEnsureContainerRecreatesAnOutdatedAgent(t *testing.T) {
+	server, fake := ensureContainerServer(t)
+	fake.exists[testDefaultContainer] = true
+	fake.running[testDefaultContainer] = true
+	fake.agentStale[testDefaultContainer] = true
+	if _, err := server.EnsureContainer(context.Background(), &ctl.EnsureContainerRequest{WorkspaceSlug: testWorkspaceSlug}); err != nil {
+		t.Fatal(err)
+	}
+	if len(fake.recreated) != 1 {
+		t.Fatalf("expected one recreate, got %v", fake.recreated)
+	}
+}
+
+func TestEnsureContainerRecreatesAStoppedContainer(t *testing.T) {
+	server, fake := ensureContainerServer(t)
+	fake.exists[testDefaultContainer] = true
+	if _, err := server.EnsureContainer(context.Background(), &ctl.EnsureContainerRequest{WorkspaceSlug: testWorkspaceSlug}); err != nil {
+		t.Fatal(err)
+	}
+	if len(fake.recreated) != 1 {
+		t.Fatalf("expected one recreate, got %v", fake.recreated)
+	}
+}
+
+func TestEnsureContainerRecreatesAMissingContainer(t *testing.T) {
+	server, fake := ensureContainerServer(t)
+	if _, err := server.EnsureContainer(context.Background(), &ctl.EnsureContainerRequest{WorkspaceSlug: testWorkspaceSlug}); err != nil {
+		t.Fatal(err)
+	}
+	if len(fake.recreated) != 1 {
+		t.Fatalf("expected one recreate, got %v", fake.recreated)
+	}
+}
+
+func TestEnsureContainerUnknownContainer(t *testing.T) {
+	server, _ := ensureContainerServer(t)
+	_, err := server.EnsureContainer(context.Background(), &ctl.EnsureContainerRequest{WorkspaceSlug: testWorkspaceSlug, Container: "nope"})
+	if status.Code(err) != codes.NotFound {
+		t.Fatalf("expected NotFound, got %v", err)
+	}
+}
+
+// TestDescribeWorkspaceIsReadOnly pins that describing never recreates, even
+// for a container whose agent is outdated: making it usable is EnsureContainer's
+// job, so a describe cannot change state.
+func TestDescribeWorkspaceIsReadOnly(t *testing.T) {
+	server, fake := ensureContainerServer(t)
+	fake.exists[testDefaultContainer] = true
+	fake.running[testDefaultContainer] = true
+	fake.agentStale[testDefaultContainer] = true
+	workspace, err := server.DescribeWorkspace(context.Background(), &ctl.DescribeWorkspaceRequest{WorkspaceSlug: testWorkspaceSlug})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if workspace.WorkspaceSlug != testWorkspaceSlug {
+		t.Fatalf("unexpected workspace: %#v", workspace)
+	}
+	if len(fake.recreated) != 0 {
+		t.Fatalf("describing must not recreate: %v", fake.recreated)
+	}
+}
+
+// ensureContainerServer builds a server with one stored default container and
+// its image, plus a fake podman whose container state each test sets up.
+func ensureContainerServer(t *testing.T) (*Server, *fakePodman) {
+	t.Helper()
+	store := newTestStore(t)
+	if err := store.SaveImages([]state.Image{{ImageID: "arch", ImageTag: "localhost/dsh-podman/arch:latest"}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.SaveWorkspaces([]state.Workspace{{
+		WorkspaceSlug: testWorkspaceSlug,
+		ContainerName: testDefaultContainer,
+		Containers:    []state.Container{{Name: "default", PodmanName: testDefaultContainer, ImageID: "arch", Status: "running"}},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	fake := newFakePodman()
+	return &Server{Store: store, Podman: fake, Logger: silentLogger()}, fake
+}
+
 func TestDescribeWorkspaceRejectsInvalidContainerName(t *testing.T) {
 	store := newTestStore(t)
 	if err := store.SaveWorkspaces([]state.Workspace{{WorkspaceSlug: "proj", ContainerName: "../escape"}}); err != nil {
@@ -407,6 +506,10 @@ func TestStartContainerAcceptsDefault(t *testing.T) {
 func (f *fakePodman) ContainerExists(name string) (bool, error) { return f.exists[name], nil }
 
 func (f *fakePodman) ContainerRunning(name string) (bool, error) { return f.running[name], nil }
+
+func (f *fakePodman) ContainerAgentStale(name string) (bool, error) {
+	return f.agentStale[name], nil
+}
 
 func (f *fakePodman) RecreateWorkspace(pod, name, image, token string, mounts []specs.Mount, secrets []specgen.Secret, envSecrets map[string]string, env map[string]string, paths []string) error {
 	f.recreated = append(f.recreated, name)

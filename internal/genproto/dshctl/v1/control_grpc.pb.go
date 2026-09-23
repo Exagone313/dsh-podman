@@ -27,6 +27,7 @@ const (
 	OrchestratorControl_ListProjects_FullMethodName          = "/dshctl.v1.OrchestratorControl/ListProjects"
 	OrchestratorControl_CreateWorkspace_FullMethodName       = "/dshctl.v1.OrchestratorControl/CreateWorkspace"
 	OrchestratorControl_DescribeWorkspace_FullMethodName     = "/dshctl.v1.OrchestratorControl/DescribeWorkspace"
+	OrchestratorControl_EnsureContainer_FullMethodName       = "/dshctl.v1.OrchestratorControl/EnsureContainer"
 	OrchestratorControl_ListWorkspaces_FullMethodName        = "/dshctl.v1.OrchestratorControl/ListWorkspaces"
 	OrchestratorControl_RemoveWorkspace_FullMethodName       = "/dshctl.v1.OrchestratorControl/RemoveWorkspace"
 	OrchestratorControl_ListImages_FullMethodName            = "/dshctl.v1.OrchestratorControl/ListImages"
@@ -66,6 +67,7 @@ type OrchestratorControlClient interface {
 	ListProjects(ctx context.Context, in *ListProjectsRequest, opts ...grpc.CallOption) (*ListProjectsResponse, error)
 	CreateWorkspace(ctx context.Context, in *CreateWorkspaceRequest, opts ...grpc.CallOption) (*Workspace, error)
 	DescribeWorkspace(ctx context.Context, in *DescribeWorkspaceRequest, opts ...grpc.CallOption) (*Workspace, error)
+	EnsureContainer(ctx context.Context, in *EnsureContainerRequest, opts ...grpc.CallOption) (*Container, error)
 	ListWorkspaces(ctx context.Context, in *ListWorkspacesRequest, opts ...grpc.CallOption) (*ListWorkspacesResponse, error)
 	RemoveWorkspace(ctx context.Context, in *RemoveWorkspaceRequest, opts ...grpc.CallOption) (*RemoveWorkspaceResponse, error)
 	ListImages(ctx context.Context, in *ListImagesRequest, opts ...grpc.CallOption) (*ListImagesResponse, error)
@@ -139,6 +141,16 @@ func (c *orchestratorControlClient) DescribeWorkspace(ctx context.Context, in *D
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(Workspace)
 	err := c.cc.Invoke(ctx, OrchestratorControl_DescribeWorkspace_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *orchestratorControlClient) EnsureContainer(ctx context.Context, in *EnsureContainerRequest, opts ...grpc.CallOption) (*Container, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(Container)
+	err := c.cc.Invoke(ctx, OrchestratorControl_EnsureContainer_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -443,6 +455,7 @@ type OrchestratorControlServer interface {
 	ListProjects(context.Context, *ListProjectsRequest) (*ListProjectsResponse, error)
 	CreateWorkspace(context.Context, *CreateWorkspaceRequest) (*Workspace, error)
 	DescribeWorkspace(context.Context, *DescribeWorkspaceRequest) (*Workspace, error)
+	EnsureContainer(context.Context, *EnsureContainerRequest) (*Container, error)
 	ListWorkspaces(context.Context, *ListWorkspacesRequest) (*ListWorkspacesResponse, error)
 	RemoveWorkspace(context.Context, *RemoveWorkspaceRequest) (*RemoveWorkspaceResponse, error)
 	ListImages(context.Context, *ListImagesRequest) (*ListImagesResponse, error)
@@ -493,6 +506,9 @@ func (UnimplementedOrchestratorControlServer) CreateWorkspace(context.Context, *
 }
 func (UnimplementedOrchestratorControlServer) DescribeWorkspace(context.Context, *DescribeWorkspaceRequest) (*Workspace, error) {
 	return nil, status.Error(codes.Unimplemented, "method DescribeWorkspace not implemented")
+}
+func (UnimplementedOrchestratorControlServer) EnsureContainer(context.Context, *EnsureContainerRequest) (*Container, error) {
+	return nil, status.Error(codes.Unimplemented, "method EnsureContainer not implemented")
 }
 func (UnimplementedOrchestratorControlServer) ListWorkspaces(context.Context, *ListWorkspacesRequest) (*ListWorkspacesResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListWorkspaces not implemented")
@@ -670,6 +686,24 @@ func _OrchestratorControl_DescribeWorkspace_Handler(srv interface{}, ctx context
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(OrchestratorControlServer).DescribeWorkspace(ctx, req.(*DescribeWorkspaceRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _OrchestratorControl_EnsureContainer_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(EnsureContainerRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(OrchestratorControlServer).EnsureContainer(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: OrchestratorControl_EnsureContainer_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(OrchestratorControlServer).EnsureContainer(ctx, req.(*EnsureContainerRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -1218,6 +1252,10 @@ var OrchestratorControl_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "DescribeWorkspace",
 			Handler:    _OrchestratorControl_DescribeWorkspace_Handler,
+		},
+		{
+			MethodName: "EnsureContainer",
+			Handler:    _OrchestratorControl_EnsureContainer_Handler,
 		},
 		{
 			MethodName: "ListWorkspaces",

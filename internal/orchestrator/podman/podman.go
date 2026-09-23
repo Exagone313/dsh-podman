@@ -290,6 +290,31 @@ func (c *Client) ContainerRunning(name string) (bool, error) {
 	return running, nil
 }
 
+// ContainerAgentStale reports whether the named container's guest agent comes
+// from a different image than the configured guest-agent image, i.e. the
+// container runs an agent from an outdated image and must be recreated. It is
+// false when no guest-agent image is configured, or when a host binary is
+// configured: that binary is bind-mounted and takes precedence, so the image is
+// not the agent source and cannot be compared.
+func (c *Client) ContainerAgentStale(name string) (bool, error) {
+	if c.guestAgentImage == "" || c.hostGuestBinary != "" {
+		return false, nil
+	}
+	inspect, err := containers.Inspect(c.ctx, name, nil)
+	if err != nil {
+		c.log().Error("guest container inspect failed", "container_name", name, "error", err)
+		return false, err
+	}
+	for _, mount := range inspect.Mounts {
+		if mount.Type == "image" && mount.Destination == c.guestAgentMount {
+			return mount.Source != c.guestAgentImage, nil
+		}
+	}
+	// No image volume at the guest-agent mount: the container predates the
+	// image-volume mechanism, so it does not carry the configured agent.
+	return true, nil
+}
+
 func boolPtr(value bool) *bool {
 	return &value
 }

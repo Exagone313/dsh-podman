@@ -145,6 +145,71 @@ func (s *Server) StopAllContainerDaemons(ctx context.Context) {
 	wg.Wait()
 }
 
+// EnsureContainer makes the named container usable and returns it: when the
+// container is missing, stopped, or runs a guest agent from an outdated
+// guest-agent image, it is recreated first. This is the single attach path for
+// both the default and named containers, so a caller is never handed a stale
+// agent. The guest-agent image is pulled only when it is absent.
+func (s *Server) EnsureContainer(_ context.Context, request *ctl.EnsureContainerRequest) (*ctl.Container, error) {
+	container := request.GetContainer()
+	if container == "" {
+		container = "default"
+	}
+	s.log().Info("control request", "method", "EnsureContainer", "workspace_slug", request.GetWorkspaceSlug(), "container", container)
+	if container != "default" && !validContainerName(container) {
+		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("invalid container name %q", container))
+	}
+	workspace, err := workspaceBySlug(s.Store, request.GetWorkspaceSlug())
+	if err != nil {
+		return nil, status.Error(codes.NotFound, err.Error())
+	}
+	record, ok := containerByLogical(&workspace, container)
+	if !ok {
+		s.log().Warn("control request failed", "method", "EnsureContainer", "workspace_slug", request.GetWorkspaceSlug(), "container", container, "reason", "container not found")
+		return nil, containerNotFoundError(container, request.GetWorkspaceSlug())
+	}
+	if s.Podman == nil {
+		return nil, status.Error(codes.FailedPrecondition, "podman is not configured")
+	}
+	usable, err := s.containerUsable(record.PodmanName)
+	if err != nil {
+		s.log().Error("control request failed", "method", "EnsureContainer", "workspace_slug", request.GetWorkspaceSlug(), "container", container, "error", err)
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	if usable {
+		s.log().Info("control request completed", "method", "EnsureContainer", "workspace_slug", workspace.WorkspaceSlug, "container", container)
+		return containerProto(workspace, *record), nil
+	}
+	refreshed, err := s.refreshContainer(workspace, record)
+	if err != nil {
+		s.log().Error("control request failed", "method", "EnsureContainer", "workspace_slug", request.GetWorkspaceSlug(), "container", container, "error", err)
+		return nil, err
+	}
+	updated, ok := containerByLogical(&refreshed, container)
+	if !ok {
+		return nil, status.Error(codes.Internal, fmt.Sprintf("container %q is missing after a recreate", container))
+	}
+	s.log().Info("control request completed", "method", "EnsureContainer", "workspace_slug", refreshed.WorkspaceSlug, "container", container)
+	return containerProto(refreshed, *updated), nil
+}
+
+// containerUsable reports whether the named container is running with a current
+// guest agent, i.e. can be handed to a caller without a recreate.
+func (s *Server) containerUsable(name string) (bool, error) {
+	running, err := s.Podman.ContainerRunning(name)
+	if err != nil {
+		return false, err
+	}
+	if !running {
+		return false, nil
+	}
+	stale, err := s.Podman.ContainerAgentStale(name)
+	if err != nil {
+		return false, err
+	}
+	return !stale, nil
+}
+
 func (s *Server) RecreateContainer(ctx context.Context, request *ctl.RecreateContainerRequest) (*ctl.Container, error) {
 	s.log().Info("control request", "method", "RecreateContainer", "workspace_slug", request.GetWorkspaceSlug(), "image_id", request.GetImageId(), "container", request.GetContainer())
 	container := request.GetContainer()

@@ -5,9 +5,15 @@
 package podman
 
 import (
+	"encoding/json"
 	"errors"
+	"fmt"
+	"io"
+	"net/http"
+	"net/url"
 	"time"
 
+	"go.podman.io/podman/v6/pkg/bindings"
 	"go.podman.io/podman/v6/pkg/bindings/images"
 )
 
@@ -25,19 +31,64 @@ func (c *Client) ImageExists(name string) (bool, error) {
 	return exists, err
 }
 
-// ImagePull pulls the named image into local storage. The name is the only
+// pullMessage is the subset of the pull stream's JSON messages we act on. The
+// stream also carries registry progress, which is deliberately ignored: only
+// errors are read.
+type pullMessage struct {
+	Error string `json:"error"`
+}
+
+// ImagePull pulls the named image into local storage by asking the Podman
+// service to do it. The request goes straight to the libpod pull endpoint
+// rather than through the images.Pull binding, whose auth header resolves the
+// caller's registry credentials through the user's config directory: in a
+// scratch image there is neither HOME nor /etc/passwd for that lookup to fall
+// back on. Without a client auth header the service pulls with its own
+// credentials, the same way builds pull their base images. The name is the only
 // detail logged; pulled layers are never echoed.
 func (c *Client) ImagePull(name string) error {
 	if err := c.connReady(); err != nil {
 		return err
 	}
 	c.log().Info("pulling image", "image", name)
-	if _, err := images.Pull(c.ctx, name, nil); err != nil {
+	if err := c.pull(name); err != nil {
 		c.log().Error("image pull failed", "image", name, "error", err)
 		return err
 	}
 	c.log().Info("image pulled", "image", name)
 	return nil
+}
+
+// pull sends one pull request and drains its progress stream, returning the
+// first error the stream reports.
+func (c *Client) pull(name string) error {
+	connection, err := bindings.GetClient(c.ctx)
+	if err != nil {
+		return err
+	}
+	params := url.Values{}
+	params.Set("reference", name)
+	response, err := connection.DoRequest(c.ctx, nil, http.MethodPost, "/images/pull", params, http.Header{})
+	if err != nil {
+		return err
+	}
+	defer response.Body.Close()
+	if !response.IsSuccess() {
+		return response.Process(nil)
+	}
+	decoder := json.NewDecoder(response.Body)
+	for {
+		var message pullMessage
+		if err := decoder.Decode(&message); err != nil {
+			if errors.Is(err, io.EOF) {
+				return nil
+			}
+			return fmt.Errorf("decode pull stream: %w", err)
+		}
+		if message.Error != "" {
+			return errors.New(message.Error)
+		}
+	}
 }
 
 // ImageCreated returns the image's creation time as an RFC3339 string, or ""

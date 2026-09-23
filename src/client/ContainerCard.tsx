@@ -71,6 +71,7 @@ export function ContainerCard(props: ContainerCardProps): ReactNode {
   // report without transcribing anything.
   const copyVersions = async (): Promise<void> => {
     const lines = [
+      `${t("dsh")} ${state.dshVersion || t("versionUnknown")}`,
       `${t("cardTitle")} ${state.version}${state.commit ? ` · ${state.commit}` : ""}`,
       `${t("orchestrator")} ${state.orchestratorVersion || t("versionUnknown")}`,
     ];
@@ -405,6 +406,21 @@ export function ContainerCard(props: ContainerCardProps): ReactNode {
               margin: 0,
             }}
           >
+            <span>
+              <span style={versionLabel}>{t("dsh")}</span>
+              {state.dshVersion ? (
+                ` ${state.dshVersion}`
+              ) : (
+                <>
+                  {" "}
+                  <span
+                    style={{ color: "var(--dsw-alias-state-error-primary)" }}
+                  >
+                    {t("versionUnknown")}
+                  </span>
+                </>
+              )}
+            </span>
             <span>
               <span style={versionLabel}>{t("cardTitle")}</span>
               {state.version ? ` ${state.version}` : ""}

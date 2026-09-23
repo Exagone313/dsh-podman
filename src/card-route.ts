@@ -23,6 +23,7 @@ import { unaryGuest } from "./guest-rpc.js";
 import { type WorkspaceResolver, workspaceSlug } from "./workspace-binding.js";
 import { GIT_COMMIT, VERSION } from "./generated/version.js";
 import { versionState as pluginVersionState } from "./version-compat.js";
+import { dshVersion } from "./dsh-version.js";
 
 // readOrchestratorVersion asks the orchestrator for its version, or returns ""
 // when the call fails (an orchestrator predating the handshake).
@@ -161,6 +162,7 @@ export async function cardSnapshot(
     return {
       version: VERSION,
       commit: GIT_COMMIT,
+      dshVersion: dshVersion(),
       orchestratorVersion,
       versionState: "major-mismatch",
       projectsRoot: resolver.getConfig().projectsRoot,
@@ -176,6 +178,7 @@ export async function cardSnapshot(
   return {
     version: VERSION,
     commit: GIT_COMMIT,
+    dshVersion: dshVersion(),
     orchestratorVersion,
     versionState: pluginVersionState(VERSION, orchestratorVersion),
     projectsRoot: resolver.getConfig().projectsRoot,

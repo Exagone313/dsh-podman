@@ -14,6 +14,7 @@ export type ContainerPluginKey =
   | "versionsTitle"
   | "orchestrator"
   | "versionUnknown"
+  | "dsh"
   | "copyVersions"
   | "copied"
   | "copyFailed"
@@ -207,6 +208,7 @@ export const en: Record<ContainerPluginKey, string> = {
   versionsTitle: "Versions",
   orchestrator: "dsh-podman-orchestrator",
   versionUnknown: "unknown",
+  dsh: "dsh",
   copyVersions: "Copy versions",
   copied: "Copied",
   copyFailed: "Copy failed",
@@ -413,6 +415,7 @@ export const zh: Record<ContainerPluginKey, string> = {
   versionsTitle: "版本",
   orchestrator: "dsh-podman-orchestrator",
   versionUnknown: "未知",
+  dsh: "dsh",
   copyVersions: "复制版本",
   copied: "已复制",
   copyFailed: "复制失败",

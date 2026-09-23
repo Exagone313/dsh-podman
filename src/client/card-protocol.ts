@@ -125,6 +125,8 @@ export interface WorkspaceView {
 export interface CardSnapshot {
   version: string;
   commit: string;
+  // The harness (dsh) version the plugin runs inside, or "" when unknown.
+  dshVersion: string;
   // The orchestrator's version, or "" when it predates the handshake.
   orchestratorVersion: string;
   versionState: "ok" | "minor-mismatch" | "major-mismatch";

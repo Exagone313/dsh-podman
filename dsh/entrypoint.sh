@@ -57,17 +57,18 @@ if [ -n "$source" ]; then
     printf 'error: DSH_PODMAN_PLUGIN_SOURCE=%s does not exist\n' "$source" >&2
     exit 1
   fi
-  printf 'dsh-podman: installing %s\n' "$spec"
   # pnpm reuses the recorded resolution for an unchanged spec, so a rebuilt
   # tarball at the same version would never be extracted. Removing the plugin
   # first forces a real install. A profile that never had it is left alone:
   # removing an undeclared dependency would fail.
   if [ -n "$declared" ]; then
+    printf 'dsh-podman: uninstalling @exagone313/dsh-podman\n'
     if ! dsh plugin --profile web remove @exagone313/dsh-podman; then
       printf 'error: cannot remove the installed plugin\n' >&2
       exit 1
     fi
   fi
+  printf 'dsh-podman: installing %s\n' "$spec"
   if ! dsh plugin --profile web add "$spec" --save-exact --allow-build=protobufjs; then
     printf 'error: cannot install %s\n' "$spec" >&2
     exit 1

@@ -375,7 +375,27 @@ export function ContainerCard(props: ContainerCardProps): ReactNode {
             onSave={props.saveSocketsRoot}
             onDiscard={props.discardSocketsRoot}
           />
-          <div style={sectionTitle}>{t("versionsTitle")}</div>
+          <div
+            style={{
+              display: "flex",
+              flexWrap: "wrap",
+              alignItems: "center",
+              gap: "8px",
+            }}
+          >
+            <div style={{ ...sectionTitle, flex: 1 }}>{t("versionsTitle")}</div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => void copyVersions()}
+            >
+              {copyState === "copied"
+                ? t("copied")
+                : copyState === "failed"
+                  ? t("copyFailed")
+                  : t("copyVersions")}
+            </Button>
+          </div>
           <div
             style={{
               ...hint,
@@ -405,19 +425,6 @@ export function ContainerCard(props: ContainerCardProps): ReactNode {
                 </>
               )}
             </span>
-            <div style={{ marginTop: "8px" }}>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => void copyVersions()}
-              >
-                {copyState === "copied"
-                  ? t("copied")
-                  : copyState === "failed"
-                    ? t("copyFailed")
-                    : t("copyVersions")}
-              </Button>
-            </div>
           </div>
           <div style={footerRow}>
             <Button

@@ -334,6 +334,34 @@ func TestRemoveImageInUse(t *testing.T) {
 	}
 }
 
+// TestRemoveImageReconcilesDeadContainers pins that a container deleted outside
+// dsh-podman no longer keeps its image in use: the dead record is reconciled
+// away before the usage check.
+func TestRemoveImageReconcilesDeadContainers(t *testing.T) {
+	store := newTestStore(t)
+	if err := store.SaveImages([]state.Image{{ImageID: "valkey", ImageTag: "localhost/dsh-podman/valkey:latest"}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.SaveWorkspaces([]state.Workspace{{
+		WorkspaceSlug: "valkey-ws",
+		Containers:    []state.Container{{Name: "default", PodmanName: "dsh-podman-valkey-ws-default", ImageID: "valkey"}},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	fake := newFakePodman()
+	server := &Server{Store: store, Podman: fake, Logger: silentLogger()}
+	if _, err := server.RemoveImage(context.Background(), &ctl.RemoveImageRequest{ImageId: "valkey"}); err != nil {
+		t.Fatalf("a dead container must not keep the image in use: %v", err)
+	}
+	stored, err := store.Workspaces()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(stored) != 0 {
+		t.Fatalf("expected the dead record to be reconciled away, got %#v", stored)
+	}
+}
+
 func TestRemoveImageRequiresPodman(t *testing.T) {
 	store := newTestStore(t)
 	if err := store.SaveImages([]state.Image{{ImageID: "valkey", ImageTag: "localhost/dsh-podman/valkey:latest"}}); err != nil {

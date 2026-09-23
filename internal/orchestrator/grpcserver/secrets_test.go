@@ -70,6 +70,35 @@ func TestRemoveSecretInUseAsEnvironment(t *testing.T) {
 	}
 }
 
+// TestRemoveSecretReconcilesDeadContainers pins that a container deleted
+// outside dsh-podman no longer keeps its secret in use: the dead record is
+// reconciled away before the usage check.
+func TestRemoveSecretReconcilesDeadContainers(t *testing.T) {
+	store := newTestStore(t)
+	if err := store.SaveWorkspaces([]state.Workspace{{
+		WorkspaceSlug: "ws",
+		Containers: []state.Container{{
+			Name:       "default",
+			PodmanName: "dsh-podman-ws-default",
+			SecretEnv:  map[string]string{"DB_PASS": "dbpass"},
+		}},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	fake := newFakePodman()
+	server := &Server{Store: store, Podman: fake, SecretPrefix: "dsh-podman-", Logger: silentLogger()}
+	if _, err := server.RemoveSecret(context.Background(), &ctl.RemoveSecretRequest{Name: "dbpass"}); err != nil {
+		t.Fatalf("a dead container must not keep the secret in use: %v", err)
+	}
+	stored, err := store.Workspaces()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(stored) != 0 {
+		t.Fatalf("expected the dead record to be reconciled away, got %#v", stored)
+	}
+}
+
 func TestRemoveSecretNotInUseStillRequiresPodman(t *testing.T) {
 	server := &Server{Store: newTestStore(t), Logger: silentLogger()}
 	_, err := server.RemoveSecret(context.Background(), &ctl.RemoveSecretRequest{Name: "dbpass"})

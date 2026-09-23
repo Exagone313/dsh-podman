@@ -256,6 +256,15 @@ func (s *Server) RemoveSecret(_ context.Context, request *ctl.RemoveSecretReques
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
+	// Reconcile first so a container deleted outside dsh-podman does not keep
+	// the secret "in use" (and its dead record is dropped).
+	if s.Podman != nil {
+		workspaces, err = s.reconcileContainers(workspaces, s.Podman.ContainerExists, s.Podman.ContainerRunning)
+		if err != nil {
+			s.log().Error("control request failed", "method", "RemoveSecret", "name", request.GetName(), "error", err)
+			return nil, status.Error(codes.Internal, err.Error())
+		}
+	}
 	if slug, container, usage, inUse := secretInUse(workspaces, request.GetName()); inUse {
 		return nil, status.Error(codes.FailedPrecondition, fmt.Sprintf("secret %q is %s workspace %q container %q", request.GetName(), usage, slug, container))
 	}

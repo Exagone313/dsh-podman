@@ -217,6 +217,15 @@ func (s *Server) RemoveImage(_ context.Context, request *ctl.RemoveImageRequest)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
+	// Reconcile first so a container deleted outside dsh-podman does not keep
+	// the image "in use" (and its dead record is dropped).
+	if s.Podman != nil {
+		workspaces, err = s.reconcileContainers(workspaces, s.Podman.ContainerExists, s.Podman.ContainerRunning)
+		if err != nil {
+			s.log().Error("control request failed", "method", "RemoveImage", "image_id", imageID, "error", err)
+			return nil, status.Error(codes.Internal, err.Error())
+		}
+	}
 	for _, workspace := range workspaces {
 		if imageRefsMatch(workspace.ImageID, imageID) {
 			return nil, status.Error(codes.FailedPrecondition, fmt.Sprintf("image %q is in use by workspace %q container %q", imageID, workspace.WorkspaceSlug, "default"))

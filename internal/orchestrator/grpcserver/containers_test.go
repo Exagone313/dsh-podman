@@ -59,6 +59,41 @@ func TestListContainersSorted(t *testing.T) {
 	}
 }
 
+// TestListContainersIsReadOnly pins that listing is a pure view: it hides
+// containers deleted outside dsh-podman and reports live status without writing
+// the store, so opening the settings card cannot change state.
+func TestListContainersIsReadOnly(t *testing.T) {
+	store := newTestStore(t)
+	workspaces := []state.Workspace{{
+		WorkspaceSlug: "proj",
+		Containers: []state.Container{
+			{Name: "default", PodmanName: "dsh-podman-proj-default", Status: "running"},
+			{Name: "dev", PodmanName: "dsh-podman-proj-dev", Status: "running"},
+		},
+	}}
+	if err := store.SaveWorkspaces(workspaces); err != nil {
+		t.Fatal(err)
+	}
+	fake := newFakePodman()
+	fake.exists["dsh-podman-proj-default"] = true
+	fake.running["dsh-podman-proj-default"] = false
+	server := &Server{Store: store, Podman: fake, Logger: silentLogger()}
+	response, err := server.ListContainers(context.Background(), &ctl.ListContainersRequest{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(response.Containers) != 1 || response.Containers[0].ContainerName != "default" || response.Containers[0].Status != "stopped" {
+		t.Fatalf("unexpected live view: %#v", response.Containers)
+	}
+	stored, err := store.Workspaces()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(stored) != 1 || len(stored[0].Containers) != 2 || stored[0].Containers[0].Status != "running" {
+		t.Fatalf("listing must not write state: %#v", stored)
+	}
+}
+
 func TestDescribeWorkspaceRejectsInvalidContainerName(t *testing.T) {
 	store := newTestStore(t)
 	if err := store.SaveWorkspaces([]state.Workspace{{WorkspaceSlug: "proj", ContainerName: "../escape"}}); err != nil {

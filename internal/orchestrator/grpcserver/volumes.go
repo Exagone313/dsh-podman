@@ -89,6 +89,15 @@ func (s *Server) RemoveVolume(_ context.Context, request *ctl.RemoveVolumeReques
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
+	// Reconcile first so a container deleted outside dsh-podman does not keep
+	// the volume "in use" (and its dead record is dropped).
+	if s.Podman != nil {
+		workspaces, err = s.reconcileContainers(workspaces, s.Podman.ContainerExists, s.Podman.ContainerRunning)
+		if err != nil {
+			s.log().Error("control request failed", "method", "RemoveVolume", "name", request.GetName(), "error", err)
+			return nil, status.Error(codes.Internal, err.Error())
+		}
+	}
 	if slug, container, inUse := volumeInUse(workspaces, request.GetName()); inUse {
 		return nil, status.Error(codes.FailedPrecondition, fmt.Sprintf("volume %q is mounted in workspace %q container %q", request.GetName(), slug, container))
 	}

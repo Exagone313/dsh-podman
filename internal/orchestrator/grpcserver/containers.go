@@ -21,14 +21,11 @@ func (s *Server) ListContainers(context.Context, *ctl.ListContainersRequest) (*c
 		s.log().Error("control request failed", "method", "ListContainers", "error", err)
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	// Drop stored containers whose podman container no longer exists (for
-	// example deleted outside dsh-podman); they must not be listed.
+	// The listing is a pure view: stored containers whose podman container no
+	// longer exists are hidden and statuses are refreshed in memory. Nothing is
+	// written, so listing (or opening the settings card) cannot change state.
 	if s.Podman != nil {
-		workspaces, err = s.reconcileContainers(workspaces, s.Podman.ContainerExists, s.Podman.ContainerRunning)
-		if err != nil {
-			s.log().Error("control request failed", "method", "ListContainers", "error", err)
-			return nil, status.Error(codes.Internal, err.Error())
-		}
+		workspaces, _ = s.containerView(workspaces, s.Podman.ContainerExists, s.Podman.ContainerRunning)
 	}
 	containers := containerRows(workspaces)
 	sort.Slice(containers, func(i, j int) bool {
@@ -70,14 +67,12 @@ func containerRows(workspaces []state.Workspace) []*ctl.Container {
 	return result
 }
 
-// reconcileContainers drops stored containers whose podman container no longer
-// exists (for example deleted outside dsh-podman), persisting the
-// reconciliation, and refreshes each surviving container's status from the
-// podman run state so a stopped container is not reported as running. A
-// workspace left with no containers is removed entirely and will be recreated
-// on demand. Podman lookup errors leave the record untouched and are logged.
-// When nothing changed, the input is returned unwritten.
-func (s *Server) reconcileContainers(workspaces []state.Workspace, exists func(podmanName string) (bool, error), running func(podmanName string) (bool, error)) ([]state.Workspace, error) {
+// containerView returns the live view of the stored workspaces: containers
+// whose podman container no longer exists are hidden, and each surviving
+// container's status is refreshed from the run state. It never writes, so read
+// paths stay stateless; changed reports whether the view differs from the
+// stored workspaces, letting a mutating caller persist the reconciliation.
+func (s *Server) containerView(workspaces []state.Workspace, exists func(podmanName string) (bool, error), running func(podmanName string) (bool, error)) ([]state.Workspace, bool) {
 	changed := false
 	next := make([]state.Workspace, 0, len(workspaces))
 	for _, ws := range workspaces {
@@ -85,19 +80,19 @@ func (s *Server) reconcileContainers(workspaces []state.Workspace, exists func(p
 		for _, container := range ws.Containers {
 			found, lookupErr := exists(container.PodmanName)
 			if lookupErr != nil {
-				s.log().Warn("ListContainers podman lookup failed", "podman_name", container.PodmanName, "error", lookupErr)
+				s.log().Warn("podman container lookup failed", "podman_name", container.PodmanName, "error", lookupErr)
 				kept = append(kept, container)
 				continue
 			}
 			if !found {
-				s.log().Info("dropping container deleted outside dsh-podman", "workspace_slug", ws.WorkspaceSlug, "container", container.Name, "podman_name", container.PodmanName)
+				s.log().Info("container deleted outside dsh-podman", "workspace_slug", ws.WorkspaceSlug, "container", container.Name, "podman_name", container.PodmanName)
 				changed = true
 				continue
 			}
 			if running != nil {
 				isRunning, runErr := running(container.PodmanName)
 				if runErr != nil {
-					s.log().Warn("ListContainers podman inspect failed", "podman_name", container.PodmanName, "error", runErr)
+					s.log().Warn("podman container inspect failed", "podman_name", container.PodmanName, "error", runErr)
 				} else {
 					status := "stopped"
 					if isRunning {
@@ -112,7 +107,7 @@ func (s *Server) reconcileContainers(workspaces []state.Workspace, exists func(p
 			kept = append(kept, container)
 		}
 		if len(kept) == 0 {
-			s.log().Info("dropping workspace with no remaining containers", "workspace_slug", ws.WorkspaceSlug)
+			s.log().Info("workspace has no containers left in podman", "workspace_slug", ws.WorkspaceSlug)
 			changed = true
 			continue
 		}
@@ -120,10 +115,21 @@ func (s *Server) reconcileContainers(workspaces []state.Workspace, exists func(p
 		syncDefaultFields(&ws)
 		next = append(next, ws)
 	}
+	return next, changed
+}
+
+// reconcileContainers persists the live view: it drops stored containers whose
+// podman container no longer exists (for example deleted outside dsh-podman)
+// and refreshes each surviving container's status. Only mutating paths call it
+// (the removal guards), so a dead record neither blocks a removal nor lingers;
+// read paths use containerView. When nothing changed, the input is returned
+// unwritten.
+func (s *Server) reconcileContainers(workspaces []state.Workspace, exists func(podmanName string) (bool, error), running func(podmanName string) (bool, error)) ([]state.Workspace, error) {
+	next, changed := s.containerView(workspaces, exists, running)
 	if !changed {
 		return workspaces, nil
 	}
-	if err := s.Store.UpdateWorkspaces(func(all []state.Workspace) ([]state.Workspace, error) {
+	if err := s.Store.UpdateWorkspaces(func([]state.Workspace) ([]state.Workspace, error) {
 		return next, nil
 	}); err != nil {
 		return nil, err

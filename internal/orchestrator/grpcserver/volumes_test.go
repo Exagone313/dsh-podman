@@ -84,6 +84,36 @@ func TestRemoveVolumeInUseViaWorkspaceMounts(t *testing.T) {
 	}
 }
 
+// TestRemoveVolumeReconcilesDeadContainers pins that a container deleted
+// outside dsh-podman no longer keeps its volume in use: the dead record is
+// reconciled away before the usage check.
+func TestRemoveVolumeReconcilesDeadContainers(t *testing.T) {
+	store := newTestStore(t)
+	if err := store.SaveWorkspaces([]state.Workspace{{
+		WorkspaceSlug: "ws",
+		Containers: []state.Container{{
+			Name:       "default",
+			PodmanName: "dsh-podman-ws-default",
+			Mounts:     []state.Mount{{Kind: "volume", Volume: "data", Destination: "/data", Mode: "read_write"}},
+		}},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	fake := newFakePodman()
+	server := &Server{Store: store, Podman: fake, VolumePrefix: "dsh-podman-", Logger: silentLogger()}
+	_, err := server.RemoveVolume(context.Background(), &ctl.RemoveVolumeRequest{Name: "data"})
+	if status.Code(err) != codes.NotFound {
+		t.Fatalf("a dead container must not keep the volume in use; expected NotFound for the absent volume, got %v", err)
+	}
+	stored, err := store.Workspaces()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(stored) != 0 {
+		t.Fatalf("expected the dead record to be reconciled away, got %#v", stored)
+	}
+}
+
 func TestRemoveVolumeNotInUseStillRequiresPodman(t *testing.T) {
 	server := &Server{Store: newTestStore(t), Logger: silentLogger()}
 	_, err := server.RemoveVolume(context.Background(), &ctl.RemoveVolumeRequest{Name: "data"})

@@ -10,9 +10,6 @@ RUN apt-get update \
 
 ENV DISABLE_AUTOUPDATER=1
 ENV DO_NOT_TRACK=1
-# pnpm prints an "update available" notice that only confuses container users:
-# the image pins pnpm deliberately.
-ENV npm_config_update_notifier=false
 ENV DSH_TELEMETRY_MODE=DISABLED
 ENV DSH_TELEMETRY_OTLP_URL=https://dsh-telemetry-disabled.invalid/v1/logs
 

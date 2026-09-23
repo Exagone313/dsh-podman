@@ -125,6 +125,22 @@ func TestEnsureContainerRecreatesAnOutdatedAgent(t *testing.T) {
 	}
 }
 
+// TestEnsureContainerRecreatesARotatedToken pins that a container whose agent
+// expects a different credential than the stored one is recreated, so the
+// caller never receives a token the agent rejects.
+func TestEnsureContainerRecreatesARotatedToken(t *testing.T) {
+	server, fake := ensureContainerServer(t)
+	fake.exists[testDefaultContainer] = true
+	fake.running[testDefaultContainer] = true
+	fake.agentToken[testDefaultContainer] = "rotated"
+	if _, err := server.EnsureContainer(context.Background(), &ctl.EnsureContainerRequest{WorkspaceSlug: testWorkspaceSlug}); err != nil {
+		t.Fatal(err)
+	}
+	if len(fake.recreated) != 1 {
+		t.Fatalf("expected one recreate, got %v", fake.recreated)
+	}
+}
+
 func TestEnsureContainerRecreatesAStoppedContainer(t *testing.T) {
 	server, fake := ensureContainerServer(t)
 	fake.exists[testDefaultContainer] = true
@@ -185,11 +201,12 @@ func ensureContainerServer(t *testing.T) (*Server, *fakePodman) {
 	if err := store.SaveWorkspaces([]state.Workspace{{
 		WorkspaceSlug: testWorkspaceSlug,
 		ContainerName: testDefaultContainer,
-		Containers:    []state.Container{{Name: "default", PodmanName: testDefaultContainer, ImageID: "arch", Status: "running"}},
+		Containers:    []state.Container{{Name: "default", PodmanName: testDefaultContainer, ImageID: "arch", Status: "running", AgentToken: "tok"}},
 	}}); err != nil {
 		t.Fatal(err)
 	}
 	fake := newFakePodman()
+	fake.agentToken[testDefaultContainer] = "tok"
 	return &Server{Store: store, Podman: fake, Logger: silentLogger()}, fake
 }
 
@@ -505,10 +522,17 @@ func TestStartContainerAcceptsDefault(t *testing.T) {
 
 func (f *fakePodman) ContainerExists(name string) (bool, error) { return f.exists[name], nil }
 
-func (f *fakePodman) ContainerRunning(name string) (bool, error) { return f.running[name], nil }
+// ContainerRunning mirrors the real client, whose inspect fails for an absent
+// container: callers must probe existence first.
+func (f *fakePodman) ContainerRunning(name string) (bool, error) {
+	if !f.exists[name] {
+		return false, errors.New("no container with name " + name + " found")
+	}
+	return f.running[name], nil
+}
 
-func (f *fakePodman) ContainerAgentStale(name string) (bool, error) {
-	return f.agentStale[name], nil
+func (f *fakePodman) ContainerAgentState(name string) (bool, string, error) {
+	return f.agentStale[name], f.agentToken[name], nil
 }
 
 func (f *fakePodman) RecreateWorkspace(pod, name, image, token string, mounts []specs.Mount, secrets []specgen.Secret, envSecrets map[string]string, env map[string]string, paths []string) error {

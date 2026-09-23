@@ -107,7 +107,14 @@ func (s *Server) restoreSnapshot(workspace state.Workspace, snapshot *state.Cont
 		s.log().Warn("cannot resolve the image for a container restore", "workspace_slug", workspace.WorkspaceSlug, "container", restore.Name, "error", err)
 		return
 	}
-	if err := s.recreateContainer(workspace, &restore, restoreTag, restore.AgentToken, restore.Env); err != nil {
+	// A snapshot predating token storage has none; mint one rather than
+	// restoring a container whose agent would reject every call.
+	token, err := s.ensureAgentToken(&restore)
+	if err != nil {
+		s.log().Warn("cannot mint an agent token for a container restore", "workspace_slug", workspace.WorkspaceSlug, "container", restore.Name, "error", err)
+		return
+	}
+	if err := s.recreateContainer(workspace, &restore, restoreTag, token, restore.Env); err != nil {
 		s.log().Warn("failed to restore container after failed recreate", "workspace_slug", workspace.WorkspaceSlug, "container", restore.Name, "error", err)
 	}
 }
@@ -171,7 +178,7 @@ func (s *Server) EnsureContainer(_ context.Context, request *ctl.EnsureContainer
 	if s.Podman == nil {
 		return nil, status.Error(codes.FailedPrecondition, "podman is not configured")
 	}
-	usable, err := s.containerUsable(record.PodmanName)
+	usable, err := s.containerUsable(record)
 	if err != nil {
 		s.log().Error("control request failed", "method", "EnsureContainer", "workspace_slug", request.GetWorkspaceSlug(), "container", container, "error", err)
 		return nil, status.Error(codes.Internal, err.Error())
@@ -193,21 +200,38 @@ func (s *Server) EnsureContainer(_ context.Context, request *ctl.EnsureContainer
 	return containerProto(refreshed, *updated), nil
 }
 
-// containerUsable reports whether the named container is running with a current
-// guest agent, i.e. can be handed to a caller without a recreate.
-func (s *Server) containerUsable(name string) (bool, error) {
-	running, err := s.Podman.ContainerRunning(name)
+// containerUsable reports whether a container can be handed to a caller without
+// a recreate: it exists, is running, carries the configured guest-agent image,
+// and its agent accepts the token the caller will receive. Any failure means
+// "not usable", so EnsureContainer recreates it.
+func (s *Server) containerUsable(record *state.Container) (bool, error) {
+	exists, err := s.Podman.ContainerExists(record.PodmanName)
+	if err != nil {
+		return false, err
+	}
+	if !exists {
+		return false, nil
+	}
+	running, err := s.Podman.ContainerRunning(record.PodmanName)
 	if err != nil {
 		return false, err
 	}
 	if !running {
 		return false, nil
 	}
-	stale, err := s.Podman.ContainerAgentStale(name)
+	// An empty stored token is not a credential a caller can use; recreating
+	// mints one.
+	if record.AgentToken == "" {
+		return false, nil
+	}
+	stale, token, err := s.Podman.ContainerAgentState(record.PodmanName)
 	if err != nil {
 		return false, err
 	}
-	return !stale, nil
+	if stale {
+		return false, nil
+	}
+	return token == record.AgentToken, nil
 }
 
 func (s *Server) RecreateContainer(ctx context.Context, request *ctl.RecreateContainerRequest) (*ctl.Container, error) {

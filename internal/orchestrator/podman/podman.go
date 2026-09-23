@@ -290,29 +290,43 @@ func (c *Client) ContainerRunning(name string) (bool, error) {
 	return running, nil
 }
 
-// ContainerAgentStale reports whether the named container's guest agent comes
-// from a different image than the configured guest-agent image, i.e. the
-// container runs an agent from an outdated image and must be recreated. It is
-// false when no guest-agent image is configured, or when a host binary is
-// configured: that binary is bind-mounted and takes precedence, so the image is
-// not the agent source and cannot be compared.
-func (c *Client) ContainerAgentStale(name string) (bool, error) {
-	if c.guestAgentImage == "" || c.hostGuestBinary != "" {
-		return false, nil
-	}
+// ContainerAgentState reports, in one inspect, whether the named container's
+// guest agent is outdated and which credential its agent expects.
+//
+// Outdated means the image volume mounted at GuestAgentMount is not the
+// configured guest-agent image; it is always false when no image is configured,
+// or when a host binary is configured (that binary is bind-mounted and takes
+// precedence, so the image is not the agent source). A container with no image
+// volume at all predates the mechanism and counts as outdated.
+//
+// The credential is the container's DSH_PODMAN_GUEST_TOKEN ("" when absent).
+// Comparing it with the stored token is what catches a credential that rotated
+// after the container was created.
+func (c *Client) ContainerAgentState(name string) (stale bool, token string, err error) {
 	inspect, err := containers.Inspect(c.ctx, name, nil)
 	if err != nil {
 		c.log().Error("guest container inspect failed", "container_name", name, "error", err)
-		return false, err
+		return false, "", err
+	}
+	if inspect.Config != nil {
+		for _, entry := range inspect.Config.Env {
+			if value, ok := strings.CutPrefix(entry, "DSH_PODMAN_GUEST_TOKEN="); ok {
+				token = value
+				break
+			}
+		}
+	}
+	if c.guestAgentImage == "" || c.hostGuestBinary != "" {
+		return false, token, nil
 	}
 	for _, mount := range inspect.Mounts {
 		if mount.Type == "image" && mount.Destination == c.guestAgentMount {
-			return mount.Source != c.guestAgentImage, nil
+			return mount.Source != c.guestAgentImage, token, nil
 		}
 	}
 	// No image volume at the guest-agent mount: the container predates the
 	// image-volume mechanism, so it does not carry the configured agent.
-	return true, nil
+	return true, token, nil
 }
 
 func boolPtr(value bool) *bool {

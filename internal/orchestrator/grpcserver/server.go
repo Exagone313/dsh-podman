@@ -22,7 +22,7 @@ import (
 type podmanAPI interface {
 	ContainerExists(name string) (bool, error)
 	ContainerRunning(name string) (bool, error)
-	ContainerAgentStale(name string) (bool, error)
+	ContainerAgentState(name string) (bool, string, error)
 	CreateWorkspace(pod, name, image, token string, mounts []specs.Mount, secrets []specgen.Secret, envSecrets map[string]string, env map[string]string, paths []string) error
 	RecreateWorkspace(pod, name, image, token string, mounts []specs.Mount, secrets []specgen.Secret, envSecrets map[string]string, env map[string]string, paths []string) error
 	Remove(name string) error

@@ -23,7 +23,11 @@ rm ~/.config/containers/systemd/dsh-podman-orchestrator.container
 systemctl --user daemon-reload
 ```
 
-## 完全删除 dsh
+## 然后在以下两个选项中选择一个
+
+这两个选项是并列的，而不是先后步骤：请根据你想保留的内容选择其一。
+
+### 完全删除 dsh
 
 ```bash
 rm -rf ~/.dsh
@@ -32,7 +36,7 @@ rm -rf ~/.dsh
 `~/.dsh` 是整个 harness 主目录：包含各个
 profile（其中有已安装的插件）、设置，以及编排器的状态与软件包缓存。
 
-## 保留 dsh 但不使用 dsh-podman
+### 保留 dsh 但不使用 dsh-podman
 
 改为直接运行 dsh，而不是从镜像运行——如 harness 文档所述，使用
 `npx @deepseek-ai/dsh web`——在此之前先从 profile 中移除插件，这样 dsh

@@ -25,7 +25,12 @@ rm ~/.config/containers/systemd/dsh-podman-orchestrator.container
 systemctl --user daemon-reload
 ```
 
-## Remove dsh entirely
+## Then choose one of the two following options
+
+These are alternatives, not steps: pick the one that matches what you want to
+keep.
+
+### Remove dsh entirely
 
 ```bash
 rm -rf ~/.dsh
@@ -34,7 +39,7 @@ rm -rf ~/.dsh
 `~/.dsh` is the whole harness home: the profiles (including the installed
 plugin), the settings, and the orchestrator's state and package caches.
 
-## Keep dsh without dsh-podman
+### Keep dsh without dsh-podman
 
 Run dsh directly instead of from the image — as the harness documents, with
 `npx @deepseek-ai/dsh web` — after removing the plugin from the profile, so dsh

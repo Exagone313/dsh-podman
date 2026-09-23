@@ -2,7 +2,13 @@
 //
 // SPDX-License-Identifier: MIT
 
-import { WorkspaceResolver, metadata, workspaceSlug } from "./workspace-binding.js";
+import {
+  type WorkspaceBinding,
+  WorkspaceResolver,
+  metadata,
+  workspaceSlug,
+} from "./workspace-binding.js";
+import { grpc } from "./grpc/runtime-client.js";
 import { isAbsolute, resolve as resolvePath } from "node:path";
 
 // Resolve a container-side path against the session working directory.
@@ -129,6 +135,29 @@ function onAbortCancel(call: any, signal: AbortSignal | undefined): () => void {
   return () => signal.removeEventListener("abort", cancel);
 }
 
+// isUnauthenticated reports whether a guest call failed because the agent
+// rejected the caller's credential.
+function isUnauthenticated(error: unknown): boolean {
+  return (error as { code?: unknown })?.code === grpc.status.UNAUTHENTICATED;
+}
+
+// withGuestAuth runs a guest call and, when the agent rejects the credential,
+// refreshes the binding once and retries. A rejection happens in the agent's
+// auth interceptor, before the handler runs, so the retry cannot duplicate a
+// side effect; a second rejection propagates.
+export async function withGuestAuth<T>(
+  binding: WorkspaceBinding,
+  run: (guest: any, token: string) => Promise<T>,
+): Promise<T> {
+  try {
+    return await run(binding.guest, binding.token);
+  } catch (error) {
+    if (!isUnauthenticated(error) || binding.refresh === undefined) throw error;
+    const refreshed = await binding.refresh();
+    return await run(refreshed.guest, refreshed.token);
+  }
+}
+
 // Stream raw bytes from the guest's ReadFile. A zero/absent length reads to
 // EOF. Cancelling the signal cancels the call and reports FS_ABORTED.
 export async function* guestChunks(
@@ -144,20 +173,38 @@ export async function* guestChunks(
   if (range?.length !== undefined && range.length > 0) {
     request.length = range.length;
   }
-  const call = (target.binding.guest as any).readFile(
-    request,
-    metadata(target.binding.token),
-  );
-  const detach = onAbortCancel(call, signal);
-  try {
-    for await (const chunk of call) {
-      yield Buffer.from(chunk.data);
+  // The read is retried once with a refreshed binding when the agent rejects
+  // the credential, but only before any byte was emitted, so a retry can never
+  // duplicate output.
+  let binding = target.binding as WorkspaceBinding;
+  for (let attempt = 0; ; attempt++) {
+    const call = (binding.guest as any).readFile(
+      request,
+      metadata(binding.token),
+    );
+    const detach = onAbortCancel(call, signal);
+    let emitted = false;
+    try {
+      for await (const chunk of call) {
+        emitted = true;
+        yield Buffer.from(chunk.data);
+      }
+      return;
+    } catch (error) {
+      if (signal?.aborted) throw fsError("FS_ABORTED", "read aborted");
+      if (
+        attempt === 0 &&
+        !emitted &&
+        isUnauthenticated(error) &&
+        binding.refresh !== undefined
+      ) {
+        binding = await binding.refresh();
+        continue;
+      }
+      throw error;
+    } finally {
+      detach();
     }
-  } catch (error) {
-    if (signal?.aborted) throw fsError("FS_ABORTED", "read aborted");
-    throw error;
-  } finally {
-    detach();
   }
 }
 
@@ -230,49 +277,49 @@ export function guestVersion(result: any): string {
 }
 
 export async function writeGuestFile(
-  binding: { guest: any; token: string },
+  binding: WorkspaceBinding,
   path: string,
   content: string,
   opts: { create: boolean; truncate: boolean },
   signal?: AbortSignal,
 ): Promise<number> {
   throwIfAborted(signal, "write");
-  return new Promise((resolveDone, reject) => {
-    let detach: () => void = () => {};
-    const call = (binding.guest as any).writeFile(
-      metadata(binding.token),
-      {},
-      (error: Error | null, result: any) => {
-        detach();
-        error
-          ? reject(signal?.aborted ? fsError("FS_ABORTED", "write aborted") : error)
-          : resolveDone(Number(result?.bytesWritten ?? 0));
-      },
-    );
-    detach = onAbortCancel(call, signal);
-    call.write({
-      start: { path, create: opts.create, truncate: opts.truncate },
-    });
-    call.write({ dataChunk: Buffer.from(content) });
-    call.end();
-  });
+  return withGuestAuth(binding, (guest, token) =>
+    new Promise((resolveDone, reject) => {
+      let detach: () => void = () => {};
+      const call = guest.writeFile(
+        metadata(token),
+        {},
+        (error: Error | null, result: any) => {
+          detach();
+          error
+            ? reject(signal?.aborted ? fsError("FS_ABORTED", "write aborted") : error)
+            : resolveDone(Number(result?.bytesWritten ?? 0));
+        },
+      );
+      detach = onAbortCancel(call, signal);
+      call.write({
+        start: { path, create: opts.create, truncate: opts.truncate },
+      });
+      call.write({ dataChunk: Buffer.from(content) });
+      call.end();
+    }),
+  );
 }
 
 export async function readGuestFile(
-  binding: { guest: any; token: string },
+  binding: WorkspaceBinding,
   path: string,
 ): Promise<string> {
-  const chunks: Buffer[] = [];
-  await new Promise<void>((resolveDone, reject) => {
-    const call = (binding.guest as any).readFile(
-      { path },
-      metadata(binding.token),
-    );
-    call.on("data", (chunk: any) => chunks.push(Buffer.from(chunk.data)));
-    call.on("error", reject);
-    call.on("end", resolveDone);
-  });
-  return Buffer.concat(chunks).toString("utf8");
+  return withGuestAuth(binding, (guest, token) =>
+    new Promise<string>((resolveDone, reject) => {
+      const chunks: Buffer[] = [];
+      const call = guest.readFile({ path }, metadata(token));
+      call.on("data", (chunk: any) => chunks.push(Buffer.from(chunk.data)));
+      call.on("error", reject);
+      call.on("end", () => resolveDone(Buffer.concat(chunks).toString("utf8")));
+    }),
+  );
 }
 
 const READ_LIMIT = 2000;
@@ -286,7 +333,7 @@ export interface ExecIdentity {
 }
 
 export async function runExec(
-  binding: { guest: any; token: string },
+  binding: WorkspaceBinding,
   argv: readonly string[],
   cwd?: string,
   env?: Record<string, string>,
@@ -298,60 +345,62 @@ export async function runExec(
   stdout: string;
   stderr: string;
 }> {
-  const stdout: Buffer[] = [];
-  const stderr: Buffer[] = [];
-  return new Promise((resolveDone, reject) => {
-    const stream = (binding.guest as any).exec(metadata(binding.token));
-    let processId: string | undefined;
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    const stopTimer = (): void => {
-      if (timer !== undefined) {
-        clearTimeout(timer);
-        timer = undefined;
-      }
-    };
-    if (typeof timeoutMs === "number" && timeoutMs > 0) {
-      timer = setTimeout(() => {
-        timer = undefined;
-        if (processId !== undefined) {
-          // Best effort: ask the guest to terminate the running process.
-          unaryGuest({ binding }, "signal", {
-            processId,
-            signal: "SIGTERM",
-          }).catch(() => {});
+  return withGuestAuth(binding, (guest, token) => {
+    const stdout: Buffer[] = [];
+    const stderr: Buffer[] = [];
+    return new Promise((resolveDone, reject) => {
+      const stream = (guest as any).exec(metadata(token));
+      let processId: string | undefined;
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      const stopTimer = (): void => {
+        if (timer !== undefined) {
+          clearTimeout(timer);
+          timer = undefined;
         }
-        reject(new Error(`command timed out after ${timeoutMs} ms`));
-      }, timeoutMs);
-    }
-    stream.on("data", (output: any) => {
-      if (output.processId) processId = String(output.processId);
-      if (output.stdoutChunk) stdout.push(Buffer.from(output.stdoutChunk));
-      if (output.stderrChunk) stderr.push(Buffer.from(output.stderrChunk));
-      if (output.exit) {
-        stopTimer();
-        resolveDone({
-          exitCode: output.exit.exitCode,
-          signal: output.exit.signaled ? output.exit.signal : null,
-          stdout: Buffer.concat(stdout).toString("utf8"),
-          stderr: Buffer.concat(stderr).toString("utf8"),
-        });
+      };
+      if (typeof timeoutMs === "number" && timeoutMs > 0) {
+        timer = setTimeout(() => {
+          timer = undefined;
+          if (processId !== undefined) {
+            // Best effort: ask the guest to terminate the running process.
+            unaryGuest({ binding: { guest, token } }, "signal", {
+              processId,
+              signal: "SIGTERM",
+            }).catch(() => {});
+          }
+          reject(new Error(`command timed out after ${timeoutMs} ms`));
+        }, timeoutMs);
       }
+      stream.on("data", (output: any) => {
+        if (output.processId) processId = String(output.processId);
+        if (output.stdoutChunk) stdout.push(Buffer.from(output.stdoutChunk));
+        if (output.stderrChunk) stderr.push(Buffer.from(output.stderrChunk));
+        if (output.exit) {
+          stopTimer();
+          resolveDone({
+            exitCode: output.exit.exitCode,
+            signal: output.exit.signaled ? output.exit.signal : null,
+            stdout: Buffer.concat(stdout).toString("utf8"),
+            stderr: Buffer.concat(stderr).toString("utf8"),
+          });
+        }
+      });
+      stream.on("error", (error: unknown) => {
+        stopTimer();
+        reject(error);
+      });
+      stream.write({
+        start: {
+          argv: remoteArgv(argv),
+          cwd,
+          env: env ?? {},
+          ...(identity?.uid !== undefined ? { uid: { value: identity.uid } } : {}),
+          ...(identity?.gid !== undefined ? { gid: { value: identity.gid } } : {}),
+          ...(identity?.groups !== undefined ? { groups: identity.groups } : {}),
+        },
+      });
+      stream.end();
     });
-    stream.on("error", (error: unknown) => {
-      stopTimer();
-      reject(error);
-    });
-    stream.write({
-      start: {
-        argv: remoteArgv(argv),
-        cwd,
-        env: env ?? {},
-        ...(identity?.uid !== undefined ? { uid: { value: identity.uid } } : {}),
-        ...(identity?.gid !== undefined ? { gid: { value: identity.gid } } : {}),
-        ...(identity?.groups !== undefined ? { groups: identity.groups } : {}),
-      },
-    });
-    stream.end();
   });
 }
 
@@ -400,7 +449,7 @@ export async function resolveToolBinding(
   resolver: WorkspaceResolver,
   cwd: unknown,
   container: string,
-): Promise<{ guest: any; token: string; socket: string; defaultCwd?: string }> {
+): Promise<WorkspaceBinding> {
   if (container === "default") return resolver.resolve(cwd);
   return resolver.containerBinding(cwd, container);
 }
@@ -417,20 +466,22 @@ export async function guestStat(target: any, signal?: AbortSignal): Promise<any>
 
 export function guestStatResponse(target: any, signal?: AbortSignal): Promise<any> {
   throwIfAborted(signal, "stat");
-  return new Promise<any>((resolveDone, reject) => {
-    let detach: () => void = () => {};
-    const call = target.binding.guest.stat(
-      { path: target.targetKey },
-      metadata(target.binding.token),
-      (error: Error | null, value: any) => {
-        detach();
-        error
-          ? reject(signal?.aborted ? fsError("FS_ABORTED", "stat aborted") : error)
-          : resolveDone(value);
-      },
-    );
-    detach = onAbortCancel(call, signal);
-  });
+  return withGuestAuth(target.binding, (guest, token) =>
+    new Promise<any>((resolveDone, reject) => {
+      let detach: () => void = () => {};
+      const call = guest.stat(
+        { path: target.targetKey },
+        metadata(token),
+        (error: Error | null, value: any) => {
+          detach();
+          error
+            ? reject(signal?.aborted ? fsError("FS_ABORTED", "stat aborted") : error)
+            : resolveDone(value);
+        },
+      );
+      detach = onAbortCancel(call, signal);
+    }),
+  );
 }
 
 export async function unaryGuest(
@@ -440,22 +491,24 @@ export async function unaryGuest(
   signal?: AbortSignal,
 ): Promise<unknown> {
   throwIfAborted(signal, method);
-  return new Promise((resolveDone, reject) => {
-    let detach: () => void = () => {};
-    const call = (target.binding.guest as any)[method](
-      request,
-      metadata(target.binding.token),
-      (error: Error | null, result: unknown) => {
-        detach();
-        error
-          ? reject(
-              signal?.aborted ? fsError("FS_ABORTED", `${method} aborted`) : error,
-            )
-          : resolveDone(result);
-      },
-    );
-    detach = onAbortCancel(call, signal);
-  });
+  return withGuestAuth(target.binding, (guest, token) =>
+    new Promise((resolveDone, reject) => {
+      let detach: () => void = () => {};
+      const call = (guest as any)[method](
+        request,
+        metadata(token),
+        (error: Error | null, result: unknown) => {
+          detach();
+          error
+            ? reject(
+                signal?.aborted ? fsError("FS_ABORTED", `${method} aborted`) : error,
+              )
+            : resolveDone(result);
+        },
+      );
+      detach = onAbortCancel(call, signal);
+    }),
+  );
 }
 
 // globCwd returns the working directory a ripgrep discovery listing must run

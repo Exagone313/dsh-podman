@@ -101,7 +101,7 @@ test("control and guest proto files resolve next to the runtime", () => {
 
 async function startControlServer(
   containers: any[] = [],
-  options: { rewriteContainerSocket?: boolean } = {},
+  options: { rewriteContainerSocket?: boolean; staleToken?: boolean } = {},
 ): Promise<{
   socketsRoot: string;
   received: string[];
@@ -120,7 +120,28 @@ async function startControlServer(
     defaults: true,
   });
   const loaded = grpc.loadPackageDefinition(definition) as any;
+  const guestDefinition = loader.loadSync(
+    resolve(
+      dirname(fileURLToPath(import.meta.url)),
+      "grpc/proto/dshguest/v1/guest.proto",
+    ),
+    { longs: String, enums: String, defaults: true },
+  );
+  const guestLoaded = grpc.loadPackageDefinition(guestDefinition) as any;
   const server = new grpc.Server();
+  // With staleToken, the first container row carries a credential the agent
+  // rejects, so the caller must refresh before it can proceed.
+  let ensureCalls = 0;
+  server.addService(guestLoaded.dshguest.v1.WorkspaceGuestAgent.service, {
+    ping: (call: any, callback: any) => {
+      const bearer = String(call.metadata.get("authorization")[0] ?? "");
+      if (bearer === "bearer stale") {
+        callback({ code: grpc.status.UNAUTHENTICATED, details: "invalid agent token" });
+        return;
+      }
+      callback(null, { version: "test", commit: "test" });
+    },
+  });
   const received: string[] = [];
   const versions: Array<string | undefined> = [];
   const createRequests: any[] = [];
@@ -135,13 +156,15 @@ async function startControlServer(
       callback({ code: grpc.status.NOT_FOUND, details: "workspace not found" });
     },
     ensureContainer: (call: any, callback: any) => {
+      const agentToken =
+        options.staleToken === true && ensureCalls++ === 0 ? "stale" : "tok";
       const row = containers.find(
         (candidate: any) =>
           candidate.workspaceSlug === call.request.workspaceSlug &&
           candidate.containerName === call.request.container,
       );
       if (row !== undefined) {
-        callback(null, row);
+        callback(null, { ...row, agentToken });
         return;
       }
       if (call.request.container === "default") {
@@ -150,7 +173,7 @@ async function startControlServer(
           workspaceSlug: call.request.workspaceSlug,
           containerName: "default",
           agentSocketPath: resolve(socketsRoot, "guest.sock"),
-          agentToken: "tok",
+          agentToken,
           mounts: [],
         });
         return;
@@ -289,6 +312,27 @@ test("resolve exposes the session directory as the default cwd", async () => {
     );
     const binding = await resolver.resolve("/projects/team");
     assert.equal(binding.defaultCwd, "/projects/team");
+  } finally {
+    stop();
+  }
+});
+
+test("resolve refreshes a binding whose token the agent rejects", async () => {
+  // The first row carries a credential the guest agent rejects; resolving must
+  // re-run the orchestrator's ensure and end with the usable token.
+  const { socketsRoot, stop } = await startControlServer([], { staleToken: true });
+  try {
+    const resolver = new WorkspaceResolver(
+      {
+        socketsRoot,
+        defaultImage: "arch",
+        projectsRoot: "/projects",
+        controlToken: "",
+      },
+      { resolveByPath: () => ({ id: SLUG, path: "/projects/team" }) } as any,
+    );
+    const binding = await resolver.resolve("/projects/team");
+    assert.equal(binding.token, "tok");
   } finally {
     stop();
   }

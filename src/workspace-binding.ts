@@ -18,6 +18,10 @@ export interface WorkspaceBinding {
   // The session working directory to use when a command tool is not given an
   // explicit one, or undefined when it is not mounted in the container.
   defaultCwd?: string;
+  // refresh re-resolves the binding, dropping any cached credential. A caller
+  // that sees the agent reject its token retries once against a refreshed
+  // binding instead of failing the turn. Absent on test doubles.
+  refresh?: () => Promise<WorkspaceBinding>;
 }
 export interface BindingConfig {
   socketsRoot: string;
@@ -105,12 +109,18 @@ export class WorkspaceResolver {
     const workspace = await this.workspaceForCwd(cwd);
     const slug = workspaceSlug(workspace.id);
     const row = await this.ensureContainer(slug, container);
-    const socket = row.agentSocketPath as string;
-    const binding: WorkspaceBinding = {
-      guest: guestClient(socket),
-      token: row.agentToken as string,
-      socket,
-    };
+    let binding = this.bindingFor(row, () => this.containerBinding(cwd, container));
+    try {
+      binding = await this.ensureAgentReady(binding);
+    } catch {
+      await this.recoverContainer(slug, container);
+      binding = await this.ensureAgentReady(
+        this.bindingFor(
+          await this.ensureContainer(slug, container),
+          () => this.containerBinding(cwd, container),
+        ),
+      );
+    }
     const session = defaultCwdOf(cwd);
     if (
       session !== undefined &&
@@ -118,7 +128,6 @@ export class WorkspaceResolver {
     ) {
       binding.defaultCwd = session;
     }
-    await this.ensureReady(binding, slug, container);
     return binding;
   }
   // ready resolves a workspace's default container and waits for its guest
@@ -130,40 +139,62 @@ export class WorkspaceResolver {
   ): Promise<WorkspaceBinding> {
     let binding = await this.resolveBinding(key, projectName);
     try {
-      await waitForReady(binding.guest, this.readyTimeoutMs());
+      return await this.ensureAgentReady(binding);
     } catch {
       this.bindings.delete(key);
       binding = await this.resolveBinding(key, projectName);
       try {
-        await waitForReady(binding.guest, this.readyTimeoutMs());
+        return await this.ensureAgentReady(binding);
       } catch {
         await this.recoverContainer(key, "default");
         this.bindings.delete(key);
         binding = await this.resolveBinding(key, projectName);
-        await waitForReady(binding.guest, this.readyTimeoutMs());
+        return await this.ensureAgentReady(binding);
       }
     }
-    return binding;
   }
   private readyTimeoutMs(): number {
     const configured = Number(this.config.readyTimeoutMs);
     return Number.isFinite(configured) && configured > 0 ? configured : 15000;
   }
-  // ensureReady waits for one binding's guest agent and recovers the container
-  // once when the wait fails.
-  private async ensureReady(
+  // bindingFor builds a binding from an orchestrator container row. refresh
+  // re-resolves it, so a caller can retry once after the agent rejects a token
+  // that went stale (the plugin caches bindings for its lifetime).
+  private bindingFor(
+    row: any,
+    refresh: () => Promise<WorkspaceBinding>,
+  ): WorkspaceBinding {
+    const socket = row.agentSocketPath as string;
+    return {
+      guest: guestClient(socket),
+      token: row.agentToken as string,
+      socket,
+      refresh,
+    };
+  }
+  // ensureAgentReady waits for the agent and verifies the credential with a
+  // Ping. A rejected credential is refreshed once (re-resolving the binding,
+  // which re-runs the orchestrator's ensure) and re-verified, so a token that
+  // rotated after the binding was cached does not fail the caller.
+  private async ensureAgentReady(
     binding: WorkspaceBinding,
-    slug: string,
-    container: string,
-  ): Promise<void> {
-    try {
-      await waitForReady(binding.guest, this.readyTimeoutMs());
-      return;
-    } catch {
-      // Recover below.
-    }
-    await this.recoverContainer(slug, container);
+  ): Promise<WorkspaceBinding> {
     await waitForReady(binding.guest, this.readyTimeoutMs());
+    try {
+      await pingAgent(binding);
+      return binding;
+    } catch (error) {
+      if (
+        (error as { code?: unknown })?.code !== grpc.status.UNAUTHENTICATED ||
+        binding.refresh === undefined
+      ) {
+        throw error;
+      }
+      const refreshed = await binding.refresh();
+      await waitForReady(refreshed.guest, this.readyTimeoutMs());
+      await pingAgent(refreshed);
+      return refreshed;
+    }
   }
   // recoverContainer best-effort recreates a container whose agent is
   // unreachable. A failure here is not fatal: the caller's retry surfaces the
@@ -214,12 +245,10 @@ export class WorkspaceResolver {
       }, controlMetadata);
     }
     const row = await this.ensureContainer(slug, "default");
-    const socket = row.agentSocketPath as string;
-    return {
-      guest: guestClient(socket),
-      token: row.agentToken as string,
-      socket,
-    };
+    return this.bindingFor(row, () => {
+      this.bindings.delete(slug);
+      return this.resolveBinding(slug, projectName);
+    });
   }
   // ensureContainer asks the orchestrator for a usable container, recreating it
   // when it is missing, stopped, or runs a guest agent from an outdated image,
@@ -290,6 +319,20 @@ function waitForReady(agent: grpc.Client, timeoutMs = 15000): Promise<void> {
   return new Promise((resolve, reject) => {
     agent.waitForReady(Date.now() + timeoutMs, (error) =>
       error ? reject(error) : resolve(),
+    );
+  });
+}
+
+// pingAgent makes the guest readiness call, which also exercises the credential
+// (the agent's auth interceptor guards every call, Ping included). Unlike
+// waitForReady, which only proves connectivity, it fails when the token is
+// rejected — which is exactly what a rotated credential looks like.
+function pingAgent(binding: WorkspaceBinding): Promise<void> {
+  return new Promise((resolveDone, reject) => {
+    (binding.guest as any).ping(
+      {},
+      metadata(binding.token),
+      (error: Error | null) => (error ? reject(error) : resolveDone()),
     );
   });
 }

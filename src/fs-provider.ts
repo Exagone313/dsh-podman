@@ -199,7 +199,7 @@ export function createFilesystemProvider(resolver: WorkspaceResolver): Filesyste
       const before =
         rawBasis === null ? null : normalizeLineEndings(rawBasis);
       await writeGuestFile(
-        { guest: target.binding.guest, token: target.binding.token },
+        target.binding,
         target.targetKey,
         content,
         { create: true, truncate: true },
@@ -315,7 +315,7 @@ export function createFilesystemProvider(resolver: WorkspaceResolver): Filesyste
       }
       const after = before.split(oldNorm).join(newNorm);
       await writeGuestFile(
-        { guest: target.binding.guest, token: target.binding.token },
+        target.binding,
         target.targetKey,
         restoreLineEndings(after, lineEndings),
         { create: true, truncate: true },

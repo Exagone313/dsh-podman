@@ -45,6 +45,7 @@ if [ -n "$source" ]; then
     printf 'error: DSH_PODMAN_PLUGIN_SOURCE=%s does not exist\n' "$source" >&2
     exit 1
   fi
+  printf 'dsh-podman: installing %s\n' "$spec"
   if ! dsh plugin --profile web add "$spec" --save-exact --allow-build=protobufjs; then
     printf 'error: cannot install %s\n' "$spec" >&2
     exit 1
@@ -59,6 +60,7 @@ else
     declared=$(node -p "require('$profile/package.json').dependencies?.['@exagone313/dsh-podman'] || ''")
   fi
   if [ "$installed" != "$DSH_PODMAN_PLUGIN_VERSION" ] || [ "$declared" != "$DSH_PODMAN_PLUGIN_VERSION" ]; then
+    printf 'dsh-podman: installing @exagone313/dsh-podman@%s\n' "$DSH_PODMAN_PLUGIN_VERSION"
     if ! dsh plugin --profile web add "@exagone313/dsh-podman@$DSH_PODMAN_PLUGIN_VERSION" --save-exact --allow-build=protobufjs; then
       printf 'error: cannot install @exagone313/dsh-podman@%s; wait if it was just released, or downgrade both the dsh and orchestrator images\n' \
         "$DSH_PODMAN_PLUGIN_VERSION" >&2

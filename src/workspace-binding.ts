@@ -104,11 +104,7 @@ export class WorkspaceResolver {
   ): Promise<WorkspaceBinding> {
     const workspace = await this.workspaceForCwd(cwd);
     const slug = workspaceSlug(workspace.id);
-    const result = await this.control<any>("listContainers", {});
-    const row = containerRowFor(result.containers ?? [], slug, container);
-    if (row === undefined) {
-      throw containerNotFound(container, slug);
-    }
+    const row = await this.ensureContainer(slug, container);
     const socket = row.agentSocketPath as string;
     const binding: WorkspaceBinding = {
       guest: guestClient(socket),
@@ -204,26 +200,41 @@ export class WorkspaceResolver {
       join(this.config.socketsRoot, "orchestrator.sock"),
     );
     const controlMetadata = metadata(this.config.controlToken, VERSION);
-    let workspace: any;
     try {
-      workspace = await unary<any>(control, "describeWorkspace", {
+      await unary<any>(control, "describeWorkspace", {
         workspaceSlug: slug,
       }, controlMetadata);
     } catch (error: any) {
       if (error.code !== grpc.status.NOT_FOUND) throw error;
-      workspace = await unary<any>(control, "createWorkspace", {
+      await unary<any>(control, "createWorkspace", {
         workspaceSlug: slug,
         projectName,
         imageId: this.config.defaultImage,
         mounts: [{ projectName, mode: "MOUNT_MODE_READ_WRITE" }],
       }, controlMetadata);
     }
-    const socket = workspace.agentSocketPath as string;
+    const row = await this.ensureContainer(slug, "default");
+    const socket = row.agentSocketPath as string;
     return {
       guest: guestClient(socket),
-      token: workspace.agentToken as string,
+      token: row.agentToken as string,
       socket,
     };
+  }
+  // ensureContainer asks the orchestrator for a usable container, recreating it
+  // when it is missing, stopped, or runs a guest agent from an outdated image,
+  // and returns its row. A container the orchestrator does not know is reported
+  // as the caller's missing container.
+  private async ensureContainer(slug: string, container: string): Promise<any> {
+    try {
+      return await this.control("ensureContainer", {
+        workspaceSlug: slug,
+        container,
+      });
+    } catch (error: any) {
+      if (error.code !== grpc.status.NOT_FOUND) throw error;
+      throw containerNotFound(container, slug);
+    }
   }
   async control<T>(method: string, request: unknown): Promise<T> {
     return unary<T>(
@@ -297,16 +308,6 @@ export function workspaceSlug(id: unknown): string {
 }
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-export function containerRowFor(
-  containers: any[],
-  slug: string,
-  container: string,
-): any | undefined {
-  return containers.find(
-    (row: any) =>
-      row.workspaceSlug === slug && row.containerName === container,
-  );
-}
 // metadata builds the call metadata. The plugin version is sent on control
 // calls so the orchestrator can refuse an incompatible plugin; guest calls omit
 // it, since the guest agent does not check it.

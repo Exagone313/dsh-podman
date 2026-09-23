@@ -15,7 +15,6 @@ import {
   workspaceSlug,
   metadata,
   WorkspaceResolver,
-  containerRowFor,
   containerNotFound,
   normalizeToolError,
 } from "./workspace-binding.js";
@@ -93,26 +92,6 @@ test("containerNotFound reports one stable shape", () => {
   assert.equal(containerNotFound("db").message, 'container "db" not found');
 });
 
-test("containerRowFor finds rows by workspace and name", () => {
-  const containers = [
-    { workspaceSlug: "team-app", containerName: "default", status: "running" },
-    { workspaceSlug: "team-app", containerName: "db", status: "stopped" },
-    { workspaceSlug: "other", containerName: "db", status: "running" },
-  ];
-  assert.deepEqual(containerRowFor(containers, "team-app", "db"), {
-    workspaceSlug: "team-app",
-    containerName: "db",
-    status: "stopped",
-  });
-  assert.deepEqual(containerRowFor(containers, "team-app", "default"), {
-    workspaceSlug: "team-app",
-    containerName: "default",
-    status: "running",
-  });
-  assert.equal(containerRowFor(containers, "team-app", "missing"), undefined);
-  assert.equal(containerRowFor([], "team-app", "default"), undefined);
-});
-
 test("control and guest proto files resolve next to the runtime", () => {
   const control = controlClient("/tmp/dsh-proto-control.sock");
   const guest = guestClient("/tmp/dsh-proto-guest.sock");
@@ -157,6 +136,29 @@ async function startControlServer(
     },
     listContainers: (_call: any, callback: any) => {
       callback(null, { containers });
+    },
+    ensureContainer: (call: any, callback: any) => {
+      const row = containers.find(
+        (candidate: any) =>
+          candidate.workspaceSlug === call.request.workspaceSlug &&
+          candidate.containerName === call.request.container,
+      );
+      if (row !== undefined) {
+        callback(null, row);
+        return;
+      }
+      if (call.request.container === "default") {
+        // The default container createWorkspace just made.
+        callback(null, {
+          workspaceSlug: call.request.workspaceSlug,
+          containerName: "default",
+          agentSocketPath: resolve(socketsRoot, "guest.sock"),
+          agentToken: "tok",
+          mounts: [],
+        });
+        return;
+      }
+      callback({ code: grpc.status.NOT_FOUND, details: "container not found" });
     },
     createWorkspace: (call: any, callback: any) => {
       createRequests.push(call.request);

@@ -23,6 +23,7 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
+	WorkspaceGuestAgent_Ping_FullMethodName           = "/dshguest.v1.WorkspaceGuestAgent/Ping"
 	WorkspaceGuestAgent_Exec_FullMethodName           = "/dshguest.v1.WorkspaceGuestAgent/Exec"
 	WorkspaceGuestAgent_Signal_FullMethodName         = "/dshguest.v1.WorkspaceGuestAgent/Signal"
 	WorkspaceGuestAgent_ReadFile_FullMethodName       = "/dshguest.v1.WorkspaceGuestAgent/ReadFile"
@@ -46,6 +47,9 @@ const (
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type WorkspaceGuestAgentClient interface {
+	// Ping reports that the agent is reachable and accepts the caller's
+	// credential. Callers use it as a readiness probe before issuing work.
+	Ping(ctx context.Context, in *PingRequest, opts ...grpc.CallOption) (*PingResponse, error)
 	Exec(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[ExecInput, ExecOutput], error)
 	Signal(ctx context.Context, in *SignalRequest, opts ...grpc.CallOption) (*SignalResponse, error)
 	ReadFile(ctx context.Context, in *ReadFileRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ReadFileChunk], error)
@@ -71,6 +75,16 @@ type workspaceGuestAgentClient struct {
 
 func NewWorkspaceGuestAgentClient(cc grpc.ClientConnInterface) WorkspaceGuestAgentClient {
 	return &workspaceGuestAgentClient{cc}
+}
+
+func (c *workspaceGuestAgentClient) Ping(ctx context.Context, in *PingRequest, opts ...grpc.CallOption) (*PingResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(PingResponse)
+	err := c.cc.Invoke(ctx, WorkspaceGuestAgent_Ping_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 func (c *workspaceGuestAgentClient) Exec(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[ExecInput, ExecOutput], error) {
@@ -265,6 +279,9 @@ type WorkspaceGuestAgent_TerminalClient = grpc.BidiStreamingClient[TerminalInput
 // All implementations must embed UnimplementedWorkspaceGuestAgentServer
 // for forward compatibility.
 type WorkspaceGuestAgentServer interface {
+	// Ping reports that the agent is reachable and accepts the caller's
+	// credential. Callers use it as a readiness probe before issuing work.
+	Ping(context.Context, *PingRequest) (*PingResponse, error)
 	Exec(grpc.BidiStreamingServer[ExecInput, ExecOutput]) error
 	Signal(context.Context, *SignalRequest) (*SignalResponse, error)
 	ReadFile(*ReadFileRequest, grpc.ServerStreamingServer[ReadFileChunk]) error
@@ -292,6 +309,9 @@ type WorkspaceGuestAgentServer interface {
 // pointer dereference when methods are called.
 type UnimplementedWorkspaceGuestAgentServer struct{}
 
+func (UnimplementedWorkspaceGuestAgentServer) Ping(context.Context, *PingRequest) (*PingResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method Ping not implemented")
+}
 func (UnimplementedWorkspaceGuestAgentServer) Exec(grpc.BidiStreamingServer[ExecInput, ExecOutput]) error {
 	return status.Error(codes.Unimplemented, "method Exec not implemented")
 }
@@ -362,6 +382,24 @@ func RegisterWorkspaceGuestAgentServer(s grpc.ServiceRegistrar, srv WorkspaceGue
 		t.testEmbeddedByValue()
 	}
 	s.RegisterService(&WorkspaceGuestAgent_ServiceDesc, srv)
+}
+
+func _WorkspaceGuestAgent_Ping_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(PingRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(WorkspaceGuestAgentServer).Ping(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: WorkspaceGuestAgent_Ping_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(WorkspaceGuestAgentServer).Ping(ctx, req.(*PingRequest))
+	}
+	return interceptor(ctx, in, info, handler)
 }
 
 func _WorkspaceGuestAgent_Exec_Handler(srv interface{}, stream grpc.ServerStream) error {
@@ -637,6 +675,10 @@ var WorkspaceGuestAgent_ServiceDesc = grpc.ServiceDesc{
 	ServiceName: "dshguest.v1.WorkspaceGuestAgent",
 	HandlerType: (*WorkspaceGuestAgentServer)(nil),
 	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "Ping",
+			Handler:    _WorkspaceGuestAgent_Ping_Handler,
+		},
 		{
 			MethodName: "Signal",
 			Handler:    _WorkspaceGuestAgent_Signal_Handler,

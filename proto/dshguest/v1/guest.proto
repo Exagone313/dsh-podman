@@ -9,6 +9,9 @@ option go_package = "github.com/Exagone313/dsh-podman/internal/genproto/dshguest
 import "google/protobuf/wrappers.proto";
 
 service WorkspaceGuestAgent {
+  // Ping reports that the agent is reachable and accepts the caller's
+  // credential. Callers use it as a readiness probe before issuing work.
+  rpc Ping(PingRequest) returns (PingResponse);
   rpc Exec(stream ExecInput) returns (stream ExecOutput);
   rpc Signal(SignalRequest) returns (SignalResponse);
   rpc ReadFile(ReadFileRequest) returns (stream ReadFileChunk);
@@ -27,6 +30,8 @@ service WorkspaceGuestAgent {
   rpc DaemonLogs(DaemonLogsRequest) returns (DaemonLogsResponse);
   rpc Terminal(stream TerminalInput) returns (stream TerminalOutput);
 }
+message PingRequest {}
+message PingResponse { string version = 1; string commit = 2; }
 message ExecInput { oneof payload { ExecStart start = 1; bytes stdin_chunk = 2; } }
 message ExecStart { repeated string argv = 1; string cwd = 2; map<string, string> env = 3; repeated string unset_env = 4; SpillTarget spill_stdout = 5; SpillTarget spill_stderr = 6; google.protobuf.Int32Value uid = 7; google.protobuf.Int32Value gid = 8; repeated uint32 groups = 9; bool stdin_pipe = 10; }
 message ExecOutput { oneof payload { bytes stdout_chunk = 1; bytes stderr_chunk = 2; ExecExit exit = 3; } string process_id = 4; }

@@ -134,9 +134,6 @@ async function startControlServer(
     describeWorkspace: (_call: any, callback: any) => {
       callback({ code: grpc.status.NOT_FOUND, details: "workspace not found" });
     },
-    listContainers: (_call: any, callback: any) => {
-      callback(null, { containers });
-    },
     ensureContainer: (call: any, callback: any) => {
       const row = containers.find(
         (candidate: any) =>

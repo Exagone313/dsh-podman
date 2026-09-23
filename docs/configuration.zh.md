@@ -111,6 +111,10 @@ guest-agent 镜像在容器创建时提供 agent：orchestrator 使用 podman
 中的标签（该标签可以完全省略）。由于摘要引用无法被覆盖，当该变量与摘要式的
 `DSH_PODMAN_GUEST_AGENT_IMAGE` 一起设置时，orchestrator 将无法启动。
 
+如果容器的 agent 来自与当前配置不同的 guest-agent
+镜像，该容器会在下次被使用时被重新创建，因此升级 orchestrator
+后无需手动重建容器即可生效。只有在镜像不存在时才会拉取，因此本地构建的开发镜像绝不会被拉取覆盖。
+
 ### `DSH_PODMAN_GUEST_TOKEN`
 
 每次 guest-agent gRPC 调用所需的共享机密，以 gRPC 元数据头

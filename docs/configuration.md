@@ -118,6 +118,12 @@ orchestrator uses its own git version as the image tag instead of the one in
 digest reference cannot be overridden, the orchestrator fails to start when that
 variable is set alongside a digest-style `DSH_PODMAN_GUEST_AGENT_IMAGE`.
 
+A container whose agent was created from a different guest-agent image than the
+one currently configured is recreated the next time it is used, so upgrading the
+orchestrator takes effect without recreating containers by hand. The image is
+pulled only when it is absent, so a locally built development image is never
+pulled over.
+
 ### `DSH_PODMAN_GUEST_TOKEN`
 
 Shared secret required on every guest-agent gRPC call, carried as the gRPC

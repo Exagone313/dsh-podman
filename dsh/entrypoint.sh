@@ -26,6 +26,18 @@ if [ -z "$source" ] && [ -z "${DSH_PODMAN_PLUGIN_VERSION:-}" ]; then
   exit 1
 fi
 
+# The plugin's installed version, and the spec the profile records for it.
+# Both branches below compare against them; the dev branch only needs to know
+# whether the plugin is a declared dependency at all.
+installed=""
+if [ -f "$installed_manifest" ]; then
+  installed=$(node -p "require('$installed_manifest').version")
+fi
+declared=""
+if [ -f "$profile/package.json" ]; then
+  declared=$(node -p "require('$profile/package.json').dependencies?.['@exagone313/dsh-podman'] || ''")
+fi
+
 if [ -n "$source" ]; then
   if [ -d "$source" ]; then
     if [ ! -f "$source/package.json" ]; then
@@ -46,19 +58,21 @@ if [ -n "$source" ]; then
     exit 1
   fi
   printf 'dsh-podman: installing %s\n' "$spec"
+  # pnpm reuses the recorded resolution for an unchanged spec, so a rebuilt
+  # tarball at the same version would never be extracted. Removing the plugin
+  # first forces a real install. A profile that never had it is left alone:
+  # removing an undeclared dependency would fail.
+  if [ -n "$declared" ]; then
+    if ! dsh plugin --profile web remove @exagone313/dsh-podman; then
+      printf 'error: cannot remove the installed plugin\n' >&2
+      exit 1
+    fi
+  fi
   if ! dsh plugin --profile web add "$spec" --save-exact --allow-build=protobufjs; then
     printf 'error: cannot install %s\n' "$spec" >&2
     exit 1
   fi
 else
-  installed=""
-  if [ -f "$installed_manifest" ]; then
-    installed=$(node -p "require('$installed_manifest').version")
-  fi
-  declared=""
-  if [ -f "$profile/package.json" ]; then
-    declared=$(node -p "require('$profile/package.json').dependencies?.['@exagone313/dsh-podman'] || ''")
-  fi
   if [ "$installed" != "$DSH_PODMAN_PLUGIN_VERSION" ] || [ "$declared" != "$DSH_PODMAN_PLUGIN_VERSION" ]; then
     printf 'dsh-podman: installing @exagone313/dsh-podman@%s\n' "$DSH_PODMAN_PLUGIN_VERSION"
     if ! dsh plugin --profile web add "@exagone313/dsh-podman@$DSH_PODMAN_PLUGIN_VERSION" --save-exact --allow-build=protobufjs; then

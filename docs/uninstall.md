@@ -33,11 +33,13 @@ keep.
 ### Remove dsh entirely
 
 ```bash
-rm -rf ~/.dsh
+podman unshare rm -rf ~/.dsh
 ```
 
 `~/.dsh` is the whole harness home: the profiles (including the installed
-plugin), the settings, and the orchestrator's state and package caches.
+plugin), the settings, and the orchestrator's state and package caches. The
+orchestrator runs as root, so parts of that directory belong to the container's
+root and only `podman unshare` can remove them, from the user namespace.
 
 ### Keep dsh without dsh-podman
 
@@ -54,10 +56,11 @@ Then archive the sessions that used the podman tools, from the session's menu
 (**Archive session**): those tools no longer exist without dsh-podman, so
 resuming such a session would leave the model calling tools that are gone.
 
-The orchestrator's leftover state and package caches can be removed too:
+The orchestrator's leftover state and package caches can be removed too. They
+belong to the container's root, so remove them from the user namespace:
 
 ```bash
-rm -rf ~/.dsh/dsh-podman
+podman unshare rm -rf ~/.dsh/dsh-podman
 ```
 
 ## Remove the Podman resources (optional)

@@ -30,11 +30,13 @@ systemctl --user daemon-reload
 ### 完全删除 dsh
 
 ```bash
-rm -rf ~/.dsh
+podman unshare rm -rf ~/.dsh
 ```
 
 `~/.dsh` 是整个 harness 主目录：包含各个
-profile（其中有已安装的插件）、设置，以及编排器的状态与软件包缓存。
+profile（其中有已安装的插件）、设置，以及编排器的状态与软件包缓存。编排器以 root
+运行，因此该目录中部分文件属于容器内的 root，只能在用户命名空间（user
+namespace）中用 `podman unshare` 删除。
 
 ### 保留 dsh 但不使用 dsh-podman
 
@@ -51,10 +53,11 @@ npx @deepseek-ai/dsh web
 session）：没有 dsh-podman
 之后这些工具已不存在，继续恢复此类会话会让模型调用已消失的工具。
 
-编排器残留的状态与软件包缓存也可以删除：
+编排器残留的状态与软件包缓存也可以删除。它们属于容器内的
+root，因此请在用户命名空间中删除：
 
 ```bash
-rm -rf ~/.dsh/dsh-podman
+podman unshare rm -rf ~/.dsh/dsh-podman
 ```
 
 ## 删除 Podman 资源（可选）

@@ -28,6 +28,7 @@ per-project Podman containers.
 - [Configuration](docs/configuration.md)
 - [Usage](docs/usage.md)
 - [Development](docs/development.md)
+- [Uninstall](docs/uninstall.md)
 
 ## AI-usage disclosure
 

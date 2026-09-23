@@ -13,7 +13,7 @@ ENV DO_NOT_TRACK=1
 ENV DSH_TELEMETRY_MODE=DISABLED
 ENV DSH_TELEMETRY_OTLP_URL=https://dsh-telemetry-disabled.invalid/v1/logs
 
-ARG DSH_VERSION=0.1.5-rc.2
+ARG DSH_VERSION=0.1.5-rc.3
 # The dsh-podman plugin version this image ships; the entrypoint installs it
 # into the profile at container start. Release builds pass the tag.
 ARG DSH_PODMAN_PLUGIN_VERSION

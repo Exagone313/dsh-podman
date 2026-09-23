@@ -13,6 +13,7 @@ import (
 
 	"github.com/Exagone313/dsh-podman/internal/auth"
 	guest "github.com/Exagone313/dsh-podman/internal/genproto/dshguest/v1"
+	"github.com/Exagone313/dsh-podman/internal/grpclog"
 	workspacefs "github.com/Exagone313/dsh-podman/internal/guestagent/fs"
 	"github.com/Exagone313/dsh-podman/internal/guestagent/grpcserver"
 	"github.com/Exagone313/dsh-podman/internal/recovery"
@@ -58,9 +59,12 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+	// The request logger runs before authentication so a call the agent rejects
+	// is still visible (method and peer, never the token); the orchestrator logs
+	// after auth, but here an unlogged rejection is exactly the blind spot.
 	server := grpc.NewServer(
-		grpc.ChainUnaryInterceptor(auth.Unary(token), recovery.Unary(logger)),
-		grpc.ChainStreamInterceptor(auth.Stream(token), recovery.Stream(logger)),
+		grpc.ChainUnaryInterceptor(grpclog.Unary(logger), auth.Unary(token), recovery.Unary(logger)),
+		grpc.ChainStreamInterceptor(grpclog.Stream(logger), auth.Stream(token), recovery.Stream(logger)),
 	)
 	agent := grpcserver.New().WithFS(filesystem)
 	agent.Paths.Set(paths)

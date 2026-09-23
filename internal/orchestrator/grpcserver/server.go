@@ -5,8 +5,6 @@
 package grpcserver
 
 import (
-	"context"
-	"fmt"
 	"log/slog"
 
 	ctl "github.com/Exagone313/dsh-podman/internal/genproto/dshctl/v1"
@@ -14,7 +12,6 @@ import (
 	"github.com/Exagone313/dsh-podman/internal/orchestrator/state"
 	"github.com/opencontainers/runtime-spec/specs-go"
 	"go.podman.io/podman/v6/pkg/specgen"
-	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -69,22 +66,6 @@ func (s *Server) log() *slog.Logger {
 		return s.Logger
 	}
 	return slog.Default()
-}
-
-func UnaryLogger(logger *slog.Logger) grpc.UnaryServerInterceptor {
-	if logger == nil {
-		logger = slog.Default()
-	}
-	return func(ctx context.Context, request any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
-		logger.Info("gRPC request", "method", info.FullMethod, "request_type", fmt.Sprintf("%T", request))
-		response, err := handler(ctx, request)
-		if err != nil {
-			logger.Error("gRPC request failed", "method", info.FullMethod, "error", err)
-			return response, err
-		}
-		logger.Info("gRPC request completed", "method", info.FullMethod)
-		return response, nil
-	}
 }
 
 // grpcError maps a plain error to an Internal status error, passing through

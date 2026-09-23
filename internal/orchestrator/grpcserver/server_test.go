@@ -11,7 +11,6 @@ import (
 
 	ctl "github.com/Exagone313/dsh-podman/internal/genproto/dshctl/v1"
 	"github.com/Exagone313/dsh-podman/internal/orchestrator/state"
-	"google.golang.org/grpc"
 )
 
 func TestToProto(t *testing.T) {
@@ -26,16 +25,6 @@ func TestToProto(t *testing.T) {
 	}
 	if len(proto.Mounts) != 2 || proto.Mounts[0].Mode != ctl.MountMode_MOUNT_MODE_READ_ONLY || proto.Mounts[1].Mode != ctl.MountMode_MOUNT_MODE_READ_WRITE {
 		t.Fatalf("mount modes not mapped: %#v", proto.Mounts)
-	}
-}
-
-func TestUnaryLoggerPassesThrough(t *testing.T) {
-	interceptor := UnaryLogger(silentLogger())
-	called := false
-	handler := func(ctx context.Context, req any) (any, error) { called = true; return "value", nil }
-	result, err := interceptor(context.Background(), nil, &grpc.UnaryServerInfo{FullMethod: "/test/Method"}, handler)
-	if err != nil || result != "value" || !called {
-		t.Fatalf("interceptor did not pass through: %v %v %v", result, err, called)
 	}
 }
 

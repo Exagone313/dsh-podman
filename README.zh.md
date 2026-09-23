@@ -33,9 +33,9 @@ dsh-podman 将所有的 shell 执行与文件访问都路由到一次性、按�
 
 本仓库的大部分代码由 AI 模型编写：
 
+- DeepSeek Flash
 - 早期提交使用 OpenAI GPT-5.6 Luna
-- DeepSeek V4 Flash
-- 源代码弱点修复由 Anthropic Claude Opus 5 完成
+- 少量修复由 Anthropic Claude Opus 5 完成
 
 ## 许可证
 

@@ -25,13 +25,27 @@ import { VolumesSection } from "./container-card-volumes.js";
 import { WorkspaceSection } from "./container-card-workspace.js";
 import { type ContainerCardFace } from "./container-card-controller.js";
 import { NS } from "./locales.js";
-import { Button, Input, Modal } from "@deepseek-ai/dsh-client-ui-primitives";
+import {
+  Button,
+  Input,
+  Modal,
+  writeClipboard,
+} from "@deepseek-ai/dsh-client-ui-primitives";
 import {
   type InjectFace,
   type PropsLocale,
   type PropsRuntime,
 } from "@deepseek-ai/dsh-client-ui-slots";
-import { type ReactNode, useEffect, useId, useState } from "react";
+import {
+  type ReactNode,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+} from "react";
+
+// The labels of the version lines, emphasised against their values.
+const versionLabel: React.CSSProperties = { fontWeight: 600 };
 
 export type ContainerCardProps = PropsRuntime<"settings.plugin.item"> &
   PropsLocale<typeof NS> &
@@ -48,7 +62,22 @@ export function ContainerCard(props: ContainerCardProps): ReactNode {
   const [packages, setPackages] = useState<string[]>([]);
   const [defaultOpen, setDefaultOpen] = useState(false);
   const [defaultImage, setDefaultImage] = useState(state.defaultImage);
+  const [copyState, setCopyState] = useState<"idle" | "copied" | "failed">(
+    "idle",
+  );
+  const copyResetTimer = useRef<ReturnType<typeof setTimeout>>();
   const projectsRootId = useId();
+  // Copies the version lines as displayed, so a user can paste them into a bug
+  // report without transcribing anything.
+  const copyVersions = async (): Promise<void> => {
+    const lines = [
+      `${t("cardTitle")} ${state.version}${state.commit ? ` · ${state.commit}` : ""}`,
+      `${t("orchestrator")} ${state.orchestratorVersion || t("versionUnknown")}`,
+    ];
+    setCopyState((await writeClipboard(lines.join("\n"))) ? "copied" : "failed");
+    if (copyResetTimer.current !== undefined) clearTimeout(copyResetTimer.current);
+    copyResetTimer.current = setTimeout(() => setCopyState("idle"), 1500);
+  };
   // The card mounts with the settings panel, so this re-reads the live state
   // every time the Plugins section is opened: a workspace created since the
   // last read shows up without pressing Reload this view.
@@ -357,12 +386,12 @@ export function ContainerCard(props: ContainerCardProps): ReactNode {
             }}
           >
             <span>
-              {t("cardTitle")}
+              <span style={versionLabel}>{t("cardTitle")}</span>
               {state.version ? ` ${state.version}` : ""}
               {state.commit ? ` · ${state.commit}` : ""}
             </span>
             <span>
-              {t("orchestrator")}
+              <span style={versionLabel}>{t("orchestrator")}</span>
               {state.orchestratorVersion ? (
                 ` ${state.orchestratorVersion}`
               ) : (
@@ -376,6 +405,19 @@ export function ContainerCard(props: ContainerCardProps): ReactNode {
                 </>
               )}
             </span>
+            <div style={{ marginTop: "8px" }}>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => void copyVersions()}
+              >
+                {copyState === "copied"
+                  ? t("copied")
+                  : copyState === "failed"
+                    ? t("copyFailed")
+                    : t("copyVersions")}
+              </Button>
+            </div>
           </div>
           <div style={footerRow}>
             <Button

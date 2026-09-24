@@ -459,7 +459,7 @@ export function MountsEditor(props: {
               onChange={(event) => setDraft(emptyMount(event.target.value))}
             >
               <option value="project">{t("mountProject")}</option>
-              <option value="tmpfs">tmpfs</option>
+              <option value="tmpfs">{t("mountTmpfs")}</option>
               <option value="volume">{t("mountVolume")}</option>
               <option value="secret">{t("mountSecret")}</option>
             </select>

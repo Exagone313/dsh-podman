@@ -131,9 +131,13 @@ export type ContainerPluginKey =
   | "remountReject"
   | "mountVolume"
   | "mountSecret"
+  | "mountTmpfs"
+  | "mountAt"
   | "mountMode"
   | "readOnly"
   | "readWrite"
+  | "mountReadOnlySuffix"
+  | "mountReadWriteSuffix"
   | "remountReadOnly"
   | "remountReadWrite"
   | "confirmRemountReadOnly"
@@ -331,9 +335,13 @@ export const en: Record<ContainerPluginKey, string> = {
   remountReject: "Reject",
   mountVolume: "Volume",
   mountSecret: "Secret",
+  mountTmpfs: "tmpfs",
+  mountAt: "at",
   mountMode: "Mode",
   readOnly: "Read-only",
   readWrite: "Read-write",
+  mountReadOnlySuffix: "(ro)",
+  mountReadWriteSuffix: "(rw)",
   remountReadOnly: "Remount as read-only",
   remountReadWrite: "Remount as read-write",
   confirmRemountReadOnly:
@@ -532,9 +540,13 @@ export const zh: Record<ContainerPluginKey, string> = {
   remountReject: "拒绝",
   mountVolume: "卷",
   mountSecret: "机密",
+  mountTmpfs: "tmpfs",
+  mountAt: "位于",
   mountMode: "模式",
   readOnly: "只读",
   readWrite: "读写",
+  mountReadOnlySuffix: "(只读)",
+  mountReadWriteSuffix: "(读写)",
   remountReadOnly: "重新挂载为只读",
   remountReadWrite: "重新挂载为读写",
   confirmRemountReadOnly: "将该挂载重新挂载为只读并重建容器？",

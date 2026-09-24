@@ -144,7 +144,7 @@ export const mountLabel = (
   withMode = true,
 ): string => {
   if (mount.kind === "tmpfs") {
-    return `tmpfs${mount.destination !== "" ? ` at ${mount.destination}` : ""}`;
+    return `${t("mountTmpfs")}${mount.destination !== "" ? ` ${t("mountAt")} ${mount.destination}` : ""}`;
   }
   if (mount.kind === "volume") {
     return `volume ${mount.volume}${mount.destination !== "" ? ` → ${mount.destination}` : ""}`;
@@ -152,7 +152,9 @@ export const mountLabel = (
   if (mount.kind === "secret") {
     return `secret ${mount.secret}${mount.destination !== "" ? ` → ${mount.destination}` : ""}`;
   }
-  const mode = withMode ? (mount.mode === "read_only" ? " (ro)" : " (rw)") : "";
+  const mode = withMode
+    ? ` ${t(mount.mode === "read_only" ? "mountReadOnlySuffix" : "mountReadWriteSuffix")}`
+    : "";
   return `${mount.project}${mount.destination !== "" ? ` → ${mount.destination}` : ""}${mode}`;
 };
 

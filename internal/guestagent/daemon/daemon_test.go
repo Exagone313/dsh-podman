@@ -344,3 +344,43 @@ func TestStartUidOnlyDefaultsGid(t *testing.T) {
 		t.Fatalf("stdout = %q, want 1000", got)
 	}
 }
+
+func TestStartRejectsInvalidNameTyped(t *testing.T) {
+	m := NewManager(childenv.NewPaths())
+	if _, err := m.Start("-bad", []string{"true"}, "", nil, StartOptions{}); !errors.Is(err, ErrInvalidName) {
+		t.Fatalf("err = %v, want ErrInvalidName", err)
+	}
+}
+
+// TestStartCapsTrackedDaemons pins the memory bound: stopped daemons are
+// forgotten to make room, and a full set of running ones is refused instead of
+// growing the capture rings without limit.
+func TestStartCapsTrackedDaemons(t *testing.T) {
+	m := NewManager(childenv.NewPaths())
+	base := time.Now().UTC().Format(time.RFC3339)
+	m.mu.Lock()
+	for i := 0; i < maxDaemons; i++ {
+		name := "stopped" + string(rune('a'+i%26)) + string(rune('a'+i/26))
+		m.daemons[name] = &daemon{info: Daemon{Name: name, Running: false, StoppedAt: base}}
+	}
+	m.mu.Unlock()
+
+	// A new start makes room by evicting stopped daemons.
+	name, err := m.Start("fresh", []string{"sleep", "60"}, "", nil, StartOptions{})
+	if err != nil {
+		t.Fatalf("expected a start to evict stale entries: %v", err)
+	}
+	_ = m.Stop(name, syscall.SIGKILL)
+
+	// A full set of running daemons is refused.
+	m.mu.Lock()
+	m.daemons = map[string]*daemon{}
+	for i := 0; i < maxDaemons; i++ {
+		n := "running" + string(rune('a'+i%26)) + string(rune('a'+i/26))
+		m.daemons[n] = &daemon{info: Daemon{Name: n, Running: true}}
+	}
+	m.mu.Unlock()
+	if _, err := m.Start("extra", []string{"sleep", "60"}, "", nil, StartOptions{}); !errors.Is(err, ErrTooMany) {
+		t.Fatalf("err = %v, want ErrTooMany", err)
+	}
+}

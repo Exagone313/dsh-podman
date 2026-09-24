@@ -23,11 +23,20 @@ import (
 var (
 	ErrAlreadyRunning = errors.New("daemon already running")
 	ErrUnknown        = errors.New("unknown daemon")
+	// ErrInvalidName is a name that cannot be a daemon name.
+	ErrInvalidName = errors.New("invalid daemon name")
+	// ErrTooMany is returned when the manager already tracks its cap of daemons
+	// and none of them is stoppable.
+	ErrTooMany = errors.New("too many daemons")
 )
 
 const (
 	ringCapacity = 256 * 1024
 	stopGrace    = 10 * time.Second
+	// maxDaemons bounds the tracked set. Each tracked daemon holds two 256 KiB
+	// capture rings, so an unbounded map is a memory leak a caller could drive
+	// by starting daemons under ever-new names.
+	maxDaemons = 64
 )
 
 var namePattern = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,63}$`)
@@ -92,10 +101,17 @@ func (m *Manager) Start(name string, argv []string, cwd string, env map[string]s
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if !namePattern.MatchString(name) {
-		return "", fmt.Errorf("invalid daemon name %q", name)
+		return "", fmt.Errorf("%w %q", ErrInvalidName, name)
 	}
 	if existing, ok := m.daemons[name]; ok && existing.info.Running {
 		return "", ErrAlreadyRunning
+	}
+	// Bound the tracked set: make room by forgetting stopped daemons first.
+	if len(m.daemons) >= maxDaemons {
+		m.evictStoppedLocked()
+	}
+	if len(m.daemons) >= maxDaemons {
+		return "", ErrTooMany
 	}
 	envCopy := make(map[string]string, len(env))
 	for key, value := range env {
@@ -159,6 +175,26 @@ func (m *Manager) wait(d *daemon) {
 	d.info.ExitCode = exitCode
 	d.info.StoppedAt = time.Now().UTC().Format(time.RFC3339)
 	m.mu.Unlock()
+}
+
+// evictStoppedLocked forgets stopped daemons, oldest first, until the map is
+// below its cap. It is called with m.mu held and never evicts a running one.
+func (m *Manager) evictStoppedLocked() {
+	stopped := make([]*daemon, 0, len(m.daemons))
+	for _, d := range m.daemons {
+		if !d.info.Running {
+			stopped = append(stopped, d)
+		}
+	}
+	sort.Slice(stopped, func(i, j int) bool {
+		return stopped[i].info.StoppedAt < stopped[j].info.StoppedAt
+	})
+	for _, d := range stopped {
+		if len(m.daemons) < maxDaemons {
+			return
+		}
+		delete(m.daemons, d.info.Name)
+	}
 }
 
 // List returns a stable snapshot of all tracked daemons sorted by name.

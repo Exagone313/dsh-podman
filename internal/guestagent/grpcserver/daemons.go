@@ -68,6 +68,12 @@ func (s *Server) StartDaemon(_ context.Context, request *guest.StartDaemonReques
 		if errors.Is(err, daemon.ErrAlreadyRunning) {
 			return nil, status.Error(codes.AlreadyExists, err.Error())
 		}
+		if errors.Is(err, daemon.ErrInvalidName) {
+			return nil, status.Error(codes.InvalidArgument, err.Error())
+		}
+		if errors.Is(err, daemon.ErrTooMany) {
+			return nil, status.Error(codes.ResourceExhausted, err.Error())
+		}
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 	if info := s.findDaemon(name); info != nil {

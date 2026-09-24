@@ -40,7 +40,7 @@ make vet            # go vet with the build tags
 make test-go        # go test with the build tags
 make test           # test-go + pnpm test (JS tests, which run against dist/)
 make download-licenses  # generate LICENSE.pkg from the project and third-party Go licenses
-make image          # build the orchestrator and guest-agent container images
+make image          # build the orchestrator, guest-agent and dsh container images
 ```
 
 `make image` depends on `LICENSE.pkg`: the `download-licenses` target runs the

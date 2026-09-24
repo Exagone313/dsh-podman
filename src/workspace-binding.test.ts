@@ -23,6 +23,17 @@ import { VERSION } from "./generated/version.js";
 const SLUG = "2c573001-4171-4900-904b-12a5cc02737a";
 const SLUG_SUB = "3d684112-5282-4a11-a15c-23b6dd13848b";
 
+test("normalizeToolError strips the prefix only for a gRPC status", () => {
+  const statusError: any = Object.assign(new Error("5 NOT_FOUND: missing"), { code: 5 });
+  const normalized = normalizeToolError(statusError);
+  assert.equal(normalized.message, "missing");
+  assert.equal((normalized as { code?: string }).code, "NOT_FOUND");
+  // A plain message that merely looks like a status keeps its text.
+  const plain = normalizeToolError(new Error("5 NOT_FOUND: missing"));
+  assert.equal(plain.message, "5 NOT_FOUND: missing");
+  assert.equal((plain as { code?: string }).code, undefined);
+});
+
 test("workspaceSlug accepts a UUID workspace id", () => {
   assert.equal(workspaceSlug(SLUG), SLUG);
   assert.equal(workspaceSlug(SLUG.toUpperCase()), SLUG);

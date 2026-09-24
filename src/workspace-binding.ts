@@ -379,11 +379,15 @@ export function containerNotFound(container: string, slug?: string): Error {
 // when the error carried one) so callers can branch without parsing text.
 export function normalizeToolError(error: unknown): Error {
   const raw = error instanceof Error ? error.message : String(error);
-  const message = raw.replace(/^\d+\s+[A-Z_]+:\s*/, "");
   const code = (error as { code?: unknown }).code;
+  const numericCode = typeof code === "number" ? code : undefined;
+  // Only a real gRPC status renders the "<code> <NAME>: " prefix; a plain
+  // message that merely looks like one must stay intact.
+  const message =
+    numericCode === undefined ? raw : raw.replace(/^\d+\s+[A-Z_]+:\s*/, "");
   const name =
-    typeof code === "number"
-      ? (grpc.status as unknown as Record<number, string>)[code]
+    numericCode !== undefined
+      ? (grpc.status as unknown as Record<number, string>)[numericCode]
       : typeof code === "string"
         ? code
         : undefined;

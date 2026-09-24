@@ -7,6 +7,7 @@ package exec
 import (
 	"context"
 	"fmt"
+	"os"
 	"os/exec"
 	"strconv"
 	"sync"
@@ -20,6 +21,27 @@ type Process struct {
 	ID      string
 	Argv    []string
 	Command *exec.Cmd
+
+	// process is Command.Process once the command has started. Command.Process
+	// is written by Command.Start on the starting goroutine while Signal may
+	// read it from another, so the started handle is published and read under
+	// this mutex instead of through Command.
+	mu      sync.Mutex
+	process *os.Process
+}
+
+// SetProcess publishes the started OS process.
+func (p *Process) SetProcess(handle *os.Process) {
+	p.mu.Lock()
+	p.process = handle
+	p.mu.Unlock()
+}
+
+// ProcessHandle returns the started OS process, or nil before Start succeeds.
+func (p *Process) ProcessHandle() *os.Process {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.process
 }
 
 type Manager struct {

@@ -81,6 +81,9 @@ func (s *Server) Exec(stream guest.WorkspaceGuestAgent_ExecServer) error {
 		return status.Error(codes.InvalidArgument, err.Error())
 	}
 	started = true
+	// Publish the started handle so Signal never reads Command.Process while
+	// Start is still writing it.
+	process.SetProcess(process.Command.Process)
 	spillStdout := s.newSpill(start.GetSpillStdout().GetPath(), start.GetSpillStdout().GetMaxBytes())
 	spillStderr := s.newSpill(start.GetSpillStderr().GetPath(), start.GetSpillStderr().GetMaxBytes())
 	var sendMu sync.Mutex
@@ -193,9 +196,10 @@ func (s *Server) Signal(_ context.Context, request *guest.SignalRequest) (*guest
 		if process.ID != request.GetProcessId() {
 			continue
 		}
-		// Command.Process is nil until Command.Start succeeds, and Exec
-		// registers the process before starting it.
-		if process.Command == nil || process.Command.Process == nil {
+		// The handle is nil until Start succeeds, and Exec registers the
+		// process before starting it.
+		handle := process.ProcessHandle()
+		if handle == nil {
 			return nil, status.Error(codes.FailedPrecondition, "process is not running")
 		}
 		signal, err := signalForName(request.GetSignal())
@@ -209,8 +213,8 @@ func (s *Server) Signal(_ context.Context, request *guest.SignalRequest) (*guest
 		// The command leads its own process group, so signal the group rather
 		// than the direct child: a shell defers a signal while its foreground
 		// child runs, and the caller's kill must reach that child too.
-		if err := syscall.Kill(-process.Command.Process.Pid, sig); err != nil {
-			if fallbackErr := process.Command.Process.Signal(signal); fallbackErr != nil {
+		if err := syscall.Kill(-handle.Pid, sig); err != nil {
+			if fallbackErr := handle.Signal(signal); fallbackErr != nil {
 				return nil, status.Error(codes.Internal, err.Error())
 			}
 		}

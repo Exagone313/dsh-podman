@@ -79,6 +79,8 @@ func TestSignalRejectsUnknownName(t *testing.T) {
 	if err := process.Command.Start(); err != nil {
 		t.Skipf("cannot start a helper process: %v", err)
 	}
+	// Exec publishes the started handle; a Signal only inspects it.
+	process.SetProcess(process.Command.Process)
 	defer func() { _ = process.Command.Process.Kill() }()
 	if _, err := server.Signal(context.Background(), &guest.SignalRequest{ProcessId: process.ID, Signal: "SIGBOGUS"}); status.Code(err) != codes.InvalidArgument {
 		t.Fatalf("expected InvalidArgument, got %v", err)

@@ -227,3 +227,28 @@ func TestStartPropagatesCommandInArgv(t *testing.T) {
 		t.Fatalf("command args mismatch: %#v", process.Command.Args)
 	}
 }
+
+// TestProcessHandleIsPublishedOnStart pins the handle Signal reads: it stays
+// nil until the command starts and the starter publishes it, so Signal never
+// races Command.Start writing Command.Process.
+func TestProcessHandleIsPublishedOnStart(t *testing.T) {
+	manager := NewManager(childenv.NewPaths())
+	process, err := manager.Start(context.Background(), []string{"true"}, "", nil, identity.Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer manager.Remove(process.ID)
+	if handle := process.ProcessHandle(); handle != nil {
+		t.Fatalf("unstarted process exposed a handle: %#v", handle)
+	}
+	if err := process.Command.Start(); err != nil {
+		t.Fatal(err)
+	}
+	process.SetProcess(process.Command.Process)
+	if handle := process.ProcessHandle(); handle != process.Command.Process {
+		t.Fatalf("handle = %#v, want the started process", handle)
+	}
+	if err := process.Command.Wait(); err != nil {
+		t.Fatal(err)
+	}
+}

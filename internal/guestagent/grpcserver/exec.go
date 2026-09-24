@@ -157,6 +157,9 @@ func (s *Server) Exec(stream guest.WorkspaceGuestAgent_ExecServer) error {
 	// have not read yet. The exit message is sent only after this, so the spill
 	// validity and the final chunks are final when the caller sees them.
 	copies.Wait()
+	// Read what the copiers recorded instead of dropping it: a send or read
+	// failure means the caller's stream is likely gone.
+	copyErr := drainErr(errCh)
 	waitErr := process.Command.Wait()
 	spillStdout.close()
 	spillStderr.close()
@@ -185,10 +188,33 @@ func (s *Server) Exec(stream guest.WorkspaceGuestAgent_ExecServer) error {
 		StdoutSpillValid: spillStdout.valid(),
 		StderrSpillValid: spillStderr.valid(),
 	}}}); err != nil {
+		if copyErr != nil {
+			// The stream is confirmed dead; the copy failure is the cause.
+			return copyErr
+		}
 		return err
+	}
+	if copyErr != nil {
+		slog.Warn("guest agent Exec output copy failed", "error", copyErr)
 	}
 	slog.Info("guest agent Exec completed", "exit_code", exit, "signaled", signaled)
 	return nil
+}
+
+// drainErr returns the first error the output copiers recorded, if any. The
+// channel is buffered for both copiers, so this never blocks.
+func drainErr(errCh <-chan error) error {
+	var first error
+	for {
+		select {
+		case err := <-errCh:
+			if first == nil {
+				first = err
+			}
+		default:
+			return first
+		}
+	}
 }
 
 func (s *Server) Signal(_ context.Context, request *guest.SignalRequest) (*guest.SignalResponse, error) {

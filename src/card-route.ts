@@ -14,6 +14,7 @@ import {
   type CommandOp,
   type CommandRequest,
   type ContainerView,
+  type ImageView,
   type MountInput,
   type WorkspaceView,
 } from "./client/card-protocol.js";
@@ -50,6 +51,42 @@ function cacheCleanModeToProto(mode: string): string {
     : undefined;
   if (proto === undefined) throw new Error(`unknown cache clean mode: ${mode}`);
   return proto;
+}
+
+// containerMountView and imageView rebuild the snapshot's nested objects from
+// an explicit allow-list, so a field added to the proto later cannot reach the
+// browser just because it exists on the wire (see AGENTS.md "Security").
+function containerMountView(mount: any): {
+  projectName: string;
+  destination: string;
+  kind: string;
+  mode: string;
+  volume: string;
+  secret: string;
+} {
+  return {
+    projectName: stringField(mount?.projectName),
+    destination: stringField(mount?.destination),
+    kind: stringField(mount?.kind),
+    mode: stringField(mount?.mode),
+    volume: stringField(mount?.volume),
+    secret: stringField(mount?.secret),
+  };
+}
+
+function imageView(image: any): ImageView {
+  return {
+    imageId: stringField(image?.imageId),
+    parent: stringField(image?.parent),
+    packages: Array.isArray(image?.packages) ? image.packages.map(String) : [],
+    imageTag: stringField(image?.imageTag),
+    builtAt: stringField(image?.builtAt),
+    isBase: Boolean(image?.isBase),
+    status: stringField(image?.status),
+    primitive: stringField(image?.primitive),
+    packageManager: stringField(image?.packageManager),
+    basePublic: Boolean(image?.basePublic),
+  };
 }
 
 function orchestratorWorkspaceViews(raw: unknown): WorkspaceView[] {
@@ -177,13 +214,13 @@ export async function cardSnapshot(
         imageId: container.imageId ?? "",
         status: container.status ?? "",
         createdAt: container.createdAt ?? "",
-        mounts: container.mounts ?? [],
+        mounts: (container.mounts ?? []).map(containerMountView),
         paths: container.paths ?? [],
         env: container.env ?? {},
         secretEnv: container.secretEnv ?? {},
       }),
     ),
-    images: (images as any).images ?? [],
+    images: (((images as any).images ?? []) as any[]).map(imageView),
     volumes: ((volumes as any).volumes ?? []).map((volume: any) => ({
       name: volume.name ?? "",
     })),

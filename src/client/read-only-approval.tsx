@@ -29,9 +29,14 @@ function ReadOnlyApprovalFlow({
   matched: PendingApproval;
 }): ReactNode {
   const [answered, setAnswered] = useState(false);
+  const [error, setError] = useState("");
   const answer = (outcome: "allowed-once" | "rejected"): void => {
     setAnswered(true);
-    void matched.answer(outcome).catch(() => setAnswered(false));
+    setError("");
+    void matched.answer(outcome).catch((failure: unknown) => {
+      setAnswered(false);
+      setError(failure instanceof Error ? failure.message : String(failure));
+    });
   };
   return (
     <div
@@ -54,6 +59,8 @@ function ReadOnlyApprovalFlow({
         }}
       >
         <div
+          role="status"
+          aria-live="polite"
           style={{
             display: "flex",
             alignItems: "center",
@@ -95,6 +102,19 @@ function ReadOnlyApprovalFlow({
             {matched.reason ?? ""}
           </div>
         </div>
+        {error === "" ? null : (
+          <p
+            role="alert"
+            style={{
+              margin: 0,
+              padding: "8px 16px 0",
+              fontSize: "13px",
+              color: "var(--dsw-alias-state-error-primary)",
+            }}
+          >
+            {error}
+          </p>
+        )}
         <div
           style={{
             display: "flex",

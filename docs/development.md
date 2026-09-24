@@ -102,7 +102,7 @@ Environment=DSH_PODMAN_PLUGIN_SOURCE=/mnt/dsh-podman
 
 ```
 # or the archive itself
-Volume=/path/to/exagone313-dsh-podman-0.2.0-rc.3.tgz:/mnt/dsh-podman.tgz:ro
+Volume=/path/to/exagone313-dsh-podman-x.y.z.tgz:/mnt/dsh-podman.tgz:ro
 Environment=DSH_PODMAN_PLUGIN_SOURCE=/mnt/dsh-podman.tgz
 ```
 
@@ -157,8 +157,8 @@ The tag must match `package.json`'s version — the workflow fails otherwise —
 bump both with the version script:
 
 ```sh
-pnpm bump-version 0.1.1            # add --dry-run to validate only
-git push origin master 0.1.1
+pnpm bump-version x.y.z            # add --dry-run to validate only
+git push origin master x.y.z
 ```
 
 `scripts/bump-version.mjs` checks that the version is a semver release or

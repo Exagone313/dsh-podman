@@ -99,7 +99,7 @@ Environment=DSH_PODMAN_PLUGIN_SOURCE=/mnt/dsh-podman
 
 ```
 # 或者归档本身
-Volume=/path/to/exagone313-dsh-podman-0.2.0-rc.3.tgz:/mnt/dsh-podman.tgz:ro
+Volume=/path/to/exagone313-dsh-podman-x.y.z.tgz:/mnt/dsh-podman.tgz:ro
 Environment=DSH_PODMAN_PLUGIN_SOURCE=/mnt/dsh-podman.tgz
 ```
 
@@ -148,8 +148,8 @@ zizmor）、`ci-code.yml`（Go、JS、镜像、Trivy）、`ci-docs.yml`（Deno f
 中的版本一致——否则工作流会失败——因此请用版本脚本同时更新两者：
 
 ```sh
-pnpm bump-version 0.1.1            # 加上 --dry-run 则仅校验
-git push origin master 0.1.1
+pnpm bump-version x.y.z            # 加上 --dry-run 则仅校验
+git push origin master x.y.z
 ```
 
 `scripts/bump-version.mjs` 会检查版本是否为递增的 Semver

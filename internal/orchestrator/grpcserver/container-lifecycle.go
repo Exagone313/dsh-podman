@@ -259,6 +259,14 @@ func (s *Server) RecreateContainer(ctx context.Context, request *ctl.RecreateCon
 	if len(request.GetEnv()) > 0 {
 		record.Env = cloneMap(request.GetEnv())
 	}
+	// A recreate request may replace the secret environment; without it the
+	// container keeps the secrets it had, matching env, mounts, and PATH.
+	if len(request.GetSecretEnv()) > 0 {
+		record.SecretEnv = cloneMap(request.GetSecretEnv())
+	}
+	if err := validateSecretEnv(record.SecretEnv); err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
 	// A recreate request may replace the PATH additions; without them the
 	// container keeps the list it had.
 	if len(request.GetPaths()) > 0 {

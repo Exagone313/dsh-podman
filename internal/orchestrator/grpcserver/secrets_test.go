@@ -612,3 +612,80 @@ func TestPodmanMountsSkipsSecretKinds(t *testing.T) {
 		t.Fatalf("secret mount leaked into OCI mounts: %#v", mounts)
 	}
 }
+
+// TestRecreateContainerReplacesSecretEnv is the regression test for a
+// recreate request carrying secret_env: the proto field must reach the stored
+// record and the prefixed env secrets handed to podman, instead of being
+// silently dropped by the loader.
+func TestRecreateContainerReplacesSecretEnv(t *testing.T) {
+	store := newTestStore(t)
+	if err := store.SaveImages([]state.Image{{ImageID: "arch", ImageTag: "localhost/dsh-podman/arch:latest"}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.SaveWorkspaces([]state.Workspace{{
+		WorkspaceSlug: "proj",
+		Containers: []state.Container{{
+			Name: "default", PodmanName: "dsh-podman-proj-default", ImageID: "arch", Status: "running",
+			SecretEnv: map[string]string{"OLD": "old"},
+		}},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	fake := newFakePodman()
+	server := &Server{Store: store, Podman: fake, SecretPrefix: "dsh-podman-", Logger: silentLogger()}
+
+	if _, err := server.RecreateContainer(context.Background(), &ctl.RecreateContainerRequest{
+		WorkspaceSlug: "proj",
+		Container:     "default",
+		ImageId:       "arch",
+		SecretEnv:     map[string]string{"TOKEN": "known"},
+	}); err != nil {
+		t.Fatalf("recreate with secret env: %v", err)
+	}
+	stored, err := store.Workspaces()
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := stored[0].Containers[0].SecretEnv
+	if len(got) != 1 || got["TOKEN"] != "known" {
+		t.Fatalf("secret env not replaced: %#v", got)
+	}
+	if len(fake.envSecrets) != 1 || fake.envSecrets[0]["TOKEN"] != "dsh-podman-known" {
+		t.Fatalf("prefixed env secrets not passed to podman: %#v", fake.envSecrets)
+	}
+}
+
+// TestRecreateContainerKeepsSecretEnvWhenOmitted pins that an omitted
+// secret_env keeps the container's existing bindings.
+func TestRecreateContainerKeepsSecretEnvWhenOmitted(t *testing.T) {
+	store := newTestStore(t)
+	if err := store.SaveImages([]state.Image{{ImageID: "arch", ImageTag: "localhost/dsh-podman/arch:latest"}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.SaveWorkspaces([]state.Workspace{{
+		WorkspaceSlug: "proj",
+		Containers: []state.Container{{
+			Name: "default", PodmanName: "dsh-podman-proj-default", ImageID: "arch", Status: "running",
+			SecretEnv: map[string]string{"KEEP": "kept"},
+		}},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	server := &Server{Store: store, Podman: newFakePodman(), SecretPrefix: "dsh-podman-", Logger: silentLogger()}
+
+	if _, err := server.RecreateContainer(context.Background(), &ctl.RecreateContainerRequest{
+		WorkspaceSlug: "proj",
+		Container:     "default",
+		ImageId:       "arch",
+	}); err != nil {
+		t.Fatalf("recreate without secret env: %v", err)
+	}
+	stored, err := store.Workspaces()
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := stored[0].Containers[0].SecretEnv
+	if len(got) != 1 || got["KEEP"] != "kept" {
+		t.Fatalf("omitted secret env must be kept: %#v", got)
+	}
+}

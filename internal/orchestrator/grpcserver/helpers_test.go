@@ -68,6 +68,7 @@ type fakePodman struct {
 	removedSocketDirs []string
 	created           []string
 	createdPaths      []string
+	envSecrets        []map[string]string
 	recreated         []string
 	createErr         error
 	recreateFails     int

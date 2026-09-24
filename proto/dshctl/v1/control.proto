@@ -114,7 +114,7 @@ message Container {
 }
 message StartContainerRequest { string workspace_slug = 1; string container = 2; string image_id = 3; repeated ProjectMount mounts = 4; map<string, string> env = 5; map<string, string> secret_env = 6; repeated string paths = 7; }
 message EnsureContainerRequest { string workspace_slug = 1; string container = 2; }
-message RecreateContainerRequest { string workspace_slug = 1; string image_id = 2; string container = 3; repeated ProjectMount mounts = 4; map<string, string> env = 5; repeated string paths = 6; }
+message RecreateContainerRequest { string workspace_slug = 1; string image_id = 2; string container = 3; repeated ProjectMount mounts = 4; map<string, string> env = 5; repeated string paths = 6; map<string, string> secret_env = 7; }
 message RemoveContainerRequest { string workspace_slug = 1; string container = 2; }
 message RemoveContainerResponse {}
 message AddContainerMountRequest { string workspace_slug = 1; string container = 2; string project = 3; reserved 4; string destination = 5; MountMode mode = 6; MountKind kind = 7; string volume = 8; string secret = 9; }

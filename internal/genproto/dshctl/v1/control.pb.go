@@ -2126,6 +2126,7 @@ type RecreateContainerRequest struct {
 	Mounts        []*ProjectMount        `protobuf:"bytes,4,rep,name=mounts,proto3" json:"mounts,omitempty"`
 	Env           map[string]string      `protobuf:"bytes,5,rep,name=env,proto3" json:"env,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	Paths         []string               `protobuf:"bytes,6,rep,name=paths,proto3" json:"paths,omitempty"`
+	SecretEnv     map[string]string      `protobuf:"bytes,7,rep,name=secret_env,json=secretEnv,proto3" json:"secret_env,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2198,6 +2199,13 @@ func (x *RecreateContainerRequest) GetEnv() map[string]string {
 func (x *RecreateContainerRequest) GetPaths() []string {
 	if x != nil {
 		return x.Paths
+	}
+	return nil
+}
+
+func (x *RecreateContainerRequest) GetSecretEnv() map[string]string {
+	if x != nil {
+		return x.SecretEnv
 	}
 	return nil
 }
@@ -3499,15 +3507,20 @@ const file_dshctl_v1_control_proto_rawDesc = "" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"]\n" +
 	"\x16EnsureContainerRequest\x12%\n" +
 	"\x0eworkspace_slug\x18\x01 \x01(\tR\rworkspaceSlug\x12\x1c\n" +
-	"\tcontainer\x18\x02 \x01(\tR\tcontainer\"\xb9\x02\n" +
+	"\tcontainer\x18\x02 \x01(\tR\tcontainer\"\xca\x03\n" +
 	"\x18RecreateContainerRequest\x12%\n" +
 	"\x0eworkspace_slug\x18\x01 \x01(\tR\rworkspaceSlug\x12\x19\n" +
 	"\bimage_id\x18\x02 \x01(\tR\aimageId\x12\x1c\n" +
 	"\tcontainer\x18\x03 \x01(\tR\tcontainer\x12/\n" +
 	"\x06mounts\x18\x04 \x03(\v2\x17.dshctl.v1.ProjectMountR\x06mounts\x12>\n" +
 	"\x03env\x18\x05 \x03(\v2,.dshctl.v1.RecreateContainerRequest.EnvEntryR\x03env\x12\x14\n" +
-	"\x05paths\x18\x06 \x03(\tR\x05paths\x1a6\n" +
+	"\x05paths\x18\x06 \x03(\tR\x05paths\x12Q\n" +
+	"\n" +
+	"secret_env\x18\a \x03(\v22.dshctl.v1.RecreateContainerRequest.SecretEnvEntryR\tsecretEnv\x1a6\n" +
 	"\bEnvEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\x1a<\n" +
+	"\x0eSecretEnvEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"]\n" +
 	"\x16RemoveContainerRequest\x12%\n" +
@@ -3645,7 +3658,7 @@ func file_dshctl_v1_control_proto_rawDescGZIP() []byte {
 }
 
 var file_dshctl_v1_control_proto_enumTypes = make([]protoimpl.EnumInfo, 3)
-var file_dshctl_v1_control_proto_msgTypes = make([]protoimpl.MessageInfo, 66)
+var file_dshctl_v1_control_proto_msgTypes = make([]protoimpl.MessageInfo, 67)
 var file_dshctl_v1_control_proto_goTypes = []any{
 	(MountMode)(0),                       // 0: dshctl.v1.MountMode
 	(MountKind)(0),                       // 1: dshctl.v1.MountKind
@@ -3716,6 +3729,7 @@ var file_dshctl_v1_control_proto_goTypes = []any{
 	nil,                                  // 66: dshctl.v1.StartContainerRequest.EnvEntry
 	nil,                                  // 67: dshctl.v1.StartContainerRequest.SecretEnvEntry
 	nil,                                  // 68: dshctl.v1.RecreateContainerRequest.EnvEntry
+	nil,                                  // 69: dshctl.v1.RecreateContainerRequest.SecretEnvEntry
 }
 var file_dshctl_v1_control_proto_depIdxs = []int32{
 	7,  // 0: dshctl.v1.ListProjectsResponse.projects:type_name -> dshctl.v1.Project
@@ -3742,86 +3756,87 @@ var file_dshctl_v1_control_proto_depIdxs = []int32{
 	67, // 21: dshctl.v1.StartContainerRequest.secret_env:type_name -> dshctl.v1.StartContainerRequest.SecretEnvEntry
 	8,  // 22: dshctl.v1.RecreateContainerRequest.mounts:type_name -> dshctl.v1.ProjectMount
 	68, // 23: dshctl.v1.RecreateContainerRequest.env:type_name -> dshctl.v1.RecreateContainerRequest.EnvEntry
-	0,  // 24: dshctl.v1.AddContainerMountRequest.mode:type_name -> dshctl.v1.MountMode
-	1,  // 25: dshctl.v1.AddContainerMountRequest.kind:type_name -> dshctl.v1.MountKind
-	1,  // 26: dshctl.v1.RemoveContainerMountRequest.kind:type_name -> dshctl.v1.MountKind
-	1,  // 27: dshctl.v1.UpdateContainerMountRequest.kind:type_name -> dshctl.v1.MountKind
-	0,  // 28: dshctl.v1.UpdateContainerMountRequest.mode:type_name -> dshctl.v1.MountMode
-	47, // 29: dshctl.v1.ListVolumesResponse.volumes:type_name -> dshctl.v1.Volume
-	53, // 30: dshctl.v1.ListSecretsResponse.secrets:type_name -> dshctl.v1.Secret
-	3,  // 31: dshctl.v1.OrchestratorControl.GetVersion:input_type -> dshctl.v1.GetVersionRequest
-	5,  // 32: dshctl.v1.OrchestratorControl.ListProjects:input_type -> dshctl.v1.ListProjectsRequest
-	9,  // 33: dshctl.v1.OrchestratorControl.CreateWorkspace:input_type -> dshctl.v1.CreateWorkspaceRequest
-	10, // 34: dshctl.v1.OrchestratorControl.DescribeWorkspace:input_type -> dshctl.v1.DescribeWorkspaceRequest
-	37, // 35: dshctl.v1.OrchestratorControl.EnsureContainer:input_type -> dshctl.v1.EnsureContainerRequest
-	13, // 36: dshctl.v1.OrchestratorControl.ListWorkspaces:input_type -> dshctl.v1.ListWorkspacesRequest
-	11, // 37: dshctl.v1.OrchestratorControl.RemoveWorkspace:input_type -> dshctl.v1.RemoveWorkspaceRequest
-	16, // 38: dshctl.v1.OrchestratorControl.ListImages:input_type -> dshctl.v1.ListImagesRequest
-	26, // 39: dshctl.v1.OrchestratorControl.GetImage:input_type -> dshctl.v1.GetImageRequest
-	27, // 40: dshctl.v1.OrchestratorControl.BuildImage:input_type -> dshctl.v1.BuildImageRequest
-	19, // 41: dshctl.v1.OrchestratorControl.RebuildImage:input_type -> dshctl.v1.RebuildImageRequest
-	20, // 42: dshctl.v1.OrchestratorControl.RebuildAllImages:input_type -> dshctl.v1.RebuildAllImagesRequest
-	22, // 43: dshctl.v1.OrchestratorControl.RemoveImage:input_type -> dshctl.v1.RemoveImageRequest
-	24, // 44: dshctl.v1.OrchestratorControl.RebuildBaseImage:input_type -> dshctl.v1.RebuildBaseImageRequest
-	25, // 45: dshctl.v1.OrchestratorControl.PullBaseImage:input_type -> dshctl.v1.PullBaseImageRequest
-	28, // 46: dshctl.v1.OrchestratorControl.ListCaches:input_type -> dshctl.v1.ListCachesRequest
-	31, // 47: dshctl.v1.OrchestratorControl.CleanCaches:input_type -> dshctl.v1.CleanCachesRequest
-	33, // 48: dshctl.v1.OrchestratorControl.ListContainers:input_type -> dshctl.v1.ListContainersRequest
-	36, // 49: dshctl.v1.OrchestratorControl.StartContainer:input_type -> dshctl.v1.StartContainerRequest
-	38, // 50: dshctl.v1.OrchestratorControl.RecreateContainer:input_type -> dshctl.v1.RecreateContainerRequest
-	39, // 51: dshctl.v1.OrchestratorControl.RemoveContainer:input_type -> dshctl.v1.RemoveContainerRequest
-	41, // 52: dshctl.v1.OrchestratorControl.AddContainerMount:input_type -> dshctl.v1.AddContainerMountRequest
-	42, // 53: dshctl.v1.OrchestratorControl.RemoveContainerMount:input_type -> dshctl.v1.RemoveContainerMountRequest
-	43, // 54: dshctl.v1.OrchestratorControl.UpdateContainerMount:input_type -> dshctl.v1.UpdateContainerMountRequest
-	44, // 55: dshctl.v1.OrchestratorControl.SetContainerPaths:input_type -> dshctl.v1.SetContainerPathsRequest
-	45, // 56: dshctl.v1.OrchestratorControl.ListVolumes:input_type -> dshctl.v1.ListVolumesRequest
-	48, // 57: dshctl.v1.OrchestratorControl.CreateVolume:input_type -> dshctl.v1.CreateVolumeRequest
-	49, // 58: dshctl.v1.OrchestratorControl.RemoveVolume:input_type -> dshctl.v1.RemoveVolumeRequest
-	51, // 59: dshctl.v1.OrchestratorControl.ListSecrets:input_type -> dshctl.v1.ListSecretsRequest
-	54, // 60: dshctl.v1.OrchestratorControl.CreateSecret:input_type -> dshctl.v1.CreateSecretRequest
-	55, // 61: dshctl.v1.OrchestratorControl.WriteSecretValue:input_type -> dshctl.v1.WriteSecretValueRequest
-	56, // 62: dshctl.v1.OrchestratorControl.RemoveSecret:input_type -> dshctl.v1.RemoveSecretRequest
-	58, // 63: dshctl.v1.OrchestratorControl.AddContainerSecret:input_type -> dshctl.v1.AddContainerSecretRequest
-	59, // 64: dshctl.v1.OrchestratorControl.RemoveContainerSecret:input_type -> dshctl.v1.RemoveContainerSecretRequest
-	4,  // 65: dshctl.v1.OrchestratorControl.GetVersion:output_type -> dshctl.v1.GetVersionResponse
-	6,  // 66: dshctl.v1.OrchestratorControl.ListProjects:output_type -> dshctl.v1.ListProjectsResponse
-	15, // 67: dshctl.v1.OrchestratorControl.CreateWorkspace:output_type -> dshctl.v1.Workspace
-	15, // 68: dshctl.v1.OrchestratorControl.DescribeWorkspace:output_type -> dshctl.v1.Workspace
-	35, // 69: dshctl.v1.OrchestratorControl.EnsureContainer:output_type -> dshctl.v1.Container
-	14, // 70: dshctl.v1.OrchestratorControl.ListWorkspaces:output_type -> dshctl.v1.ListWorkspacesResponse
-	12, // 71: dshctl.v1.OrchestratorControl.RemoveWorkspace:output_type -> dshctl.v1.RemoveWorkspaceResponse
-	17, // 72: dshctl.v1.OrchestratorControl.ListImages:output_type -> dshctl.v1.ListImagesResponse
-	18, // 73: dshctl.v1.OrchestratorControl.GetImage:output_type -> dshctl.v1.Image
-	18, // 74: dshctl.v1.OrchestratorControl.BuildImage:output_type -> dshctl.v1.Image
-	18, // 75: dshctl.v1.OrchestratorControl.RebuildImage:output_type -> dshctl.v1.Image
-	21, // 76: dshctl.v1.OrchestratorControl.RebuildAllImages:output_type -> dshctl.v1.RebuildAllImagesResponse
-	23, // 77: dshctl.v1.OrchestratorControl.RemoveImage:output_type -> dshctl.v1.RemoveImageResponse
-	18, // 78: dshctl.v1.OrchestratorControl.RebuildBaseImage:output_type -> dshctl.v1.Image
-	18, // 79: dshctl.v1.OrchestratorControl.PullBaseImage:output_type -> dshctl.v1.Image
-	29, // 80: dshctl.v1.OrchestratorControl.ListCaches:output_type -> dshctl.v1.ListCachesResponse
-	32, // 81: dshctl.v1.OrchestratorControl.CleanCaches:output_type -> dshctl.v1.CleanCachesResponse
-	34, // 82: dshctl.v1.OrchestratorControl.ListContainers:output_type -> dshctl.v1.ListContainersResponse
-	35, // 83: dshctl.v1.OrchestratorControl.StartContainer:output_type -> dshctl.v1.Container
-	35, // 84: dshctl.v1.OrchestratorControl.RecreateContainer:output_type -> dshctl.v1.Container
-	40, // 85: dshctl.v1.OrchestratorControl.RemoveContainer:output_type -> dshctl.v1.RemoveContainerResponse
-	35, // 86: dshctl.v1.OrchestratorControl.AddContainerMount:output_type -> dshctl.v1.Container
-	35, // 87: dshctl.v1.OrchestratorControl.RemoveContainerMount:output_type -> dshctl.v1.Container
-	35, // 88: dshctl.v1.OrchestratorControl.UpdateContainerMount:output_type -> dshctl.v1.Container
-	35, // 89: dshctl.v1.OrchestratorControl.SetContainerPaths:output_type -> dshctl.v1.Container
-	46, // 90: dshctl.v1.OrchestratorControl.ListVolumes:output_type -> dshctl.v1.ListVolumesResponse
-	47, // 91: dshctl.v1.OrchestratorControl.CreateVolume:output_type -> dshctl.v1.Volume
-	50, // 92: dshctl.v1.OrchestratorControl.RemoveVolume:output_type -> dshctl.v1.RemoveVolumeResponse
-	52, // 93: dshctl.v1.OrchestratorControl.ListSecrets:output_type -> dshctl.v1.ListSecretsResponse
-	53, // 94: dshctl.v1.OrchestratorControl.CreateSecret:output_type -> dshctl.v1.Secret
-	53, // 95: dshctl.v1.OrchestratorControl.WriteSecretValue:output_type -> dshctl.v1.Secret
-	57, // 96: dshctl.v1.OrchestratorControl.RemoveSecret:output_type -> dshctl.v1.RemoveSecretResponse
-	35, // 97: dshctl.v1.OrchestratorControl.AddContainerSecret:output_type -> dshctl.v1.Container
-	35, // 98: dshctl.v1.OrchestratorControl.RemoveContainerSecret:output_type -> dshctl.v1.Container
-	65, // [65:99] is the sub-list for method output_type
-	31, // [31:65] is the sub-list for method input_type
-	31, // [31:31] is the sub-list for extension type_name
-	31, // [31:31] is the sub-list for extension extendee
-	0,  // [0:31] is the sub-list for field type_name
+	69, // 24: dshctl.v1.RecreateContainerRequest.secret_env:type_name -> dshctl.v1.RecreateContainerRequest.SecretEnvEntry
+	0,  // 25: dshctl.v1.AddContainerMountRequest.mode:type_name -> dshctl.v1.MountMode
+	1,  // 26: dshctl.v1.AddContainerMountRequest.kind:type_name -> dshctl.v1.MountKind
+	1,  // 27: dshctl.v1.RemoveContainerMountRequest.kind:type_name -> dshctl.v1.MountKind
+	1,  // 28: dshctl.v1.UpdateContainerMountRequest.kind:type_name -> dshctl.v1.MountKind
+	0,  // 29: dshctl.v1.UpdateContainerMountRequest.mode:type_name -> dshctl.v1.MountMode
+	47, // 30: dshctl.v1.ListVolumesResponse.volumes:type_name -> dshctl.v1.Volume
+	53, // 31: dshctl.v1.ListSecretsResponse.secrets:type_name -> dshctl.v1.Secret
+	3,  // 32: dshctl.v1.OrchestratorControl.GetVersion:input_type -> dshctl.v1.GetVersionRequest
+	5,  // 33: dshctl.v1.OrchestratorControl.ListProjects:input_type -> dshctl.v1.ListProjectsRequest
+	9,  // 34: dshctl.v1.OrchestratorControl.CreateWorkspace:input_type -> dshctl.v1.CreateWorkspaceRequest
+	10, // 35: dshctl.v1.OrchestratorControl.DescribeWorkspace:input_type -> dshctl.v1.DescribeWorkspaceRequest
+	37, // 36: dshctl.v1.OrchestratorControl.EnsureContainer:input_type -> dshctl.v1.EnsureContainerRequest
+	13, // 37: dshctl.v1.OrchestratorControl.ListWorkspaces:input_type -> dshctl.v1.ListWorkspacesRequest
+	11, // 38: dshctl.v1.OrchestratorControl.RemoveWorkspace:input_type -> dshctl.v1.RemoveWorkspaceRequest
+	16, // 39: dshctl.v1.OrchestratorControl.ListImages:input_type -> dshctl.v1.ListImagesRequest
+	26, // 40: dshctl.v1.OrchestratorControl.GetImage:input_type -> dshctl.v1.GetImageRequest
+	27, // 41: dshctl.v1.OrchestratorControl.BuildImage:input_type -> dshctl.v1.BuildImageRequest
+	19, // 42: dshctl.v1.OrchestratorControl.RebuildImage:input_type -> dshctl.v1.RebuildImageRequest
+	20, // 43: dshctl.v1.OrchestratorControl.RebuildAllImages:input_type -> dshctl.v1.RebuildAllImagesRequest
+	22, // 44: dshctl.v1.OrchestratorControl.RemoveImage:input_type -> dshctl.v1.RemoveImageRequest
+	24, // 45: dshctl.v1.OrchestratorControl.RebuildBaseImage:input_type -> dshctl.v1.RebuildBaseImageRequest
+	25, // 46: dshctl.v1.OrchestratorControl.PullBaseImage:input_type -> dshctl.v1.PullBaseImageRequest
+	28, // 47: dshctl.v1.OrchestratorControl.ListCaches:input_type -> dshctl.v1.ListCachesRequest
+	31, // 48: dshctl.v1.OrchestratorControl.CleanCaches:input_type -> dshctl.v1.CleanCachesRequest
+	33, // 49: dshctl.v1.OrchestratorControl.ListContainers:input_type -> dshctl.v1.ListContainersRequest
+	36, // 50: dshctl.v1.OrchestratorControl.StartContainer:input_type -> dshctl.v1.StartContainerRequest
+	38, // 51: dshctl.v1.OrchestratorControl.RecreateContainer:input_type -> dshctl.v1.RecreateContainerRequest
+	39, // 52: dshctl.v1.OrchestratorControl.RemoveContainer:input_type -> dshctl.v1.RemoveContainerRequest
+	41, // 53: dshctl.v1.OrchestratorControl.AddContainerMount:input_type -> dshctl.v1.AddContainerMountRequest
+	42, // 54: dshctl.v1.OrchestratorControl.RemoveContainerMount:input_type -> dshctl.v1.RemoveContainerMountRequest
+	43, // 55: dshctl.v1.OrchestratorControl.UpdateContainerMount:input_type -> dshctl.v1.UpdateContainerMountRequest
+	44, // 56: dshctl.v1.OrchestratorControl.SetContainerPaths:input_type -> dshctl.v1.SetContainerPathsRequest
+	45, // 57: dshctl.v1.OrchestratorControl.ListVolumes:input_type -> dshctl.v1.ListVolumesRequest
+	48, // 58: dshctl.v1.OrchestratorControl.CreateVolume:input_type -> dshctl.v1.CreateVolumeRequest
+	49, // 59: dshctl.v1.OrchestratorControl.RemoveVolume:input_type -> dshctl.v1.RemoveVolumeRequest
+	51, // 60: dshctl.v1.OrchestratorControl.ListSecrets:input_type -> dshctl.v1.ListSecretsRequest
+	54, // 61: dshctl.v1.OrchestratorControl.CreateSecret:input_type -> dshctl.v1.CreateSecretRequest
+	55, // 62: dshctl.v1.OrchestratorControl.WriteSecretValue:input_type -> dshctl.v1.WriteSecretValueRequest
+	56, // 63: dshctl.v1.OrchestratorControl.RemoveSecret:input_type -> dshctl.v1.RemoveSecretRequest
+	58, // 64: dshctl.v1.OrchestratorControl.AddContainerSecret:input_type -> dshctl.v1.AddContainerSecretRequest
+	59, // 65: dshctl.v1.OrchestratorControl.RemoveContainerSecret:input_type -> dshctl.v1.RemoveContainerSecretRequest
+	4,  // 66: dshctl.v1.OrchestratorControl.GetVersion:output_type -> dshctl.v1.GetVersionResponse
+	6,  // 67: dshctl.v1.OrchestratorControl.ListProjects:output_type -> dshctl.v1.ListProjectsResponse
+	15, // 68: dshctl.v1.OrchestratorControl.CreateWorkspace:output_type -> dshctl.v1.Workspace
+	15, // 69: dshctl.v1.OrchestratorControl.DescribeWorkspace:output_type -> dshctl.v1.Workspace
+	35, // 70: dshctl.v1.OrchestratorControl.EnsureContainer:output_type -> dshctl.v1.Container
+	14, // 71: dshctl.v1.OrchestratorControl.ListWorkspaces:output_type -> dshctl.v1.ListWorkspacesResponse
+	12, // 72: dshctl.v1.OrchestratorControl.RemoveWorkspace:output_type -> dshctl.v1.RemoveWorkspaceResponse
+	17, // 73: dshctl.v1.OrchestratorControl.ListImages:output_type -> dshctl.v1.ListImagesResponse
+	18, // 74: dshctl.v1.OrchestratorControl.GetImage:output_type -> dshctl.v1.Image
+	18, // 75: dshctl.v1.OrchestratorControl.BuildImage:output_type -> dshctl.v1.Image
+	18, // 76: dshctl.v1.OrchestratorControl.RebuildImage:output_type -> dshctl.v1.Image
+	21, // 77: dshctl.v1.OrchestratorControl.RebuildAllImages:output_type -> dshctl.v1.RebuildAllImagesResponse
+	23, // 78: dshctl.v1.OrchestratorControl.RemoveImage:output_type -> dshctl.v1.RemoveImageResponse
+	18, // 79: dshctl.v1.OrchestratorControl.RebuildBaseImage:output_type -> dshctl.v1.Image
+	18, // 80: dshctl.v1.OrchestratorControl.PullBaseImage:output_type -> dshctl.v1.Image
+	29, // 81: dshctl.v1.OrchestratorControl.ListCaches:output_type -> dshctl.v1.ListCachesResponse
+	32, // 82: dshctl.v1.OrchestratorControl.CleanCaches:output_type -> dshctl.v1.CleanCachesResponse
+	34, // 83: dshctl.v1.OrchestratorControl.ListContainers:output_type -> dshctl.v1.ListContainersResponse
+	35, // 84: dshctl.v1.OrchestratorControl.StartContainer:output_type -> dshctl.v1.Container
+	35, // 85: dshctl.v1.OrchestratorControl.RecreateContainer:output_type -> dshctl.v1.Container
+	40, // 86: dshctl.v1.OrchestratorControl.RemoveContainer:output_type -> dshctl.v1.RemoveContainerResponse
+	35, // 87: dshctl.v1.OrchestratorControl.AddContainerMount:output_type -> dshctl.v1.Container
+	35, // 88: dshctl.v1.OrchestratorControl.RemoveContainerMount:output_type -> dshctl.v1.Container
+	35, // 89: dshctl.v1.OrchestratorControl.UpdateContainerMount:output_type -> dshctl.v1.Container
+	35, // 90: dshctl.v1.OrchestratorControl.SetContainerPaths:output_type -> dshctl.v1.Container
+	46, // 91: dshctl.v1.OrchestratorControl.ListVolumes:output_type -> dshctl.v1.ListVolumesResponse
+	47, // 92: dshctl.v1.OrchestratorControl.CreateVolume:output_type -> dshctl.v1.Volume
+	50, // 93: dshctl.v1.OrchestratorControl.RemoveVolume:output_type -> dshctl.v1.RemoveVolumeResponse
+	52, // 94: dshctl.v1.OrchestratorControl.ListSecrets:output_type -> dshctl.v1.ListSecretsResponse
+	53, // 95: dshctl.v1.OrchestratorControl.CreateSecret:output_type -> dshctl.v1.Secret
+	53, // 96: dshctl.v1.OrchestratorControl.WriteSecretValue:output_type -> dshctl.v1.Secret
+	57, // 97: dshctl.v1.OrchestratorControl.RemoveSecret:output_type -> dshctl.v1.RemoveSecretResponse
+	35, // 98: dshctl.v1.OrchestratorControl.AddContainerSecret:output_type -> dshctl.v1.Container
+	35, // 99: dshctl.v1.OrchestratorControl.RemoveContainerSecret:output_type -> dshctl.v1.Container
+	66, // [66:100] is the sub-list for method output_type
+	32, // [32:66] is the sub-list for method input_type
+	32, // [32:32] is the sub-list for extension type_name
+	32, // [32:32] is the sub-list for extension extendee
+	0,  // [0:32] is the sub-list for field type_name
 }
 
 func init() { file_dshctl_v1_control_proto_init() }
@@ -3835,7 +3850,7 @@ func file_dshctl_v1_control_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_dshctl_v1_control_proto_rawDesc), len(file_dshctl_v1_control_proto_rawDesc)),
 			NumEnums:      3,
-			NumMessages:   66,
+			NumMessages:   67,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

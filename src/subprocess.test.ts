@@ -139,6 +139,28 @@ test("outputReader drops bytes beyond the retention window", () => {
   assert.equal(read.lossy, true);
 });
 
+test("outputReader with a zero cap retains nothing", () => {
+  const spill = { path: "/tmp/dsh-podman/x.stdout", maxBytes: 64 };
+  const reader = outputReader({ maxBytes: 0 }, spill)!;
+  reader.append(Buffer.from("abcdef"));
+  // `subarray(-0)` is the whole buffer, so a zero cap must be special-cased.
+  assert.equal(reader.readFrom(0).text, "");
+  assert.equal(reader.readFrom(0).lossy, true);
+  assert.equal(reader.spillNeeded, true);
+  assert.equal(reader.readFrom(0).spillPath, spill.path);
+});
+
+test("outputReader keeps the exact tail across many small chunks", () => {
+  const reader = outputReader({ maxBytes: 4 })!;
+  for (const character of "0123456789") {
+    reader.append(Buffer.from(character));
+  }
+  const read = reader.readFrom(0);
+  assert.equal(read.text, "6789");
+  assert.equal(read.nextOffset, 10);
+  assert.equal(read.lossy, true);
+});
+
 test("outputReader honors in-window offsets", () => {
   const reader = outputReader({ maxBytes: 5 })!;
   reader.append(Buffer.from("abcdefghij"));

@@ -39,20 +39,51 @@ export function outputReader(
   const maxBytes = Number((mode as { maxBytes?: number }).maxBytes);
   if (!Number.isFinite(maxBytes) || maxBytes < 0) return undefined;
   let total = 0;
-  let retained = Buffer.alloc(0);
+  // Retained chunks, trimmed from the front down to the cap. Appending copies
+  // only the incoming chunk instead of re-concatenating the whole window on
+  // every append, which was quadratic over a long stream. `head` is the first
+  // live index; the prefix is compacted away periodically so dropped buffers do
+  // not stay referenced.
+  const chunks: Buffer[] = [];
+  let head = 0;
+  let retained = 0;
   let spillValid = spill !== undefined;
   return {
     append(data) {
       total += data.length;
-      retained = Buffer.concat([retained, data]).subarray(-maxBytes);
+      // A zero cap keeps nothing: `subarray(-0)` is the whole buffer.
+      if (maxBytes === 0 || data.length === 0) return;
+      chunks.push(data);
+      retained += data.length;
+      let excess = retained - maxBytes;
+      while (excess > 0 && head < chunks.length) {
+        const first = chunks[head];
+        if (first.length <= excess) {
+          head++;
+          retained -= first.length;
+          excess -= first.length;
+        } else {
+          chunks[head] = first.subarray(excess);
+          retained -= excess;
+          excess = 0;
+        }
+      }
+      if (head > 32 && head * 2 >= chunks.length) {
+        chunks.splice(0, head);
+        head = 0;
+      }
     },
     readFrom(offset) {
-      const start = Math.max(0, total - retained.length);
+      const start = Math.max(0, total - retained);
       const requested = Math.max(0, Number.isFinite(offset) ? offset : 0);
       const local = Math.max(0, requested - start);
       const lossy = requested < start;
+      const window =
+        head >= chunks.length
+          ? Buffer.alloc(0)
+          : Buffer.concat(chunks.slice(head), retained);
       return {
-        text: retained.subarray(local).toString("utf8"),
+        text: window.subarray(local).toString("utf8"),
         nextOffset: total,
         lossy,
         // Advertise the full-stream file only while it can still hold the

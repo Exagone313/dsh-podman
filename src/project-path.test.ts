@@ -58,6 +58,21 @@ test("confineToRoot clamps a directory to the projects root", () => {
   );
 });
 
+test("project paths resolve their dots and never escape the root", () => {
+  // A ".." that stays inside the root is resolved.
+  assert.equal(confineToRoot("/projects", "/projects/a/../b"), "/projects/b");
+  assert.equal(hostPathForProjectName("/projects", "a/../b"), "/projects/b");
+  // A ".." that would climb above the root clamps to the root, on both the
+  // path-building and the path-clamping helper.
+  assert.equal(confineToRoot("/projects", "/projects/../etc"), "/projects");
+  assert.equal(confineToRoot("/projects", "/projects/a/../../etc"), "/projects");
+  assert.equal(hostPathForProjectName("/projects", "../etc"), "/projects");
+  assert.equal(hostPathForProjectName("/projects", "a/../../etc"), "/projects");
+  assert.equal(hostPathForProjectName("/projects", "/../etc"), "/projects");
+  // A "." segment is dropped, not kept as a directory name.
+  assert.equal(hostPathForProjectName("/projects", "./web"), "/projects/web");
+});
+
 test("parentDirectory never climbs above the projects root", () => {
   assert.equal(parentDirectory("/projects", "/projects/web/sub"), "/projects/web");
   assert.equal(parentDirectory("/projects", "/projects/web"), "/projects");

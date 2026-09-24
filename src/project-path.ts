@@ -20,31 +20,54 @@ export function projectNameFromHostPath(
 
 // hostPathForProjectName is the inverse: the absolute directory a project path
 // names under the projects root, used to open a directory browser where the
-// field's current value lives.
+// field's current value lives. A value that climbs above the root with ".."
+// clamps to the root instead of yielding a path outside it.
 export function hostPathForProjectName(
   projectsRoot: string,
   project: string,
 ): string {
   const root = stripTrailingSlash(projectsRoot);
-  const name = stripTrailingSlash(project).replace(/^\/+/, "");
-  return name === "" ? root : `${root}/${name}`;
+  const name = normalizeProjectPath(String(project ?? ""));
+  if (root === "" || name === undefined || name === "") return root;
+  return `${root}/${name}`;
 }
 
 function stripTrailingSlash(value: string): string {
   return String(value ?? "").replace(/\/+$/, "");
 }
 
+// normalizeProjectPath collapses "." and empty segments and resolves ".."
+// lexically. It returns undefined when a ".." would climb above the root, so a
+// caller can clamp rather than build an escaping path.
+function normalizeProjectPath(project: string): string | undefined {
+  const segments: string[] = [];
+  for (const segment of project.split("/")) {
+    if (segment === "" || segment === ".") continue;
+    if (segment === "..") {
+      if (segments.length === 0) return undefined;
+      segments.pop();
+      continue;
+    }
+    segments.push(segment);
+  }
+  return segments.join("/");
+}
+
 // confineToRoot clamps a directory to the projects root subtree, so a stale or
-// hand-edited project path can never open a browser outside it.
+// hand-edited project path can never open a browser outside it. A ".." inside
+// the root is resolved; one that would escape clamps to the root.
 export function confineToRoot(root: string, path: string): string {
   const normalizedRoot = stripTrailingSlash(root);
   const normalizedPath = stripTrailingSlash(path);
   if (normalizedRoot === "" || normalizedPath === normalizedRoot) {
     return normalizedRoot;
   }
-  return normalizedPath.startsWith(`${normalizedRoot}/`)
-    ? normalizedPath
-    : normalizedRoot;
+  if (!normalizedPath.startsWith(`${normalizedRoot}/`)) {
+    return normalizedRoot;
+  }
+  const name = normalizeProjectPath(normalizedPath.slice(normalizedRoot.length + 1));
+  if (name === undefined || name === "") return normalizedRoot;
+  return `${normalizedRoot}/${name}`;
 }
 
 // parentDirectory is the directory one level above `path`, never above the

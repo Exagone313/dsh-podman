@@ -6,7 +6,7 @@ import { Field } from "./container-card-shared.js";
 import { greyId, hint } from "./container-card-styles.js";
 import { type ContainerPluginKey } from "./locales.js";
 import { Button, Input, Modal } from "@deepseek-ai/dsh-client-ui-primitives";
-import { type ReactNode, useId, useState } from "react";
+import { type ReactNode, useId, useMemo, useState } from "react";
 
 // One editable PATH entry. The id keeps React keys stable while a path is
 // edited or reordered, so an input keeps focus.
@@ -177,6 +177,9 @@ export function PathsEditor(props: {
   const { t, paths, busy, enabled, onApply } = props;
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState<PathEntry[]>([]);
+  // The read-only rows reuse the same ids as the editor, so two identical PATH
+  // entries never collide on a React key.
+  const shown = useMemo(() => pathEntries(paths), [paths]);
   const openEditor = (): void => {
     setDraft(pathEntries(paths));
     setOpen(true);
@@ -190,16 +193,16 @@ export function PathsEditor(props: {
       {paths.length === 0 ? (
         <p style={{ ...hint, margin: 0 }}>{t("noPaths")}</p>
       ) : (
-        paths.map((path) => (
+        shown.map((entry) => (
           <code
-            key={path}
+            key={entry.id}
             style={{
               ...greyId,
               fontSize: "13px",
               color: "var(--dsw-alias-label-primary)",
             }}
           >
-            {path}
+            {entry.path}
           </code>
         ))
       )}

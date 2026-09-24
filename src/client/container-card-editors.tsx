@@ -324,7 +324,10 @@ export function MountsEditor(props: {
           mount.project !== primaryProject;
         return (
           <div
-            key={mountLabel(t, mount)}
+            // Mounts carry no id and duplicates are legal (two identical
+            // project mounts, empty tmpfs destinations), so the positional
+            // index is the only collision-free key here.
+            key={index}
             style={{
               display: "flex",
               flexWrap: "wrap",

@@ -74,8 +74,8 @@ export function createFilesystemProvider(resolver: WorkspaceResolver): Filesyste
       const container = typeof opts?.container === "string" ? opts.container : "";
       const binding =
         container !== "" && container !== "default"
-          ? await resolver.containerBinding(opts?.cwd, container)
-          : await resolver.resolveForPath(resolved, opts?.cwd);
+          ? await resolver.containerBinding(opts?.cwd, container, opts?.signal)
+          : await resolver.resolveForPath(resolved, opts?.cwd, opts?.signal);
       return {
         targetKey: resolved,
         displayPath: resolved,
@@ -135,7 +135,7 @@ export function createFilesystemProvider(resolver: WorkspaceResolver): Filesyste
     lstat: async (path: string, opts?: any, signal?: AbortSignal) => {
       throwIfAborted(signal, "lstat");
       const resolved = resolveGuestPath(path, opts?.cwd);
-      const binding = await resolver.resolveForPath(resolved, opts?.cwd);
+      const binding = await resolver.resolveForPath(resolved, opts?.cwd, signal);
       const result: any = await unaryGuest(
         { binding },
         "stat",

@@ -4,7 +4,8 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
-import { withGuestAuth } from "./guest-rpc.js";
+import { EventEmitter } from "node:events";
+import { runExec, sessionWorkspaceSlug, withGuestAuth } from "./guest-rpc.js";
 import { grpc } from "./grpc/runtime-client.js";
 
 // pingOnce is a stand-in for a real guest call: it invokes the guest client and
@@ -77,4 +78,123 @@ test("withGuestAuth does not refresh on a non-auth error", async () => {
 test("withGuestAuth surfaces the error when the binding cannot refresh", async () => {
   const binding: any = rejectingGuest();
   await assert.rejects(() => withGuestAuth(binding, pingOnce), /invalid agent token/);
+});
+
+// FakeExecStream is the guest Exec bidi stream a real channel would give us.
+class FakeExecStream extends EventEmitter {
+  readonly written: any[] = [];
+  ended = false;
+  cancelled = false;
+  write(message: any): boolean {
+    this.written.push(message);
+    return true;
+  }
+  end(): void {
+    this.ended = true;
+  }
+  cancel(): void {
+    this.cancelled = true;
+  }
+}
+
+// execGuest returns a guest double driving one FakeExecStream. `signal` and
+// `delete` are the calls runExec makes for cancellation and spill cleanup.
+function execGuest(stream: FakeExecStream) {
+  const signals: string[] = [];
+  return {
+    stream,
+    signals,
+    guest: {
+      exec: () => stream,
+      signal: (request: any, _metadata: any, callback: any) => {
+        signals.push(request.signal);
+        callback(null, {});
+      },
+      delete: (_request: any, _metadata: any, callback: any) =>
+        callback(null, {}),
+    },
+  };
+}
+
+const EXIT_OK = {
+  exitCode: 0,
+  signaled: false,
+  stdoutSpillValid: true,
+  stderrSpillValid: true,
+};
+
+test("runExec resolves on exit and asks the guest for a spill copy", async () => {
+  const harness = execGuest(new FakeExecStream());
+  const binding: any = { guest: harness.guest, token: "t" };
+  const promise = runExec(binding, ["echo", "hi"]);
+  harness.stream.emit("data", { processId: "1" });
+  harness.stream.emit("data", { stdoutChunk: Buffer.from("hi\n") });
+  harness.stream.emit("data", { exit: EXIT_OK });
+  const result = await promise;
+  assert.equal(result.exitCode, 0);
+  assert.equal(result.stdout, "hi\n");
+  const start = harness.stream.written[0].start;
+  assert.match(start.spillStdout.path, /^\/tmp\/dsh-podman\/[0-9a-f-]+\.stdout$/);
+  assert.equal(start.spillStderr.path.endsWith(".stderr"), true);
+  // The output fit in memory, so the spill file is deleted again.
+  assert.equal(result.stdoutSpillPath, undefined);
+});
+
+test("runExec rejects when the stream ends without an exit message", async () => {
+  const harness = execGuest(new FakeExecStream());
+  const binding: any = { guest: harness.guest, token: "t" };
+  const promise = runExec(binding, ["hang"]);
+  harness.stream.emit("end");
+  await assert.rejects(promise, /ended before the process exited/);
+});
+
+test("runExec aborts with the turn signal, cancelling and signalling the process", async () => {
+  const harness = execGuest(new FakeExecStream());
+  const binding: any = { guest: harness.guest, token: "t" };
+  const controller = new AbortController();
+  const promise = runExec(binding, ["sleep", "99"], undefined, undefined, undefined, undefined, {
+    signal: controller.signal,
+  });
+  harness.stream.emit("data", { processId: "7" });
+  controller.abort();
+  await assert.rejects(promise, /aborted/);
+  assert.equal(harness.stream.cancelled, true);
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.deepEqual(harness.signals, ["SIGTERM"]);
+});
+
+test("runExec rejects a pre-aborted call without starting it", async () => {
+  const harness = execGuest(new FakeExecStream());
+  const binding: any = { guest: harness.guest, token: "t" };
+  const controller = new AbortController();
+  controller.abort();
+  await assert.rejects(
+    () => runExec(binding, ["x"], undefined, undefined, undefined, undefined, {
+      signal: controller.signal,
+    }),
+    /aborted/,
+  );
+  assert.equal(harness.stream.written.length, 0);
+});
+
+test("runExec keeps a bounded tail and points at the spill on truncation", async () => {
+  const harness = execGuest(new FakeExecStream());
+  const binding: any = { guest: harness.guest, token: "t" };
+  const promise = runExec(binding, ["big"], undefined, undefined, undefined, undefined, {
+    maxBytes: 4,
+    spillBytes: 1024,
+  });
+  harness.stream.emit("data", { stdoutChunk: Buffer.from("0123456789") });
+  harness.stream.emit("data", { exit: EXIT_OK });
+  const result = await promise;
+  assert.equal(result.stdout, "6789", "only the bounded tail is retained");
+  assert.match(result.stdoutSpillPath ?? "", /^\/tmp\/dsh-podman\/[0-9a-f-]+\.stdout$/);
+});
+
+test("sessionWorkspaceSlug fails instead of fabricating a default workspace", async () => {
+  const resolver: any = { registry: { resolveByPath: async () => undefined } };
+  await assert.rejects(
+    () => sessionWorkspaceSlug(resolver, "/projects/gone"),
+    /cannot resolve a DH workspace/,
+  );
 });

@@ -9,6 +9,12 @@ import {
   workspaceSlug,
 } from "./workspace-binding.js";
 import { grpc } from "./grpc/runtime-client.js";
+import {
+  SPILL_ROOT,
+  discardUnneededSpill,
+  outputReader,
+} from "./output-reader.js";
+import { randomUUID } from "node:crypto";
 import { isAbsolute, resolve as resolvePath } from "node:path";
 
 // Resolve a container-side path against the session working directory.
@@ -332,6 +338,21 @@ export interface ExecIdentity {
   groups?: number[];
 }
 
+// In-memory retention per stream for one command. The full stream is also
+// written to a bounded guest spill file, so the plugin never buffers an
+// unbounded command output and the caller can read the rest back with
+// container_read.
+const EXEC_RETAIN_BYTES = 1 << 20;
+const EXEC_SPILL_BYTES = 8 << 20;
+
+// The optional per-call controls runExec accepts. `signal` cancels the turn's
+// command; the byte caps override the retention/spill bounds.
+export interface RunExecOptions {
+  signal?: AbortSignal;
+  maxBytes?: number;
+  spillBytes?: number;
+}
+
 export async function runExec(
   binding: WorkspaceBinding,
   argv: readonly string[],
@@ -339,56 +360,120 @@ export async function runExec(
   env?: Record<string, string>,
   timeoutMs?: number,
   identity?: ExecIdentity,
+  options: RunExecOptions = {},
 ): Promise<{
   exitCode: number;
   signal: string | null;
   stdout: string;
   stderr: string;
+  stdoutSpillPath?: string;
+  stderrSpillPath?: string;
 }> {
-  return withGuestAuth(binding, (guest, token) => {
-    const stdout: Buffer[] = [];
-    const stderr: Buffer[] = [];
-    return new Promise((resolveDone, reject) => {
+  const signal = options.signal;
+  throwIfAborted(signal, "exec");
+  const maxBytes = options.maxBytes ?? EXEC_RETAIN_BYTES;
+  const spillBytes = options.spillBytes ?? EXEC_SPILL_BYTES;
+  const stdoutSpec = { path: `${SPILL_ROOT}/${randomUUID()}.stdout`, maxBytes: spillBytes };
+  const stderrSpec = { path: `${SPILL_ROOT}/${randomUUID()}.stderr`, maxBytes: spillBytes };
+  return withGuestAuth(binding, (guest, token) =>
+    new Promise((resolveDone, reject) => {
+      const stdoutReader = outputReader({ maxBytes }, stdoutSpec);
+      const stderrReader = outputReader({ maxBytes }, stderrSpec);
+      if (stdoutReader === undefined || stderrReader === undefined) {
+        reject(new Error("exec output reader is unavailable"));
+        return;
+      }
       const stream = (guest as any).exec(metadata(token));
       let processId: string | undefined;
       let timer: ReturnType<typeof setTimeout> | undefined;
-      const stopTimer = (): void => {
+      let settled = false;
+      let detach: () => void = () => {};
+      // settle runs one final action exactly once and tears down the timer and
+      // the abort listener, so a timeout, an abort, and an exit cannot race.
+      const settle = (finish: () => void): void => {
+        if (settled) return;
+        settled = true;
         if (timer !== undefined) {
           clearTimeout(timer);
           timer = undefined;
         }
+        detach();
+        finish();
+      };
+      const stopProcess = (sig: string): void => {
+        if (processId === undefined) return;
+        // Best effort: ask the guest to terminate the running process tree.
+        unaryGuest({ binding: { guest, token } }, "signal", {
+          processId,
+          signal: sig,
+        }).catch(() => {});
+      };
+      const abortWith = (error: Error): void => {
+        stopProcess("SIGTERM");
+        try {
+          stream.cancel?.();
+        } catch {
+          // The stream already ended; nothing to cancel.
+        }
+        settle(() => reject(error));
       };
       if (typeof timeoutMs === "number" && timeoutMs > 0) {
         timer = setTimeout(() => {
           timer = undefined;
-          if (processId !== undefined) {
-            // Best effort: ask the guest to terminate the running process.
-            unaryGuest({ binding: { guest, token } }, "signal", {
-              processId,
-              signal: "SIGTERM",
-            }).catch(() => {});
-          }
-          reject(new Error(`command timed out after ${timeoutMs} ms`));
+          abortWith(new Error(`command timed out after ${timeoutMs} ms`));
         }, timeoutMs);
+      }
+      if (signal !== undefined) {
+        if (signal.aborted) {
+          abortWith(fsError("FS_ABORTED", "exec aborted"));
+          return;
+        }
+        const onAbort = (): void =>
+          abortWith(fsError("FS_ABORTED", "exec aborted"));
+        signal.addEventListener("abort", onAbort, { once: true });
+        detach = () => signal.removeEventListener("abort", onAbort);
       }
       stream.on("data", (output: any) => {
         if (output.processId) processId = String(output.processId);
-        if (output.stdoutChunk) stdout.push(Buffer.from(output.stdoutChunk));
-        if (output.stderrChunk) stderr.push(Buffer.from(output.stderrChunk));
+        if (output.stdoutChunk) {
+          stdoutReader.append(Buffer.from(output.stdoutChunk));
+        }
+        if (output.stderrChunk) {
+          stderrReader.append(Buffer.from(output.stderrChunk));
+        }
         if (output.exit) {
-          stopTimer();
-          resolveDone({
-            exitCode: output.exit.exitCode,
-            signal: output.exit.signaled ? output.exit.signal : null,
-            stdout: Buffer.concat(stdout).toString("utf8"),
-            stderr: Buffer.concat(stderr).toString("utf8"),
-          });
+          stdoutReader.setSpillValid(Boolean(output.exit.stdoutSpillValid));
+          stderrReader.setSpillValid(Boolean(output.exit.stderrSpillValid));
+          const out = stdoutReader.readFrom(0);
+          const err = stderrReader.readFrom(0);
+          // A spill the in-memory tail already covered is deleted; a valid one
+          // holding dropped output stays for the caller to read.
+          discardUnneededSpill({ guest, token }, stdoutReader);
+          discardUnneededSpill({ guest, token }, stderrReader);
+          settle(() =>
+            resolveDone({
+              exitCode: output.exit.exitCode,
+              signal: output.exit.signaled ? output.exit.signal : null,
+              stdout: out.text,
+              stderr: err.text,
+              ...(out.spillPath === undefined
+                ? {}
+                : { stdoutSpillPath: out.spillPath }),
+              ...(err.spillPath === undefined
+                ? {}
+                : { stderrSpillPath: err.spillPath }),
+            }),
+          );
         }
       });
-      stream.on("error", (error: unknown) => {
-        stopTimer();
-        reject(error);
-      });
+      stream.on("error", (error: unknown) => settle(() => reject(error)));
+      stream.on("end", () =>
+        // A stream that ends without an exit message (guest restart, dropped
+        // socket) must not leave the caller pending forever.
+        settle(() =>
+          reject(new Error("exec stream ended before the process exited")),
+        ),
+      );
       stream.write({
         start: {
           argv: remoteArgv(argv),
@@ -397,11 +482,13 @@ export async function runExec(
           ...(identity?.uid !== undefined ? { uid: { value: identity.uid } } : {}),
           ...(identity?.gid !== undefined ? { gid: { value: identity.gid } } : {}),
           ...(identity?.groups !== undefined ? { groups: identity.groups } : {}),
+          spillStdout: stdoutSpec,
+          spillStderr: stderrSpec,
         },
       });
       stream.end();
-    });
-  });
+    }),
+  );
 }
 
 // sliceLines returns the requested 1-based line range of a file's content,
@@ -441,7 +528,14 @@ export async function sessionWorkspaceSlug(
   const workspace = await (resolver as any).registry?.resolveByPath?.(
     String(cwd),
   );
-  if (workspace === undefined) return "default";
+  if (workspace === undefined) {
+    // "default" is not a workspace slug, so returning it only produced an
+    // opaque orchestrator error downstream and a fabricated container_list
+    // row; fail with the same shape resolve() uses instead.
+    throw new Error(
+      `cannot resolve a DH workspace without a session working directory (got ${JSON.stringify(cwd)})`,
+    );
+  }
   return workspaceSlug(workspace.id);
 }
 
@@ -449,9 +543,10 @@ export async function resolveToolBinding(
   resolver: WorkspaceResolver,
   cwd: unknown,
   container: string,
+  signal?: AbortSignal,
 ): Promise<WorkspaceBinding> {
-  if (container === "default") return resolver.resolve(cwd);
-  return resolver.containerBinding(cwd, container);
+  if (container === "default") return resolver.resolve(cwd, signal);
+  return resolver.containerBinding(cwd, container, signal);
 }
 
 export async function guestStat(target: any, signal?: AbortSignal): Promise<any> {

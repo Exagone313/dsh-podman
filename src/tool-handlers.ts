@@ -48,6 +48,22 @@ function failOnSearchError(
   throw new Error(detail === "" ? `${tool} search failed (ripgrep exit code 2)` : detail);
 }
 
+// withSpillNote points the caller at the guest spill file when a command's
+// output was truncated in memory, so the full stream stays reachable with
+// container_read instead of silently vanishing.
+function withSpillNote<T extends { stdoutSpillPath?: string; stderrSpillPath?: string }>(
+  result: T,
+): T & { note?: string } {
+  const paths = [result.stdoutSpillPath, result.stderrSpillPath].filter(
+    (path): path is string => typeof path === "string",
+  );
+  if (paths.length === 0) return result;
+  return {
+    ...result,
+    note: `output was truncated; the full stream is at ${paths.join(", ")} (read it with container_read)`,
+  };
+}
+
 // The terminal environment the harness's shell executors impose on every
 // command (`ENV_OVERRIDES` in dsh-bash-local), so a container command sees the
 // same non-interactive terminal as the built-in `bash`.
@@ -224,26 +240,32 @@ export const toolHandlers: Record<
   },
   container_bash: async (resolver, input, exec, ctx) => {
     const sessionCwd = currentCwd(exec);
-    const binding = await resolveToolBinding(resolver, sessionCwd, input.container);
-    return runExec(
-      binding,
-      ["bash", "-c", input.command],
-      guestCwd(input.workdir, sessionCwd, binding),
-      managedEnv(ctx, exec, input.env),
-      input.timeoutMs,
-      identityFromInput(input),
+    const binding = await resolveToolBinding(resolver, sessionCwd, input.container, exec?.signal);
+    return withSpillNote(
+      await runExec(
+        binding,
+        ["bash", "-c", input.command],
+        guestCwd(input.workdir, sessionCwd, binding),
+        managedEnv(ctx, exec, input.env),
+        input.timeoutMs,
+        identityFromInput(input),
+        { signal: exec?.signal },
+      ),
     );
   },
   container_exec: async (resolver, input, exec, ctx) => {
     const sessionCwd = currentCwd(exec);
-    const binding = await resolveToolBinding(resolver, sessionCwd, input.container);
-    return runExec(
-      binding,
-      input.argv,
-      guestCwd(input.workdir, sessionCwd, binding),
-      managedEnv(ctx, exec, input.env),
-      input.timeoutMs,
-      identityFromInput(input),
+    const binding = await resolveToolBinding(resolver, sessionCwd, input.container, exec?.signal);
+    return withSpillNote(
+      await runExec(
+        binding,
+        input.argv,
+        guestCwd(input.workdir, sessionCwd, binding),
+        managedEnv(ctx, exec, input.env),
+        input.timeoutMs,
+        identityFromInput(input),
+        { signal: exec?.signal },
+      ),
     );
   },
   container_read: async (resolver, input, exec, ctx) => {
@@ -296,7 +318,7 @@ export const toolHandlers: Record<
   },
   container_glob: async (resolver, input, exec) => {
     const sessionCwd = currentCwd(exec);
-    const binding = await resolveToolBinding(resolver, sessionCwd, input.container);
+    const binding = await resolveToolBinding(resolver, sessionCwd, input.container, exec?.signal);
     const argv = [
       "rg",
       "--files",
@@ -313,6 +335,10 @@ export const toolHandlers: Record<
       binding,
       argv,
       guestCwd(input.path, sessionCwd, binding),
+      undefined,
+      undefined,
+      undefined,
+      { signal: exec?.signal },
     );
     failOnSearchError("glob", result);
     const files = outputLines(result.stdout);
@@ -328,7 +354,7 @@ export const toolHandlers: Record<
   },
   container_grep: async (resolver, input, exec) => {
     const sessionCwd = currentCwd(exec);
-    const binding = await resolveToolBinding(resolver, sessionCwd, input.container);
+    const binding = await resolveToolBinding(resolver, sessionCwd, input.container, exec?.signal);
     const cwd = guestCwd(undefined, sessionCwd, binding);
     // The search root: the requested path, else the container's default (the
     // session workspace when it is mounted). Ripgrep reads stdin instead of the
@@ -340,7 +366,9 @@ export const toolHandlers: Record<
     }
     argv.push(input.pattern);
     if (root !== undefined) argv.push(root);
-    const result = await runExec(binding, argv, cwd);
+    const result = await runExec(binding, argv, cwd, undefined, undefined, undefined, {
+      signal: exec?.signal,
+    });
     failOnSearchError("grep", result);
     return {
       matches: outputLines(result.stdout),
@@ -448,7 +476,7 @@ export const toolHandlers: Record<
   container_path_set: async (resolver, input, exec) => {
     const sessionCwd = currentCwd(exec);
     const slug = await sessionWorkspaceSlug(resolver, sessionCwd);
-    const binding = await resolveToolBinding(resolver, sessionCwd, input.container);
+    const binding = await resolveToolBinding(resolver, sessionCwd, input.container, exec?.signal);
     const paths = Array.isArray(input.paths) ? input.paths.map(String) : [];
     return {
       paths: await applyContainerPaths(resolver, binding, slug, input.container, paths),
@@ -457,7 +485,7 @@ export const toolHandlers: Record<
   container_path_add: async (resolver, input, exec) => {
     const sessionCwd = currentCwd(exec);
     const slug = await sessionWorkspaceSlug(resolver, sessionCwd);
-    const binding = await resolveToolBinding(resolver, sessionCwd, input.container);
+    const binding = await resolveToolBinding(resolver, sessionCwd, input.container, exec?.signal);
     const current = await containerPathState(binding);
     // Prepending gives the new path the highest priority; an existing entry is
     // moved to the front rather than duplicated.
@@ -472,7 +500,7 @@ export const toolHandlers: Record<
   container_path_remove: async (resolver, input, exec) => {
     const sessionCwd = currentCwd(exec);
     const slug = await sessionWorkspaceSlug(resolver, sessionCwd);
-    const binding = await resolveToolBinding(resolver, sessionCwd, input.container);
+    const binding = await resolveToolBinding(resolver, sessionCwd, input.container, exec?.signal);
     const current = await containerPathState(binding);
     if (!current.paths.includes(input.path)) {
       if (current.defaultPaths.includes(input.path)) {
@@ -536,7 +564,7 @@ export const toolHandlers: Record<
   },
   daemon_start: async (resolver, input, exec) => {
     const sessionCwd = currentCwd(exec);
-    const binding = await resolveToolBinding(resolver, sessionCwd, input.container);
+    const binding = await resolveToolBinding(resolver, sessionCwd, input.container, exec?.signal);
     const request: Record<string, unknown> = {
       argv: input.argv,
       inheritEnv: { value: input.inheritEnv !== false },
@@ -557,6 +585,7 @@ export const toolHandlers: Record<
       resolver,
       currentCwd(exec),
       input.container,
+      exec?.signal,
     );
     const result = (await unaryGuest(
       { binding },
@@ -570,6 +599,7 @@ export const toolHandlers: Record<
       resolver,
       currentCwd(exec),
       input.container,
+      exec?.signal,
     );
     await daemonCall(input.name, () =>
       unaryGuest({ binding }, "stopDaemon", {
@@ -584,6 +614,7 @@ export const toolHandlers: Record<
       resolver,
       currentCwd(exec),
       input.container,
+      exec?.signal,
     );
     const info = await daemonCall(input.name, () =>
       unaryGuest({ binding }, "restartDaemon", { name: input.name }),
@@ -595,6 +626,7 @@ export const toolHandlers: Record<
       resolver,
       currentCwd(exec),
       input.container,
+      exec?.signal,
     );
     const result = (await daemonCall(input.name, () =>
       unaryGuest({ binding }, "daemonLogs", {

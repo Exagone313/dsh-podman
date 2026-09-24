@@ -20,7 +20,7 @@ import {
 } from "./container-card-styles.js";
 import { type ContainerPluginKey } from "./locales.js";
 import { Button, DisclosureRow, Input, Pill } from "@deepseek-ai/dsh-client-ui-primitives";
-import { type ReactNode, useState } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 
 export function ContainerRow(props: {
   t: (key: ContainerPluginKey) => string;
@@ -70,6 +70,18 @@ export function ContainerRow(props: {
   } = props;
   const [selected, setSelected] = useState(container.imageId);
   const [env, setEnv] = useState<Record<string, string>>(container.env);
+  // The row is keyed by container name, so it survives a snapshot refresh.
+  // Re-sync the image draft when the live image changes, or the select would
+  // keep offering and re-sending the previous one.
+  useEffect(() => {
+    setSelected(container.imageId);
+  }, [container.imageId]);
+  // Env is a fresh object on every snapshot; key the resync on its content so
+  // an unchanged refresh does not clobber an in-progress edit.
+  const serverEnv = JSON.stringify(container.env);
+  useEffect(() => {
+    setEnv(container.env);
+  }, [serverEnv]);
   const [envOpen, setEnvOpen] = useState(false);
   const [mountOpen, setMountOpen] = useState(false);
   const [pathOpen, setPathOpen] = useState(false);

@@ -19,7 +19,6 @@ export type ContainerPluginKey =
   | "copied"
   | "copyFailed"
   | "reload"
-  | "reloading"
   | "notice"
   | "configTitle"
   | "defaultImage"
@@ -31,9 +30,7 @@ export type ContainerPluginKey =
   | "workspacesTitle"
   | "noContainers"
   | "createContainer"
-  | "containersTitle"
   | "containerName"
-  | "workspace"
   | "image"
   | "status"
   | "created"
@@ -45,7 +42,6 @@ export type ContainerPluginKey =
   | "recreateWithImage"
   | "imagesTitle"
   | "imageId"
-  | "baseImage"
   | "imageTag"
   | "builtAt"
   | "packages"
@@ -217,7 +213,6 @@ export const en: Record<ContainerPluginKey, string> = {
   copied: "Copied",
   copyFailed: "Copy failed",
   reload: "Reload this view",
-  reloading: "Reloading…",
   notice: "Notice",
   configTitle: "Configuration",
   defaultImage: "Default image",
@@ -229,9 +224,7 @@ export const en: Record<ContainerPluginKey, string> = {
   workspacesTitle: "Workspaces",
   noContainers: "This workspace has no containers yet.",
   createContainer: "Create container",
-  containersTitle: "Containers",
   containerName: "Container",
-  workspace: "Workspace",
   image: "Image",
   status: "Status",
   created: "Created",
@@ -244,7 +237,6 @@ export const en: Record<ContainerPluginKey, string> = {
   recreateWithImage: "Recreate with image",
   imagesTitle: "Images",
   imageId: "Image ID",
-  baseImage: "Base image",
   imageTag: "Tag",
   builtAt: "Built at",
   packages: "Packages",
@@ -428,7 +420,6 @@ export const zh: Record<ContainerPluginKey, string> = {
   copied: "已复制",
   copyFailed: "复制失败",
   reload: "刷新此视图",
-  reloading: "刷新中…",
   notice: "提示",
   configTitle: "配置",
   defaultImage: "默认镜像",
@@ -440,9 +431,7 @@ export const zh: Record<ContainerPluginKey, string> = {
   workspacesTitle: "工作区",
   noContainers: "该工作区还没有容器。",
   createContainer: "创建容器",
-  containersTitle: "容器",
   containerName: "容器",
-  workspace: "工作区",
   image: "镜像",
   status: "状态",
   created: "创建时间",
@@ -454,7 +443,6 @@ export const zh: Record<ContainerPluginKey, string> = {
   recreateWithImage: "使用镜像重建",
   imagesTitle: "镜像",
   imageId: "镜像 ID",
-  baseImage: "基础镜像",
   imageTag: "标签",
   builtAt: "构建时间",
   packages: "软件包",

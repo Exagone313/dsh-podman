@@ -330,6 +330,7 @@ export function ContainerCard(props: ContainerCardProps): ReactNode {
                 </option>
               ))}
             </select>
+            <p style={hint}>{t("defaultImageHint")}</p>
           </Modal>
           <CachesSection
             t={t}

@@ -77,7 +77,7 @@ func main() {
 	} else {
 		logger.Warn("control-plane authentication is disabled; set DSH_PODMAN_ORCHESTRATOR_TOKEN")
 	}
-	unary = append(unary, grpcserver.UnaryVersion(logger), grpclog.Unary(logger), recovery.Unary(logger))
+	unary = append(unary, grpcserver.UnaryVersion(logger), grpclog.Sanitize(), grpclog.Unary(logger), recovery.Unary(logger))
 	server := grpc.NewServer(grpc.ChainUnaryInterceptor(unary...))
 	var podmanClient *podman.Client
 	var imageBuilder *images.Builder
@@ -88,7 +88,12 @@ func main() {
 		if connectionErr != nil {
 			panic(fmt.Errorf("connect to Podman API: %w", connectionErr))
 		}
-		if _, connectionErr = system.Info(podmanContext, nil); connectionErr != nil {
+		// Bound the connectivity probe: a wedged Podman API must not hang
+		// startup forever.
+		infoContext, cancelInfo := context.WithTimeout(podmanContext, 30*time.Second)
+		_, connectionErr = system.Info(infoContext, nil)
+		cancelInfo()
+		if connectionErr != nil {
 			panic(fmt.Errorf("Podman API is unreachable: %w", connectionErr))
 		}
 		logger.Info("Podman API reachable", "socket", podmanSocket)

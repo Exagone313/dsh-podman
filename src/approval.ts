@@ -81,14 +81,15 @@ export function reasonFact(
       .filter((item): item is MountFact => item !== undefined);
     return items.length === 0 ? undefined : items;
   };
-  const envKeys = (): string[] | undefined => {
-    const value = args.env;
+  const mapKeys = (key: string): string[] | undefined => {
+    const value = args[key];
     if (typeof value !== "object" || value === null || Array.isArray(value)) {
       return undefined;
     }
     const keys = Object.keys(value);
     return keys.length === 0 ? undefined : keys;
   };
+  const envKeys = (): string[] | undefined => mapKeys("env");
   const numberListOf = (key: string): number[] | undefined => {
     const value = args[key];
     return Array.isArray(value) && value.length > 0
@@ -138,6 +139,7 @@ export function reasonFact(
       const image = str("image");
       const mounts = mountItems();
       const env = envKeys();
+      const secretEnv = mapKeys("secretEnv");
       const paths = listOf("paths");
       return {
         kind: name,
@@ -145,6 +147,7 @@ export function reasonFact(
         ...(image === undefined ? {} : { image }),
         ...(mounts === undefined ? {} : { mounts }),
         ...(env === undefined ? {} : { env }),
+        ...(secretEnv === undefined ? {} : { secretEnv }),
         ...(paths === undefined ? {} : { paths }),
       };
     }

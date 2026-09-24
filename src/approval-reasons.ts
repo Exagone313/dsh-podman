@@ -35,6 +35,7 @@ export type ReasonFact =
       image?: string;
       mounts?: readonly MountFact[];
       env?: readonly string[];
+      secretEnv?: readonly string[];
       paths?: readonly string[];
     }
   | { kind: "container_remove"; container: string }
@@ -264,6 +265,14 @@ function containerRun(
           ` with env: ${joinList(locale, fact.env)}`,
           `，环境变量：${joinList(locale, fact.env)}`,
         );
+  const secretEnv =
+    fact.secretEnv === undefined || fact.secretEnv.length === 0
+      ? ""
+      : pick(
+          locale,
+          ` with secret env: ${joinList(locale, fact.secretEnv)}`,
+          `，机密环境变量：${joinList(locale, fact.secretEnv)}`,
+        );
   const paths =
     fact.paths === undefined || fact.paths.length === 0
       ? ""
@@ -278,8 +287,8 @@ function containerRun(
       : pick(locale, "Recreate", "重建");
   return pick(
     locale,
-    `${verb} container ${quoted(locale, fact.container)}${image}${mounts}${env}${paths}.`,
-    `${verb}容器 ${quoted(locale, fact.container)}${image}${mounts}${env}${paths}。`,
+    `${verb} container ${quoted(locale, fact.container)}${image}${mounts}${env}${secretEnv}${paths}.`,
+    `${verb}容器 ${quoted(locale, fact.container)}${image}${mounts}${env}${secretEnv}${paths}。`,
   );
 }
 

@@ -24,6 +24,19 @@ export interface ToolDefinition {
   approvalWhen?: (args: Record<string, unknown>) => boolean;
 }
 
+// hasSecretEnv reports whether a call attaches secrets to a container. Unlike
+// plain `env`, a secret env var injects a value the caller never sees, so
+// container_start must be approved for it exactly like container_secret_add.
+function hasSecretEnv(args: Record<string, unknown>): boolean {
+  const secretEnv = args.secretEnv;
+  return (
+    typeof secretEnv === "object" &&
+    secretEnv !== null &&
+    !Array.isArray(secretEnv) &&
+    Object.keys(secretEnv).length > 0
+  );
+}
+
 export const TOOLS: ToolDefinition[] = [
   { name: "image_list", parameters: imageListParameters },
   { name: "image_get", parameters: imageGetParameters },
@@ -44,7 +57,8 @@ export const TOOLS: ToolDefinition[] = [
     name: "container_start",
     parameters: containerStartParameters,
     approvalWhen: (args) =>
-      Array.isArray(args.mounts) && args.mounts.length > 0,
+      (Array.isArray(args.mounts) && args.mounts.length > 0) ||
+      hasSecretEnv(args),
   },
   {
     name: "container_recreate",

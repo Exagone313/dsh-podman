@@ -693,3 +693,61 @@ test("approval prompts name the resolved path", () => {
     'Write "../x" in container "c".',
   );
 });
+
+test("summarizeArgs includes secret env names for container start/recreate", () => {
+  assert.equal(
+    summarizeArgs("container_start", {
+      container: "web",
+      secretEnv: { TOKEN: "api-token" },
+    }),
+    'Start container "web" with secret env: TOKEN.',
+  );
+  assert.equal(
+    summarizeArgs("container_recreate", {
+      container: "c",
+      env: { A: "1" },
+      secretEnv: { TOKEN: "api-token" },
+    }),
+    'Recreate container "c" with env: A with secret env: TOKEN.',
+  );
+  // An empty map is not an attachment and is not named.
+  assert.equal(
+    summarizeArgs("container_start", { container: "web", secretEnv: {} }),
+    'Start container "web".',
+  );
+});
+
+test("container_start asks for approval when it attaches secrets", () => {
+  // Plain env, paths, and a bare start stay prompt-free by design: the caller
+  // already knows those values, unlike a secret the container injects.
+  assert.equal(
+    approvalDecision("container_start", { container: "web" }),
+    undefined,
+  );
+  assert.equal(
+    approvalDecision("container_start", { container: "web", paths: ["/opt/bin"] }),
+    undefined,
+  );
+  assert.equal(
+    approvalDecision("container_start", { container: "web", env: { A: "1" } }),
+    undefined,
+  );
+  assert.equal(
+    approvalDecision("container_start", { container: "web", secretEnv: {} }),
+    undefined,
+  );
+  // Mounts and secret attachments both change what the container can reach.
+  assert.equal(
+    approvalDecision("container_start", {
+      container: "web",
+      mounts: [{ project: "team" }],
+    })?.kind,
+    "ask",
+  );
+  const withSecret = approvalDecision("container_start", {
+    container: "web",
+    secretEnv: { TOKEN: "api-token" },
+  });
+  assert.equal(withSecret?.kind, "ask");
+  assert.match(withSecret?.reason ?? "", /secret env: TOKEN/);
+});

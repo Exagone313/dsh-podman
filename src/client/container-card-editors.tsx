@@ -11,7 +11,12 @@ import { forcedMountMode } from "../mount-enums.js";
 import { hostPathForProjectName, projectNameFromHostPath } from "../project-path.js";
 import { type ContainerPluginKey } from "./locales.js";
 import { Button, Input, Modal } from "@deepseek-ai/dsh-client-ui-primitives";
-import { type ReactNode, useId, useState } from "react";
+import { type ReactNode, useId, useRef, useState } from "react";
+
+// One stable key per env row, so renaming a variable does not remount the row
+// and drop focus mid-keystroke. The parent keeps env as a record; rows are
+// positional, so the id list is aligned by index.
+let nextEnvId = 0;
 
 export function EnvEditor(props: {
   t: (key: ContainerPluginKey) => string;
@@ -21,30 +26,49 @@ export function EnvEditor(props: {
 }): ReactNode {
   const { t, env, busy, onChange } = props;
   const entries = Object.entries(env);
-  const updateKey = (oldKey: string, key: string, value: string): void => {
+  const idsRef = useRef<number[]>([]);
+  if (idsRef.current.length !== entries.length) {
+    const ids = idsRef.current.slice(0, entries.length);
+    while (ids.length < entries.length) ids.push(nextEnvId++);
+    idsRef.current = ids;
+  }
+  // Every mutation rebuilds the record in order, so a renamed key stays in
+  // place instead of jumping to the end.
+  const updateKey = (index: number, key: string): void => {
     const next: Record<string, string> = {};
-    for (const [k, v] of entries) {
-      if (k !== oldKey) next[k] = v;
-    }
-    next[key] = value;
+    entries.forEach(([k, v], i) => {
+      next[i === index ? key : k] = v;
+    });
     onChange(next);
   };
-  const updateValue = (key: string, value: string): void => {
-    onChange({ ...env, [key]: value });
+  const updateValue = (index: number, value: string): void => {
+    const next: Record<string, string> = {};
+    entries.forEach(([k, v], i) => {
+      next[k] = i === index ? value : v;
+    });
+    onChange(next);
   };
-  const remove = (key: string): void => {
-    const next: Record<string, string> = { ...env };
-    delete next[key];
+  const remove = (index: number): void => {
+    const next: Record<string, string> = {};
+    entries.forEach(([k, v], i) => {
+      if (i !== index) next[k] = v;
+    });
     onChange(next);
   };
   const add = (): void => {
-    onChange({ ...env, "": "" });
+    // A distinct key per added row: an empty key would make a second Add a
+    // no-op and silently lose the row.
+    let key = "KEY";
+    for (let n = 1; Object.prototype.hasOwnProperty.call(env, key); n++) {
+      key = `KEY_${n}`;
+    }
+    onChange({ ...env, [key]: "" });
   };
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-      {entries.map(([key, value]) => (
+      {entries.map(([key, value], index) => (
         <div
-          key={key}
+          key={idsRef.current[index]}
           style={{
             display: "flex",
             flexWrap: "wrap",
@@ -57,7 +81,7 @@ export function EnvEditor(props: {
             disabled={busy}
             placeholder={t("envKey")}
             aria-label={t("envKey")}
-            onChange={(event) => updateKey(key, event.target.value, value)}
+            onChange={(event) => updateKey(index, event.target.value)}
             style={{ width: "160px" }}
           />
           <Input
@@ -65,14 +89,14 @@ export function EnvEditor(props: {
             disabled={busy}
             placeholder={t("envValue")}
             aria-label={t("envValue")}
-            onChange={(event) => updateValue(key, event.target.value)}
+            onChange={(event) => updateValue(index, event.target.value)}
             style={{ width: "200px" }}
           />
           <Button
             variant="outline"
             size="sm"
             disabled={busy}
-            onClick={() => remove(key)}
+            onClick={() => remove(index)}
           >
             {t("removeEnv")}
           </Button>

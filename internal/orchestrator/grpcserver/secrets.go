@@ -131,17 +131,22 @@ func randomSecret(length int, charset string) (string, error) {
 	if !ok {
 		return "", fmt.Errorf("invalid secret charset %q", charset)
 	}
-	result := make([]byte, length)
+	result := make([]byte, 0, length)
 	modulus := len(alphabet)
 	limit := 256 - 256%modulus
-	buf := make([]byte, 1)
-	for i := range result {
-		for {
-			if _, err := rand.Read(buf); err != nil {
-				return "", fmt.Errorf("generate secret: %w", err)
+	// Draw in blocks and reject bytes at or above the limit, so the alphabet
+	// stays uniform without one crypto/rand read per output byte.
+	randBuf := make([]byte, 64)
+	for len(result) < length {
+		if _, err := rand.Read(randBuf); err != nil {
+			return "", fmt.Errorf("generate secret: %w", err)
+		}
+		for _, b := range randBuf {
+			if int(b) >= limit {
+				continue
 			}
-			if b := int(buf[0]); b < limit {
-				result[i] = alphabet[b%modulus]
+			result = append(result, alphabet[int(b)%modulus])
+			if len(result) == length {
 				break
 			}
 		}
@@ -347,7 +352,7 @@ func (s *Server) AddContainerSecret(ctx context.Context, request *ctl.AddContain
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	if err := s.recreateOrRestore(workspace, record, imageTag, secretToken, &snapshot); err != nil {
+	if err := s.recreateOrRestore(ctx, workspace, record, imageTag, secretToken, &snapshot); err != nil {
 		s.log().Error("control request failed", "method", "AddContainerSecret", "workspace_slug", request.GetWorkspaceSlug(), "container", container, "error", err)
 		return nil, status.Error(codes.Internal, err.Error())
 	}
@@ -407,7 +412,7 @@ func (s *Server) RemoveContainerSecret(ctx context.Context, request *ctl.RemoveC
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	if err := s.recreateOrRestore(workspace, record, imageTag, secretToken, &snapshot); err != nil {
+	if err := s.recreateOrRestore(ctx, workspace, record, imageTag, secretToken, &snapshot); err != nil {
 		s.log().Error("control request failed", "method", "RemoveContainerSecret", "workspace_slug", request.GetWorkspaceSlug(), "container", container, "error", err)
 		return nil, status.Error(codes.Internal, err.Error())
 	}

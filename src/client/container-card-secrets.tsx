@@ -67,7 +67,7 @@ export function SecretRow(props: {
         label={t("removeSecret")}
         title={t("confirmTitle")}
         description={t("confirmRemoveSecret")}
-        disabled={busy}
+        disabled={!writable || busy}
         onConfirm={() => onRemove(name)}
       />
     </div>

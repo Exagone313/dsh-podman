@@ -78,7 +78,7 @@ test("container_mount_add command drives addContainerMount for each kind", async
       mount: {
         kind: "project",
         project: "team/src",
-        destination: "/workspace/team",
+        destination: "",
         mode: "read_only",
         volume: "",
         secret: "",
@@ -133,7 +133,7 @@ test("container_mount_add command drives addContainerMount for each kind", async
         kind: "secret",
         project: "",
         destination: "/run/secrets/tls",
-        mode: "read_write",
+        mode: "read_only",
         volume: "",
         secret: "valkey-tls",
       },

@@ -14,6 +14,47 @@ import {
 } from "./test-support.js";
 import { TOOLS, approvalDecision, preExecutePolicy, summarizeArgs, toolHandlers } from "./index.js";
 import { forcedMountMode } from "./mount-enums.js";
+import { mountInputToProto, mountsFromInput, validateMountInput } from "./mount-input.js";
+
+test("mount validation is shared between the tools and the card", () => {
+  // A secret mount is read-only on every entry point.
+  assert.throws(
+    () => validateMountInput({ kind: "secret", secret: "s", mode: "read_write" }, "/projects"),
+    /read-only/,
+  );
+  assert.throws(
+    () => mountInputToProto({ kind: "secret", secret: "s", mode: "read_write" }, "/projects"),
+    /read-only/,
+  );
+  // A project mount never takes a destination.
+  assert.throws(
+    () => mountInputToProto({ kind: "project", project: "p", destination: "/x" }, "/projects"),
+    /destination/,
+  );
+  assert.deepEqual(mountInputToProto({ kind: "project", project: "team" }, "/projects"), {
+    projectName: "team",
+    kind: "MOUNT_KIND_PROJECT",
+    mode: "MOUNT_MODE_READ_ONLY",
+  });
+  assert.deepEqual(
+    mountInputToProto({ kind: "secret", secret: "s", destination: "/run/s" }, "/projects"),
+    {
+      projectName: "",
+      kind: "MOUNT_KIND_SECRET",
+      mode: "MOUNT_MODE_READ_ONLY",
+      destination: "/run/s",
+      secret: "s",
+    },
+  );
+  assert.deepEqual(mountsFromInput([{ kind: "tmpfs", destination: "/data" }], "/projects"), [
+    {
+      projectName: "",
+      kind: "MOUNT_KIND_TMPFS",
+      mode: "MOUNT_MODE_READ_WRITE",
+      destination: "/data",
+    },
+  ]);
+});
 
 test("container_start approval depends on mounts being passed", () => {
   const tool = TOOLS.find((entry) => entry.name === "container_start");

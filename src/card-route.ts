@@ -19,6 +19,7 @@ import {
 } from "./client/card-protocol.js";
 import { renderCacheCleanNotice, resolveReasonLocale } from "./approval-reasons.js";
 import { defaultMountMode, mountKindToProto, mountModeToProto } from "./mount-enums.js";
+import { mountInputToProto, validateMountInput } from "./mount-input.js";
 import { unaryGuest } from "./guest-rpc.js";
 import { type WorkspaceResolver, workspaceSlug } from "./workspace-binding.js";
 import { GIT_COMMIT, VERSION } from "./generated/version.js";
@@ -49,23 +50,6 @@ function cacheCleanModeToProto(mode: string): string {
     : undefined;
   if (proto === undefined) throw new Error(`unknown cache clean mode: ${mode}`);
   return proto;
-}
-
-function mountInputToProto(mount: {
-  kind: string;
-  project: string;
-  destination: string;
-  mode: string;
-  volume: string;
-  secret: string;
-}): Record<string, unknown> {
-  const kind = mountKindToProto(mount.kind || undefined);
-  const mode = mountModeToProto(mount.mode || defaultMountMode(mount.kind || undefined));
-  const result: Record<string, unknown> = { projectName: mount.project ?? "", kind, mode };
-  if (kind !== "MOUNT_KIND_PROJECT" && mount.destination) result.destination = mount.destination;
-  if (mount.volume) result.volume = mount.volume;
-  if (mount.secret) result.secret = mount.secret;
-  return result;
 }
 
 function orchestratorWorkspaceViews(raw: unknown): WorkspaceView[] {
@@ -234,7 +218,10 @@ export async function runCommand(
         workspaceSlug: command.workspace,
         imageId: command.image === "" ? undefined : command.image,
       };
-      const mounts = command.mounts.map(mountInputToProto);
+      const projectsRoot = resolver.getConfig().projectsRoot;
+      const mounts = command.mounts.map((mount) =>
+        mountInputToProto(mount, projectsRoot),
+      );
       if (mounts.length > 0) payload.mounts = mounts;
       if (Object.keys(command.env).length > 0) payload.env = command.env;
       if (Object.keys(command.secretEnvMap).length > 0) {
@@ -257,6 +244,7 @@ export async function runCommand(
     case "container_mount_add": {
       const m = command.mount;
       if (m === null) break;
+      validateMountInput(m, resolver.getConfig().projectsRoot);
       const kind = mountKindToProto(m.kind || undefined);
       const mode = mountModeToProto(m.mode || defaultMountMode(m.kind || undefined));
       const request: Record<string, unknown> = {
@@ -306,6 +294,9 @@ export async function runCommand(
     case "container_mount_update": {
       const m = command.mount;
       if (m === null) break;
+      // An update sets a mode, so a secret mount must not be made read-write
+      // here either.
+      validateMountInput(m, resolver.getConfig().projectsRoot);
       const kind = mountKindToProto(m.kind || undefined);
       const request: Record<string, unknown> = {
         workspaceSlug: command.workspace,

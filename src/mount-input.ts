@@ -55,26 +55,49 @@ export function projectMountDestinationReason(
   });
 }
 
+// validateMountInput applies the rules a mount must satisfy before it reaches
+// the control plane: a project mount never takes a destination, and a secret
+// mount is read-only. Both the model tools and the settings card call this, so
+// the same rule cannot hold on one path and not the other.
+export function validateMountInput(
+  mount: any,
+  projectsRoot: string | undefined,
+): void {
+  const destinationReason = projectMountDestinationReason(projectsRoot, mount);
+  if (destinationReason !== undefined) throw new Error(destinationReason);
+  if (inferMountKind(mount) === "secret" && mount?.mode === "read_write") {
+    throw new Error("secret mounts are read-only; omit mode or use read_only");
+  }
+}
+
+// mountInputToProto validates one mount and encodes it for the control plane.
+// It is the single encoder both entry points use.
+export function mountInputToProto(
+  mount: any,
+  projectsRoot: string | undefined,
+): Record<string, unknown> {
+  validateMountInput(mount, projectsRoot);
+  const inferredKind = inferMountKind(mount);
+  const kind = mountKindToProto(inferredKind);
+  // `||`, not `??`: the card sends an empty string for an unset mode.
+  const mode = mountModeToProto(mount?.mode || defaultMountMode(inferredKind));
+  const result: Record<string, unknown> = {
+    projectName: mount?.project ?? "",
+    kind,
+    mode,
+  };
+  if (inferredKind !== "project" && mount?.destination) {
+    result.destination = mount.destination;
+  }
+  if (mount?.volume) result.volume = mount.volume;
+  if (mount?.secret) result.secret = mount.secret;
+  return result;
+}
+
 export function mountsFromInput(
   mounts: unknown,
   projectsRoot: string | undefined,
 ): Record<string, unknown>[] | undefined {
   if (!Array.isArray(mounts) || mounts.length === 0) return undefined;
-  return mounts.map((mount: any) => {
-    const inferredKind = inferMountKind(mount);
-    const destinationReason = projectMountDestinationReason(projectsRoot, mount);
-    if (destinationReason !== undefined) throw new Error(destinationReason);
-    if (inferredKind === "secret" && mount.mode === "read_write") {
-      throw new Error("secret mounts are read-only; omit mode or use read_only");
-    }
-    const kind = mountKindToProto(inferredKind);
-    const mode = mountModeToProto(mount.mode ?? defaultMountMode(inferredKind));
-    const result: Record<string, unknown> = { projectName: mount.project ?? "", kind, mode };
-    if (inferredKind !== "project" && mount.destination) {
-      result.destination = mount.destination;
-    }
-    if (mount.volume) result.volume = mount.volume;
-    if (mount.secret) result.secret = mount.secret;
-    return result;
-  });
+  return mounts.map((mount) => mountInputToProto(mount, projectsRoot));
 }

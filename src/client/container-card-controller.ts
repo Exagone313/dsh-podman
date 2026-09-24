@@ -148,7 +148,10 @@ export class ContainerCardController {
   private readonly drafts = new Map<DraftableField, string>();
   private readonly client: CardClient;
   private snapshot: CardSnapshot = EMPTY_SNAPSHOT;
-  private busy = false;
+  // Counts in-flight commands, so overlapping ones cannot clear the busy state
+  // early; generation makes a superseded response drop its stale snapshot.
+  private pending = 0;
+  private generation = 0;
   private notice = "";
   private directoryPicker: DirectoryPickerFace | undefined;
 
@@ -174,7 +177,7 @@ export class ContainerCardController {
     return {
       available: snapshot.status === "ready" && value !== undefined,
       writable: snapshot.writable,
-      busy: this.busy,
+      busy: this.pending > 0,
       notice: this.notice,
       version: this.snapshot.version,
       commit: this.snapshot.commit,
@@ -252,31 +255,47 @@ export class ContainerCardController {
   }
 
   private async dispatch(request: CommandRequest): Promise<void> {
-    this.busy = true;
+    const generation = ++this.generation;
+    this.pending++;
     this.notice = "";
     this.publish();
     try {
       const result = await this.client.command(request);
+      const snapshot = await this.client.snapshot();
+      // A reload (or another command) started after this one wins: applying
+      // this response would overwrite the fresher state with a stale snapshot.
+      if (generation !== this.generation) return;
       this.notice = result.notice ?? "";
-      this.snapshot = await this.client.snapshot();
+      this.snapshot = snapshot;
     } catch (error) {
-      this.notice = error instanceof Error ? error.message : String(error);
+      if (generation === this.generation) {
+        this.notice = error instanceof Error ? error.message : String(error);
+      }
     } finally {
-      this.busy = false;
+      this.pending--;
       this.publish();
     }
   }
 
   private async reload(): Promise<void> {
+    const generation = ++this.generation;
+    this.pending++;
+    this.publish();
     try {
-      this.snapshot = await this.client.snapshot();
+      const snapshot = await this.client.snapshot();
+      if (generation !== this.generation) return;
+      this.snapshot = snapshot;
       // A refresh clears the previous action's notice, so reopening the
       // settings does not replay feedback from an earlier session.
       this.notice = "";
     } catch (error) {
-      this.notice = error instanceof Error ? error.message : String(error);
+      if (generation === this.generation) {
+        this.notice = error instanceof Error ? error.message : String(error);
+      }
+    } finally {
+      this.pending--;
+      this.publish();
     }
-    this.publish();
   }
 
   private edit(field: DraftableField, text: string): void {

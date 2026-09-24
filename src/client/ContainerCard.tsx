@@ -79,6 +79,14 @@ export function ContainerCard(props: ContainerCardProps): ReactNode {
     if (copyResetTimer.current !== undefined) clearTimeout(copyResetTimer.current);
     copyResetTimer.current = setTimeout(() => setCopyState("idle"), 1500);
   };
+  // The reset timer is cancelled on unmount, so it cannot fire against an
+  // unmounted component.
+  useEffect(
+    () => () => {
+      if (copyResetTimer.current !== undefined) clearTimeout(copyResetTimer.current);
+    },
+    [],
+  );
   // The card mounts with the settings panel, so this re-reads the live state
   // every time the Plugins section is opened: a workspace created since the
   // last read shows up without pressing Reload this view.

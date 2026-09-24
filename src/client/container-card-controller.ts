@@ -68,7 +68,6 @@ export interface CardState {
   orchestratorVersion: string;
   versionState: "ok" | "minor-mismatch" | "major-mismatch";
   defaultImage: string;
-  defaultImageDraft: string;
   socketsRoot: string;
   socketsRootDraft: string;
   projectsRoot: string;
@@ -115,9 +114,6 @@ export interface ContainerCardFace {
   setSecret: (name: string, value: string) => void;
   addContainerSecret: (workspace: string, envVar: string, secret: string) => void;
   removeContainerSecret: (workspace: string, envVar: string) => void;
-  editDefaultImage: (text: string) => void;
-  saveDefaultImage: () => void;
-  discardDefaultImage: () => void;
   editSocketsRoot: (text: string) => void;
   saveSocketsRoot: () => void;
   discardSocketsRoot: () => void;
@@ -185,7 +181,6 @@ export class ContainerCardController {
       orchestratorVersion: this.snapshot.orchestratorVersion,
       versionState: this.snapshot.versionState,
       defaultImage: value?.defaultImage ?? "",
-      defaultImageDraft: this.draft("defaultImage", value?.defaultImage ?? ""),
       socketsRoot: value?.socketsRoot ?? "",
       socketsRootDraft: this.draft("socketsRoot", value?.socketsRoot ?? ""),
       projectsRoot: this.snapshot.projectsRoot,
@@ -391,9 +386,6 @@ export class ContainerCardController {
           container: "default",
           secretEnv: envVar,
         }),
-      editDefaultImage: (text) => this.edit("defaultImage", text),
-      saveDefaultImage: () => this.save("defaultImage"),
-      discardDefaultImage: () => this.discard("defaultImage"),
       editSocketsRoot: (text) => this.edit("socketsRoot", text),
       saveSocketsRoot: () => this.save("socketsRoot"),
       discardSocketsRoot: () => this.discard("socketsRoot"),

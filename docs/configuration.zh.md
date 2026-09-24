@@ -35,6 +35,8 @@ dsh 的 **设置 → 插件** 卡片中暴露了一些 **UI 设置**，与环境
 | `defaultImage` | `archlinux`               | 用于新工作区的镜像**短名称**；可通过 Set-default 弹窗从基础镜像和自定义镜像中选择 |
 | `socketsRoot`  | `DSH_PODMAN_SOCKETS_ROOT` | 插件用于连接 orchestrator 的套接字根目录；回退到环境变量                          |
 
+## Orchestrator（`dsh-podman-orchestrator`）
+
 | 变量                                           | 默认值                        | 说明                                                                                                                                                                |
 | ---------------------------------------------- | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `DSH_PODMAN_BASE_IMAGE_PREFIX`                 | `localhost/dsh-podman/base/`  | 基础镜像的标签前缀；以 `localhost/` 开头的前缀会在本地构建它们，否则从公共镜像仓库拉取                                                                              |
@@ -50,7 +52,7 @@ dsh 的 **设置 → 插件** 卡片中暴露了一些 **UI 设置**，与环境
 | `DSH_PODMAN_HOST_SOCKETS_ROOT`                 | `DSH_PODMAN_SOCKETS_ROOT`     | 用于 guest 套接字绑定挂载的主机侧套接字根目录                                                                                                                       |
 | `DSH_PODMAN_IMAGE_PREFIX`                      | `localhost/dsh-podman/`       | 前置到已构建的工作区镜像引用上的前缀                                                                                                                                |
 | `DSH_PODMAN_ORCHESTRATOR_PODMAN_SOCKET`        | required                      | Podman API 套接字，例如 `unix:///run/podman/podman.sock`                                                                                                            |
-| `DSH_PODMAN_ORCHESTRATOR_STATE`                | `/var/lib/dsh-orchestrator`   | 持久化状态目录                                                                                                                                                      |
+| `DSH_PODMAN_ORCHESTRATOR_STATE`                | `/var/lib/dsh-orchestrator`   | 持久化状态目录（二进制默认值；随附的 Quadlet 会将其覆盖为 `%h/.dsh/dsh-podman/state`）                                                                              |
 | `DSH_PODMAN_ORCHESTRATOR_TOKEN`                | —                             | 用于认证控制平面 gRPC 调用的共享机密；见[变量详解](#变量详解)                                                                                                       |
 | `DSH_PODMAN_PROJECTS_ROOT`                     | `/projects`                   | 每个 guest 容器内的项目根目录                                                                                                                                       |
 | `DSH_PODMAN_SECRET_PREFIX`                     | `dsh-podman-`                 | 应用于受管 podman 机密的前缀（见[使用](usage.zh.md#机密)）                                                                                                          |

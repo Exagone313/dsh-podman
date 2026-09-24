@@ -30,7 +30,8 @@ ENV DSH_PODMAN_PLUGIN_VERSION=${DSH_PODMAN_PLUGIN_VERSION}
 RUN mkdir -p /opt/dsh
 COPY ./dsh/defaults.cordis.patch.yml /opt/dsh/
 COPY ./dsh/entrypoint.sh /opt/dsh/entrypoint.sh
-RUN chmod 0755 /opt/dsh/entrypoint.sh
+COPY ./dsh/dsh-busy.sh /opt/dsh/dsh-busy.sh
+RUN chmod 0755 /opt/dsh/entrypoint.sh /opt/dsh/dsh-busy.sh
 
 ENTRYPOINT ["/opt/dsh/entrypoint.sh"]
 CMD ["dsh", "--profile", "web", "--patch", "/opt/dsh/defaults.cordis.patch.yml", "--no-open"]

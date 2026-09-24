@@ -5,6 +5,7 @@
 import {
   guestClient,
   controlClient,
+  closeClients,
   grpc,
   unary,
 } from "./grpc/runtime-client.js";
@@ -34,6 +35,13 @@ export interface BindingConfig {
 
 export class WorkspaceResolver {
   private readonly bindings = new Map<string, Promise<WorkspaceBinding>>();
+  // Named containers get their own cache, keyed by "<slug>:<logical name>", so
+  // resolving one does not re-run ensureContainer, rebuild a gRPC channel, and
+  // wait for readiness on every tool call.
+  private readonly containerBindings = new Map<
+    string,
+    Promise<{ binding: WorkspaceBinding; mounts: readonly any[] }>
+  >();
   constructor(
     private readonly config: BindingConfig,
     private readonly registry: any,
@@ -44,14 +52,18 @@ export class WorkspaceResolver {
   getConfig(): Readonly<BindingConfig> {
     return this.config;
   }
-  async resolve(cwd: unknown): Promise<WorkspaceBinding> {
+  // dispose closes every cached gRPC channel and drops the cached bindings.
+  // Called when the plugin is disposed so a reload does not leak unix sockets.
+  dispose(): void {
+    this.bindings.clear();
+    this.containerBindings.clear();
+    closeClients();
+  }
+  async resolve(cwd: unknown, signal?: AbortSignal): Promise<WorkspaceBinding> {
     const workspace = await this.workspaceForCwd(cwd);
-    const relativePath = String(workspace.path).replace(
-      `${this.config.projectsRoot}/`,
-      "",
-    );
     const key = workspaceSlug(workspace.id);
-    const binding = await this.ready(key, relativePath);
+    const projectName = projectNameForPath(this.config.projectsRoot, workspace.path);
+    const binding = await this.ready(key, projectName, signal);
     // The default container always keeps its project mount, so the session
     // directory is always mounted in it.
     const session = defaultCwdOf(cwd);
@@ -63,11 +75,17 @@ export class WorkspaceResolver {
   // sensible owner, so match it by longest canonical-path prefix. A path
   // outside every workspace is not in any container's filesystem, so it is
   // reported as missing rather than failing the caller.
-  async resolveForPath(path: string, cwd: unknown): Promise<WorkspaceBinding> {
-    if (typeof cwd === "string" && cwd !== "") return this.resolve(cwd);
+  async resolveForPath(
+    path: string,
+    cwd: unknown,
+    signal?: AbortSignal,
+  ): Promise<WorkspaceBinding> {
+    if (typeof cwd === "string" && cwd !== "") return this.resolve(cwd, signal);
     if (isAbsolute(path)) {
       const workspace = this.containingWorkspace(path);
-      if (workspace !== undefined) return this.resolve(String(workspace.path));
+      if (workspace !== undefined) {
+        return this.resolve(String(workspace.path), signal);
+      }
       throw notFoundError(`no DH workspace contains path ${JSON.stringify(path)}`);
     }
     throw new Error(
@@ -99,36 +117,79 @@ export class WorkspaceResolver {
     }
     return workspace;
   }
-  resolveSlug(key: string): Promise<WorkspaceBinding> {
-    return this.ready(key, key);
+  resolveSlug(key: string, signal?: AbortSignal): Promise<WorkspaceBinding> {
+    return this.ready(key, key, signal);
   }
   async containerBinding(
     cwd: unknown,
     container: string,
+    signal?: AbortSignal,
   ): Promise<WorkspaceBinding> {
     const workspace = await this.workspaceForCwd(cwd);
     const slug = workspaceSlug(workspace.id);
-    const row = await this.ensureContainer(slug, container);
-    let binding = this.bindingFor(row, () => this.containerBinding(cwd, container));
+    const key = `${slug}:${container}`;
+    let entry = await this.resolveContainerBinding(slug, container, key, signal);
     try {
-      binding = await this.ensureAgentReady(binding);
+      entry = {
+        binding: await this.ensureAgentReady(entry.binding),
+        mounts: entry.mounts,
+      };
     } catch {
-      await this.recoverContainer(slug, container);
-      binding = await this.ensureAgentReady(
-        this.bindingFor(
-          await this.ensureContainer(slug, container),
-          () => this.containerBinding(cwd, container),
-        ),
-      );
+      this.containerBindings.delete(key);
+      await this.recoverContainer(slug, container, signal);
+      entry = await this.resolveContainerBinding(slug, container, key, signal);
+      entry = {
+        binding: await this.ensureAgentReady(entry.binding),
+        mounts: entry.mounts,
+      };
     }
     const session = defaultCwdOf(cwd);
     if (
       session !== undefined &&
-      projectMountCovers(this.config.projectsRoot, row.mounts ?? [], session)
+      projectMountCovers(this.config.projectsRoot, entry.mounts, session)
     ) {
-      binding.defaultCwd = session;
+      return { ...entry.binding, defaultCwd: session };
     }
-    return binding;
+    return entry.binding;
+  }
+  // resolveContainerBinding returns the cached promise for a named container,
+  // creating it once. It deliberately stops at an "ensureContainer + build a
+  // binding" step: readiness is per-call, so a credential refresh can never
+  // recurse through this path.
+  private resolveContainerBinding(
+    slug: string,
+    container: string,
+    key: string,
+    signal?: AbortSignal,
+  ): Promise<{ binding: WorkspaceBinding; mounts: readonly any[] }> {
+    let entry = this.containerBindings.get(key);
+    if (entry === undefined) {
+      entry = this.buildContainerBinding(slug, container, key).catch(
+        (error: unknown) => {
+          if (this.containerBindings.get(key) === entry) {
+            this.containerBindings.delete(key);
+          }
+          throw error;
+        },
+      );
+      this.containerBindings.set(key, entry);
+    }
+    return entry;
+  }
+  private async buildContainerBinding(
+    slug: string,
+    container: string,
+    key: string,
+  ): Promise<{ binding: WorkspaceBinding; mounts: readonly any[] }> {
+    const row = await this.ensureContainer(slug, container);
+    // refresh re-resolves the container row and swaps the cache entry, so a
+    // binding whose token rotated is not re-served from the stale cache.
+    const refresh = (): Promise<WorkspaceBinding> => {
+      const next = this.buildContainerBinding(slug, container, key);
+      this.containerBindings.set(key, next);
+      return next.then((fresh) => fresh.binding);
+    };
+    return { binding: this.bindingFor(row, refresh), mounts: row.mounts ?? [] };
   }
   // ready resolves a workspace's default container and waits for its guest
   // agent, recreating the container once when it is reported running but its
@@ -136,19 +197,20 @@ export class WorkspaceResolver {
   private async ready(
     key: string,
     projectName: string,
+    signal?: AbortSignal,
   ): Promise<WorkspaceBinding> {
-    let binding = await this.resolveBinding(key, projectName);
+    let binding = await this.resolveBinding(key, projectName, signal);
     try {
       return await this.ensureAgentReady(binding);
     } catch {
       this.bindings.delete(key);
-      binding = await this.resolveBinding(key, projectName);
+      binding = await this.resolveBinding(key, projectName, signal);
       try {
         return await this.ensureAgentReady(binding);
       } catch {
-        await this.recoverContainer(key, "default");
+        await this.recoverContainer(key, "default", signal);
         this.bindings.delete(key);
-        binding = await this.resolveBinding(key, projectName);
+        binding = await this.resolveBinding(key, projectName, signal);
         return await this.ensureAgentReady(binding);
       }
     }
@@ -199,12 +261,16 @@ export class WorkspaceResolver {
   // recoverContainer best-effort recreates a container whose agent is
   // unreachable. A failure here is not fatal: the caller's retry surfaces the
   // real readiness failure.
-  private async recoverContainer(slug: string, container: string): Promise<void> {
+  private async recoverContainer(
+    slug: string,
+    container: string,
+    signal?: AbortSignal,
+  ): Promise<void> {
     try {
       await this.control("recreateContainer", {
         workspaceSlug: slug,
         container,
-      });
+      }, signal);
     } catch {
       // Best-effort.
     }
@@ -212,10 +278,11 @@ export class WorkspaceResolver {
   private resolveBinding(
     key: string,
     projectName: string,
+    signal?: AbortSignal,
   ): Promise<WorkspaceBinding> {
     let binding = this.bindings.get(key);
     if (binding === undefined) {
-      binding = this.create(key, projectName).catch((error: unknown) => {
+      binding = this.create(key, projectName, signal).catch((error: unknown) => {
         if (this.bindings.get(key) === binding) this.bindings.delete(key);
         throw error;
       });
@@ -226,6 +293,7 @@ export class WorkspaceResolver {
   private async create(
     slug: string,
     projectName: string,
+    signal?: AbortSignal,
   ): Promise<WorkspaceBinding> {
     const control = controlClient(
       join(this.config.socketsRoot, "orchestrator.sock"),
@@ -234,7 +302,7 @@ export class WorkspaceResolver {
     try {
       await unary<any>(control, "describeWorkspace", {
         workspaceSlug: slug,
-      }, controlMetadata);
+      }, controlMetadata, signal);
     } catch (error: any) {
       if (error.code !== grpc.status.NOT_FOUND) throw error;
       await unary<any>(control, "createWorkspace", {
@@ -242,9 +310,9 @@ export class WorkspaceResolver {
         projectName,
         imageId: this.config.defaultImage,
         mounts: [{ projectName, mode: "MOUNT_MODE_READ_WRITE" }],
-      }, controlMetadata);
+      }, controlMetadata, signal);
     }
-    const row = await this.ensureContainer(slug, "default");
+    const row = await this.ensureContainer(slug, "default", signal);
     return this.bindingFor(row, () => {
       this.bindings.delete(slug);
       return this.resolveBinding(slug, projectName);
@@ -254,23 +322,32 @@ export class WorkspaceResolver {
   // when it is missing, stopped, or runs a guest agent from an outdated image,
   // and returns its row. A container the orchestrator does not know is reported
   // as the caller's missing container.
-  private async ensureContainer(slug: string, container: string): Promise<any> {
+  private async ensureContainer(
+    slug: string,
+    container: string,
+    signal?: AbortSignal,
+  ): Promise<any> {
     try {
       return await this.control("ensureContainer", {
         workspaceSlug: slug,
         container,
-      });
+      }, signal);
     } catch (error: any) {
       if (error.code !== grpc.status.NOT_FOUND) throw error;
       throw containerNotFound(container, slug);
     }
   }
-  async control<T>(method: string, request: unknown): Promise<T> {
+  async control<T>(
+    method: string,
+    request: unknown,
+    signal?: AbortSignal,
+  ): Promise<T> {
     return unary<T>(
       controlClient(join(this.config.socketsRoot, "orchestrator.sock")),
       method,
       request,
       metadata(this.config.controlToken, VERSION),
+      signal,
     );
   }
 }
@@ -369,6 +446,23 @@ export function metadata(token: string, pluginVersion?: string): grpc.Metadata {
 // path, or undefined when it is unset.
 function defaultCwdOf(cwd: unknown): string | undefined {
   return typeof cwd === "string" && cwd !== "" ? cwd : undefined;
+}
+
+// projectNameForPath maps a dsh workspace's host path to the project path a
+// mount stores: the path relative to the projects root. It is a prefix test,
+// not a String.replace, so a root that appears later in the path cannot corrupt
+// the name, and a workspace outside the root fails with a clear error instead
+// of silently producing an absolute "project name".
+function projectNameForPath(projectsRoot: string, path: unknown): string {
+  const root = String(projectsRoot ?? "").replace(/\/+$/, "");
+  const value = String(path ?? "").replace(/\/+$/, "");
+  if (root === "" || value === root) return "";
+  if (!value.startsWith(`${root}/`)) {
+    throw new Error(
+      `workspace path ${JSON.stringify(value)} is not under the projects root ${JSON.stringify(root)}`,
+    );
+  }
+  return value.slice(root.length + 1);
 }
 
 // projectMountCovers reports whether a project mount of a container makes the

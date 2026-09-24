@@ -130,6 +130,7 @@ export function apply(ctx: any, config: PluginConfig = {}): void {
     ctx.workspaceRegistry,
   );
   ctx.provide("workspaceResolver", resolver);
+  ctx.effect(() => () => resolver.dispose(), "podman: resolver cleanup");
   const subprocess = createSubprocessProvider(resolver);
   ctx.provide("subprocess", subprocess);
   ctx.effect(() => () => subprocess.dispose(), "podman: subprocess cleanup");

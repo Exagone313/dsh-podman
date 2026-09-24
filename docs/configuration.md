@@ -32,10 +32,11 @@ cordis, then the environment variables below, then built-in defaults.
 Editable in the card's **Settings → Plugins → Podman** panel (the Configuration
 section and the images' Set-default popup):
 
-| Setting        | Default                   | Description                                                                                                |
-| -------------- | ------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| `defaultImage` | `archlinux`               | Image **short name** used for new workspaces; chosen from base and custom images via the Set-default popup |
-| `socketsRoot`  | `DSH_PODMAN_SOCKETS_ROOT` | Socket root the plugin uses to reach the orchestrator; falls back to the env var                           |
+| Setting        | Default                   | Description                                                                                                                                                                     |
+| -------------- | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `defaultImage` | `archlinux`               | Image **short name** used for new workspaces; chosen from base and custom images via the Set-default popup                                                                      |
+| `socketsRoot`  | `DSH_PODMAN_SOCKETS_ROOT` | Socket root the plugin uses to reach the orchestrator; falls back to the env var                                                                                                |
+| `uiLocale`     | `""`                      | Plugin-managed active locale, written by the browser client so the host can render approval text in the session language (see [Approval](usage.md#approval)); not user-editable |
 
 ## Orchestrator (`dsh-podman-orchestrator`)
 

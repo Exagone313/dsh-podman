@@ -61,7 +61,7 @@ func (s *Server) DescribeWorkspace(_ context.Context, request *ctl.DescribeWorks
 // refreshed workspace. The guest-agent image is pulled only when it is absent
 // (podman.Client.CreateWorkspace's ensureImage), so a local development image
 // is never pulled.
-func (s *Server) refreshContainer(workspace state.Workspace, record *state.Container) (state.Workspace, error) {
+func (s *Server) refreshContainer(ctx context.Context, workspace state.Workspace, record *state.Container) (state.Workspace, error) {
 	imageTag, err := s.resolveImageTag(record.ImageID)
 	if err != nil {
 		return workspace, err
@@ -70,7 +70,7 @@ func (s *Server) refreshContainer(workspace state.Workspace, record *state.Conta
 	if err != nil {
 		return workspace, status.Error(codes.Internal, err.Error())
 	}
-	if err := s.recreateContainer(workspace, record, imageTag, token, record.Env); err != nil {
+	if err := s.recreateContainer(ctx, workspace, record, imageTag, token, record.Env); err != nil {
 		s.log().Error("recreating guest container failed", "workspace_slug", workspace.WorkspaceSlug, "container", record.Name, "error", err)
 		return workspace, status.Error(codes.Internal, err.Error())
 	}
@@ -314,7 +314,7 @@ func (s *Server) CreateWorkspace(ctx context.Context, request *ctl.CreateWorkspa
 // it), cleans the containers' socket directories, and drops the stored
 // workspace. It is idempotent: an absent workspace or pod succeeds, so the
 // settings card can call it for a workspace that never had a container.
-func (s *Server) RemoveWorkspace(_ context.Context, request *ctl.RemoveWorkspaceRequest) (*ctl.RemoveWorkspaceResponse, error) {
+func (s *Server) RemoveWorkspace(ctx context.Context, request *ctl.RemoveWorkspaceRequest) (*ctl.RemoveWorkspaceResponse, error) {
 	slug := request.GetWorkspaceSlug()
 	s.log().Info("control request", "method", "RemoveWorkspace", "workspace_slug", slug)
 	if !validWorkspaceSlug(slug) {
@@ -331,7 +331,7 @@ func (s *Server) RemoveWorkspace(_ context.Context, request *ctl.RemoveWorkspace
 		workspace = state.Workspace{WorkspaceSlug: slug}
 	}
 	for i := range workspace.Containers {
-		s.stopContainerDaemons(context.Background(), workspace.Containers[i])
+		s.stopContainerDaemons(ctx, workspace.Containers[i])
 	}
 	if err := s.Podman.RemovePod(podNameFor(slug)); err != nil {
 		s.log().Error("control request failed", "method", "RemoveWorkspace", "workspace_slug", slug, "error", err)

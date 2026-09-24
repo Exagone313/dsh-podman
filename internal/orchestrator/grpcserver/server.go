@@ -6,6 +6,7 @@ package grpcserver
 
 import (
 	"log/slog"
+	"sync"
 
 	ctl "github.com/Exagone313/dsh-podman/internal/genproto/dshctl/v1"
 	imagebuild "github.com/Exagone313/dsh-podman/internal/orchestrator/images"
@@ -59,6 +60,28 @@ type Server struct {
 	VolumePrefix    string
 	SecretPrefix    string
 	Logger          *slog.Logger
+
+	// containerLocks serializes work on one podman container so two concurrent
+	// ensures cannot recreate the same name at once. Keyed by podman name,
+	// which is unique per workspace and container.
+	locksMu        sync.Mutex
+	containerLocks map[string]*sync.Mutex
+}
+
+// lockContainer takes the per-container lock and returns its unlock function.
+func (s *Server) lockContainer(podmanName string) func() {
+	s.locksMu.Lock()
+	if s.containerLocks == nil {
+		s.containerLocks = make(map[string]*sync.Mutex)
+	}
+	lock, ok := s.containerLocks[podmanName]
+	if !ok {
+		lock = &sync.Mutex{}
+		s.containerLocks[podmanName] = lock
+	}
+	s.locksMu.Unlock()
+	lock.Lock()
+	return lock.Unlock
 }
 
 func (s *Server) log() *slog.Logger {

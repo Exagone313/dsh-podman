@@ -67,8 +67,8 @@ func (s *Server) ensureAgentToken(record *state.Container) (string, error) {
 // recreateContainer gracefully stops the container's daemons, then recreates
 // the podman container with the given image tag and agent token, using the
 // container's effective mounts.
-func (s *Server) recreateContainer(workspace state.Workspace, record *state.Container, imageTag, newToken string, env map[string]string) error {
-	s.stopContainerDaemons(context.Background(), *record)
+func (s *Server) recreateContainer(ctx context.Context, workspace state.Workspace, record *state.Container, imageTag, newToken string, env map[string]string) error {
+	s.stopContainerDaemons(ctx, *record)
 	podmanMounts, err := s.podmanMounts(containerMounts(workspace, *record))
 	if err != nil {
 		return err
@@ -85,8 +85,8 @@ func (s *Server) recreateContainer(workspace state.Workspace, record *state.Cont
 // best-effort restores the pre-mutation snapshot so a failed mutation does not
 // leave the container gone. The store is untouched here; callers persist only
 // on success, and the original error is returned either way.
-func (s *Server) recreateOrRestore(workspace state.Workspace, record *state.Container, imageTag, token string, snapshot *state.Container) error {
-	err := s.recreateContainer(workspace, record, imageTag, token, record.Env)
+func (s *Server) recreateOrRestore(ctx context.Context, workspace state.Workspace, record *state.Container, imageTag, token string, snapshot *state.Container) error {
+	err := s.recreateContainer(ctx, workspace, record, imageTag, token, record.Env)
 	if err == nil || snapshot == nil {
 		return err
 	}
@@ -114,7 +114,9 @@ func (s *Server) restoreSnapshot(workspace state.Workspace, snapshot *state.Cont
 		s.log().Warn("cannot mint an agent token for a container restore", "workspace_slug", workspace.WorkspaceSlug, "container", restore.Name, "error", err)
 		return
 	}
-	if err := s.recreateContainer(workspace, &restore, restoreTag, token, restore.Env); err != nil {
+	// The restore runs on a fresh context: a recreate usually fails because the
+	// request's context was cancelled, and a rollback must still be attempted.
+	if err := s.recreateContainer(context.Background(), workspace, &restore, restoreTag, token, restore.Env); err != nil {
 		s.log().Warn("failed to restore container after failed recreate", "workspace_slug", workspace.WorkspaceSlug, "container", restore.Name, "error", err)
 	}
 }
@@ -157,7 +159,7 @@ func (s *Server) StopAllContainerDaemons(ctx context.Context) {
 // guest-agent image, it is recreated first. This is the single attach path for
 // both the default and named containers, so a caller is never handed a stale
 // agent. The guest-agent image is pulled only when it is absent.
-func (s *Server) EnsureContainer(_ context.Context, request *ctl.EnsureContainerRequest) (*ctl.Container, error) {
+func (s *Server) EnsureContainer(ctx context.Context, request *ctl.EnsureContainerRequest) (*ctl.Container, error) {
 	container := request.GetContainer()
 	if container == "" {
 		container = "default"
@@ -178,6 +180,19 @@ func (s *Server) EnsureContainer(_ context.Context, request *ctl.EnsureContainer
 	if s.Podman == nil {
 		return nil, status.Error(codes.FailedPrecondition, "podman is not configured")
 	}
+	// Serialize on the container: a second ensure that arrived while the first
+	// was recreating must observe the refreshed record, not race the same
+	// podman name.
+	unlock := s.lockContainer(record.PodmanName)
+	defer unlock()
+	workspace, err = workspaceBySlug(s.Store, request.GetWorkspaceSlug())
+	if err != nil {
+		return nil, status.Error(codes.NotFound, err.Error())
+	}
+	record, ok = containerByLogical(&workspace, container)
+	if !ok {
+		return nil, containerNotFoundError(container, request.GetWorkspaceSlug())
+	}
 	usable, err := s.containerUsable(record)
 	if err != nil {
 		s.log().Error("control request failed", "method", "EnsureContainer", "workspace_slug", request.GetWorkspaceSlug(), "container", container, "error", err)
@@ -187,7 +202,7 @@ func (s *Server) EnsureContainer(_ context.Context, request *ctl.EnsureContainer
 		s.log().Info("control request completed", "method", "EnsureContainer", "workspace_slug", workspace.WorkspaceSlug, "container", container)
 		return containerProto(workspace, *record), nil
 	}
-	refreshed, err := s.refreshContainer(workspace, record)
+	refreshed, err := s.refreshContainer(ctx, workspace, record)
 	if err != nil {
 		s.log().Error("control request failed", "method", "EnsureContainer", "workspace_slug", request.GetWorkspaceSlug(), "container", container, "error", err)
 		return nil, err
@@ -314,7 +329,7 @@ func (s *Server) RecreateContainer(ctx context.Context, request *ctl.RecreateCon
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	if err := s.recreateOrRestore(workspace, record, imageTag, secret, &snapshot); err != nil {
+	if err := s.recreateOrRestore(ctx, workspace, record, imageTag, secret, &snapshot); err != nil {
 		s.log().Error("control request failed", "method", "RecreateContainer", "workspace_slug", request.GetWorkspaceSlug(), "container", container, "error", err)
 		return nil, status.Error(codes.Internal, err.Error())
 	}
@@ -423,7 +438,7 @@ func (s *Server) StartContainer(ctx context.Context, request *ctl.StartContainer
 	if existing, ok := containerByLogical(&workspace, request.GetContainer()); ok {
 		snapshot := snapshotContainer(*existing)
 		existingSnapshot = &snapshot
-		s.stopContainerDaemons(context.Background(), *existing)
+		s.stopContainerDaemons(ctx, *existing)
 		record.AgentToken = existing.AgentToken
 		if err := s.Podman.Stop(existing.PodmanName); err != nil {
 			s.log().Warn("StartContainer replace stop failed", "workspace_slug", workspace.WorkspaceSlug, "container", request.GetContainer(), "error", err)
@@ -476,7 +491,7 @@ func (s *Server) StartContainer(ctx context.Context, request *ctl.StartContainer
 	return containerProto(updated, record), nil
 }
 
-func (s *Server) RemoveContainer(_ context.Context, request *ctl.RemoveContainerRequest) (*ctl.RemoveContainerResponse, error) {
+func (s *Server) RemoveContainer(ctx context.Context, request *ctl.RemoveContainerRequest) (*ctl.RemoveContainerResponse, error) {
 	s.log().Info("control request", "method", "RemoveContainer", "workspace_slug", request.GetWorkspaceSlug(), "container", request.GetContainer())
 	container := request.GetContainer()
 	if container == "" {
@@ -521,7 +536,7 @@ func (s *Server) RemoveContainer(_ context.Context, request *ctl.RemoveContainer
 	if s.Podman == nil {
 		return nil, status.Error(codes.FailedPrecondition, "podman is not configured")
 	}
-	s.stopContainerDaemons(context.Background(), *record)
+	s.stopContainerDaemons(ctx, *record)
 	exists, err := s.Podman.ContainerExists(record.PodmanName)
 	if err != nil {
 		s.log().Error("control request failed", "method", "RemoveContainer", "workspace_slug", request.GetWorkspaceSlug(), "container", container, "error", err)

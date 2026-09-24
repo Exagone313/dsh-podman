@@ -249,7 +249,7 @@ export function Chip(props: {
         <Button
           variant="ghost"
           size="sm"
-          aria-label={t("removeTag")}
+          aria-label={`${t("removeTag")} ${label}`}
           disabled={disabled}
           onClick={onRemove}
           style={{

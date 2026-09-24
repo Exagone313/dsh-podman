@@ -200,6 +200,11 @@ func (b *Builder) cacheMount(packageManager string) (host, container string, con
 	}
 }
 
+// Build holds the read lock for its whole duration. Builds may run
+// concurrently (the read lock is shared), but a cache cleanup takes the write
+// lock and therefore waits for them: deleting a package out from under a
+// running build is exactly what this ordering prevents. A cleanup blocking for
+// the length of a build is the intended trade-off.
 func (b *Builder) Build(spec BuildSpec) (string, error) {
 	b.mu.RLock()
 	defer b.mu.RUnlock()

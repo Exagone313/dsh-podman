@@ -5,7 +5,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { EventEmitter } from "node:events";
-import { runExec, sessionWorkspaceSlug, withGuestAuth } from "./guest-rpc.js";
+import { runExec, sessionWorkspaceSlug, sliceLines, streamLines, withGuestAuth } from "./guest-rpc.js";
 import { grpc } from "./grpc/runtime-client.js";
 
 // pingOnce is a stand-in for a real guest call: it invokes the guest client and
@@ -197,4 +197,49 @@ test("sessionWorkspaceSlug fails instead of fabricating a default workspace", as
     () => sessionWorkspaceSlug(resolver, "/projects/gone"),
     /cannot resolve a DH workspace/,
   );
+});
+
+// chunks yields one character at a time, the worst case for a streaming line
+// reader because every boundary can fall inside a line.
+async function* characters(content: string): AsyncGenerator<string> {
+  for (const character of content) yield character;
+}
+
+test("streamLines matches sliceLines for every window shape", async () => {
+  const cases: Array<[string, number, number]> = [
+    ["", 1, 5],
+    ["a", 1, 5],
+    ["a\n", 1, 5],
+    ["a\nb\nc", 1, 2],
+    ["a\nb\nc\n", 1, 2],
+    ["a\nb\nc\n", 2, 2],
+    ["a\nb\nc\n", 2, 10],
+    ["a\nb", 2, 2],
+    ["a\nb", 5, 2],
+    ["x\ny\nz\n", 3, 10],
+    ["1\n2\n3\n4\n5", 2, 3],
+    ["\n\n\n", 2, 2],
+  ];
+  for (const [content, offset, limit] of cases) {
+    const expected = sliceLines(content, offset, limit);
+    const streamed = await streamLines(characters(content), offset, limit);
+    assert.equal(
+      streamed,
+      expected,
+      `content=${JSON.stringify(content)} offset=${offset} limit=${limit}`,
+    );
+  }
+});
+
+test("streamLines stops consuming once the window is filled", async () => {
+  let consumed = 0;
+  async function* source(): AsyncGenerator<string> {
+    for (let index = 1; index <= 100; index++) {
+      consumed++;
+      yield `${index}\n`;
+    }
+  }
+  const out = await streamLines(source(), 1, 2);
+  assert.equal(out, "1\n2");
+  assert.equal(consumed, 2);
 });

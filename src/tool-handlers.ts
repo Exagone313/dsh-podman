@@ -13,7 +13,7 @@ import {
   resolveToolBinding,
   runExec,
   sessionWorkspaceSlug,
-  sliceLines,
+  streamLines,
   unaryGuest,
   writeGuestFile,
 } from "./guest-rpc.js";
@@ -285,9 +285,15 @@ export const toolHandlers: Record<
         `cannot read "${target.displayPath}": not a regular file`,
       );
     }
-    const content = await ctx.fs.readText(target, exec?.signal);
+    // Stream the requested line window instead of buffering the whole file:
+    // a read of a few lines from a huge file must not read it all into memory.
+    const lines = await streamLines(
+      await ctx.fs.streamText(target, exec?.signal),
+      input.offset,
+      input.limit,
+    );
     ctx.emit("fs/observed", target, { kind: "present", version: info.version }, exec);
-    return sliceLines(content, input.offset, input.limit);
+    return lines;
   },
   container_write: async (resolver, input, exec, ctx) => {
     const target = await containerTarget(ctx, input.file_path, input.container, exec);

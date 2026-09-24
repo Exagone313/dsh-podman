@@ -190,11 +190,13 @@ export async function* guestChunks(
     );
     const detach = onAbortCancel(call, signal);
     let emitted = false;
+    let completed = false;
     try {
       for await (const chunk of call) {
         emitted = true;
         yield Buffer.from(chunk.data);
       }
+      completed = true;
       return;
     } catch (error) {
       if (signal?.aborted) throw fsError("FS_ABORTED", "read aborted");
@@ -210,6 +212,15 @@ export async function* guestChunks(
       throw error;
     } finally {
       detach();
+      if (!completed) {
+        // A consumer that stopped early (a bounded line read) or an error path
+        // must not leave the guest reading a file nobody consumes.
+        try {
+          call.cancel?.();
+        } catch {
+          // The call already finished.
+        }
+      }
     }
   }
 }
@@ -503,6 +514,49 @@ export function sliceLines(content: string, offset: unknown, limit: unknown): st
       ? limit
       : READ_LIMIT;
   return content.split("\n").slice(start - 1, start - 1 + max).join("\n");
+}
+
+// streamLines returns the requested 1-based line window of a text stream
+// without buffering the whole source. It matches sliceLines exactly — the
+// source is split on "\n", so a trailing newline keeps a final empty line —
+// while consuming only as much of the stream as the window needs.
+export async function streamLines(
+  stream: AsyncIterable<string>,
+  offset: unknown,
+  limit: unknown,
+): Promise<string> {
+  const start =
+    typeof offset === "number" && Number.isInteger(offset) && offset > 0
+      ? offset
+      : 1;
+  const max =
+    typeof limit === "number" && Number.isInteger(limit) && limit > 0
+      ? limit
+      : READ_LIMIT;
+  const end = start - 1 + max;
+  const out: string[] = [];
+  let index = 0;
+  let carry = "";
+  let filled = false;
+  for await (const chunk of stream) {
+    carry += chunk;
+    let newline = carry.indexOf("\n");
+    while (newline >= 0) {
+      if (index >= start - 1 && index < end) out.push(carry.slice(0, newline));
+      index++;
+      carry = carry.slice(newline + 1);
+      newline = carry.indexOf("\n");
+      if (index >= end) {
+        filled = true;
+        break;
+      }
+    }
+    if (filled) break;
+  }
+  // The segment after the last newline, which split always keeps (possibly
+  // empty) when the stream ended before the window was filled.
+  if (!filled && index >= start - 1 && index < end) out.push(carry);
+  return out.join("\n");
 }
 
 export function outputLines(text: string): string[] {

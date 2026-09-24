@@ -94,9 +94,24 @@ export function ContainerCard(props: ContainerCardProps): ReactNode {
   ];
   if (!state.available) {
     return (
-      <p style={{ padding: "8px 0", fontSize: "13px", opacity: 0.8 }}>
-        {t("unavailable")}
-      </p>
+      <div style={{ padding: "8px 0", fontSize: "13px", opacity: 0.8 }}>
+        <p style={{ margin: 0 }}>{t("unavailable")}</p>
+        {state.notice === "" ? null : (
+          <p style={{ margin: "4px 0 0" }} role="status">
+            {t("notice")}: {state.notice}
+          </p>
+        )}
+        <div style={{ marginTop: "8px" }}>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={state.busy}
+            onClick={props.reload}
+          >
+            {state.busy ? t("busy") : t("reload")}
+          </Button>
+        </div>
+      </div>
     );
   }
   return (

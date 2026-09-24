@@ -131,6 +131,16 @@ function firstLine(text: string): string {
   return newline === -1 ? text : text.slice(0, newline);
 }
 
+// A hard bound on the output lines a result may render, so a multi-megabyte
+// result cannot create an unbounded number of DOM nodes. Small outputs pass
+// through untouched.
+const MAX_RENDERED_LINES = 2000;
+
+function capLines(text: string, max: number): string {
+  const lines = text.split("\n");
+  return lines.length <= max ? text : lines.slice(0, max).join("\n");
+}
+
 function parseArgs(argsRaw: string): Record<string, unknown> {
   try {
     const parsed: unknown = JSON.parse(argsRaw);
@@ -345,12 +355,14 @@ export function PodmanToolRow({
           exitCode={terminal.exitCode}
           signal={terminal.signal}
           running={terminal.running}
-          maxLines={Infinity}
+          maxLines={MAX_RENDERED_LINES}
           className={TERMINAL_CLASS}
           labels={terminalLabels(t)}
         />
       ) : expandable ? (
-        <pre style={state === "error" ? errorBodyStyle : bodyStyle}>{output}</pre>
+        <pre style={state === "error" ? errorBodyStyle : bodyStyle}>
+          {capLines(output ?? "", MAX_RENDERED_LINES)}
+        </pre>
       ) : null}
     </DisclosureRow>
   );

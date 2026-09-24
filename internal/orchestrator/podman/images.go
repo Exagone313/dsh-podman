@@ -22,7 +22,9 @@ func (c *Client) ImageExists(name string) (bool, error) {
 	if err := c.connReady(); err != nil {
 		return false, err
 	}
-	exists, err := images.Exists(c.ctx, name, nil)
+	ctx, cancel := c.lookupContext()
+	defer cancel()
+	exists, err := images.Exists(ctx, name, nil)
 	if err != nil {
 		c.log().Error("workspace image lookup failed", "image", name, "error", err)
 	} else {
@@ -97,7 +99,9 @@ func (c *Client) ImageCreated(name string) string {
 	if err := c.connReady(); err != nil {
 		return ""
 	}
-	report, err := images.GetImage(c.ctx, name, nil)
+	ctx, cancel := c.lookupContext()
+	defer cancel()
+	report, err := images.GetImage(ctx, name, nil)
 	if err != nil {
 		return ""
 	}

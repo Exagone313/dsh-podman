@@ -12,7 +12,9 @@ import (
 )
 
 func (c *Client) SecretExists(name string) (bool, error) {
-	return secrets.Exists(c.ctx, name)
+	ctx, cancel := c.lookupContext()
+	defer cancel()
+	return secrets.Exists(ctx, name)
 }
 
 // SecretCreate stores a secret value under the given name. The value is never
@@ -28,7 +30,9 @@ func (c *Client) SecretCreate(name, value string) error {
 
 // SecretList returns the full podman names of every secret.
 func (c *Client) SecretList() ([]string, error) {
-	reports, err := secrets.List(c.ctx, nil)
+	ctx, cancel := c.lookupContext()
+	defer cancel()
+	reports, err := secrets.List(ctx, nil)
 	if err != nil {
 		return nil, err
 	}

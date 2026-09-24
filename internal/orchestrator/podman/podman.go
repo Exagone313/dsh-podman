@@ -13,6 +13,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/opencontainers/runtime-spec/specs-go"
 	"go.podman.io/podman/v6/pkg/bindings"
@@ -21,6 +22,21 @@ import (
 	entities "go.podman.io/podman/v6/pkg/domain/entities/types"
 	"go.podman.io/podman/v6/pkg/specgen"
 )
+
+// lookupTimeout bounds the quick, read-only Podman calls (exists, inspect,
+// list) so a wedged API cannot hang a tool. Mutating and build calls stay
+// unbounded: a container recreate or an image pull is legitimately long, and
+// cutting it off would be worse than waiting.
+const lookupTimeout = 30 * time.Second
+
+// lookupContext returns a bounded context for a quick Podman lookup, falling
+// back to a plain background context for a zero-value client (tests).
+func (c *Client) lookupContext() (context.Context, context.CancelFunc) {
+	if c.ctx == nil {
+		return context.Background(), func() {}
+	}
+	return context.WithTimeout(c.ctx, lookupTimeout)
+}
 
 // guestRestartPolicy keeps guest pods and containers alive across podman/host
 // restarts. "unless-stopped" restarts after a crash or a podman restart but
@@ -85,7 +101,9 @@ func (c *Client) connReady() error {
 // EnsurePod lazily creates the pod when it does not already exist. Containers
 // created afterwards are placed inside it, sharing its network namespace.
 func (c *Client) EnsurePod(name string) error {
-	exists, err := pods.Exists(c.ctx, name, nil)
+	ctx, cancel := c.lookupContext()
+	exists, err := pods.Exists(ctx, name, nil)
+	cancel()
 	if err != nil {
 		return err
 	}
@@ -103,7 +121,9 @@ func (c *Client) EnsurePod(name string) error {
 
 // RemovePod deletes the pod, tolerating an already-absent pod.
 func (c *Client) RemovePod(name string) error {
-	exists, err := pods.Exists(c.ctx, name, nil)
+	ctx, cancel := c.lookupContext()
+	exists, err := pods.Exists(ctx, name, nil)
+	cancel()
 	if err != nil {
 		return err
 	}
@@ -267,7 +287,9 @@ func (c *Client) Stop(name string) error {
 }
 
 func (c *Client) ContainerExists(name string) (bool, error) {
-	exists, err := containers.Exists(c.ctx, name, nil)
+	ctx, cancel := c.lookupContext()
+	defer cancel()
+	exists, err := containers.Exists(ctx, name, nil)
 	if err != nil {
 		c.log().Error("guest container lookup failed", "container_name", name, "error", err)
 	} else {
@@ -280,7 +302,9 @@ func (c *Client) ContainerExists(name string) (bool, error) {
 // to bring a stopped guest container back before handing its socket to a
 // caller.
 func (c *Client) ContainerRunning(name string) (bool, error) {
-	inspect, err := containers.Inspect(c.ctx, name, nil)
+	ctx, cancel := c.lookupContext()
+	defer cancel()
+	inspect, err := containers.Inspect(ctx, name, nil)
 	if err != nil {
 		c.log().Error("guest container inspect failed", "container_name", name, "error", err)
 		return false, err
@@ -303,7 +327,9 @@ func (c *Client) ContainerRunning(name string) (bool, error) {
 // Comparing it with the stored token is what catches a credential that rotated
 // after the container was created.
 func (c *Client) ContainerAgentState(name string) (stale bool, token string, err error) {
-	inspect, err := containers.Inspect(c.ctx, name, nil)
+	ctx, cancel := c.lookupContext()
+	defer cancel()
+	inspect, err := containers.Inspect(ctx, name, nil)
 	if err != nil {
 		c.log().Error("guest container inspect failed", "container_name", name, "error", err)
 		return false, "", err

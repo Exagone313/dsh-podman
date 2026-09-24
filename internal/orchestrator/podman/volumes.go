@@ -12,7 +12,9 @@ import (
 )
 
 func (c *Client) VolumeExists(name string) (bool, error) {
-	return volumes.Exists(c.ctx, name, nil)
+	ctx, cancel := c.lookupContext()
+	defer cancel()
+	return volumes.Exists(ctx, name, nil)
 }
 
 // ensureVolume auto-creates a named volume when it does not already exist.
@@ -38,7 +40,9 @@ func (c *Client) VolumeCreate(name string) error {
 }
 
 func (c *Client) VolumeList() ([]string, error) {
-	reports, err := volumes.List(c.ctx, nil)
+	ctx, cancel := c.lookupContext()
+	defer cancel()
+	reports, err := volumes.List(ctx, nil)
 	if err != nil {
 		return nil, err
 	}

@@ -15,6 +15,15 @@ type Mount struct {
 	Virtual, Host string
 	ReadOnly      bool
 }
+// WorkspaceFS confines the guest file API to its configured mounts.
+//
+// Resolve checks the path and returns the resolved host path; the caller then
+// opens it, so a symlink swapped in between is not re-checked. That window is
+// accepted rather than closed with os.Root: the caller already runs commands in
+// this container as root, so the file API is a convenience boundary, not a
+// security one, and the kernel still enforces a read-only mount. The
+// orchestrator's project mounts, which do cross a trust boundary, resolve with
+// os.Root (see mount-resolve.go).
 type WorkspaceFS struct{ mounts []Mount }
 
 func New(mounts []Mount) (*WorkspaceFS, error) {

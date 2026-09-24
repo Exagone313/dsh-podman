@@ -187,13 +187,15 @@ export function createFilesystemProvider(resolver: WorkspaceResolver): Filesyste
           `cannot overwrite existing "${target.displayPath}" without reading it first`,
         );
       }
-      // The basis is gated on the incoming content, like the local backend:
-      // either side at/above the limit yields `before: null` and the consumer
-      // falls back to a whole-file diff. Both sides are LF-normalized so a CRLF
-      // overwrite does not read as every line changed.
+      // The basis is gated on both sides: an incoming or existing file at or
+      // above the limit yields `before: null` and the consumer falls back to a
+      // whole-file diff, so writing one byte into a huge file does not read the
+      // whole file back just for presentation. Both sides are LF-normalized so
+      // a CRLF overwrite does not read as every line changed.
       const rawBasis =
         current.exists &&
-        Buffer.byteLength(content, "utf8") < DIFF_BASIS_MAX_BYTES
+        Buffer.byteLength(content, "utf8") < DIFF_BASIS_MAX_BYTES &&
+        Number(current.size ?? 0) < DIFF_BASIS_MAX_BYTES
           ? await readDiffBasis(target, signal)
           : null;
       const before =

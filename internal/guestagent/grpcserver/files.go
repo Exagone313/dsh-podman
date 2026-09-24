@@ -105,6 +105,11 @@ func (s *Server) WriteFile(stream guest.WorkspaceGuestAgent_WriteFileServer) err
 	}
 	temporaryName := temporary.Name()
 	defer os.Remove(temporaryName)
+	// Close the temp file on every early return (a mid-stream recv error, a
+	// short write) so a failed write does not leak its descriptor. The success
+	// path closes it explicitly below so a flush error is reported before the
+	// rename.
+	defer func() { _ = temporary.Close() }()
 	// Preserve the target's permission bits (a new file gets the usual 0644)
 	// so a write does not silently drop an executable bit.
 	mode := os.FileMode(0644)

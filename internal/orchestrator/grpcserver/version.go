@@ -28,6 +28,11 @@ const PluginVersionHeader = "x-dsh-podman-plugin-version"
 // check so a plugin can always learn which orchestrator it is talking to.
 const GetVersionFullMethod = "/dshctl.v1.OrchestratorControl/GetVersion"
 
+// maxWarnedVersions bounds the set of plugin versions the "compatible but
+// different" warning remembers, so a stream of distinct versions cannot grow it
+// without limit.
+const maxWarnedVersions = 64
+
 // GetVersion answers the version handshake.
 func (s *Server) GetVersion(_ context.Context, _ *ctl.GetVersionRequest) (*ctl.GetVersionResponse, error) {
 	return &ctl.GetVersionResponse{Version: version.Version, Commit: version.Commit}, nil
@@ -66,7 +71,15 @@ func UnaryVersion(logger *slog.Logger) grpc.UnaryServerInterceptor {
 		if version.Compare(plugin, version.Version) != 0 {
 			mu.Lock()
 			_, seen := warned[plugin]
-			warned[plugin] = struct{}{}
+			if !seen {
+				if len(warned) >= maxWarnedVersions {
+					// Bound the memory a long stream of distinct plugin
+					// versions could pin; after a reset a version is logged
+					// once more, which is harmless for a warning.
+					warned = map[string]struct{}{}
+				}
+				warned[plugin] = struct{}{}
+			}
 			mu.Unlock()
 			if !seen {
 				logger.Warn("dsh-podman plugin and orchestrator versions differ but remain compatible",

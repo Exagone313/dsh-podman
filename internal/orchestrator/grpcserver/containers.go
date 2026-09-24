@@ -25,7 +25,7 @@ func (s *Server) ListContainers(context.Context, *ctl.ListContainersRequest) (*c
 	// longer exists are hidden and statuses are refreshed in memory. Nothing is
 	// written, so listing (or opening the settings card) cannot change state.
 	if s.Podman != nil {
-		workspaces, _ = s.containerView(workspaces, s.Podman.ContainerExists, s.Podman.ContainerRunning)
+		workspaces, _, _ = s.containerView(workspaces, s.Podman.ContainerExists, s.Podman.ContainerRunning)
 	}
 	containers := containerRows(workspaces)
 	sort.Slice(containers, func(i, j int) bool {
@@ -67,13 +67,23 @@ func containerRows(workspaces []state.Workspace) []*ctl.Container {
 	return result
 }
 
+// containerDecision is the podman verdict for one stored container: dropped
+// when the podman container no longer exists, otherwise its refreshed status
+// (empty when the lookup failed and the record must stay untouched).
+type containerDecision struct {
+	drop   bool
+	status string
+}
+
 // containerView returns the live view of the stored workspaces: containers
 // whose podman container no longer exists are hidden, and each surviving
 // container's status is refreshed from the run state. It never writes, so read
 // paths stay stateless; changed reports whether the view differs from the
-// stored workspaces, letting a mutating caller persist the reconciliation.
-func (s *Server) containerView(workspaces []state.Workspace, exists func(podmanName string) (bool, error), running func(podmanName string) (bool, error)) ([]state.Workspace, bool) {
+// stored workspaces, and decisions carries the per-container verdicts a
+// mutating caller can apply to freshly read state.
+func (s *Server) containerView(workspaces []state.Workspace, exists func(podmanName string) (bool, error), running func(podmanName string) (bool, error)) ([]state.Workspace, bool, map[string]containerDecision) {
 	changed := false
+	decisions := map[string]containerDecision{}
 	next := make([]state.Workspace, 0, len(workspaces))
 	for _, ws := range workspaces {
 		kept := make([]state.Container, 0, len(ws.Containers))
@@ -87,6 +97,7 @@ func (s *Server) containerView(workspaces []state.Workspace, exists func(podmanN
 			if !found {
 				s.log().Info("container deleted outside dsh-podman", "workspace_slug", ws.WorkspaceSlug, "container", container.Name, "podman_name", container.PodmanName)
 				changed = true
+				decisions[container.PodmanName] = containerDecision{drop: true}
 				continue
 			}
 			if running != nil {
@@ -98,6 +109,7 @@ func (s *Server) containerView(workspaces []state.Workspace, exists func(podmanN
 					if isRunning {
 						status = "running"
 					}
+					decisions[container.PodmanName] = containerDecision{status: status}
 					if container.Status != status {
 						container.Status = status
 						changed = true
@@ -115,7 +127,7 @@ func (s *Server) containerView(workspaces []state.Workspace, exists func(podmanN
 		syncDefaultFields(&ws)
 		next = append(next, ws)
 	}
-	return next, changed
+	return next, changed, decisions
 }
 
 // reconcileContainers persists the live view: it drops stored containers whose
@@ -124,15 +136,46 @@ func (s *Server) containerView(workspaces []state.Workspace, exists func(podmanN
 // (the removal guards), so a dead record neither blocks a removal nor lingers;
 // read paths use containerView. When nothing changed, the input is returned
 // unwritten.
+//
+// The verdicts are applied to the state as the store currently holds it, not
+// written back from the snapshot read before the podman lookups: writing the
+// whole snapshot would silently drop a concurrent change to another container.
 func (s *Server) reconcileContainers(workspaces []state.Workspace, exists func(podmanName string) (bool, error), running func(podmanName string) (bool, error)) ([]state.Workspace, error) {
-	next, changed := s.containerView(workspaces, exists, running)
+	next, changed, decisions := s.containerView(workspaces, exists, running)
 	if !changed {
 		return workspaces, nil
 	}
-	if err := s.Store.UpdateWorkspaces(func([]state.Workspace) ([]state.Workspace, error) {
-		return next, nil
+	if err := s.Store.UpdateWorkspaces(func(all []state.Workspace) ([]state.Workspace, error) {
+		return applyContainerDecisions(all, decisions), nil
 	}); err != nil {
 		return nil, err
 	}
 	return next, nil
+}
+
+// applyContainerDecisions applies precomputed podman verdicts (keyed by podman
+// name) to the freshly read workspaces. A container with no verdict — its
+// lookup failed, or it was written after the lookups ran — is kept untouched.
+func applyContainerDecisions(all []state.Workspace, decisions map[string]containerDecision) []state.Workspace {
+	out := make([]state.Workspace, 0, len(all))
+	for _, ws := range all {
+		kept := make([]state.Container, 0, len(ws.Containers))
+		for _, container := range ws.Containers {
+			decision, ok := decisions[container.PodmanName]
+			if ok && decision.drop {
+				continue
+			}
+			if ok && decision.status != "" {
+				container.Status = decision.status
+			}
+			kept = append(kept, container)
+		}
+		if len(kept) == 0 {
+			continue
+		}
+		ws.Containers = kept
+		syncDefaultFields(&ws)
+		out = append(out, ws)
+	}
+	return out
 }

@@ -101,30 +101,46 @@ func (s *Server) ListWorkspaces(context.Context, *ctl.ListWorkspacesRequest) (*c
 // upsertContainer replaces (or appends) the container record with the same
 // logical name in the workspace, keeps the legacy default-container fields in
 // sync, and persists the workspace.
+//
+// The record is merged into the workspace as the store currently holds it, not
+// written back from the snapshot the caller read: callers mutate a record after
+// a multi-second podman recreate, and writing the whole stale workspace would
+// silently drop a concurrent change to another container.
 func (s *Server) upsertContainer(workspace state.Workspace, record state.Container) (state.Workspace, error) {
-	replaced := false
-	for i := range workspace.Containers {
-		if workspace.Containers[i].Name == record.Name {
-			workspace.Containers[i] = record
-			replaced = true
-		}
-	}
-	if !replaced {
-		workspace.Containers = append(workspace.Containers, record)
-	}
-	syncDefaultFields(&workspace)
+	var result state.Workspace
 	if err := s.Store.UpdateWorkspaces(func(all []state.Workspace) ([]state.Workspace, error) {
 		for i := range all {
-			if all[i].WorkspaceSlug == workspace.WorkspaceSlug {
-				all[i] = workspace
-				return all, nil
+			if all[i].WorkspaceSlug != workspace.WorkspaceSlug {
+				continue
 			}
+			merged := all[i]
+			replaceContainerRecord(&merged, record)
+			syncDefaultFields(&merged)
+			all[i] = merged
+			result = merged
+			return all, nil
 		}
-		return append(all, workspace), nil
+		merged := workspace
+		replaceContainerRecord(&merged, record)
+		syncDefaultFields(&merged)
+		result = merged
+		return append(all, merged), nil
 	}); err != nil {
 		return state.Workspace{}, err
 	}
-	return workspace, nil
+	return result, nil
+}
+
+// replaceContainerRecord replaces (or appends) the container with the same
+// logical name, leaving every other container record untouched.
+func replaceContainerRecord(workspace *state.Workspace, record state.Container) {
+	for i := range workspace.Containers {
+		if workspace.Containers[i].Name == record.Name {
+			workspace.Containers[i] = record
+			return
+		}
+	}
+	workspace.Containers = append(workspace.Containers, record)
 }
 
 // syncDefaultFields projects the default container record onto the workspace's

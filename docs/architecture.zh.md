@@ -31,12 +31,16 @@ token（`DSH_PODMAN_ORCHESTRATOR_TOKEN`）作为 `authorization: bearer` 标头�
 
 orchestrator 服务公开以下 gRPC 方法（同时支撑 UI
 和工具）：`ListContainers`（仅返回 orchestrator 创建的 guest
-容器——它不拥有的容器永远不会被暴露）、`StartContainer{workspace_slug, container, image_id, mounts, env, secret_env, paths}`（在工作区的
+容器——它不拥有的容器永远不会被暴露）、`EnsureContainer{workspace_slug, container}`（唯一的接入路径：返回指定容器，若其缺失、已停止或运行过期的
+guest
+agent，则先重建它）、`StartContainer{workspace_slug, container, image_id, mounts, env, secret_env, paths}`（在工作区的
 pod 中创建或替换容器；空的 `container`
 指向默认容器，其他名称会被校验）、`RecreateContainer{workspace_slug, container, image_id, mounts, env, paths}`（停止、删除并重新创建容器，可选择使用新镜像、项目挂载、环境或
 PATH 附加项；空的 `image_id`
-保留工作区当前的镜像）、`RemoveContainer`、`AddContainerMount`、`RemoveContainerMount`、`SetContainerPaths`、`AddContainerSecret`
-和 `RemoveContainerSecret`。
+保留工作区当前的镜像）、`RemoveContainer`、`AddContainerMount`、`UpdateContainerMount`、`RemoveContainerMount`、`SetContainerPaths`、`AddContainerSecret`
+和
+`RemoveContainerSecret`。该服务还公开支撑设置卡片的工作区、卷、机密、镜像（构建、重建、删除以及拉取基础镜像）和缓存（列出与清理）操作，以及
+`GetVersion`。
 
 ## 工作区与 pod
 

@@ -37,6 +37,9 @@ check, so a plugin can always learn the orchestrator's version.
 The orchestrator service exposes these gRPC methods (backing both the UI and the
 tools): `ListContainers` (returns only the guest containers the orchestrator
 created — containers it does not own are never exposed),
+`EnsureContainer{workspace_slug, container}` (the single attach path: returns
+the named container, recreating it first when it is missing, stopped, or running
+an outdated guest agent),
 `StartContainer{workspace_slug, container, image_id, mounts, env, secret_env,
 paths}`
 (creates or replaces a container in the workspace's pod; an empty `container`
@@ -45,8 +48,11 @@ targets the default container and other names are validated),
 (stops, removes, and recreates a container, optionally with a new image, project
 mounts, environment, or PATH additions; an empty `image_id` keeps the
 workspace's current image), `RemoveContainer`, `AddContainerMount`,
-`RemoveContainerMount`, `SetContainerPaths`, `AddContainerSecret`, and
-`RemoveContainerSecret`.
+`UpdateContainerMount`, `RemoveContainerMount`, `SetContainerPaths`,
+`AddContainerSecret`, and `RemoveContainerSecret`. The service also exposes the
+workspace, volume, secret, image (build, rebuild, remove and base-image pull),
+and cache (list and clean) operations that back the settings card, plus
+`GetVersion`.
 
 ## Workspaces and pods
 

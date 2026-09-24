@@ -85,17 +85,14 @@ func podNameFor(slug string) string {
 
 // containerByLogical returns the container record for the given logical name.
 // An empty name or "default" resolves to the workspace's default container.
+// containerByLogical resolves a container record by its logical name. An empty
+// name means "default". There is deliberately no positional fallback: a
+// workspace that has lost its default container but still has named ones must
+// report the default as missing, not silently return Containers[0] and act on
+// an unrelated container.
 func containerByLogical(ws *state.Workspace, name string) (*state.Container, bool) {
-	if name == "" || name == "default" {
-		for i := range ws.Containers {
-			if ws.Containers[i].Name == "default" {
-				return &ws.Containers[i], true
-			}
-		}
-		if len(ws.Containers) > 0 {
-			return &ws.Containers[0], true
-		}
-		return nil, false
+	if name == "" {
+		name = "default"
 	}
 	for i := range ws.Containers {
 		if ws.Containers[i].Name == name {

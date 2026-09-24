@@ -5,9 +5,13 @@
 package grpcserver
 
 import (
+	"context"
 	"testing"
 
+	ctl "github.com/Exagone313/dsh-podman/internal/genproto/dshctl/v1"
 	"github.com/Exagone313/dsh-podman/internal/orchestrator/state"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 func mergeTestWorkspace() state.Workspace {
@@ -156,5 +160,36 @@ func TestApplyContainerDecisions(t *testing.T) {
 	})
 	if len(dropped) != 0 {
 		t.Fatalf("empty workspace must be dropped: %#v", dropped)
+	}
+}
+
+// TestDefaultContainerIsNotFabricated pins that a workspace whose default
+// container is gone but which still has a named one reports the default as
+// missing instead of silently acting on an unrelated container.
+func TestDefaultContainerIsNotFabricated(t *testing.T) {
+	store := newTestStore(t)
+	if err := store.SaveWorkspaces([]state.Workspace{{
+		WorkspaceSlug: "proj",
+		Containers: []state.Container{
+			{Name: "db", PodmanName: "dsh-podman-proj-db", ImageID: "arch", Status: "running"},
+		},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.SaveImages([]state.Image{{ImageID: "arch", ImageTag: "localhost/dsh-podman/arch:latest"}}); err != nil {
+		t.Fatal(err)
+	}
+	fake := newFakePodman()
+	server := &Server{Store: store, Podman: fake, Logger: silentLogger()}
+
+	if _, err := server.EnsureContainer(context.Background(), &ctl.EnsureContainerRequest{WorkspaceSlug: "proj"}); status.Code(err) != codes.NotFound {
+		t.Fatalf("expected NotFound for the missing default, got %v", err)
+	}
+	if len(fake.recreated) != 0 {
+		t.Fatalf("must not touch an unrelated container: %#v", fake.recreated)
+	}
+	// The named container still resolves.
+	if _, err := server.EnsureContainer(context.Background(), &ctl.EnsureContainerRequest{WorkspaceSlug: "proj", Container: "db"}); err != nil {
+		t.Fatalf("named container must still resolve: %v", err)
 	}
 }

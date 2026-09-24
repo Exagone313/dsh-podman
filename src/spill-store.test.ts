@@ -4,10 +4,11 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createSpillStore } from "./spill-store.js";
+import { createSpillStore, sessionSegment } from "./spill-store.js";
 import { guestFileRecorder } from "./test-support.js";
 
 const SESSION_ID = "2c573001-4171-4900-904b-12a5cc02737a";
+const SEGMENT = sessionSegment(SESSION_ID);
 
 function fakeCtx(sessions: Record<string, any>): any {
   return {
@@ -32,11 +33,11 @@ test("saveText writes a tool-result spill inside the session container", async (
     suggestedName: "web_fetch.txt",
     content,
   });
-  assert.equal(mkdirs[0], `/tmp/dsh-podman/spill/${SESSION_ID}`);
+  assert.equal(mkdirs[0], `/tmp/dsh-podman/spill/${SEGMENT}`);
   assert.equal(writes.length, 1);
   assert.match(
     writes[0].path,
-    new RegExp(`^/tmp/dsh-podman/spill/${SESSION_ID}/[0-9a-f]{32}-web_fetch\\.txt$`),
+    new RegExp(`^/tmp/dsh-podman/spill/${SEGMENT}/[0-9a-f]{32}-web_fetch\\.txt$`),
   );
   assert.equal(ref.locator, writes[0].path);
   assert.equal(ref.bytes, content.length);
@@ -53,9 +54,29 @@ test("saveText never lets the suggested name escape the spill directory", async 
     suggestedName: "../../etc/passwd",
     content: "x",
   });
-  assert.ok(ref.locator.startsWith(`/tmp/dsh-podman/spill/${SESSION_ID}/`));
+  assert.ok(ref.locator.startsWith(`/tmp/dsh-podman/spill/${SEGMENT}/`));
   assert.ok(!ref.locator.includes(".."));
   assert.equal(writes.length, 1);
+});
+
+test("sessionSegment neutralizes path-shaped session ids", () => {
+  // A session id is not necessarily a UUID, so it must never survive as a path
+  // segment that can traverse or collide.
+  for (const id of ["..", ".", "../../etc", "a/b", "session-1", "sess..ion", ""]) {
+    const segment = sessionSegment(id);
+    assert.notEqual(segment, "");
+    assert.notEqual(segment, ".");
+    assert.notEqual(segment, "..");
+    assert.doesNotMatch(segment, /[^A-Za-z0-9_-]/);
+    assert.ok(!segment.includes(".."), `${JSON.stringify(id)} -> ${segment}`);
+  }
+  // Distinct ids never share a directory, even when their readable prefixes do.
+  assert.notEqual(sessionSegment("session-1"), sessionSegment("session_1"));
+  // The readable prefix is kept for debugging.
+  assert.match(sessionSegment("session-42"), /^session-42-/);
+  // A UUID-shaped id stays recognizable.
+  assert.match(SEGMENT, /^2c573001-4171-4900-904b-[0-9a-f]+$/);
+  assert.equal(sessionSegment(SESSION_ID), SEGMENT);
 });
 
 test("saveText rejects when the session has no working directory", async () => {

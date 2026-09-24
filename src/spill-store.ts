@@ -40,10 +40,22 @@ function spillName(suggestedName: unknown): string {
   return `${randomUUID().replace(/-/g, "")}-${safe === "" ? "spill.txt" : safe}`;
 }
 
-// sessionSegment is the per-session directory name: session ids are UUIDs, but
-// a backend must never trust a caller-supplied segment in a path.
-function sessionSegment(sessionId: string): string {
-  return sessionId.replace(/[^A-Za-z0-9._-]/g, "_");
+// sessionSegment is the per-session directory name. Session ids are not
+// guaranteed to be UUIDs (dsh mints `session-<n>`, `<id>-session-<uuid>`, and
+// `webhook-<uuid>`, and accepts a caller-supplied id), so the id is encoded
+// rather than trusted: a short readable prefix from a safe alphabet plus the
+// full id in hex — deterministic, collision-free, and never "." or "..".
+export function sessionSegment(sessionId: unknown): string {
+  const id = String(sessionId ?? "");
+  const encoded = Buffer.from(id, "utf8").toString("hex");
+  const readable = id
+    .replace(/[^A-Za-z0-9_-]/g, "_")
+    .replace(/_{2,}/g, "_")
+    .replace(/^[_-]+/, "")
+    .slice(0, 24)
+    .replace(/[_-]+$/, "");
+  if (readable !== "") return `${readable}-${encoded}`;
+  return encoded === "" ? "session" : encoded;
 }
 
 // createSpillStore backs `ctx.spillStore` with the session's container:

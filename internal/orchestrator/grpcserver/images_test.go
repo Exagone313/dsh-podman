@@ -478,8 +478,13 @@ func TestRebuildAllImagesNoImages(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
-	if len(response.Rebuilt) != 0 || len(response.Skipped) != 0 {
-		t.Fatalf("expected empty rebuild lists, got %#v", response)
+	if len(response.Rebuilt) != 0 {
+		t.Fatalf("expected no rebuilt images, got %#v", response.Rebuilt)
+	}
+	// No custom image exists, but the unusable builder still reports every base
+	// it could not ensure, instead of logging the failure only.
+	if len(response.Skipped) != len(imagebuild.BaseImages) {
+		t.Fatalf("expected the unbuildable bases to be reported, got %#v", response.Skipped)
 	}
 }
 
@@ -496,7 +501,13 @@ func TestRebuildAllImagesFailingBuilderSkipsAll(t *testing.T) {
 	if len(response.Rebuilt) != 0 {
 		t.Fatalf("expected no rebuilt images, got %#v", response.Rebuilt)
 	}
-	want := []string{"mid", "top"}
+	// The base images the builder could not ensure come first, then the custom
+	// images and their dependents.
+	want := make([]string, 0, len(imagebuild.BaseImages)+2)
+	for _, base := range imagebuild.BaseImages {
+		want = append(want, base.ID)
+	}
+	want = append(want, "mid", "top")
 	if !sameStrings(response.Skipped, want) {
 		t.Fatalf("expected skipped %#v, got %#v", want, response.Skipped)
 	}

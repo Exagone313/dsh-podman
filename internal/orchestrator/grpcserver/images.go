@@ -119,13 +119,19 @@ func (s *Server) RebuildAllImages(_ context.Context, _ *ctl.RebuildAllImagesRequ
 		s.log().Error("control request failed", "method", "RebuildAllImages", "error", err)
 		return nil, status.Error(codes.Internal, err.Error())
 	}
+	baseFailures := make([]string, 0)
 	for _, base := range imagebuild.BaseImages {
 		if _, _, err := s.ensureBase(base.ID); err != nil {
 			s.log().Error("control request failed", "method", "RebuildAllImages", "base_image", base.ID, "error", err)
+			// A base that could not be built or pulled is reported in skipped
+			// like any other image left unavailable, instead of being only
+			// logged.
+			baseFailures = append(baseFailures, base.ID)
 		}
 	}
 	_, dependents := rebuildGraph(images)
 	ordered, skipped := rebuildPlan(images)
+	skipped = append(baseFailures, skipped...)
 	settled := make(map[string]bool, len(images))
 	for _, id := range skipped {
 		settled[id] = true

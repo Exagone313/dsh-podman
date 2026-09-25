@@ -378,6 +378,7 @@ export async function runCommand(
     case "remove":
       await resolver.control("removeContainer", {
         workspaceSlug: command.workspace,
+        ...(command.container !== "" ? { container: command.container } : {}),
       });
       break;
     case "workspace_remove":
@@ -388,6 +389,7 @@ export async function runCommand(
     case "recreate":
       await resolver.control("recreateContainer", {
         workspaceSlug: command.workspace,
+        ...(command.container !== "" ? { container: command.container } : {}),
         imageId: command.image === "" ? undefined : command.image,
         ...(Object.keys(command.env).length > 0 ? { env: command.env } : {}),
       });

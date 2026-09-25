@@ -71,9 +71,10 @@ export function ContainerRow(props: {
   volumes: readonly { name: string }[];
   secrets: readonly { name: string }[];
   busy: boolean;
-  onRemove: (workspace: string) => void;
+  onRemove: (workspace: string, container: string) => void;
   onRecreate: (
     workspace: string,
+    container: string,
     image: string,
     env?: Record<string, string>,
   ) => void;
@@ -85,8 +86,17 @@ export function ContainerRow(props: {
     container: string,
     paths: readonly string[],
   ) => void;
-  onAddContainerSecret: (workspace: string, envVar: string, secret: string) => void;
-  onRemoveContainerSecret: (workspace: string, envVar: string) => void;
+  onAddContainerSecret: (
+    workspace: string,
+    container: string,
+    envVar: string,
+    secret: string,
+  ) => void;
+  onRemoveContainerSecret: (
+    workspace: string,
+    container: string,
+    envVar: string,
+  ) => void;
   projectName: string;
   projectsRoot: string;
   directoryPicker?: DirectoryPickerFace;
@@ -137,7 +147,12 @@ export function ContainerRow(props: {
   const attach = (): void => {
     const envVar = attachVar.trim();
     if (envVar === "" || attachSecret === "") return;
-    onAddContainerSecret(container.workspaceSlug, envVar, attachSecret);
+    onAddContainerSecret(
+      container.workspaceSlug,
+      container.containerName,
+      envVar,
+      attachSecret,
+    );
     setAttachVar("");
   };
   return (
@@ -193,17 +208,23 @@ export function ContainerRow(props: {
           t={t}
           label={t("remove")}
           title={t("confirmTitle")}
-          description={t("confirmRemoveContainer", { workspace: projectName })}
+          description={t("confirmRemoveContainer", {
+            workspace: projectName,
+            container: container.containerName,
+          })}
           disabled={!enabled}
-          onConfirm={() => onRemove(container.workspaceSlug)}
+          onConfirm={() => onRemove(container.workspaceSlug, container.containerName)}
         />
         <ConfirmButton
           t={t}
           label={t("recreate")}
           title={t("confirmTitle")}
-          description={t("confirmRecreate", { workspace: projectName })}
+          description={t("confirmRecreate", {
+            workspace: projectName,
+            container: container.containerName,
+          })}
           disabled={!enabled}
-          onConfirm={() => onRecreate(container.workspaceSlug, "", env)}
+          onConfirm={() => onRecreate(container.workspaceSlug, container.containerName, "", env)}
         />
         <select
           style={imageSelect}
@@ -223,9 +244,13 @@ export function ContainerRow(props: {
           t={t}
           label={t("recreateWithImage")}
           title={t("confirmTitle")}
-          description={t("confirmRecreate", { workspace: projectName })}
+          description={t("confirmRecreate", {
+            workspace: projectName,
+            container: container.containerName,
+          })}
           disabled={!enabled || selected === ""}
-          onConfirm={() => onRecreate(container.workspaceSlug, selected, env)}
+          onConfirm={() =>
+            onRecreate(container.workspaceSlug, container.containerName, selected, env)}
         />
       </div>
       <DisclosureRow
@@ -335,7 +360,12 @@ export function ContainerRow(props: {
                 title={t("confirmTitle")}
                 description={t("confirmDetachSecret", { env: envVar, secret: secretName })}
                 disabled={busy}
-                onConfirm={() => onRemoveContainerSecret(container.workspaceSlug, envVar)}
+                onConfirm={() =>
+                  onRemoveContainerSecret(
+                    container.workspaceSlug,
+                    container.containerName,
+                    envVar,
+                  )}
               />
             </div>
           ))}

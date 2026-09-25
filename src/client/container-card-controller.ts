@@ -89,10 +89,15 @@ export interface ContainerCardFace {
     containerCard: SnapshotStore<CardState>;
   };
   reload: () => void;
-  remove: (workspace: string) => void;
+  remove: (workspace: string, container: string) => void;
   cleanCaches: (mode: string) => void;
   removeWorkspace: (workspace: string) => void;
-  recreate: (workspace: string, image: string, env?: Record<string, string>) => void;
+  recreate: (
+    workspace: string,
+    container: string,
+    image: string,
+    env?: Record<string, string>,
+  ) => void;
   createContainer: (workspace: WorkspaceView, config?: ContainerCreateConfig) => void;
   startContainer: (
     workspace: WorkspaceView,
@@ -115,8 +120,13 @@ export interface ContainerCardFace {
   createSecret: (name: string, length?: number, charset?: string) => void;
   removeSecret: (name: string) => void;
   setSecret: (name: string, value: string) => void;
-  addContainerSecret: (workspace: string, envVar: string, secret: string) => void;
-  removeContainerSecret: (workspace: string, envVar: string) => void;
+  addContainerSecret: (
+    workspace: string,
+    container: string,
+    envVar: string,
+    secret: string,
+  ) => void;
+  removeContainerSecret: (workspace: string, container: string, envVar: string) => void;
   // Replace the default environment (the git popup and the generic editor both
   // go through this).
   saveContainerEnv: (env: Record<string, string>) => void;
@@ -318,11 +328,14 @@ export class ContainerCardController {
       reload: () => {
         void this.reload();
       },
-      remove: (workspace) => this.command("remove", workspace, ""),
+      remove: (workspace, container) => this.command("remove", workspace, "", { container }),
       cleanCaches: (mode) => this.command("cache_clean", "", "", { cacheMode: mode }),
       removeWorkspace: (workspace) => this.command("workspace_remove", workspace, ""),
-      recreate: (workspace, image, env) =>
-        this.command("recreate", workspace, image, { ...(env ? { env } : {}) }),
+      recreate: (workspace, container, image, env) =>
+        this.command("recreate", workspace, image, {
+          container,
+          ...(env ? { env } : {}),
+        }),
       createContainer: (workspace, config) =>
         this.command(
           "create",
@@ -381,15 +394,15 @@ export class ContainerCardController {
         }),
       removeSecret: (name) => this.command("secret_remove", name, ""),
       setSecret: (name, value) => this.command("secret_set", name, "", { value }),
-      addContainerSecret: (workspace, envVar, secret) =>
+      addContainerSecret: (workspace, container, envVar, secret) =>
         this.command("container_secret_add", workspace, "", {
-          container: "default",
+          container,
           secretEnvName: envVar,
           secret,
         }),
-      removeContainerSecret: (workspace, envVar) =>
+      removeContainerSecret: (workspace, container, envVar) =>
         this.command("container_secret_remove", workspace, "", {
-          container: "default",
+          container,
           secretEnvName: envVar,
         }),
       saveContainerEnv: (env) => {

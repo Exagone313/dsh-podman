@@ -13,7 +13,9 @@ import { en, zh } from "./client/locales.js";
 const SUBJECTS: readonly (readonly [keyof typeof en, string])[] = [
   ["confirmRemovePod", "workspace"],
   ["confirmRemoveContainer", "workspace"],
+  ["confirmRemoveContainer", "container"],
   ["confirmRecreate", "workspace"],
+  ["confirmRecreate", "container"],
   ["confirmDetachSecret", "env"],
   ["confirmDetachSecret", "secret"],
   ["confirmRebuildImage", "image"],

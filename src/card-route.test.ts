@@ -142,9 +142,57 @@ test("the card route runs one command per POST and returns its notice", async ()
   }));
   assert.equal(remove.status, 200);
   assert.deepEqual(await remove.json(), {});
-  assert.deepEqual(calls.find(([method]) => method === "removeContainer")?.[1], {
+
+  // A command that names no container keeps the orchestrator's default; one that
+  // names a container must reach it, or a row's Remove would hit another one.
+  const removeNamed = await routes[0].fetch(cardRequest({
+    method: "POST",
+    body: JSON.stringify({
+      command: { op: "remove", workspace: "w1", container: "foo" },
+    }),
+  }));
+  assert.equal(removeNamed.status, 200);
+  const removeCalls = calls.filter(([method]) => method === "removeContainer");
+  assert.deepEqual(removeCalls[0]?.[1], { workspaceSlug: "w1" });
+  assert.deepEqual(removeCalls[1]?.[1], {
     workspaceSlug: "w1",
+    container: "foo",
   });
+
+  const recreate = await routes[0].fetch(cardRequest({
+    method: "POST",
+    body: JSON.stringify({
+      command: {
+        op: "recreate",
+        workspace: "w1",
+        container: "foo",
+        image: "img1",
+      },
+    }),
+  }));
+  assert.equal(recreate.status, 200);
+  assert.deepEqual(calls.find(([method]) => method === "recreateContainer")?.[1], {
+    workspaceSlug: "w1",
+    container: "foo",
+    imageId: "img1",
+  });
+
+  const detach = await routes[0].fetch(cardRequest({
+    method: "POST",
+    body: JSON.stringify({
+      command: {
+        op: "container_secret_remove",
+        workspace: "w1",
+        container: "foo",
+        secretEnvName: "TOKEN",
+      },
+    }),
+  }));
+  assert.equal(detach.status, 200);
+  assert.deepEqual(
+    calls.find(([method]) => method === "removeContainerSecret")?.[1],
+    { workspaceSlug: "w1", container: "foo", env: "TOKEN" },
+  );
 
   const clean = await routes[0].fetch(cardRequest({
     method: "POST",

@@ -4,7 +4,7 @@
 
 import { Field } from "./container-card-shared.js";
 import { greyId, hint } from "./container-card-styles.js";
-import { type ContainerPluginKey } from "./locales.js";
+import type { Translate } from "./locales.js";
 import { Button, Input, Modal } from "@deepseek-ai/dsh-client-ui-primitives";
 import { type ReactNode, useId, useMemo, useState } from "react";
 
@@ -53,7 +53,7 @@ const dragHandle: React.CSSProperties = {
 // dragging the handle or with the move buttons, edit in place, and remove. It
 // is controlled: every change reports the whole list through onChange.
 export function PathsList(props: {
-  t: (key: ContainerPluginKey) => string;
+  t: Translate;
   entries: readonly PathEntry[];
   busy: boolean;
   onChange: (entries: PathEntry[]) => void;
@@ -166,7 +166,7 @@ export function PathsList(props: {
 // PathsEditor shows the container's ordered PATH additions and edits them in a
 // modal around PathsList. Apply sends the whole list at once.
 export function PathsEditor(props: {
-  t: (key: ContainerPluginKey) => string;
+  t: Translate;
   paths: readonly string[];
   busy: boolean;
   enabled: boolean;

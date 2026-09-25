@@ -20,12 +20,12 @@ import {
   wsBody,
 } from "./container-card-styles.js";
 import { type ImageView } from "./container-card-controller.js";
-import { type ContainerPluginKey } from "./locales.js";
+import type { Translate } from "./locales.js";
 import { Button, DisclosureRow, Input, Modal } from "@deepseek-ai/dsh-client-ui-primitives";
 import { type ReactNode, useId, useState } from "react";
 
 export function ImageItem(props: {
-  t: (key: ContainerPluginKey) => string;
+  t: Translate;
   image: ImageView;
   busy: boolean;
   defaultImage: string;
@@ -79,7 +79,7 @@ export function ImageItem(props: {
             t={t}
             label={t("rebuildImage")}
             title={t("confirmTitle")}
-            description={t("confirmRebuildImage")}
+            description={t("confirmRebuildImage", { image: image.imageId })}
             disabled={busy}
             onConfirm={() => onRebuild(image.imageId)}
           />
@@ -87,7 +87,7 @@ export function ImageItem(props: {
             t={t}
             label={t("removeImage")}
             title={t("confirmTitle")}
-            description={t("confirmRemoveImage")}
+            description={t("confirmRemoveImage", { image: image.imageId })}
             disabled={busy}
             onConfirm={() => onRemove(image.imageId)}
           />
@@ -106,7 +106,7 @@ export function ImageItem(props: {
 }
 
 export function BaseImageRow(props: {
-  t: (key: ContainerPluginKey) => string;
+  t: Translate;
   image: ImageView;
   busy: boolean;
   defaultImage: string;
@@ -214,7 +214,7 @@ export function BaseImageRow(props: {
 }
 
 export function ImageBuildModal(props: {
-  t: (key: ContainerPluginKey) => string;
+  t: Translate;
   images: readonly { imageId: string; isBase: boolean }[];
   open: boolean;
   imageId: string;

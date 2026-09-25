@@ -13,12 +13,12 @@ import {
   type WorkspaceView,
 } from "./container-card-controller.js";
 import { type DirectoryPickerFace } from "./directory-picker.js";
-import { type ContainerPluginKey } from "./locales.js";
+import type { Translate } from "./locales.js";
 import { Button, DisclosureRow, StateDot } from "@deepseek-ai/dsh-client-ui-primitives";
 import { type ReactNode, useState } from "react";
 
 export function WorkspaceSection(props: {
-  t: (key: ContainerPluginKey) => string;
+  t: Translate;
   workspace: WorkspaceView;
   containers: readonly ContainerView[];
   images: readonly ImageView[];
@@ -173,7 +173,7 @@ export function WorkspaceSection(props: {
             t={t}
             label={t("removePod")}
             title={t("confirmTitle")}
-            description={t("confirmRemovePod")}
+            description={t("confirmRemovePod", { workspace: workspace.projectName })}
             disabled={busy}
             onConfirm={() => onRemoveWorkspace(workspace.workspaceSlug)}
           />

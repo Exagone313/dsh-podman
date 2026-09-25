@@ -4,12 +4,12 @@
 
 import { ConfirmButton, Field, namePattern, sanitizeName } from "./container-card-shared.js";
 import { greyId, hint, imageSelect, sectionTitle, wsBody } from "./container-card-styles.js";
-import { type ContainerPluginKey } from "./locales.js";
+import type { Translate } from "./locales.js";
 import { Button, DisclosureRow, Input, Modal } from "@deepseek-ai/dsh-client-ui-primitives";
 import { type ReactNode, useId, useState } from "react";
 
 export function SecretRow(props: {
-  t: (key: ContainerPluginKey) => string;
+  t: Translate;
   name: string;
   busy: boolean;
   writable: boolean;
@@ -58,7 +58,7 @@ export function SecretRow(props: {
         t={t}
         label={t("setSecret")}
         title={t("confirmTitle")}
-        description={t("confirmSetSecret")}
+        description={t("confirmSetSecret", { secret: name })}
         disabled={!writable || !canSave}
         onConfirm={submit}
       />
@@ -66,7 +66,7 @@ export function SecretRow(props: {
         t={t}
         label={t("removeSecret")}
         title={t("confirmTitle")}
-        description={t("confirmRemoveSecret")}
+        description={t("confirmRemoveSecret", { secret: name })}
         disabled={!writable || busy}
         onConfirm={() => onRemove(name)}
       />
@@ -75,7 +75,7 @@ export function SecretRow(props: {
 }
 
 export function SecretsSection(props: {
-  t: (key: ContainerPluginKey) => string;
+  t: Translate;
   secrets: readonly { name: string }[];
   busy: boolean;
   writable: boolean;

@@ -4,7 +4,7 @@
 
 import { hint } from "./container-card-styles.js";
 import { type MountInput, type ProjectMountView } from "./container-card-controller.js";
-import { type ContainerPluginKey } from "./locales.js";
+import { type ContainerPluginKey, type Translate } from "./locales.js";
 import { Button, Input, Modal, type StateDotState } from "@deepseek-ai/dsh-client-ui-primitives";
 import { type ReactNode, useState } from "react";
 
@@ -91,7 +91,7 @@ export const emptyMount = (kind = "project"): MountInput => ({
 });
 
 export function ConfirmButton(props: {
-  t: (key: ContainerPluginKey) => string;
+  t: Translate;
   label: string;
   title: string;
   description: string;
@@ -143,7 +143,7 @@ export function ConfirmButton(props: {
 }
 
 export function Chip(props: {
-  t: (key: ContainerPluginKey) => string;
+  t: Translate;
   label: string;
   disabled?: boolean;
   onRemove?: () => void;
@@ -190,7 +190,7 @@ export function Chip(props: {
 }
 
 export function TagInput(props: {
-  t: (key: ContainerPluginKey) => string;
+  t: Translate;
   value: readonly string[];
   onChange: (tags: string[]) => void;
   placeholder?: string;

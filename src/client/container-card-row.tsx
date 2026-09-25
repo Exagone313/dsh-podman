@@ -18,7 +18,7 @@ import {
   thStyle,
   wsBody,
 } from "./container-card-styles.js";
-import { type ContainerPluginKey } from "./locales.js";
+import { type ContainerPluginKey, type Translate } from "./locales.js";
 import { Button, DisclosureRow, Input, Pill } from "@deepseek-ai/dsh-client-ui-primitives";
 import { type ReactNode, useEffect, useState } from "react";
 
@@ -65,7 +65,7 @@ export function mountSummaries(
 }
 
 export function ContainerRow(props: {
-  t: (key: ContainerPluginKey) => string;
+  t: Translate;
   container: ContainerView;
   images: readonly { imageId: string }[];
   volumes: readonly { name: string }[];
@@ -193,7 +193,7 @@ export function ContainerRow(props: {
           t={t}
           label={t("remove")}
           title={t("confirmTitle")}
-          description={t("confirmRemoveContainer")}
+          description={t("confirmRemoveContainer", { workspace: projectName })}
           disabled={!enabled}
           onConfirm={() => onRemove(container.workspaceSlug)}
         />
@@ -201,7 +201,7 @@ export function ContainerRow(props: {
           t={t}
           label={t("recreate")}
           title={t("confirmTitle")}
-          description={t("confirmRecreate")}
+          description={t("confirmRecreate", { workspace: projectName })}
           disabled={!enabled}
           onConfirm={() => onRecreate(container.workspaceSlug, "", env)}
         />
@@ -223,7 +223,7 @@ export function ContainerRow(props: {
           t={t}
           label={t("recreateWithImage")}
           title={t("confirmTitle")}
-          description={t("confirmRecreate")}
+          description={t("confirmRecreate", { workspace: projectName })}
           disabled={!enabled || selected === ""}
           onConfirm={() => onRecreate(container.workspaceSlug, selected, env)}
         />
@@ -333,7 +333,7 @@ export function ContainerRow(props: {
                 t={t}
                 label={t("detachSecret")}
                 title={t("confirmTitle")}
-                description={t("confirmDetachSecret")}
+                description={t("confirmDetachSecret", { env: envVar, secret: secretName })}
                 disabled={busy}
                 onConfirm={() => onRemoveContainerSecret(container.workspaceSlug, envVar)}
               />

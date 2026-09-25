@@ -378,9 +378,12 @@ image build is in progress.
 
 The plugin owns a **Podman terminal** right-Sidebar tab, separate from dsh's own
 Terminal tab. Open it from the right Sidebar's new-tab guide, or press
-**Ctrl+Shift+`**. Its header picks a workspace and any container of that
-workspace, so a shell can run in the default container or in a named one; the
-harness's own Terminal always uses the session workspace's default container.
+**Ctrl+Shift+`**. It always runs in the session's own workspace — each workspace
+has its own side panes and terminals — so the start form only asks for a
+container and then a shell, and a shell can run in the default container or in a
+named one. If the session's directory names no known workspace the form reports
+that instead of guessing; the harness's own Terminal always uses that workspace's
+default container.
 
 The shell list is discovered **inside the chosen container**: candidate names
 are looked up on that container's PATH (`command -v`) and merged with

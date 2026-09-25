@@ -2,23 +2,29 @@
 //
 // SPDX-License-Identifier: MIT
 
-// The Podman terminal tab's body: target pickers (workspace, container, shell)
-// over the settings card's live snapshot, and one xterm screen bound to the
-// host's terminal stream. Closing the tab only detaches; the host retains the
-// shell, and reopening the same tab reattaches and replays a snapshot.
+// The Podman terminal tab's body: the container and shell pickers over the
+// settings card's live snapshot, and one xterm screen bound to the host's
+// terminal stream. The workspace is the Session's own — never chosen, never
+// shown. Closing the tab only detaches; the host retains the shell, and
+// reopening the same tab reattaches and replays a snapshot.
 import { FitAddon } from "@xterm/addon-fit";
 import { type ITheme, Terminal } from "@xterm/xterm";
 import xtermCss from "@xterm/xterm/css/xterm.css";
 import { Button } from "@deepseek-ai/dsh-client-ui-primitives";
 import type { InjectFace, PropsLocale, PropsRuntime } from "@deepseek-ai/dsh-client-ui-slots";
 import { type ReactNode, useEffect, useLayoutEffect, useRef, useState } from "react";
-import type { ContainerView, WorkspaceView } from "./card-protocol.js";
+import type { ContainerView } from "./card-protocol.js";
 import type { ContainerCardFace } from "./container-card-controller.js";
-import { imageSelect } from "./container-card-styles.js";
+import { fieldLabel, imageSelect } from "./container-card-styles.js";
 import { NS } from "./locales.js";
 import type { PodmanTerminalParams } from "./terminal-tab.js";
 import type { TerminalFrame, TerminalShellView } from "./terminal-protocol.js";
-import { containerOptions } from "./terminal-targets.js";
+import {
+  containerOptions,
+  type SessionStandardShare,
+  sessionWorkspace,
+  useSessionCwd,
+} from "./terminal-targets.js";
 import {
   base64ToBytes,
   bytesToBase64,
@@ -74,26 +80,6 @@ function readTerminalTheme(): ITheme {
   };
 }
 
-// `ui-session`, a harness client plugin the product always loads, merges these
-// two members into every session-scope slot's props. It is not a dependency of
-// this package, so its declaration merge is absent here; declaring the share
-// we consume (optionally, so the registration's composed-props check still
-// holds) keeps the body honest about what the runtime hands it.
-interface PodmanSessionState {
-  readonly header?: { readonly cwd?: string } | undefined;
-}
-interface SessionStandardShare {
-  /** Selector over the current Session's state. */
-  readonly useSession?: <T>(selector: (state: PodmanSessionState) => T) => T;
-}
-
-// A stable stand-in keeps the selector-hook call unconditional even if the
-// type-level share is missing; the runtime binding always supplies the real
-// hook, so this branch never runs in the product.
-const noSession = (
-  _selector: (state: PodmanSessionState) => unknown,
-): undefined => undefined;
-
 /** Everything the tab body is given: framework shares plus the injected card face. */
 export interface PodmanTerminalInjected extends ContainerCardFace {
   /** Owning session, injected by the session-scope registration. */
@@ -119,81 +105,32 @@ type TerminalStatus =
   | { readonly kind: "detached" }
   | { readonly kind: "error"; readonly message: string };
 
-/** The workspace's project name, when `cwd` is `<projectsRoot>/<projectName>/…`. */
-function projectNameFromCwd(
-  cwd: string | undefined,
-  projectsRoot: string,
-): string | undefined {
-  if (cwd === undefined || cwd === "" || projectsRoot === "") return undefined;
-  const prefix = projectsRoot.endsWith("/") ? projectsRoot : `${projectsRoot}/`;
-  if (!cwd.startsWith(prefix)) return undefined;
-  const name = cwd.slice(prefix.length).split("/")[0] ?? "";
-  return name === "" ? undefined : name;
-}
-
-/** The session's workspace when the cwd names one, else the first workspace. */
-function defaultWorkspace(
-  workspaces: readonly WorkspaceView[],
-  cwd: string | undefined,
-  projectsRoot: string,
-): string | undefined {
-  const fromCwd = projectNameFromCwd(cwd, projectsRoot);
-  if (
-    fromCwd !== undefined &&
-    workspaces.some((workspace) => workspace.projectName === fromCwd)
-  ) {
-    return fromCwd;
-  }
-  return workspaces[0]?.projectName;
-}
-
-/** The workspace/container pickers shared by the body and the guide card. */
-interface TerminalTargetFieldsProps {
-  readonly workspaces: readonly WorkspaceView[];
+/** The labelled container picker shared by the body and the guide card. */
+interface ContainerFieldProps {
   readonly containers: readonly ContainerView[];
-  readonly workspace: string | undefined;
+  readonly workspaceSlug: string | undefined;
   readonly container: string | undefined;
   readonly disabled: boolean;
-  readonly workspaceLabel: string;
-  readonly containerLabel: string;
+  readonly label: string;
   readonly defaultLabel: string;
-  readonly onWorkspace: (workspace: string) => void;
   readonly onContainer: (container: string) => void;
 }
 
-export function TerminalTargetFields(
-  props: TerminalTargetFieldsProps,
-): ReactNode {
-  const selected = props.workspaces.find((workspace) => workspace.projectName === props.workspace);
+export function ContainerField(props: ContainerFieldProps): ReactNode {
   return (
     <>
+      <span style={fieldLabel}>{props.label}</span>
       <select
         style={imageSelect}
-        aria-label={props.workspaceLabel}
-        value={props.workspace ?? ""}
-        disabled={props.disabled || props.workspaces.length === 0}
-        onChange={(event) => {
-          props.onWorkspace(event.target.value);
-        }}
-      >
-        {props.workspaces.length === 0 && <option value="">{props.workspaceLabel}</option>}
-        {props.workspaces.map((workspace) => (
-          <option key={workspace.projectName} value={workspace.projectName}>
-            {workspace.projectName}
-          </option>
-        ))}
-      </select>
-      <select
-        style={imageSelect}
-        aria-label={props.containerLabel}
+        aria-label={props.label}
         value={props.container ?? ""}
-        disabled={props.disabled || props.workspace === undefined}
+        disabled={props.disabled || props.workspaceSlug === undefined}
         onChange={(event) => {
           props.onContainer(event.target.value);
         }}
       >
         <option value="">{props.defaultLabel}</option>
-        {containerOptions(props.containers, selected?.workspaceSlug).map((name) => (
+        {containerOptions(props.containers, props.workspaceSlug).map((name) => (
           <option key={name} value={name}>{name}</option>
         ))}
       </select>
@@ -211,11 +148,17 @@ export function PodmanTerminal(props: PodmanTerminalProps): ReactNode {
   const params = info.tab.navigation.params as
     | PodmanTerminalParams
     | undefined;
-  const useSession = props.useSession ?? noSession;
-  const cwd = useSession((snapshot) => snapshot.header?.cwd);
-  const [workspace, setWorkspace] = useState<string | undefined>(
-    params?.workspace,
+  // The Session's own workspace: never chosen and never guessed. `undefined`
+  // means either the snapshot is still loading or the Session's directory names
+  // no known workspace, and the render below tells those two apart.
+  const workspace = sessionWorkspace(
+    state.workspaces,
+    useSessionCwd(props.useSession),
+    state.projectsRoot,
   );
+  const workspaceSlug = state.workspaces.find((row) => row.projectName === workspace)
+    ?.workspaceSlug;
+  const unknownWorkspace = state.workspaces.length > 0 && workspace === undefined;
   const [container, setContainer] = useState<string | undefined>(
     params?.container,
   );
@@ -238,13 +181,6 @@ export function PodmanTerminal(props: PodmanTerminalProps): ReactNode {
   useEffect(() => {
     props.reload();
   }, [props.reload]);
-
-  // Default workspace: the session's when its cwd names one, else the first.
-  useEffect(() => {
-    if (workspace !== undefined || state.workspaces.length === 0) return;
-    const next = defaultWorkspace(state.workspaces, cwd, state.projectsRoot);
-    if (next !== undefined) setWorkspace(next);
-  }, [workspace, cwd, state.workspaces, state.projectsRoot]);
 
   // Default container: the empty value means the workspace's default container
   // to the host. The workspace row carries that container's podman name, which
@@ -480,30 +416,25 @@ export function PodmanTerminal(props: PodmanTerminalProps): ReactNode {
   return (
     <section style={ROOT_STYLE} data-dsh-podman-terminal>
       <div style={TOOLBAR_STYLE}>
-        <TerminalTargetFields
-          workspaces={state.workspaces}
+        <ContainerField
           containers={state.containers}
-          workspace={workspace}
+          workspaceSlug={workspaceSlug}
           container={container}
-          disabled={state.workspaces.length === 0}
-          workspaceLabel={t("terminalWorkspace")}
-          containerLabel={t("terminalContainer")}
+          disabled={state.workspaces.length === 0 || unknownWorkspace}
+          label={t("terminalContainer")}
           defaultLabel={t("terminalDefaultContainer")}
-          onWorkspace={(value) => {
-            setWorkspace(value === "" ? undefined : value);
-            setContainer(undefined);
-            setShell(undefined);
-          }}
           onContainer={(value) => {
             setContainer(value);
             setShell(undefined);
           }}
         />
+        <span style={fieldLabel}>{t("terminalShell")}</span>
         <select
           style={imageSelect}
           aria-label={t("terminalShell")}
           value={shell ?? ""}
-          disabled={shells.phase !== "ready" || shellList.length === 0}
+          disabled={unknownWorkspace || shells.phase !== "ready" ||
+            shellList.length === 0}
           onChange={(event) => {
             setShell(event.target.value);
           }}
@@ -511,7 +442,11 @@ export function PodmanTerminal(props: PodmanTerminalProps): ReactNode {
           {shellList.length === 0
             ? (
               <option value="">
-                {shells.phase === "loading" ? t("terminalLoading") : t("terminalNoShells")}
+                {unknownWorkspace
+                  ? ""
+                  : shells.phase === "loading"
+                  ? t("terminalLoading")
+                  : t("terminalNoShells")}
               </option>
             )
             : shellList.map((entry) => (
@@ -538,6 +473,11 @@ export function PodmanTerminal(props: PodmanTerminalProps): ReactNode {
       {state.workspaces.length === 0 && (
         <p style={ERROR_STYLE} role="status">
           {state.busy ? t("terminalLoading") : t("unavailable")}
+        </p>
+      )}
+      {unknownWorkspace && (
+        <p style={ERROR_STYLE} role="alert">
+          {t("terminalWorkspaceUnknown")}
         </p>
       )}
       {shells.phase === "failed" && (

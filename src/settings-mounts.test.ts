@@ -333,6 +333,50 @@ test("container_mount_update command drives updateContainerMount", async () => {
   assert.equal(scope.value.command, null);
 });
 
+test("container_mount_add command rejects a read-write secret mount", async () => {
+  const { scope, calls } = await installedMountScope();
+  await scope.update({
+    command: mountCommand("container_mount_add", {
+      kind: "secret",
+      secret: "valkey-tls",
+      destination: "/run/secrets/tls",
+      mode: "read_write",
+    }),
+  });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(
+    scope.value.notice,
+    "secret mounts are read-only; omit mode or use read_only",
+  );
+  assert.equal(
+    calls.some(([method]) => method === "addContainerMount"),
+    false,
+    "a rejected secret mount must not reach the orchestrator",
+  );
+});
+
+test("container_mount_update command rejects a secret mount", async () => {
+  const { scope, calls } = await installedMountScope();
+  await scope.update({
+    command: mountCommand("container_mount_update", {
+      kind: "secret",
+      secret: "valkey-tls",
+      destination: "/run/secrets/tls",
+      mode: "read_write",
+    }),
+  });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(
+    scope.value.notice,
+    "secret mounts are read-only; omit mode or use read_only",
+  );
+  assert.equal(
+    calls.some(([method]) => method === "updateContainerMount"),
+    false,
+    "a rejected secret mount must not reach the orchestrator",
+  );
+});
+
 test("container_mount_add command reports an unknown kind as a notice", async () => {
   const { scope, calls } = await installedMountScope();
   await scope.update({

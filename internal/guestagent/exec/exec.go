@@ -12,10 +12,15 @@ import (
 	"strconv"
 	"sync"
 	"syscall"
+	"time"
 
 	"github.com/Exagone313/dsh-podman/internal/guestagent/childenv"
 	"github.com/Exagone313/dsh-podman/internal/guestagent/identity"
 )
+
+// cancelGrace bounds how long Wait may wait for a cancelled command's output
+// pipes to close once the process group has been killed.
+const cancelGrace = 5 * time.Second
 
 type Process struct {
 	ID      string
@@ -75,6 +80,22 @@ func (m *Manager) Start(ctx context.Context, argv []string, cwd string, env map[
 	if cred := identity.Credential(opts); cred != nil {
 		cmd.SysProcAttr.Credential = cred
 	}
+	// A cancelled context must stop the whole command group, not just the
+	// direct child: the caller cancels the exec stream on a timeout or an
+	// abort, and the default cancellation kills only the child, leaving a
+	// shell's foreground child running. The kill is best-effort, and returning
+	// no error keeps a process that exited on its own from turning Wait's
+	// result into a cancellation error. WaitDelay bounds Wait when a surviving
+	// grandchild still holds the output pipes.
+	cmd.Cancel = func() error {
+		if cmd.Process != nil {
+			if err := syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL); err != nil {
+				_ = cmd.Process.Kill()
+			}
+		}
+		return nil
+	}
+	cmd.WaitDelay = cancelGrace
 	proc := &Process{Argv: append([]string(nil), argv...), Command: cmd}
 	m.mu.Lock()
 	m.nextID++

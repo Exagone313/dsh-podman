@@ -217,6 +217,45 @@ func TestProcessGroupReachesChildren(t *testing.T) {
 	}
 }
 
+// TestCancelKillsWholeProcessGroup pins the escalation the caller relies on: a
+// cancelled context must take down every member of the command's process group,
+// not just the direct child, and Wait must return instead of blocking on a
+// grandchild that still holds the output pipes.
+func TestCancelKillsWholeProcessGroup(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	manager := NewManager(childenv.NewPaths())
+	process, err := manager.Start(ctx, []string{"sh", "-c", "sleep 60 & wait"}, "", nil, identity.Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := process.Command.Start(); err != nil {
+		t.Fatal(err)
+	}
+	process.SetProcess(process.Command.Process)
+	waited := make(chan error, 1)
+	go func() { waited <- process.Command.Wait() }()
+	cancel()
+	select {
+	case <-waited:
+	case <-time.After(10 * time.Second):
+		_ = syscall.Kill(-process.Command.Process.Pid, syscall.SIGKILL)
+		t.Fatal("Wait did not return after the context was cancelled")
+	}
+	deadline := time.Now().Add(2 * time.Second)
+	for {
+		err := syscall.Kill(-process.Command.Process.Pid, 0)
+		if err == syscall.ESRCH {
+			return
+		}
+		if time.Now().After(deadline) {
+			_ = syscall.Kill(-process.Command.Process.Pid, syscall.SIGKILL)
+			t.Fatalf("the command's process group survived cancellation: %v", err)
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+}
+
 func TestStartPropagatesCommandInArgv(t *testing.T) {
 	manager := NewManager(childenv.NewPaths())
 	process, err := manager.Start(context.Background(), []string{"bash", "-c", "echo hi"}, "", nil, identity.Options{})

@@ -49,3 +49,7 @@ glob so deno expands it, not the shell); a docs-only workflow enforces this on
   properties. Tool parameters are camelCase except the ones mirroring the
   harness's built-in tools (`file_path`, `old_string`, `new_string`,
   `replace_all`).
+- Pin `@deepseek-ai/*` dependencies to exact versions in both `devDependencies`
+  and `peerDependencies`, and keep every `@deepseek-ai/dsh-*` specifier equal to
+  `Containerfile.dsh`'s `ARG DSH_VERSION`. Bump them together with the image,
+  never individually (Dependabot ignores the scope for this reason).

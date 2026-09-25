@@ -18,7 +18,12 @@ import {
   type MountInput,
   type WorkspaceView,
 } from "./client/card-protocol.js";
-import { renderCacheCleanNotice, resolveReasonLocale } from "./approval-reasons.js";
+import {
+  renderCacheCleanNotice,
+  renderDefaultEnvSyncNotice,
+  resolveReasonLocale,
+} from "./approval-reasons.js";
+import { mergeDefaultEnv, missingDefaultEnv } from "./container-env.js";
 import { defaultMountMode, mountKindToProto, mountModeToProto } from "./mount-enums.js";
 import { mountInputToProto, validateMountInput } from "./mount-input.js";
 import { unaryGuest } from "./guest-rpc.js";
@@ -256,7 +261,11 @@ export async function runCommand(
       const projectsRoot = resolver.getConfig().projectsRoot;
       const mounts = command.mounts.map((mount) => mountInputToProto(mount, projectsRoot));
       if (mounts.length > 0) payload.mounts = mounts;
-      if (Object.keys(command.env).length > 0) payload.env = command.env;
+      // The card's create is a creation path: seed the default environment
+      // under whatever the modal collected. A later recreate is authoritative,
+      // which is how a seeded value is removed again.
+      const env = mergeDefaultEnv(resolver.getConfig().containerEnv, command.env);
+      if (Object.keys(env).length > 0) payload.env = env;
       if (Object.keys(command.secretEnv).length > 0) {
         payload.secretEnv = command.secretEnv;
       }
@@ -439,6 +448,44 @@ export async function runCommand(
     case "image_base_pull":
       await resolver.control("pullBaseImage", { name: command.workspace });
       break;
+    case "default_env_sync": {
+      // Add the default environment to containers that already exist. Only the
+      // keys a container is missing are added, so an explicit value is never
+      // overwritten, and a stopped container is left for its next start (which
+      // seeds the defaults). A recreate applies the merged map.
+      const defaults = resolver.getConfig().containerEnv ?? {};
+      if (Object.keys(defaults).length === 0) break;
+      const listings = await resolver.control<{ containers?: any[] }>(
+        "listContainers",
+        {},
+      );
+      let applied = 0;
+      let skipped = 0;
+      for (const row of listings.containers ?? []) {
+        if (command.workspace !== "" && row.workspaceSlug !== command.workspace) {
+          continue;
+        }
+        const current = (row.env ?? {}) as Record<string, string>;
+        const missing = missingDefaultEnv(defaults, current);
+        if (Object.keys(missing).length === 0) continue;
+        if (row.status !== "running") {
+          skipped++;
+          continue;
+        }
+        await resolver.control("recreateContainer", {
+          workspaceSlug: row.workspaceSlug,
+          container: row.containerName,
+          env: mergeDefaultEnv(defaults, current),
+        });
+        applied++;
+      }
+      notice = renderDefaultEnvSyncNotice(
+        resolveReasonLocale(ctx?.settings),
+        applied,
+        skipped,
+      );
+      break;
+    }
     case "cache_clean": {
       const result = (await resolver.control("cleanCaches", {
         mode: cacheCleanModeToProto(command.cacheMode),

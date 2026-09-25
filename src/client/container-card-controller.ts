@@ -29,6 +29,8 @@ export interface ContainerSettings {
   defaultImage: string;
   socketsRoot: string;
   uiLocale?: string;
+  // The environment seeded into a container when it is created.
+  containerEnv?: Record<string, string>;
 }
 
 export interface ProjectMountView {
@@ -70,6 +72,9 @@ export interface CardState {
   defaultImage: string;
   socketsRoot: string;
   socketsRootDraft: string;
+  // The default container environment, seeded into new containers (see
+  // container-env.ts).
+  containerEnv: Record<string, string>;
   projectsRoot: string;
   // The harness's host-side directory picker, when this deployment mounts one;
   // the card hides the project-mount browse affordance without it. Published
@@ -121,6 +126,12 @@ export interface ContainerCardFace {
   editSocketsRoot: (text: string) => void;
   saveSocketsRoot: () => void;
   discardSocketsRoot: () => void;
+  // Replace the default environment (the git popup and the generic editor both
+  // go through this).
+  saveContainerEnv: (env: Record<string, string>) => void;
+  // Add the default environment to existing containers; an empty workspace
+  // covers every workspace.
+  syncDefaultEnv: (workspace: string) => void;
 }
 
 const EMPTY_SNAPSHOT: CardSnapshot = {
@@ -187,6 +198,7 @@ export class ContainerCardController {
       defaultImage: value?.defaultImage ?? "",
       socketsRoot: value?.socketsRoot ?? "",
       socketsRootDraft: this.draft("socketsRoot", value?.socketsRoot ?? ""),
+      containerEnv: value?.containerEnv ?? {},
       projectsRoot: this.snapshot.projectsRoot,
       ...(this.directoryPicker === undefined ? {} : { directoryPicker: this.directoryPicker }),
       workspaces: this.snapshot.workspaces,
@@ -394,6 +406,10 @@ export class ContainerCardController {
       editSocketsRoot: (text) => this.edit("socketsRoot", text),
       saveSocketsRoot: () => this.save("socketsRoot"),
       discardSocketsRoot: () => this.discard("socketsRoot"),
+      saveContainerEnv: (env) => {
+        void this.scope.set("containerEnv", env);
+      },
+      syncDefaultEnv: (workspace) => this.command("default_env_sync", workspace, ""),
     };
   }
 

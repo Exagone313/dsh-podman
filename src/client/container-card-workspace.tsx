@@ -63,6 +63,10 @@ export function WorkspaceSection(props: {
   ) => void;
   onAddContainerSecret: (workspace: string, envVar: string, secret: string) => void;
   onRemoveContainerSecret: (workspace: string, envVar: string) => void;
+  // Adds the default container environment to this workspace's containers.
+  onSyncDefaults: (workspace: string) => void;
+  // How many default variables exist; the sync action is pointless without any.
+  defaultEnvCount: number;
 }): ReactNode {
   const {
     t,
@@ -86,6 +90,8 @@ export function WorkspaceSection(props: {
     onSetContainerPaths,
     onAddContainerSecret,
     onRemoveContainerSecret,
+    onSyncDefaults,
+    defaultEnvCount,
   } = props;
   const [open, setOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState<"default" | "named" | null>(null);
@@ -154,7 +160,15 @@ export function WorkspaceSection(props: {
               </div>
             </>
           )}
-        <div>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
+          <ConfirmButton
+            t={t}
+            label={t("applyDefaults")}
+            title={t("confirmTitle")}
+            description={t("confirmApplyDefaults")}
+            disabled={busy || defaultEnvCount === 0}
+            onConfirm={() => onSyncDefaults(workspace.workspaceSlug)}
+          />
           <ConfirmButton
             t={t}
             label={t("removePod")}

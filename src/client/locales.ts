@@ -25,6 +25,16 @@ export type ContainerPluginKey =
   | "socketsRoot"
   | "projectsRoot"
   | "defaultImageHint"
+  | "defaultEnvironment"
+  | "defaultEnvironmentHint"
+  | "edit"
+  | "gitIdentity"
+  | "gitName"
+  | "gitEmail"
+  | "gitIdentityHint"
+  | "applyDefaults"
+  | "confirmApplyDefaults"
+  | "clear"
   | "save"
   | "discard"
   | "workspacesTitle"
@@ -219,6 +229,19 @@ export const en: Record<ContainerPluginKey, string> = {
   socketsRoot: "Sockets root",
   projectsRoot: "Projects root",
   defaultImageHint: "Image used when a workspace has no image of its own.",
+  defaultEnvironment: "Default environment",
+  defaultEnvironmentHint:
+    "Seeded into a container when it is created. Edit a container's own environment and recreate it to change or remove a value for that container.",
+  edit: "Edit",
+  gitIdentity: "Git identity",
+  gitName: "Name",
+  gitEmail: "Email",
+  gitIdentityHint:
+    "Fills GIT_AUTHOR_NAME/EMAIL and GIT_COMMITTER_NAME/EMAIL for new containers, so commits made inside them are attributed to you.",
+  applyDefaults: "Apply to existing containers",
+  confirmApplyDefaults:
+    "Add the default environment to the containers that are missing it? Matching running containers are recreated (their processes and daemons stop); existing values are kept and stopped containers are left alone.",
+  clear: "Clear",
   save: "Save",
   discard: "Discard",
   workspacesTitle: "Workspaces",
@@ -416,6 +439,19 @@ export const zh: Record<ContainerPluginKey, string> = {
   socketsRoot: "套接字根目录",
   projectsRoot: "项目根目录",
   defaultImageHint: "工作区没有自带镜像时使用的镜像。",
+  defaultEnvironment: "默认环境变量",
+  defaultEnvironmentHint:
+    "容器创建时注入的环境变量。编辑容器自身的环境变量后重建该容器，即可修改或移除其中的某一项。",
+  edit: "编辑",
+  gitIdentity: "Git 身份",
+  gitName: "姓名",
+  gitEmail: "邮箱",
+  gitIdentityHint:
+    "为新容器填入 GIT_AUTHOR_NAME/EMAIL 与 GIT_COMMITTER_NAME/EMAIL，使容器内提交的提交者信息正确。",
+  applyDefaults: "应用到现有容器",
+  confirmApplyDefaults:
+    "为缺少默认环境变量的容器补上这些变量？匹配的运行中容器会被重建（其进程与守护进程会停止）；已有值保持不变，已停止的容器不会被处理。",
+  clear: "清除",
   save: "保存",
   discard: "放弃",
   workspacesTitle: "工作区",

@@ -42,6 +42,7 @@ export type CommandOp =
   | "container_mount_remove"
   | "container_mount_update"
   | "container_path_set"
+  | "default_env_sync"
   | "cache_clean";
 
 export interface CommandRequest {

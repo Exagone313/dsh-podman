@@ -70,7 +70,7 @@
     "@deepseek-ai/dsh-subprocess": "0.1.7-rc.2",
     "@deepseek-ai/schemastery": "3.18.4",
     "@types/node": "^22.0.0",
-    "@types/react": "^18.3.31",
+    "@types/react": "^19.3.0",
     "esbuild": "^0.28.2",
     "typescript": "^7.0.2"
   },

@@ -10,10 +10,12 @@ import { Button, PluginArtworkTerminal } from "@deepseek-ai/dsh-client-ui-primit
 import type { InjectFace, PropsLocale, PropsRuntime } from "@deepseek-ai/dsh-client-ui-slots";
 import { type ReactNode, useEffect, useState } from "react";
 import type { ContainerCardFace } from "./container-card-controller.js";
-import { fieldLabel, hint } from "./container-card-styles.js";
+import { fieldLabel, hint, imageSelect } from "./container-card-styles.js";
 import { NS } from "./locales.js";
 import { ContainerField } from "./podman-terminal.js";
 import { PODMAN_TERMINAL_KIND } from "./terminal-tab.js";
+import { readTerminalTarget, writeTerminalTarget } from "./terminal-preference.js";
+import { containerOptions, validContainer, validShell } from "./terminal-targets.js";
 import type { TerminalShellView, TerminalTargetView } from "./terminal-protocol.js";
 import { fetchTerminalShells, fetchTerminalTarget } from "./terminal-transport.js";
 import type {} from "@deepseek-ai/dsh-client-ui-sidebar-right/client";
@@ -52,6 +54,10 @@ export function PodmanTerminalGuide(
   const unknownWorkspace = target.phase === "failed";
   const [container, setContainer] = useState<string | undefined>(undefined);
   const [shells, setShells] = useState<ShellsState>({ phase: "loading" });
+  const [shell, setShell] = useState<string | undefined>(undefined);
+  // The last target this browser started from the card, reused below while it
+  // is still valid. Read once: the card shows it, it does not track it.
+  const [stored] = useState(() => readTerminalTarget());
 
   useEffect(() => {
     props.reload();
@@ -79,13 +85,26 @@ export function PodmanTerminalGuide(
 
   // The empty value means the workspace's default container; the workspace
   // row's own containerName is that container's podman name, which the
-  // orchestrator rejects, so it is never used as a target.
+  // orchestrator rejects, so it is never used as a target. The choice waits for
+  // the first snapshot, otherwise the empty default would pre-empt a remembered
+  // named container before the options are known.
   useEffect(() => {
     if (unknownWorkspace || workspace === undefined || container !== undefined) {
       return;
     }
-    setContainer("");
-  }, [workspace, container, unknownWorkspace]);
+    if (state.busy) return;
+    setContainer(
+      validContainer(stored?.container, containerOptions(state.containers, workspaceSlug)),
+    );
+  }, [
+    unknownWorkspace,
+    workspace,
+    container,
+    state.busy,
+    state.containers,
+    workspaceSlug,
+    stored,
+  ]);
 
   useEffect(() => {
     if (workspace === undefined || workspace === "" || container === undefined) {
@@ -100,7 +119,9 @@ export function PodmanTerminalGuide(
       controller.signal,
     ).then(
       (list) => {
-        if (!controller.signal.aborted) setShells({ phase: "ready", shells: list });
+        if (controller.signal.aborted) return;
+        setShells({ phase: "ready", shells: list });
+        setShell((previous) => previous ?? validShell(stored?.shell, list) ?? list[0]?.path);
       },
       (error: unknown) => {
         if (controller.signal.aborted) return;
@@ -116,8 +137,8 @@ export function PodmanTerminalGuide(
   }, [workspace, container, sessionId]);
 
   const shellList = shells.phase === "ready" ? shells.shells : [];
-  const ready = workspace !== undefined && workspace !== "" &&
-    container !== undefined && shellList.length > 0;
+  const ready = !unknownWorkspace && container !== undefined && shell !== undefined &&
+    shellList.length > 0;
   return (
     <div style={CARD_STYLE} data-sidebar-right-guide-entry={props.kind}>
       <div style={HEADER_STYLE}>
@@ -148,10 +169,39 @@ export function PodmanTerminalGuide(
                 disabled={unknownWorkspace}
                 label={t("terminalContainer")}
                 defaultLabel={t("terminalDefaultContainer")}
-                onContainer={setContainer}
+                onContainer={(value) => {
+                  // The new container may not offer the current shell, so the
+                  // shells effect re-picks one (remembered when still valid).
+                  setContainer(value);
+                  setShell(undefined);
+                }}
               />
             </div>
             <span style={fieldLabel}>{t("terminalShell")}</span>
+            <select
+              style={imageSelect}
+              aria-label={t("terminalShell")}
+              value={shell ?? ""}
+              disabled={unknownWorkspace || shells.phase !== "ready" ||
+                shellList.length === 0}
+              onChange={(event) => {
+                setShell(event.target.value);
+              }}
+            >
+              {shellList.length === 0
+                ? (
+                  <option value="">
+                    {unknownWorkspace
+                      ? ""
+                      : shells.phase === "loading"
+                      ? t("terminalLoading")
+                      : t("terminalNoShells")}
+                  </option>
+                )
+                : shellList.map((entry) => (
+                  <option key={entry.path} value={entry.path}>{entry.name}</option>
+                ))}
+            </select>
             {!unknownWorkspace && shells.phase === "failed" && (
               <p style={hint} role="alert">
                 {t("terminalShellsFailed", { message: shells.message })}
@@ -164,24 +214,23 @@ export function PodmanTerminalGuide(
               <p style={hint} role="status">{t("terminalNoShells")}</p>
             )}
             <div style={ACTIONS_STYLE}>
-              {shellList.map((entry) => (
-                <Button
-                  key={entry.path}
-                  variant="outline"
-                  size="sm"
-                  disabled={!ready}
-                  onClick={() => {
-                    // Replace the guide tab in place, exactly like the built-in
-                    // guide cards, instead of adding a second terminal tab.
-                    tab.actions.openTab(PODMAN_TERMINAL_KIND, {
-                      replaceTab: true,
-                      params: { container, shell: entry.path },
-                    });
-                  }}
-                >
-                  {entry.name}
-                </Button>
-              ))}
+              <Button
+                variant="primary"
+                size="sm"
+                disabled={!ready}
+                onClick={() => {
+                  if (container === undefined || shell === undefined) return;
+                  writeTerminalTarget({ container, shell });
+                  // Replace the guide tab in place, exactly like the built-in
+                  // guide cards, instead of adding a second terminal tab.
+                  tab.actions.openTab(PODMAN_TERMINAL_KIND, {
+                    replaceTab: true,
+                    params: { container, shell },
+                  });
+                }}
+              >
+                {t("terminalStart")}
+              </Button>
             </div>
           </>
         )}

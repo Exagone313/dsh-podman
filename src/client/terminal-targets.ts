@@ -16,6 +16,7 @@
 // is why it must never be offered as a target.
 
 import type { ContainerView } from "./card-protocol.js";
+import type { TerminalShellView } from "./terminal-protocol.js";
 
 /**
  * The named containers selectable for one workspace, sorted.
@@ -42,4 +43,33 @@ export function containerOptions(
     names.add(container.containerName);
   }
   return [...names].sort((left, right) => left.localeCompare(right));
+}
+
+/**
+ * The remembered container, but only while the workspace still offers it.
+ * @param remembered - the container name the card started last time.
+ * @param options - the workspace's selectable container names.
+ * @returns the remembered name, or `""` for the workspace's default container.
+ */
+export function validContainer(
+  remembered: string | undefined,
+  options: readonly string[],
+): string {
+  if (remembered === undefined || remembered === "") return "";
+  return options.includes(remembered) ? remembered : "";
+}
+
+/**
+ * The remembered shell, but only while the chosen container still offers it —
+ * the same container may have been recreated from another image.
+ * @param remembered - the absolute shell path the card started last time.
+ * @param shells - the shells the host discovered in the chosen container.
+ * @returns the remembered path, or `undefined` when it is gone.
+ */
+export function validShell(
+  remembered: string | undefined,
+  shells: readonly TerminalShellView[],
+): string | undefined {
+  if (remembered === undefined || remembered === "") return undefined;
+  return shells.some((shell) => shell.path === remembered) ? remembered : undefined;
 }

@@ -383,7 +383,10 @@ has its own side panes and terminals — so the start form only asks for a
 container and then a shell, and a shell can run in the default container or in a
 named one. If the session's directory names no known workspace the form reports
 that instead of guessing; the harness's own Terminal always uses that workspace's
-default container.
+default container. The container and shell you last started are remembered in
+the browser's local storage and preselected while they are still available — a
+container that disappeared falls back to the default, and a shell the image no
+longer ships falls back to the first one the container offers.
 
 The shell list is discovered **inside the chosen container**: candidate names
 are looked up on that container's PATH (`command -v`) and merged with

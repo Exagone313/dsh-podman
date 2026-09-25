@@ -298,19 +298,23 @@ const DESCRIPTION_STYLE: React.CSSProperties = {
   textOverflow: "ellipsis",
 };
 
-// A label/select grid: each pair is one row, so a narrow card can never wrap a
-// label away from its control, and the auto column keeps both selects aligned.
+// A centred label/select grid: each pair is one row, so a narrow card can never
+// wrap a label away from its control. The auto column sizes to the widest label
+// (right-aligned by `fieldLabel`), the second is capped at the select width so
+// both controls line up, and the pair is centred in the card.
 const FIELDS_STYLE: React.CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "auto minmax(0, 1fr)",
+  gridTemplateColumns: "auto minmax(0, 160px)",
   gap: "8px",
   alignItems: "center",
+  justifyContent: "center",
   width: "100%",
 };
 
 const ACTIONS_STYLE: React.CSSProperties = {
   display: "flex",
   flexWrap: "wrap",
+  justifyContent: "center",
   gap: "8px",
   alignItems: "center",
 };

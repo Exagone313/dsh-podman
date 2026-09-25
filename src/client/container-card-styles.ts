@@ -35,6 +35,9 @@ export const fieldLabel: React.CSSProperties = {
   fontSize: "12px",
   color: "var(--dsw-alias-label-tertiary)",
   whiteSpace: "nowrap",
+  // Hugs the control when the label fills a grid cell; an auto-width flex item
+  // (the tab body's toolbar) is unaffected.
+  textAlign: "right",
 };
 
 export const wsBody: React.CSSProperties = {

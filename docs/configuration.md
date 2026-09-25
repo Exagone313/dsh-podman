@@ -45,10 +45,11 @@ container's own `env` wins per key, and a recreate stores exactly the
 environment it is given, so removing a value from a container's environment and
 recreating it removes that value for good.
 
-The card's **Default environment** row edits it: **Edit** opens a key/value
-editor, **Git identity** fills `GIT_AUTHOR_NAME`, `GIT_AUTHOR_EMAIL`,
+The card's **Default environment** section edits it with the same key/value rows
+a container uses: add or remove variables, then **Save** (or **Discard**).
+**Git identity** fills `GIT_AUTHOR_NAME`, `GIT_AUTHOR_EMAIL`,
 `GIT_COMMITTER_NAME` and `GIT_COMMITTER_EMAIL` from one name and one email, and
-**Apply to existing containers** adds the missing values to the running
+**Apply default environment variables** adds the missing values to the running
 containers that lack them, recreating only those and never overwriting an
 existing value; stopped containers are left for their next start. Every
 workspace row offers the same action for its own containers. Reserved

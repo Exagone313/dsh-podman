@@ -31,8 +31,6 @@ declare module "@deepseek-ai/dsh-client-ui-sidebar-right/client" {
 
 /** Navigation parameters of one Podman terminal page. */
 export interface PodmanTerminalParams {
-  /** Workspace project name (as the card lists it). */
-  readonly workspace?: string;
   /** `""`/`"default"` for the default container, or a named one. */
   readonly container?: string;
   /** Absolute shell path returned by the shells route. */

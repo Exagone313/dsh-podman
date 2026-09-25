@@ -31,6 +31,12 @@ export const hint: React.CSSProperties = {
   margin: "8px 0",
 };
 
+export const fieldLabel: React.CSSProperties = {
+  fontSize: "12px",
+  color: "var(--dsw-alias-label-tertiary)",
+  whiteSpace: "nowrap",
+};
+
 export const wsBody: React.CSSProperties = {
   display: "flex",
   flexDirection: "column",

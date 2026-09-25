@@ -2,18 +2,20 @@
 //
 // SPDX-License-Identifier: MIT
 
-// The Podman terminal's guide card: pick a workspace, a container and one of
-// the shells that container really offers, then open a new terminal tab bound
-// to that target. It reads the same settings-card snapshot as the tab body.
+// The Podman terminal's guide card: pick a container and one of the shells that
+// container really offers, then open a new terminal tab bound to that target in
+// the Session's own workspace. It reads the same settings-card snapshot as the
+// tab body and never asks for a workspace, because each Session has exactly one.
 import { Button, PluginArtworkTerminal } from "@deepseek-ai/dsh-client-ui-primitives";
 import type { InjectFace, PropsLocale, PropsRuntime } from "@deepseek-ai/dsh-client-ui-slots";
 import { type ReactNode, useEffect, useState } from "react";
 import type { ContainerCardFace } from "./container-card-controller.js";
-import { hint } from "./container-card-styles.js";
+import { fieldLabel, hint } from "./container-card-styles.js";
 import { NS } from "./locales.js";
-import { TerminalTargetFields } from "./podman-terminal.js";
+import { ContainerField } from "./podman-terminal.js";
 import type { PodmanTerminalParams } from "./terminal-tab.js";
 import type { TerminalShellView } from "./terminal-protocol.js";
+import { type SessionStandardShare, sessionWorkspace, useSessionCwd } from "./terminal-targets.js";
 import { fetchTerminalShells } from "./terminal-transport.js";
 import type {} from "@deepseek-ai/dsh-client-ui-sidebar-right/client";
 
@@ -28,7 +30,8 @@ export interface PodmanTerminalGuideInjected extends ContainerCardFace {
 export type PodmanTerminalGuideProps =
   & PropsRuntime<"sidebar.right.tab.guide.entry">
   & PropsLocale<typeof NS>
-  & InjectFace<PodmanTerminalGuideInjected>;
+  & InjectFace<PodmanTerminalGuideInjected>
+  & SessionStandardShare;
 
 type ShellsState =
   | { readonly phase: "loading" }
@@ -40,7 +43,16 @@ export function PodmanTerminalGuide(
 ): ReactNode {
   const { t, sessionId } = props;
   const state = props.useContainerCard((snapshot) => snapshot);
-  const [workspace, setWorkspace] = useState<string | undefined>(undefined);
+  // The Session's own workspace, never chosen and never guessed; the render
+  // below tells "still loading" apart from "no known workspace".
+  const workspace = sessionWorkspace(
+    state.workspaces,
+    useSessionCwd(props.useSession),
+    state.projectsRoot,
+  );
+  const workspaceSlug = state.workspaces.find((row) => row.projectName === workspace)
+    ?.workspaceSlug;
+  const unknownWorkspace = state.workspaces.length > 0 && workspace === undefined;
   const [container, setContainer] = useState<string | undefined>(undefined);
   const [shells, setShells] = useState<ShellsState>({ phase: "loading" });
 
@@ -48,20 +60,15 @@ export function PodmanTerminalGuide(
     props.reload();
   }, [props.reload]);
 
-  // The guide has no session cwd to match against, so the first workspace is
-  // the default; picking another one is one click away.
-  useEffect(() => {
-    if (workspace !== undefined || state.workspaces.length === 0) return;
-    setWorkspace(state.workspaces[0]?.projectName);
-  }, [workspace, state.workspaces]);
-
   // The empty value means the workspace's default container; the workspace
   // row's own containerName is that container's podman name, which the
   // orchestrator rejects, so it is never used as a target.
   useEffect(() => {
-    if (workspace === undefined || container !== undefined) return;
+    if (unknownWorkspace || workspace === undefined || container !== undefined) {
+      return;
+    }
     setContainer("");
-  }, [workspace, container]);
+  }, [workspace, container, unknownWorkspace]);
 
   useEffect(() => {
     if (workspace === undefined || workspace === "" || container === undefined) {
@@ -115,30 +122,28 @@ export function PodmanTerminalGuide(
         )
         : (
           <>
+            {unknownWorkspace && <p style={hint} role="alert">{t("terminalWorkspaceUnknown")}</p>}
             <div style={FIELDS_STYLE}>
-              <TerminalTargetFields
-                workspaces={state.workspaces}
+              <ContainerField
                 containers={state.containers}
-                workspace={workspace}
+                workspaceSlug={workspaceSlug}
                 container={container}
-                disabled={false}
-                workspaceLabel={t("terminalWorkspace")}
-                containerLabel={t("terminalContainer")}
+                disabled={unknownWorkspace}
+                label={t("terminalContainer")}
                 defaultLabel={t("terminalDefaultContainer")}
-                onWorkspace={(value) => {
-                  setWorkspace(value === "" ? undefined : value);
-                  setContainer(undefined);
-                }}
                 onContainer={setContainer}
               />
             </div>
-            {shells.phase === "failed" && (
+            <span style={fieldLabel}>{t("terminalShell")}</span>
+            {!unknownWorkspace && shells.phase === "failed" && (
               <p style={hint} role="alert">
                 {t("terminalShellsFailed", { message: shells.message })}
               </p>
             )}
-            {shells.phase === "loading" && <p style={hint} role="status">{t("terminalLoading")}</p>}
-            {shells.phase === "ready" && shellList.length === 0 && (
+            {!unknownWorkspace && shells.phase === "loading" && (
+              <p style={hint} role="status">{t("terminalLoading")}</p>
+            )}
+            {!unknownWorkspace && shells.phase === "ready" && shellList.length === 0 && (
               <p style={hint} role="status">{t("terminalNoShells")}</p>
             )}
             <div style={ACTIONS_STYLE}>
@@ -149,11 +154,7 @@ export function PodmanTerminalGuide(
                   size="sm"
                   disabled={!ready}
                   onClick={() => {
-                    props.openTab({
-                      workspace,
-                      container,
-                      shell: entry.path,
-                    });
+                    props.openTab({ container, shell: entry.path });
                   }}
                 >
                   {entry.name}

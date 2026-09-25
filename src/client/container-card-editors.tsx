@@ -8,6 +8,15 @@ import { type MountInput } from "./container-card-controller.js";
 import { DirectoryPickerModal } from "./container-card-directory.js";
 import { type DirectoryPickerFace } from "./directory-picker.js";
 import { forcedMountMode } from "../mount-enums.js";
+import {
+  commitEnvDraft,
+  emptyEnvDraft,
+  envRows,
+  removeEnvRow,
+  renameEnvKey,
+  setEnvValue,
+  type EnvDraft,
+} from "../env-rows.js";
 import { hostPathForProjectName, projectNameFromHostPath } from "../project-path.js";
 import { type ContainerPluginKey } from "./locales.js";
 import { Button, Input, Modal } from "@deepseek-ai/dsh-client-ui-primitives";
@@ -25,48 +34,58 @@ export function EnvEditor(props: {
   onChange: (env: Record<string, string>) => void;
 }): ReactNode {
   const { t, env, busy, onChange } = props;
-  const entries = Object.entries(env);
+  // The row being typed: it becomes a record entry only once its key is a real,
+  // unused variable name, so an abandoned Add cannot apply a placeholder.
+  const [draft, setDraft] = useState<EnvDraft | undefined>(undefined);
+  const rows = envRows(env, draft);
   const idsRef = useRef<number[]>([]);
-  if (idsRef.current.length !== entries.length) {
-    const ids = idsRef.current.slice(0, entries.length);
-    while (ids.length < entries.length) ids.push(nextEnvId++);
+  if (idsRef.current.length !== rows.length) {
+    const ids = idsRef.current.slice(0, rows.length);
+    while (ids.length < rows.length) ids.push(nextEnvId++);
     idsRef.current = ids;
   }
-  // Every mutation rebuilds the record in order, so a renamed key stays in
-  // place instead of jumping to the end.
+  const commitDraft = (): void => {
+    if (draft === undefined) return;
+    if (draft.key === "") {
+      // An untouched row is dropped rather than kept as an empty entry.
+      setDraft(undefined);
+      return;
+    }
+    const committed = commitEnvDraft(env, draft);
+    // A duplicate key keeps the row open so the caller can fix it.
+    if (committed === undefined) return;
+    setDraft(undefined);
+    onChange(committed);
+  };
   const updateKey = (index: number, key: string): void => {
-    const next: Record<string, string> = {};
-    entries.forEach(([k, v], i) => {
-      next[i === index ? key : k] = v;
-    });
-    onChange(next);
+    const row = rows[index];
+    if (row.pending) {
+      setDraft({ key, value: row.value });
+      return;
+    }
+    onChange(renameEnvKey(env, index, key));
   };
   const updateValue = (index: number, value: string): void => {
-    const next: Record<string, string> = {};
-    entries.forEach(([k, v], i) => {
-      next[k] = i === index ? value : v;
-    });
-    onChange(next);
+    const row = rows[index];
+    if (row.pending) {
+      setDraft({ key: row.key, value });
+      return;
+    }
+    onChange(setEnvValue(env, index, value));
   };
   const remove = (index: number): void => {
-    const next: Record<string, string> = {};
-    entries.forEach(([k, v], i) => {
-      if (i !== index) next[k] = v;
-    });
-    onChange(next);
+    if (rows[index]?.pending === true) {
+      setDraft(undefined);
+      return;
+    }
+    onChange(removeEnvRow(env, index));
   };
   const add = (): void => {
-    // A distinct key per added row: an empty key would make a second Add a
-    // no-op and silently lose the row.
-    let key = "KEY";
-    for (let n = 1; Object.prototype.hasOwnProperty.call(env, key); n++) {
-      key = `KEY_${n}`;
-    }
-    onChange({ ...env, [key]: "" });
+    setDraft((current) => current ?? emptyEnvDraft());
   };
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-      {entries.map(([key, value], index) => (
+      {rows.map((row, index) => (
         <div
           key={idsRef.current[index]}
           style={{
@@ -77,19 +96,29 @@ export function EnvEditor(props: {
           }}
         >
           <Input
-            value={key}
+            value={row.key}
             disabled={busy}
             placeholder={t("envKey")}
             aria-label={t("envKey")}
+            autoFocus={row.pending}
             onChange={(event) => updateKey(index, event.target.value)}
+            onBlur={row.pending ? commitDraft : undefined}
+            onKeyDown={
+              row.pending
+                ? (event) => {
+                    if (event.key === "Enter") commitDraft();
+                  }
+                : undefined
+            }
             style={{ width: "160px" }}
           />
           <Input
-            value={value}
+            value={row.value}
             disabled={busy}
             placeholder={t("envValue")}
             aria-label={t("envValue")}
             onChange={(event) => updateValue(index, event.target.value)}
+            onBlur={row.pending ? commitDraft : undefined}
             style={{ width: "200px" }}
           />
           <Button

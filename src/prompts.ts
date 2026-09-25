@@ -61,6 +61,21 @@ const RUNTIME_CONTAINER_ONLY =
   "and `/proc/version` do report the host kernel; the container's own identity " +
   "shows in `hostname`, `/etc/os-release`, and `/proc/1/cmdline`.";
 
+// Storage guidance both runtime wordings carry. It names only tools that exist
+// in every agent composition (`image_build`, `container_start`,
+// `container_recreate`, volume mounts), so it is safe to append verbatim to the
+// wording for an agent with or without the built-in tools.
+const RUNTIME_STORAGE_NOTES =
+  " To install software, prefer building a custom image with `image_build` (a " +
+  "short name, a base or custom parent image, and the packages to add) and " +
+  "then running containers from it with `container_start` or " +
+  "`container_recreate` (`image`); an install into a running container does " +
+  "not survive a recreate, while an image change does. For data that must " +
+  "outlive a recreate, mount a named `volume` (auto-created on first use) " +
+  "instead of a `tmpfs`, including the container's `/tmp` — a tool call that " +
+  "recreates the container (a mount or secret change, `container_recreate`, a " +
+  "read-only remount) clears tmpfs contents.";
+
 // Correct the model's host/container mental model: the built-in shell and
 // filesystem tools are container-backed too, so there is no host shell. It sits
 // just before the tool sections so the correction lands next to the tool
@@ -80,9 +95,9 @@ export function podmanRuntimeSection(ctx: any): {
     name: "podman:runtime",
     order: 950,
     text: ({ scope }: { scope?: unknown } = {}) =>
-      BUILTIN_TOOLS.some((name) => ctx.tools.get(name, scope) !== undefined)
+      (BUILTIN_TOOLS.some((name) => ctx.tools.get(name, scope) !== undefined)
         ? RUNTIME_WITH_BUILTINS
-        : RUNTIME_CONTAINER_ONLY,
+        : RUNTIME_CONTAINER_ONLY) + RUNTIME_STORAGE_NOTES,
   };
 }
 

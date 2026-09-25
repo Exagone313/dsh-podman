@@ -584,6 +584,28 @@ test("podmanRuntimeSection names only the tools the agent has", () => {
   assert.match(short, /share the host kernel/);
 });
 
+test("podmanRuntimeSection guides the model to custom images and named volumes", () => {
+  const variants = [
+    podmanRuntimeSection({ tools: { get: () => ({}) } }),
+    podmanRuntimeSection({ tools: { get: () => undefined } }),
+  ];
+  for (const section of variants) {
+    const text = section.text({ scope: "agent" });
+    // Software installs belong in an image, not a running container.
+    assert.match(text, /custom image/);
+    assert.match(text, /`image_build`/);
+    assert.match(text, /`container_start`/);
+    assert.match(text, /`container_recreate`/);
+    // Persistence belongs in a named volume, not a tmpfs.
+    assert.match(text, /named `volume`/);
+    assert.match(text, /`tmpfs`/);
+    assert.match(text, /\/tmp/);
+    assert.match(text, /clears tmpfs contents/);
+    // The guidance stays free of plugin lore: the section reads as facts.
+    assert.doesNotMatch(text, /plugin/i);
+  }
+});
+
 test("container_grep fails loudly when ripgrep reports an error", async () => {
   const guest = {
     exec: () => {

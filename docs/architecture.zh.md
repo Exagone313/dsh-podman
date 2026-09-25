@@ -93,6 +93,11 @@ API，运行并监督后台**守护进程**，并读取和写入文件。每个 
 容器恰好获得一个绑定挂载到其中的套接字目录，因此 guest 永远不会看到 orchestrator
 的 control socket，也不会看到任何其他工作区的套接字目录。
 
+Guest API 不提供监视器，因此插件的 `ctx.fs` 提供者对 `watch` 返回
+`FS_IO_ERROR`（`Filesystem watching is not supported by this provider.`）。harness
+的工作区文件变更流因此返回 `workspace-file/watch-unsupported`，浏览器的文件树改为按需刷新，而非实时刷新——与
+harness 自带的 SSH 文件系统提供者对远程路径采取的做法一致。
+
 命令和守护进程继承 guest agent 的环境，减去保留的 `DSH_PODMAN` 命名空间：agent
 自身的 token 保留在 agent 中，而不会被复制到它所启动的每个东西中。以
 `inheritEnv=false` 启动的守护进程则只接收 `PATH`/`HOME` 基线以及自身的 `env`。

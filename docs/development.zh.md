@@ -137,7 +137,7 @@ guest-agent 镜像会在容器创建时挂载进去，因此正在运行的容�
 guest-agent 镜像引用与当前配置不一致时，orchestrator 才会自行重建该容器——带版本标签的发布引用会如此，本地
 `:latest` 标签则不会。重建 guest agent 之后，请自行重建容器：
 
-- 在设置卡片中按容器操作：**Recreate**（沿用当前镜像）或 **Recreate with image**；
+- 在 Podman 页面（侧边栏 **插件** 面板）中按容器操作：**Recreate**（沿用当前镜像）或 **Recreate with image**；
 - 或使用 `container_recreate`，作用于命名容器或默认容器。
 
 若要重建整个工作区，可在其行上使用 **Remove pod**（或 `RemoveWorkspace`）：pod
@@ -162,7 +162,7 @@ guest-agent 镜像引用与当前配置不一致时，orchestrator 才会自行�
 | PATH 追加项 | `/opt/toolchain/gopath/bin`、`/opt/toolchain/npm-global/bin`、`/opt/toolchain/pnpm-home`                                                                                                                                                                                                                                   |
 | 环境变量    | `GOCACHE=/opt/toolchain/gocache`、`GOMODCACHE=/opt/toolchain/gomodcache`、`GOPATH=/opt/toolchain/gopath`、`npm_config_cache=/opt/toolchain/npm-cache`、`npm_config_prefix=/opt/toolchain/npm-global`、`PNPM_HOME=/opt/toolchain/pnpm-home`、`DENO_DIR=/opt/toolchain/deno-dir`、`GOENV=/opt/toolchain/home/.config/go/env` |
 
-在设置卡片的[默认环境变量](configuration.zh.md#默认环境变量) → **Git 身份** 中设置一次提交身份，容器便无需
+在 Podman 页面（侧边栏 **插件** 面板）的[默认环境变量](configuration.zh.md#默认环境变量) → **Git 身份** 中设置一次提交身份，容器便无需
 `~/.gitconfig` 即可获得 `GIT_AUTHOR_*`/`GIT_COMMITTER_*`。
 
 提示词会在 dsh 内完成上述全部配置，并且可以反复粘贴以修复工作区。Podman 存储受管卷时会加上 `DSH_PODMAN_VOLUME_PREFIX`

@@ -8,8 +8,9 @@ SPDX-License-Identifier: MIT
 
 Environment variables use the `DSH_PODMAN_` prefix and are listed under the
 component that reads them (a variable read by several components appears in each
-of their sections). The plugin also exposes a few **UI settings** in the dsh
-**Settings → Plugins** card, listed separately from env vars.
+of their sections). The plugin also exposes a few **UI settings** on the
+**dsh-podman** page of the sidebar's **Plugins** panel, listed separately from
+env vars.
 
 The plugin reads its configuration from, in order: the plugin `config` in
 cordis, then the environment variables below, then built-in defaults.
@@ -27,8 +28,8 @@ from the plugin `config` or `DSH_PODMAN_ORCHESTRATOR_TOKEN`.
 
 ## Plugin (dsh client) — UI settings
 
-Editable in the card's **Settings → Plugins → Podman** panel (the Configuration
-section and the images' Set-default popup):
+Editable on the **dsh-podman** page of the sidebar's **Plugins** panel (the
+Configuration section and the images' Set-default popup):
 
 | Setting        | Default                   | Description                                                                                                                                                                     |
 | -------------- | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -45,7 +46,8 @@ container's own `env` wins per key, and a recreate stores exactly the
 environment it is given, so removing a value from a container's environment and
 recreating it removes that value for good.
 
-The card's **Default environment** section edits it with the same key/value rows
+The Podman page's **Default environment** section edits it with the same
+key/value rows
 a container uses: add or remove variables, then **Save** (or **Discard**).
 **Git identity** fills `GIT_AUTHOR_NAME`, `GIT_AUTHOR_EMAIL`,
 `GIT_COMMITTER_NAME` and `GIT_COMMITTER_EMAIL` from one name and one email, and

@@ -26,7 +26,7 @@ token（`DSH_PODMAN_ORCHESTRATOR_TOKEN`）作为 `authorization: bearer` 标头�
 请求还会在 `x-dsh-podman-plugin-version` 标头中携带插件版本。插件与 orchestrator
 分别部署（前者是 dsh 镜像中的 npm 包，后者是此二进制文件），因此 orchestrator
 会拒绝来自**主版本**不同的插件的控制调用，并指出两者的版本以及哪一方更旧——不同步的部署会明确失败，而不会被误读。缺失或无法解析的版本同样会被拒绝。次版本或修订版本不同是兼容的：调用照常进行，orchestrator
-会按插件版本记录一次警告，设置卡片也会显示。`GetVersion`
+会按插件版本记录一次警告，Podman 页面也会显示。`GetVersion`
 不受该检查约束，因此插件始终可以获知 orchestrator 的版本。
 
 orchestrator 服务公开以下 gRPC 方法（同时支撑 UI
@@ -39,7 +39,7 @@ pod 中创建或替换容器；空的 `container`
 PATH 附加项；空的 `image_id`
 保留工作区当前的镜像）、`RemoveContainer`、`AddContainerMount`、`UpdateContainerMount`、`RemoveContainerMount`、`SetContainerPaths`、`AddContainerSecret`
 和
-`RemoveContainerSecret`。该服务还公开支撑设置卡片的工作区、卷、机密、镜像（构建、重建、删除以及拉取基础镜像）和缓存（列出与清理）操作，以及
+`RemoveContainerSecret`。该服务还公开支撑 Podman 页面的工作区、卷、机密、镜像（构建、重建、删除以及拉取基础镜像）和缓存（列出与清理）操作，以及
 `GetVersion`。
 
 ## 工作区与 pod
@@ -56,7 +56,7 @@ UUID），因此其容器共享一个网络命名空间。每个工作区都有�
 `/tmp/dsh-podman/spill/<session>/`——因此模型会用容器文件工具读回该产物，而不是使用容器无法访问的主机路径。
 
 工作区的 Pod 会在其最后一个容器被移除时拆除，也可直接通过
-`RemoveWorkspace`（设置卡片中的 **移除 Pod**
+`RemoveWorkspace`（Podman 页面中的 **移除 Pod**
 操作）拆除：它会停止各容器的守护进程、移除 Pod 及其容器、清理它们的 socket
 目录，并删除存储的工作区记录。卷、机密和项目数据保持不变。
 
@@ -134,11 +134,11 @@ API，因此构建不会向 orchestrator 的状态目录写入任何内容。
 只列出自定义镜像，因此不会包含本次调用所确保的基础镜像。
 
 配置了主机缓存时（`DSH_PODMAN_HOST_*_CACHE`，同时挂载到构建容器和 orchestrator
-中），构建会复用已下载的软件包。设置卡片会报告每个缓存的大小并可清理它——保留每个软件包的最新版本，或清空缓存。构建器用读写锁将清理与构建串行化，因此清理绝不会在构建进行时删除其正在使用的软件包。
+中），构建会复用已下载的软件包。Podman 页面会报告每个缓存的大小并可清理它——保留每个软件包的最新版本，或清空缓存。构建器用读写锁将清理与构建串行化，因此清理绝不会在构建进行时删除其正在使用的软件包。
 
-## 设置卡片传输
+## Podman 页面传输
 
-卡片通过 harness API 路径（`/api/podman/card`）之下的一个已认证 fetch
+Podman 页面通过 harness API 路径（`/api/podman/card`）之下的一个已认证 fetch
 路由与主机通信；该路由注册在 connection 服务上，因此承载层会先应用其 Host/Origin
 校验和浏览器认证：
 
@@ -149,6 +149,6 @@ API，因此构建不会向 orchestrator 的状态目录写入任何内容。
   操作），并返回要显示的提示。
 
 因此插件自身的配置中**只保留真正的偏好**：默认镜像、sockets
-根目录，以及卡片的当前语言（`uiLocale`，以便主机以会话语言呈现审批文本——参见[审批](usage.zh.md#审批)）。它们是
+根目录，以及 Podman 页面的当前语言（`uiLocale`，以便主机以会话语言呈现审批文本——参见[审批](usage.zh.md#审批)）。它们是
 volatile 字段，修改后无需重新加载插件即可生效。orchestrator
 派生的任何内容都不会被持久化，也不会有命令经由配置文档往返。

@@ -9,9 +9,11 @@ import {
   TERMINAL_PATH,
   TERMINAL_RETAINED_PATH,
   TERMINAL_SHELLS_PATH,
+  TERMINAL_TARGET_PATH,
   type TerminalFrame,
   type TerminalShellView,
 } from "./client/terminal-protocol.js";
+import { workspaceSlug } from "./workspace-binding.js";
 import { discoverShells, requireShell } from "./terminal-shells.js";
 import { TerminalSessions } from "./terminal-sessions.js";
 import { registerTerminalRoutes } from "./terminal-route.js";
@@ -54,7 +56,11 @@ function fakeRegistry() {
   return { list: () => [{ id: WORKSPACE_ID, path: ROOT }] };
 }
 
-function routeHarness(sessions: TerminalSessions, resolver: any) {
+function routeHarness(
+  sessions: TerminalSessions,
+  resolver: any,
+  sessionStore?: { get: (id: string) => unknown },
+) {
   const routes = new Map<string, any>();
   const ctx = {
     inject: (_names: string[], fn: (child: any) => void) => {
@@ -69,7 +75,7 @@ function routeHarness(sessions: TerminalSessions, resolver: any) {
         },
       });
     },
-    get: () => undefined,
+    get: (name: string) => name === "sessions" ? sessionStore : undefined,
   };
   registerTerminalRoutes(ctx, resolver, sessions, fakeRegistry());
   return routes;
@@ -98,6 +104,54 @@ test("shell discovery ignores names outside the candidate list", async () => {
     stdout: "rbash\t/usr/bin/rbash\ngit-shell\t/usr/bin/git-shell\n",
   });
   assert.deepEqual(await discoverShells(binding as any, ROOT), []);
+});
+
+test("the host resolves a session's workspace from its own directory", async () => {
+  const { binding } = fakeGuest();
+  const resolver = fakeResolver(binding);
+  const sessions = new TerminalSessions({ resolver, retentionMs: 60_000 });
+  try {
+    const routes = routeHarness(sessions, resolver, {
+      get: (id: string) => id === "s1" ? { header: { cwd: `${ROOT}/src` } } : undefined,
+    });
+    const target = routes.get(TERMINAL_TARGET_PATH);
+    assert.ok(target);
+
+    const found = await target.fetch(
+      new Request(`http://dsh.internal${TERMINAL_TARGET_PATH}?sessionId=s1`),
+    );
+    assert.equal(found.status, 200);
+    assert.deepEqual(await found.json(), {
+      workspace: "team",
+      workspaceSlug: workspaceSlug(WORKSPACE_ID),
+    });
+
+    // A missing id, an unknown session, an empty directory and a directory
+    // outside every workspace all refuse rather than guessing.
+    const missingId = await target.fetch(
+      new Request(`http://dsh.internal${TERMINAL_TARGET_PATH}`),
+    );
+    assert.equal(missingId.status, 400);
+    assert.deepEqual(await missingId.json(), { error: "sessionId is required" });
+    for (
+      const store of [
+        { get: () => undefined },
+        { get: () => ({ header: { cwd: "" } }) },
+        { get: () => ({ header: { cwd: "/elsewhere" } }) },
+      ]
+    ) {
+      const other = routeHarness(sessions, resolver, store).get(TERMINAL_TARGET_PATH);
+      const refused = await other.fetch(
+        new Request(`http://dsh.internal${TERMINAL_TARGET_PATH}?sessionId=s1`),
+      );
+      assert.equal(refused.status, 400);
+      assert.deepEqual(await refused.json(), {
+        error: "Cannot determine this session's workspace",
+      });
+    }
+  } finally {
+    sessions.dispose();
+  }
 });
 
 test("a shell missing from the probe is refused", async () => {

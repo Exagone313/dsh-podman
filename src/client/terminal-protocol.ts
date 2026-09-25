@@ -15,6 +15,17 @@ export const TERMINAL_SHELLS_PATH = "/api/podman/terminal/shells";
 /** The terminals a session still has retained on the host. */
 export const TERMINAL_RETAINED_PATH = "/api/podman/terminal/retained";
 
+/** The workspace the host resolved for one session. */
+export const TERMINAL_TARGET_PATH = "/api/podman/terminal/target";
+
+/** The workspace a session runs in, resolved by the host from the session itself. */
+export interface TerminalTargetView {
+  /** Workspace project name, as the card lists it. */
+  readonly workspace: string;
+  /** The harness workspace slug, used to filter that workspace's containers. */
+  readonly workspaceSlug: string;
+}
+
 /** One shell verified inside a container. */
 export interface TerminalShellView {
   readonly name: string;

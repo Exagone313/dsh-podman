@@ -14,9 +14,8 @@ import { fieldLabel, hint } from "./container-card-styles.js";
 import { NS } from "./locales.js";
 import { ContainerField } from "./podman-terminal.js";
 import type { PodmanTerminalParams } from "./terminal-tab.js";
-import type { TerminalShellView } from "./terminal-protocol.js";
-import { type SessionStandardShare, sessionWorkspace, useSessionCwd } from "./terminal-targets.js";
-import { fetchTerminalShells } from "./terminal-transport.js";
+import type { TerminalShellView, TerminalTargetView } from "./terminal-protocol.js";
+import { fetchTerminalShells, fetchTerminalTarget } from "./terminal-transport.js";
 import type {} from "@deepseek-ai/dsh-client-ui-sidebar-right/client";
 
 /** The card snapshot plus the open action the guide needs. */
@@ -30,8 +29,12 @@ export interface PodmanTerminalGuideInjected extends ContainerCardFace {
 export type PodmanTerminalGuideProps =
   & PropsRuntime<"sidebar.right.tab.guide.entry">
   & PropsLocale<typeof NS>
-  & InjectFace<PodmanTerminalGuideInjected>
-  & SessionStandardShare;
+  & InjectFace<PodmanTerminalGuideInjected>;
+
+type TargetState =
+  | { readonly phase: "loading" }
+  | { readonly phase: "ready"; readonly target: TerminalTargetView }
+  | { readonly phase: "failed"; readonly message: string };
 
 type ShellsState =
   | { readonly phase: "loading" }
@@ -43,22 +46,37 @@ export function PodmanTerminalGuide(
 ): ReactNode {
   const { t, sessionId } = props;
   const state = props.useContainerCard((snapshot) => snapshot);
-  // The Session's own workspace, never chosen and never guessed; the render
-  // below tells "still loading" apart from "no known workspace".
-  const workspace = sessionWorkspace(
-    state.workspaces,
-    useSessionCwd(props.useSession),
-    state.projectsRoot,
-  );
-  const workspaceSlug = state.workspaces.find((row) => row.projectName === workspace)
-    ?.workspaceSlug;
-  const unknownWorkspace = state.workspaces.length > 0 && workspace === undefined;
+  // The host resolves the Session's workspace and reports it when it cannot.
+  const [target, setTarget] = useState<TargetState>({ phase: "loading" });
+  const workspace = target.phase === "ready" ? target.target.workspace : undefined;
+  const workspaceSlug = target.phase === "ready" ? target.target.workspaceSlug : undefined;
+  const unknownWorkspace = target.phase === "failed";
   const [container, setContainer] = useState<string | undefined>(undefined);
   const [shells, setShells] = useState<ShellsState>({ phase: "loading" });
 
   useEffect(() => {
     props.reload();
   }, [props.reload]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    setTarget({ phase: "loading" });
+    void fetchTerminalTarget(sessionId, controller.signal).then(
+      (resolved) => {
+        if (!controller.signal.aborted) setTarget({ phase: "ready", target: resolved });
+      },
+      (error: unknown) => {
+        if (controller.signal.aborted) return;
+        setTarget({
+          phase: "failed",
+          message: error instanceof Error ? error.message : String(error),
+        });
+      },
+    );
+    return () => {
+      controller.abort();
+    };
+  }, [sessionId]);
 
   // The empty value means the workspace's default container; the workspace
   // row's own containerName is that container's podman name, which the
@@ -122,7 +140,7 @@ export function PodmanTerminalGuide(
         )
         : (
           <>
-            {unknownWorkspace && <p style={hint} role="alert">{t("terminalWorkspaceUnknown")}</p>}
+            {target.phase === "failed" && <p style={hint} role="alert">{target.message}</p>}
             <div style={FIELDS_STYLE}>
               <ContainerField
                 containers={state.containers}

@@ -11,11 +11,13 @@ import {
   TERMINAL_PATH,
   TERMINAL_RETAINED_PATH,
   TERMINAL_SHELLS_PATH,
+  TERMINAL_TARGET_PATH,
   type TerminalControl,
   type TerminalFrame,
   type TerminalOpenQuery,
   type TerminalRetainedView,
   type TerminalShellView,
+  type TerminalTargetView,
 } from "./terminal-protocol.js";
 
 // `reopen` forces a fresh shell instead of reattaching the retained one.
@@ -143,6 +145,38 @@ export async function fetchTerminalShells(
     name: trimmed((shell as { name?: unknown }).name),
     path: trimmed((shell as { path?: unknown }).path),
   }));
+}
+
+/**
+ * The workspace the host resolved for one session.
+ *
+ * A Session belongs to exactly one workspace, whose side panes — and terminals —
+ * are its own, so the browser never asks for a workspace: the host answers from
+ * the session itself and reports when it cannot place it.
+ * @param sessionId - owning session.
+ * @param signal - cancellation of the read.
+ * @returns the resolved workspace and its harness workspace slug.
+ * @throws when the host cannot determine the session's workspace.
+ */
+export async function fetchTerminalTarget(
+  sessionId: string,
+  signal?: AbortSignal,
+): Promise<TerminalTargetView> {
+  const url = endpoint(TERMINAL_TARGET_PATH);
+  url.searchParams.set("sessionId", sessionId);
+  const response = await fetch(url, {
+    headers: { accept: "application/json" },
+    signal,
+  });
+  if (!response.ok) throw await failure(response);
+  const body = (await response.json()) as {
+    workspace?: unknown;
+    workspaceSlug?: unknown;
+  };
+  return {
+    workspace: trimmed(body.workspace),
+    workspaceSlug: trimmed(body.workspaceSlug),
+  };
 }
 
 /**

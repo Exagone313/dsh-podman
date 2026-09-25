@@ -101,7 +101,10 @@ export function Field(props: {
 }): ReactNode {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-      <label htmlFor={props.htmlFor} style={{ fontSize: "13px", color: "var(--dsw-alias-label-secondary)" }}>
+      <label
+        htmlFor={props.htmlFor}
+        style={{ fontSize: "13px", color: "var(--dsw-alias-label-secondary)" }}
+      >
         {props.label}
       </label>
       {props.children}
@@ -113,11 +116,9 @@ export const namePattern = /^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,63}$/;
 
 export const imageIdPattern = /^[a-zA-Z0-9_][a-zA-Z0-9_.\-/:]{0,127}$/;
 
-export const sanitizeName = (raw: string): string =>
-  raw.replace(/[^a-zA-Z0-9_.-]/g, "");
+export const sanitizeName = (raw: string): string => raw.replace(/[^a-zA-Z0-9_.-]/g, "");
 
-export const sanitizeImageId = (raw: string): string =>
-  raw.replace(/[^a-zA-Z0-9_.\-/:]/g, "");
+export const sanitizeImageId = (raw: string): string => raw.replace(/[^a-zA-Z0-9_.\-/:]/g, "");
 
 export const mountKindShort = (kind: string): string => {
   if (kind === "MOUNT_KIND_TMPFS") return "tmpfs";
@@ -144,7 +145,9 @@ export const mountLabel = (
   withMode = true,
 ): string => {
   if (mount.kind === "tmpfs") {
-    return `${t("mountTmpfs")}${mount.destination !== "" ? ` ${t("mountAt")} ${mount.destination}` : ""}`;
+    return `${t("mountTmpfs")}${
+      mount.destination !== "" ? ` ${t("mountAt")} ${mount.destination}` : ""
+    }`;
   }
   if (mount.kind === "volume") {
     return `volume ${mount.volume}${mount.destination !== "" ? ` → ${mount.destination}` : ""}`;

@@ -5,7 +5,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { VOLUME_TOOLS } from "./test-support.js";
-import { TOOLS, toolHandlers } from "./index.js";
+import { toolHandlers, TOOLS } from "./index.js";
 
 test("volume tools are registered with the expected schemas", () => {
   for (const name of VOLUME_TOOLS) {

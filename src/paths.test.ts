@@ -5,16 +5,18 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { pathRequestRecorder, WORKSPACE_ID } from "./test-support.js";
-import { TOOLS, summarizeArgs, toolHandlers } from "./index.js";
+import { summarizeArgs, toolHandlers, TOOLS } from "./index.js";
 
 const EXEC = { agent: { session: { header: { cwd: "/proj" } } } };
 
 test("the path tools are registered and approval-gated", () => {
-  for (const name of [
-    "container_path_set",
-    "container_path_add",
-    "container_path_remove",
-  ]) {
+  for (
+    const name of [
+      "container_path_set",
+      "container_path_add",
+      "container_path_remove",
+    ]
+  ) {
     const tool = TOOLS.find((entry) => entry.name === name);
     assert.ok(tool, `${name} registered`);
     assert.equal(tool!.approval, true, `${name} must require approval`);

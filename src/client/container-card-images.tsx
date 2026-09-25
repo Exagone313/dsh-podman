@@ -6,9 +6,9 @@ import {
   Chip,
   ConfirmButton,
   Field,
-  TagInput,
   imageIdPattern,
   sanitizeImageId,
+  TagInput,
 } from "./container-card-shared.js";
 import {
   actions,
@@ -61,15 +61,15 @@ export function ImageItem(props: {
             <tr>
               <th style={thStyle} scope="row">{t("packages")}</th>
               <td style={tdStyle}>
-                {image.packages.length === 0 ? (
-                  t("none")
-                ) : (
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
-                    {image.packages.map((pkg) => (
-                      <Chip key={pkg} t={t} label={pkg} />
-                    ))}
-                  </div>
-                )}
+                {image.packages.length === 0
+                  ? (
+                    t("none")
+                  )
+                  : (
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+                      {image.packages.map((pkg) => <Chip key={pkg} t={t} label={pkg} />)}
+                    </div>
+                  )}
               </td>
             </tr>
           </tbody>
@@ -149,50 +149,56 @@ export function BaseImageRow(props: {
             <tr>
               <th style={thStyle} scope="row">{t("packages")}</th>
               <td style={tdStyle}>
-                {image.packages.length === 0 ? (
-                  t("none")
-                ) : (
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
-                    {image.packages.map((pkg) => (
-                      <Chip key={pkg} t={t} label={pkg} />
-                    ))}
-                  </div>
-                )}
+                {image.packages.length === 0
+                  ? (
+                    t("none")
+                  )
+                  : (
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+                      {image.packages.map((pkg) => <Chip key={pkg} t={t} label={pkg} />)}
+                    </div>
+                  )}
               </td>
             </tr>
           </tbody>
         </table>
         <div style={actions}>
-          {pull ? (
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={busy}
-              onClick={() => onPull(image.imageId)}
-            >
-              {t("pullImage")}
-            </Button>
-          ) : null}
-          {build ? (
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={busy}
-              onClick={() => onRebuild(image.imageId)}
-            >
-              {t("build")}
-            </Button>
-          ) : null}
-          {rebuild ? (
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={busy}
-              onClick={() => onRebuild(image.imageId)}
-            >
-              {t("rebuildImage")}
-            </Button>
-          ) : null}
+          {pull
+            ? (
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={busy}
+                onClick={() => onPull(image.imageId)}
+              >
+                {t("pullImage")}
+              </Button>
+            )
+            : null}
+          {build
+            ? (
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={busy}
+                onClick={() => onRebuild(image.imageId)}
+              >
+                {t("build")}
+              </Button>
+            )
+            : null}
+          {rebuild
+            ? (
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={busy}
+                onClick={() => onRebuild(image.imageId)}
+              >
+                {t("rebuildImage")}
+              </Button>
+            )
+            : null}
           <Button
             variant="outline"
             size="sm"
@@ -278,9 +284,9 @@ export function ImageBuildModal(props: {
             value={imageId}
             onChange={(event) => onImageId(sanitizeImageId(event.target.value))}
           />
-          {imageId !== "" && !imageIdPattern.test(imageId) ? (
-            <p style={{ ...hint, margin: 0 }}>{t("invalidImageId")}</p>
-          ) : null}
+          {imageId !== "" && !imageIdPattern.test(imageId)
+            ? <p style={{ ...hint, margin: 0 }}>{t("invalidImageId")}</p>
+            : null}
         </Field>
         <Field label={t("parent")} htmlFor={parentLabel}>
           <select

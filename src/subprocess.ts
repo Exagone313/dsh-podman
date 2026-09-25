@@ -4,7 +4,7 @@
 
 import { discardUnneededSpill, outputReader, spillTargetFor, splitEnv } from "./output-reader.js";
 import { globCwd, remoteArgv, unaryGuest } from "./guest-rpc.js";
-import { type WorkspaceResolver, metadata } from "./workspace-binding.js";
+import { metadata, type WorkspaceResolver } from "./workspace-binding.js";
 import { randomUUID } from "node:crypto";
 import { PassThrough } from "node:stream";
 
@@ -51,8 +51,9 @@ export function createSubprocessProvider(resolver: WorkspaceResolver): Subproces
         spec.argv.length === 0 ||
         typeof spec.argv[0] !== "string" ||
         spec.argv[0] === ""
-      )
+      ) {
         throw new Error("argv must contain a program");
+      }
       const stdoutSpill = spillTargetFor(spec.stdio?.stdout, "stdout");
       const stderrSpill = spillTargetFor(spec.stdio?.stderr, "stderr");
       const stdoutReader = outputReader(spec.stdio?.stdout, stdoutSpill.spec);
@@ -81,10 +82,7 @@ export function createSubprocessProvider(resolver: WorkspaceResolver): Subproces
         terminated = true;
         signalProcess("SIGTERM");
         if (killTimer === undefined) {
-          const grace =
-            typeof spec.graceMs === "number" && spec.graceMs > 0
-              ? spec.graceMs
-              : 5000;
+          const grace = typeof spec.graceMs === "number" && spec.graceMs > 0 ? spec.graceMs : 5000;
           killTimer = setTimeout(() => {
             if (!exited) signalProcess("SIGKILL");
           }, grace);
@@ -214,20 +212,14 @@ export function createSubprocessProvider(resolver: WorkspaceResolver): Subproces
                 // /dev/null: a pipe would be a non-TTY stdin, and tools like
                 // ripgrep then read stdin instead of the working directory.
                 stdinPipe: spec.stdio?.stdin === "pipe",
-                ...(stdoutSpill.target !== undefined
-                  ? { spillStdout: stdoutSpill.target }
-                  : {}),
-                ...(stderrSpill.target !== undefined
-                  ? { spillStderr: stderrSpill.target }
-                  : {}),
+                ...(stdoutSpill.target !== undefined ? { spillStdout: stdoutSpill.target } : {}),
+                ...(stderrSpill.target !== undefined ? { spillStderr: stderrSpill.target } : {}),
               },
             });
             if (spec.stdio?.stdin !== "pipe") stream.end();
             else {
               state.stdin = new PassThrough();
-              state.stdin.on("data", (data: Buffer) =>
-                stream.write({ stdinChunk: data }),
-              );
+              state.stdin.on("data", (data: Buffer) => stream.write({ stdinChunk: data }));
               state.stdin.on("end", () => stream.end());
             }
           }),
@@ -279,8 +271,9 @@ export function createSubprocessProvider(resolver: WorkspaceResolver): Subproces
         spec.argv.length === 0 ||
         typeof spec.argv[0] !== "string" ||
         spec.argv[0] === ""
-      )
+      ) {
         throw new Error("argv must contain a program");
+      }
       spec.signal?.throwIfAborted();
       const binding = await resolver.resolveForPath(spec.cwd, spec.cwd);
       const call = (binding.guest as any).terminal(metadata(binding.token));
@@ -412,9 +405,9 @@ export function createSubprocessProvider(resolver: WorkspaceResolver): Subproces
           }));
           return response.found
             ? {
-                processGroupId: response.processGroupId,
-                inputWaiting: response.inputWaiting,
-              }
+              processGroupId: response.processGroupId,
+              inputWaiting: response.inputWaiting,
+            }
             : undefined;
         },
         signalForeground: async (signal: string) => {
@@ -422,8 +415,9 @@ export function createSubprocessProvider(resolver: WorkspaceResolver): Subproces
           const response = await request((requestId) => ({
             signal: { signal, requestId },
           }));
-          if (!response.found)
+          if (!response.found) {
             throw new Error(`no foreground process group to signal ${signal}`);
+          }
           return response.processGroupId;
         },
         terminate: async () => {

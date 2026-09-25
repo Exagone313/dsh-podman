@@ -118,30 +118,36 @@ export function ContainerRow(props: {
             <th style={thStyle} scope="row">{t("created")}</th>
             <td style={tdStyle}>{container.createdAt}</td>
           </tr>
-          {projects !== "" ? (
-            <tr>
-              <th style={thStyle} scope="row">{t("projects")}</th>
-              <td style={tdStyle}>{projects}</td>
-            </tr>
-          ) : null}
-          {envEntries.length > 0 ? (
-            <tr>
-              <th style={thStyle} scope="row">{t("env")}</th>
-              <td style={tdStyle}>
-                {envEntries.map(([key]) => key).join(", ")}
-              </td>
-            </tr>
-          ) : null}
-          {secretEntries.length > 0 ? (
-            <tr>
-              <th style={thStyle} scope="row">{t("secretEnv")}</th>
-              <td style={tdStyle}>
-                {secretEntries
-                  .map(([envVar, secretName]) => `${envVar}=${secretName}`)
-                  .join(", ")}
-              </td>
-            </tr>
-          ) : null}
+          {projects !== ""
+            ? (
+              <tr>
+                <th style={thStyle} scope="row">{t("projects")}</th>
+                <td style={tdStyle}>{projects}</td>
+              </tr>
+            )
+            : null}
+          {envEntries.length > 0
+            ? (
+              <tr>
+                <th style={thStyle} scope="row">{t("env")}</th>
+                <td style={tdStyle}>
+                  {envEntries.map(([key]) => key).join(", ")}
+                </td>
+              </tr>
+            )
+            : null}
+          {secretEntries.length > 0
+            ? (
+              <tr>
+                <th style={thStyle} scope="row">{t("secretEnv")}</th>
+                <td style={tdStyle}>
+                  {secretEntries
+                    .map(([envVar, secretName]) => `${envVar}=${secretName}`)
+                    .join(", ")}
+                </td>
+              </tr>
+            )
+            : null}
         </tbody>
       </table>
       <div style={actions}>
@@ -168,9 +174,7 @@ export function ContainerRow(props: {
           onChange={(event) => setSelected(event.target.value)}
           aria-label={t("recreateWithImage")}
         >
-          {container.imageId === "" ? (
-            <option value="">{t("none")}</option>
-          ) : null}
+          {container.imageId === "" ? <option value="">{t("none")}</option> : null}
           {images.map((image) => (
             <option key={image.imageId} value={image.imageId}>
               {image.imageId}
@@ -215,30 +219,25 @@ export function ContainerRow(props: {
             projectsRoot={projectsRoot}
             directoryPicker={directoryPicker}
             confirmRemove
-            primaryProject={
-              container.containerName === "default" ? projectName : ""
-            }
+            primaryProject={container.containerName === "default" ? projectName : ""}
             onUpdate={(mount) =>
               onUpdateContainerMount(
                 container.workspaceSlug,
                 container.containerName,
                 mount,
-              )
-            }
+              )}
             onRemove={(mount) =>
               onRemoveContainerMount(
                 container.workspaceSlug,
                 container.containerName,
                 mount,
-              )
-            }
+              )}
             onAdd={(mount) =>
               onAddContainerMount(
                 container.workspaceSlug,
                 container.containerName,
                 mount,
-              )
-            }
+              )}
           />
         </div>
       </DisclosureRow>
@@ -260,8 +259,7 @@ export function ContainerRow(props: {
                 container.workspaceSlug,
                 container.containerName,
                 paths,
-              )
-            }
+              )}
           />
         </div>
       </DisclosureRow>
@@ -299,9 +297,7 @@ export function ContainerRow(props: {
                 title={t("confirmTitle")}
                 description={t("confirmDetachSecret")}
                 disabled={busy}
-                onConfirm={() =>
-                  onRemoveContainerSecret(container.workspaceSlug, envVar)
-                }
+                onConfirm={() => onRemoveContainerSecret(container.workspaceSlug, envVar)}
               />
             </div>
           ))}
@@ -321,9 +317,7 @@ export function ContainerRow(props: {
               onChange={(event) => setAttachSecret(event.target.value)}
               aria-label={t("attachSecret")}
             >
-              {secrets.length === 0 ? (
-                <option value="">{t("none")}</option>
-              ) : null}
+              {secrets.length === 0 ? <option value="">{t("none")}</option> : null}
               {secrets.map((secret) => (
                 <option key={secret.name} value={secret.name}>
                   {secret.name}

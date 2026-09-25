@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: MIT
 
 import { isSandboxEscalation, preExecutePolicy, type SessionFacts } from "./approval.js";
-import { resolveReasonLocale, type ReasonLocale } from "./approval-reasons.js";
+import { type ReasonLocale, resolveReasonLocale } from "./approval-reasons.js";
 import { createFilesystemProvider } from "./fs-provider.js";
 import { createSpillStore } from "./spill-store.js";
 import {
@@ -14,11 +14,11 @@ import {
 import { createSubprocessProvider } from "./subprocess.js";
 import { createReadOnlyShellGate, REMOUNT_TOOL_NAME } from "./read-only-shell.js";
 import { toolHandlers } from "./tool-handlers.js";
-import { TOOLS, TOOL_DESCRIPTIONS, defineTool, toolOutput } from "./tool-schemas.js";
+import { defineTool, TOOL_DESCRIPTIONS, toolOutput, TOOLS } from "./tool-schemas.js";
 import { toolCallView, toolResultView } from "./tool-views.js";
 import { installContainerPreferences } from "./preferences.js";
 import { registerCardRoute } from "./card-route.js";
-import { WorkspaceResolver, normalizeToolError } from "./workspace-binding.js";
+import { normalizeToolError, WorkspaceResolver } from "./workspace-binding.js";
 
 export const name = "podman";
 
@@ -49,8 +49,7 @@ export function apply(ctx: any, config: PluginConfig = {}): void {
     // The deployment default is private, so an unset override conservatively
     // keeps asking.
     policy: ctx.get("approval")?.overrideOf(session) ?? "ask",
-    preset:
-      ctx.get("sessionProjections")?.stateOf(session, "agentPreset") ??
+    preset: ctx.get("sessionProjections")?.stateOf(session, "agentPreset") ??
       session?.header?.agentPreset,
   });
   // The read-only shell gate needs the resolver, which is created below, so it
@@ -58,28 +57,29 @@ export function apply(ctx: any, config: PluginConfig = {}): void {
   // container's mounts and, when a read-write mount would block the tool, asks
   // the user (through the approval service) to remount them read-only.
   let readOnlyShell: ReturnType<typeof createReadOnlyShellGate> | undefined;
-  const readOnlyShellGate = (): ReturnType<typeof createReadOnlyShellGate> =>
-    (readOnlyShell ??= createReadOnlyShellGate({
-      resolver,
-      approve: async (exec: any, reason: string): Promise<boolean> => {
-        const approval = ctx.get("approval");
-        if (approval === undefined || exec?.agent === undefined) return false;
-        try {
-          const outcome = await approval.request({
-            agent: exec.agent,
-            toolName: REMOUNT_TOOL_NAME,
-            ...(exec.callId !== undefined ? { callId: exec.callId } : {}),
-            ...(exec.signal !== undefined ? { signal: exec.signal } : {}),
-            reason,
-          });
-          return outcome === "allowed-once";
-        } catch {
-          // A request that cannot be raised (no open turn, no channel) fails
-          // closed, exactly like a rejection.
-          return false;
-        }
-      },
-    }));
+  const readOnlyShellGate = (): ReturnType<
+    typeof createReadOnlyShellGate
+  > => (readOnlyShell ??= createReadOnlyShellGate({
+    resolver,
+    approve: async (exec: any, reason: string): Promise<boolean> => {
+      const approval = ctx.get("approval");
+      if (approval === undefined || exec?.agent === undefined) return false;
+      try {
+        const outcome = await approval.request({
+          agent: exec.agent,
+          toolName: REMOUNT_TOOL_NAME,
+          ...(exec.callId !== undefined ? { callId: exec.callId } : {}),
+          ...(exec.signal !== undefined ? { signal: exec.signal } : {}),
+          reason,
+        });
+        return outcome === "allowed-once";
+      } catch {
+        // A request that cannot be raised (no open turn, no channel) fails
+        // closed, exactly like a rejection.
+        return false;
+      }
+    },
+  }));
   ctx.on(
     "tools/pre-execute",
     (exec: any, next: any) =>
@@ -107,17 +107,14 @@ export function apply(ctx: any, config: PluginConfig = {}): void {
   ensurePodmanOpsPreset(ctx);
   const resolver = new WorkspaceResolver(
     {
-      socketsRoot:
-        config.socketsRoot ??
+      socketsRoot: config.socketsRoot ??
         process.env.DSH_PODMAN_SOCKETS_ROOT ??
         "/run/dsh-podman",
       defaultImage: config.defaultImage ?? "archlinux",
-      projectsRoot:
-        config.projectsRoot ??
+      projectsRoot: config.projectsRoot ??
         process.env.DSH_PODMAN_PROJECTS_ROOT ??
         "/projects",
-      controlToken:
-        config.controlToken ?? process.env.DSH_PODMAN_ORCHESTRATOR_TOKEN ?? "",
+      controlToken: config.controlToken ?? process.env.DSH_PODMAN_ORCHESTRATOR_TOKEN ?? "",
     },
     ctx.workspaceRegistry,
   );
@@ -135,8 +132,7 @@ export function apply(ctx: any, config: PluginConfig = {}): void {
     promptCtx.systemPrompt.section(podmanRuntimeSection(promptCtx));
     promptCtx.on(
       "system-prompt/assemble",
-      async (_assembly: any, _context: any, next: any) =>
-        withoutHarnessSourceSection(await next()),
+      async (_assembly: any, _context: any, next: any) => withoutHarnessSourceSection(await next()),
       { global: true, prepend: true },
     );
   });
@@ -155,8 +151,7 @@ function registerTools(ctx: any, resolver: WorkspaceResolver): void {
         parameters: tool.parameters,
         ...(tool.approval ? { approval: true } : {}),
         presentCall: (args: any) => toolCallView(tool.name, args),
-        presentResult: (args: any, result: any) =>
-          toolResultView(tool.name, args, result),
+        presentResult: (args: any, result: any) => toolResultView(tool.name, args, result),
         output: toolOutput,
         execute: async (input: any, exec: any) => {
           try {
@@ -171,49 +166,47 @@ function registerTools(ctx: any, resolver: WorkspaceResolver): void {
 }
 
 export {
-  PODMAN_OPS_APPROVAL_TOOLS,
-  PODMAN_OPS_PRESET,
-  READ_ONLY_TOOLS,
-  SANDBOX_ESCALATION_REASON_PREFIX,
   approvalDecision,
   isSandboxEscalation,
   mountDestinationsReason,
+  PODMAN_OPS_APPROVAL_TOOLS,
+  PODMAN_OPS_PRESET,
   preExecutePolicy,
+  READ_ONLY_TOOLS,
+  SANDBOX_ESCALATION_REASON_PREFIX,
   summarizeArgs,
 } from "./approval.js";
 export type { SessionFacts } from "./approval.js";
 export {
+  createReadOnlyShellGate,
   READ_ONLY_GATED_TOOLS,
   REMOUNT_TOOL_NAME,
-  createReadOnlyShellGate,
 } from "./read-only-shell.js";
-export { FilesystemProvider, createFilesystemProvider } from "./fs-provider.js";
-export { resolveGuestCwd, resolveGuestPath, remoteArgv, globCwd } from "./guest-rpc.js";
+export { createFilesystemProvider, FilesystemProvider } from "./fs-provider.js";
+export { globCwd, remoteArgv, resolveGuestCwd, resolveGuestPath } from "./guest-rpc.js";
 export {
   inferMountKind,
   projectMountDestinationReason,
   projectMountMirror,
 } from "./mount-input.js";
 export {
+  ensurePodmanOpsPreset,
   HARNESS_SOURCE_SECTION,
+  homePresetsRoot,
   PODMAN_OPS_AGENT_CORDIS_YML,
   PODMAN_OPS_PRESET_YML,
-  ensurePodmanOpsPreset,
-  homePresetsRoot,
   podmanRuntimeSection,
   withoutHarnessSourceSection,
 } from "./prompts.js";
 export { publicContainer, publicDaemon, publicImage, publicMount } from "./public.js";
 export {
-  OutputReader,
-  SubprocessProvider,
   createSubprocessProvider,
+  OutputReader,
   outputReader,
+  SubprocessProvider,
 } from "./subprocess.js";
 export { toolHandlers } from "./tool-handlers.js";
 export {
-  TOOLS,
-  ToolDefinition,
   containerBashParameters,
   containerEditParameters,
   containerExecParameters,
@@ -246,7 +239,9 @@ export {
   secretCreateParameters,
   secretListParameters,
   secretRemoveParameters,
+  ToolDefinition,
   toolOutput,
+  TOOLS,
   volumeCreateParameters,
   volumeListParameters,
   volumeRemoveParameters,

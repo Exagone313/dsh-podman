@@ -12,10 +12,7 @@ const SEGMENT = sessionSegment(SESSION_ID);
 
 function fakeCtx(sessions: Record<string, any>): any {
   return {
-    get: (name: string) =>
-      name === "sessions"
-        ? { get: (id: string) => sessions[id] }
-        : undefined,
+    get: (name: string) => name === "sessions" ? { get: (id: string) => sessions[id] } : undefined,
   };
 }
 

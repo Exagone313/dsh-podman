@@ -60,10 +60,9 @@ export function forcedMountMode(kind: string | undefined): string | undefined {
 }
 
 export function mountModeToProto(mode: string | undefined): string {
-  const proto =
-    mode !== undefined && Object.prototype.hasOwnProperty.call(MOUNT_MODES, mode)
-      ? MOUNT_MODES[mode]
-      : undefined;
+  const proto = mode !== undefined && Object.prototype.hasOwnProperty.call(MOUNT_MODES, mode)
+    ? MOUNT_MODES[mode]
+    : undefined;
   if (proto === undefined) throw new Error(`unknown mount mode: ${mode}`);
   return proto;
 }

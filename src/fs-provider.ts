@@ -3,8 +3,8 @@
 // SPDX-License-Identifier: MIT
 
 import {
-  DIFF_BASIS_MAX_BYTES,
   detectLineEndings,
+  DIFF_BASIS_MAX_BYTES,
   fsError,
   guestChunks,
   guestStat,
@@ -72,10 +72,9 @@ export function createFilesystemProvider(resolver: WorkspaceResolver): Filesyste
       // An explicit container targets that container's guest; the harness's own
       // tools never pass one and keep the session workspace's default.
       const container = typeof opts?.container === "string" ? opts.container : "";
-      const binding =
-        container !== "" && container !== "default"
-          ? await resolver.containerBinding(opts?.cwd, container, opts?.signal)
-          : await resolver.resolveForPath(resolved, opts?.cwd, opts?.signal);
+      const binding = container !== "" && container !== "default"
+        ? await resolver.containerBinding(opts?.cwd, container, opts?.signal)
+        : await resolver.resolveForPath(resolved, opts?.cwd, opts?.signal);
       return {
         targetKey: resolved,
         displayPath: resolved,
@@ -91,8 +90,7 @@ export function createFilesystemProvider(resolver: WorkspaceResolver): Filesyste
     contains: (parent: any, child: any) =>
       child.targetKey === parent.targetKey ||
       child.targetKey.startsWith(`${parent.targetKey}/`),
-    readText: (target: any, signal?: AbortSignal) =>
-      readGuestText(target, signal),
+    readText: (target: any, signal?: AbortSignal) => readGuestText(target, signal),
     streamText: (target: any, signal?: AbortSignal) =>
       Promise.resolve(guestTextChunks(target, signal)),
     readBytes: async (
@@ -102,11 +100,13 @@ export function createFilesystemProvider(resolver: WorkspaceResolver): Filesyste
     ) => {
       const chunks: Buffer[] = [];
       let total = 0;
-      for await (const buffer of guestChunks(
-        target,
-        { length: maxBytes + 1 },
-        signal,
-      )) {
+      for await (
+        const buffer of guestChunks(
+          target,
+          { length: maxBytes + 1 },
+          signal,
+        )
+      ) {
         total += buffer.length;
         if (total > maxBytes) {
           throw fsError(
@@ -145,14 +145,8 @@ export function createFilesystemProvider(resolver: WorkspaceResolver): Filesyste
       if (!result?.exists) return undefined;
       return {
         version: guestVersion(result),
-        type: result.isSymlink
-          ? "symlink"
-          : result.isDir
-            ? "directory"
-            : "file",
-        ...(result.size !== undefined && result.size !== null
-          ? { size: Number(result.size) }
-          : {}),
+        type: result.isSymlink ? "symlink" : result.isDir ? "directory" : "file",
+        ...(result.size !== undefined && result.size !== null ? { size: Number(result.size) } : {}),
       };
     },
     writeText: async (
@@ -192,14 +186,12 @@ export function createFilesystemProvider(resolver: WorkspaceResolver): Filesyste
       // whole-file diff, so writing one byte into a huge file does not read the
       // whole file back just for presentation. Both sides are LF-normalized so
       // a CRLF overwrite does not read as every line changed.
-      const rawBasis =
-        current.exists &&
-        Buffer.byteLength(content, "utf8") < DIFF_BASIS_MAX_BYTES &&
-        Number(current.size ?? 0) < DIFF_BASIS_MAX_BYTES
-          ? await readDiffBasis(target, signal)
-          : null;
-      const before =
-        rawBasis === null ? null : normalizeLineEndings(rawBasis);
+      const rawBasis = current.exists &&
+          Buffer.byteLength(content, "utf8") < DIFF_BASIS_MAX_BYTES &&
+          Number(current.size ?? 0) < DIFF_BASIS_MAX_BYTES
+        ? await readDiffBasis(target, signal)
+        : null;
+      const before = rawBasis === null ? null : normalizeLineEndings(rawBasis);
       await writeGuestFile(
         target.binding,
         target.targetKey,
@@ -223,21 +215,18 @@ export function createFilesystemProvider(resolver: WorkspaceResolver): Filesyste
         { path: target.targetKey },
         signal,
       );
-      const entries: any[] = Array.isArray(response?.entries)
-        ? response.entries
-        : [];
+      const entries: any[] = Array.isArray(response?.entries) ? response.entries : [];
       return entries.map((entry: any) => {
         const childKey = join(target.targetKey, entry.name);
         // Prefer the guest-reported followed type; fall back to the directory
         // bit for an agent that predates the field.
-        const type =
-          entry.type === "file" ||
-          entry.type === "directory" ||
-          entry.type === "other"
-            ? entry.type
-            : entry.isDir
-              ? "directory"
-              : "file";
+        const type = entry.type === "file" ||
+            entry.type === "directory" ||
+            entry.type === "other"
+          ? entry.type
+          : entry.isDir
+          ? "directory"
+          : "file";
         return {
           name: entry.name,
           type,
@@ -247,8 +236,8 @@ export function createFilesystemProvider(resolver: WorkspaceResolver): Filesyste
             binding: target.binding,
           },
           ...(type === "file" &&
-          entry.size !== undefined &&
-          entry.size !== null
+              entry.size !== undefined &&
+              entry.size !== null
             ? { size: Number(entry.size) }
             : {}),
         };

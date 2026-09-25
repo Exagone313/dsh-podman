@@ -7,10 +7,10 @@ import assert from "node:assert/strict";
 import { fakeToolContext, guestExecRecorder, guestFileRecorder } from "./test-support.js";
 import {
   HARNESS_SOURCE_SECTION,
-  TOOLS,
   toolCallView,
   toolHandlers,
   toolResultView,
+  TOOLS,
   withoutHarnessSourceSection,
 } from "./index.js";
 
@@ -79,7 +79,13 @@ test("file tools refuse traversal before reaching the guest", async () => {
   const { reads, writes, resolver } = guestFileRecorder();
   for (const path of ["../escape", "a/../../b"]) {
     await assert.rejects(
-      () => toolHandlers.container_read(resolver as never, { container: "default", file_path: path }, exec, fakeToolContext(resolver)),
+      () =>
+        toolHandlers.container_read(
+          resolver as never,
+          { container: "default", file_path: path },
+          exec,
+          fakeToolContext(resolver),
+        ),
       /must not escape/,
     );
   }
@@ -145,15 +151,26 @@ test("tool presenters render command results as terminal output", () => {
     isError: false,
   });
   assert.deepEqual(
-    toolResultView("container_bash", {}, result({ exitCode: 0, signal: null, stdout: "hi\n", stderr: "" })),
+    toolResultView(
+      "container_bash",
+      {},
+      result({ exitCode: 0, signal: null, stdout: "hi\n", stderr: "" }),
+    ),
     { card: "terminal", output: "hi\n", exitCode: 0 },
   );
   assert.deepEqual(
-    toolResultView("container_bash", {}, result({ exitCode: 0, signal: "SIGTERM", stdout: "", stderr: "" })),
+    toolResultView(
+      "container_bash",
+      {},
+      result({ exitCode: 0, signal: "SIGTERM", stdout: "", stderr: "" }),
+    ),
     { card: "terminal", output: "", signal: "SIGTERM" },
   );
   assert.equal(
-    toolResultView("container_bash", {}, { content: [{ type: "text", text: "boom" }], isError: true }),
+    toolResultView("container_bash", {}, {
+      content: [{ type: "text", text: "boom" }],
+      isError: true,
+    }),
     undefined,
   );
   assert.equal(toolResultView("image_list", {}, result({})), undefined);
@@ -227,17 +244,23 @@ test("command tools pass an optional uid, gid, and groups", async () => {
 
   // No identity leaves the command as the container's default user.
   const none = guestExecRecorder("/projects/team");
-  await toolHandlers.container_exec(none.resolver as never, { container: "default", argv: ["id"] }, exec);
+  await toolHandlers.container_exec(
+    none.resolver as never,
+    { container: "default", argv: ["id"] },
+    exec,
+  );
   assert.equal("uid" in none.starts[0], false);
   assert.equal("groups" in none.starts[0], false);
 
-  for (const bad of [
-    { uid: -1 },
-    { gid: -1 },
-    { groups: [1, -2] },
-    { groups: "1" },
-    { uid: 1.5 },
-  ]) {
+  for (
+    const bad of [
+      { uid: -1 },
+      { gid: -1 },
+      { groups: [1, -2] },
+      { groups: "1" },
+      { uid: 1.5 },
+    ]
+  ) {
     await assert.rejects(
       toolHandlers.container_exec(
         guestExecRecorder("/projects/team").resolver as never,

@@ -19,7 +19,7 @@ import type {
   VolumeView,
   WorkspaceView,
 } from "./card-protocol.js";
-import { createCardClient, type CardClient } from "./card-client.js";
+import { type CardClient, createCardClient } from "./card-client.js";
 import { type DirectoryPickerFace } from "./directory-picker.js";
 
 export const CONTAINER_NS = "podman";
@@ -95,7 +95,11 @@ export interface ContainerCardFace {
   removeWorkspace: (workspace: string) => void;
   recreate: (workspace: string, image: string, env?: Record<string, string>) => void;
   createContainer: (workspace: WorkspaceView, config?: ContainerCreateConfig) => void;
-  startContainer: (workspace: WorkspaceView, container: string, config?: ContainerCreateConfig) => void;
+  startContainer: (
+    workspace: WorkspaceView,
+    container: string,
+    config?: ContainerCreateConfig,
+  ) => void;
   addContainerMount: (workspace: string, container: string, mount: MountInput) => void;
   removeContainerMount: (workspace: string, container: string, mount: MountInput) => void;
   updateContainerMount: (workspace: string, container: string, mount: MountInput) => void;
@@ -184,9 +188,7 @@ export class ContainerCardController {
       socketsRoot: value?.socketsRoot ?? "",
       socketsRootDraft: this.draft("socketsRoot", value?.socketsRoot ?? ""),
       projectsRoot: this.snapshot.projectsRoot,
-      ...(this.directoryPicker === undefined
-        ? {}
-        : { directoryPicker: this.directoryPicker }),
+      ...(this.directoryPicker === undefined ? {} : { directoryPicker: this.directoryPicker }),
       workspaces: this.snapshot.workspaces,
       containers: this.snapshot.containers,
       images: this.snapshot.images,
@@ -330,7 +332,9 @@ export class ContainerCardController {
             ...(config?.mounts && config.mounts.length > 0 ? { mounts: config.mounts } : {}),
             ...(config?.env && Object.keys(config.env).length > 0 ? { env: config.env } : {}),
             ...(config?.paths && config.paths.length > 0 ? { paths: config.paths } : {}),
-            ...(config?.secretEnv && Object.keys(config.secretEnv).length > 0 ? { secretEnv: config.secretEnv } : {}),
+            ...(config?.secretEnv && Object.keys(config.secretEnv).length > 0
+              ? { secretEnv: config.secretEnv }
+              : {}),
           },
         ),
       startContainer: (workspace, container, config) =>
@@ -343,7 +347,9 @@ export class ContainerCardController {
             ...(config?.mounts && config.mounts.length > 0 ? { mounts: config.mounts } : {}),
             ...(config?.env && Object.keys(config.env).length > 0 ? { env: config.env } : {}),
             ...(config?.paths && config.paths.length > 0 ? { paths: config.paths } : {}),
-            ...(config?.secretEnv && Object.keys(config.secretEnv).length > 0 ? { secretEnv: config.secretEnv } : {}),
+            ...(config?.secretEnv && Object.keys(config.secretEnv).length > 0
+              ? { secretEnv: config.secretEnv }
+              : {}),
           },
         ),
       addContainerMount: (workspace, container, mount) =>
@@ -373,8 +379,7 @@ export class ContainerCardController {
           ...(charset ? { charset } : {}),
         }),
       removeSecret: (name) => this.command("secret_remove", name, ""),
-      setSecret: (name, value) =>
-        this.command("secret_set", name, "", { value }),
+      setSecret: (name, value) => this.command("secret_set", name, "", { value }),
       addContainerSecret: (workspace, envVar, secret) =>
         this.command("container_secret_add", workspace, "", {
           container: "default",

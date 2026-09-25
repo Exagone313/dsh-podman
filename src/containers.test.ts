@@ -5,13 +5,19 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { join } from "node:path";
-import { WORKSPACE_ID, fakeToolContext, guestExecRecorder, guestFileRecorder, secretBearingResolver } from "./test-support.js";
 import {
-  TOOLS,
+  fakeToolContext,
+  guestExecRecorder,
+  guestFileRecorder,
+  secretBearingResolver,
+  WORKSPACE_ID,
+} from "./test-support.js";
+import {
   podmanRuntimeSection,
   resolveGuestCwd,
   resolveGuestPath,
   toolHandlers,
+  TOOLS,
 } from "./index.js";
 
 test("container start/recreate/bash accept an env map schema", () => {
@@ -115,10 +121,30 @@ test("container tools never expose internal fields in their results", async () =
   const cases: Array<[any, Record<string, unknown>]> = [
     [toolHandlers.container_start, { container: "default", image: "img-1" }],
     [toolHandlers.container_recreate, { container: "default" }],
-    [toolHandlers.container_mount_add, { container: "default", kind: "volume", volume: "v", destination: "/data" }],
-    [toolHandlers.container_mount_remove, { container: "default", kind: "volume", volume: "v", destination: "/data" }],
-    [toolHandlers.container_mount_update, { container: "default", kind: "volume", volume: "v", destination: "/data", mode: "read_only" }],
-    [toolHandlers.container_secret_add, { container: "default", env: "DB_PASS", secret: "db-pass" }],
+    [toolHandlers.container_mount_add, {
+      container: "default",
+      kind: "volume",
+      volume: "v",
+      destination: "/data",
+    }],
+    [toolHandlers.container_mount_remove, {
+      container: "default",
+      kind: "volume",
+      volume: "v",
+      destination: "/data",
+    }],
+    [toolHandlers.container_mount_update, {
+      container: "default",
+      kind: "volume",
+      volume: "v",
+      destination: "/data",
+      mode: "read_only",
+    }],
+    [toolHandlers.container_secret_add, {
+      container: "default",
+      env: "DB_PASS",
+      secret: "db-pass",
+    }],
     [toolHandlers.container_secret_remove, { container: "default", env: "DB_PASS" }],
   ];
   for (const [handler, input] of cases) {
@@ -304,8 +330,7 @@ test("container_edit requires a unique match unless replace_all is set", async (
 });
 
 test("container command and file tools mirror the built-in arguments", () => {
-  const parameters = (name: string): any =>
-    TOOLS.find((entry) => entry.name === name)!.parameters;
+  const parameters = (name: string): any => TOOLS.find((entry) => entry.name === name)!.parameters;
 
   const bash = parameters("container_bash");
   assert.ok(bash.required.includes("command"));
@@ -390,12 +415,12 @@ test("container commands inherit the managed shell environment", async () => {
     get: (name: string) =>
       name === "shellEnv"
         ? {
-            collect: () => ({
-              DSH_HOME: "/dsh",
-              DSH_SHELL: "1",
-              DSH_SESSION_ID: "s1",
-            }),
-          }
+          collect: () => ({
+            DSH_HOME: "/dsh",
+            DSH_SHELL: "1",
+            DSH_SESSION_ID: "s1",
+          }),
+        }
         : undefined,
   };
   const bash = guestExecRecorder();
@@ -455,7 +480,14 @@ test("container_grep resolves its search path like a shell would", async () => {
     { container: "default", pattern: "TODO", path: "src", include: "*.ts" },
     exec,
   );
-  assert.deepEqual(filtered.starts[0].argv, ["/usr/bin/rg", "-n", "--glob", "*.ts", "TODO", "/projects/team/src"]);
+  assert.deepEqual(filtered.starts[0].argv, [
+    "/usr/bin/rg",
+    "-n",
+    "--glob",
+    "*.ts",
+    "TODO",
+    "/projects/team/src",
+  ]);
   assert.equal(filtered.starts[0].cwd, "/projects/team");
 
   const none = guestExecRecorder("/projects/team");

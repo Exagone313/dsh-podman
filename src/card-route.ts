@@ -92,8 +92,7 @@ function imageView(image: any): ImageView {
 function orchestratorWorkspaceViews(raw: unknown): WorkspaceView[] {
   return ((raw as any[] | undefined) ?? []).map((workspace: any) => ({
     workspaceSlug: workspace.workspaceSlug ?? "",
-    projectName:
-      workspace.projectName ??
+    projectName: workspace.projectName ??
       workspace.mounts?.[0]?.projectName ??
       workspace.workspaceSlug ??
       "",
@@ -117,8 +116,7 @@ function dshWorkspaceViews(registry: any, projectsRoot: string): WorkspaceView[]
       : path;
     return {
       workspaceSlug: workspaceSlug(workspace.id),
-      projectName:
-        projectName || String(workspace.title ?? "") || String(workspace.id ?? ""),
+      projectName: projectName || String(workspace.title ?? "") || String(workspace.id ?? ""),
       containerName: "",
       imageId: "",
       status: "",
@@ -256,9 +254,7 @@ export async function runCommand(
         imageId: command.image === "" ? undefined : command.image,
       };
       const projectsRoot = resolver.getConfig().projectsRoot;
-      const mounts = command.mounts.map((mount) =>
-        mountInputToProto(mount, projectsRoot),
-      );
+      const mounts = command.mounts.map((mount) => mountInputToProto(mount, projectsRoot));
       if (mounts.length > 0) payload.mounts = mounts;
       if (Object.keys(command.env).length > 0) payload.env = command.env;
       if (Object.keys(command.secretEnv).length > 0) {
@@ -361,10 +357,9 @@ export async function runCommand(
       // agent as well; the record above is what a recreate restores.
       const cwd = dshWorkspaceCwd(workspaceRegistry, command.workspace);
       const container = command.container || "default";
-      const binding =
-        container === "default"
-          ? await resolver.resolve(cwd)
-          : await resolver.containerBinding(cwd, container);
+      const binding = container === "default"
+        ? await resolver.resolve(cwd)
+        : await resolver.containerBinding(cwd, container);
       await unaryGuest({ binding }, "setPaths", { paths });
       break;
     }

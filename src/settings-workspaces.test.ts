@@ -43,7 +43,15 @@ test("refresh on install publishes containers, images and workspaces", async () 
   await scope.update({}); // settle the queued async refresh
   assert.deepEqual(
     calls.map(([method]) => method),
-    ["getVersion", "listContainers", "listImages", "listWorkspaces", "listVolumes", "listSecrets", "listCaches"],
+    [
+      "getVersion",
+      "listContainers",
+      "listImages",
+      "listWorkspaces",
+      "listVolumes",
+      "listSecrets",
+      "listCaches",
+    ],
   );
   assert.equal((scope.value.containers as any[]).length, 1);
   assert.equal((scope.value.images as any[]).length, 1);
@@ -195,10 +203,16 @@ test("create command drives createWorkspace without env when empty", async () =>
   assert.equal(scope.value.command, null);
 });
 
-test("workspace list comes from the dsh registry even without orchestrator state", async () => {  const scope = fakeScope(baseValue());
+test("workspace list comes from the dsh registry even without orchestrator state", async () => {
+  const scope = fakeScope(baseValue());
   const registry = {
     list: () => [
-      { id: WORKSPACE_ID, path: "/projects/team/app", title: "app", createdAt: "2026-01-01T00:00:00Z" },
+      {
+        id: WORKSPACE_ID,
+        path: "/projects/team/app",
+        title: "app",
+        createdAt: "2026-01-01T00:00:00Z",
+      },
     ],
   };
   const resolver: any = {
@@ -231,7 +245,12 @@ test("dsh workspace layers orchestrator container info", async () => {
   const scope = fakeScope(baseValue());
   const registry = {
     list: () => [
-      { id: WORKSPACE_ID, path: "/projects/team/app", title: "app", createdAt: "2026-01-01T00:00:00Z" },
+      {
+        id: WORKSPACE_ID,
+        path: "/projects/team/app",
+        title: "app",
+        createdAt: "2026-01-01T00:00:00Z",
+      },
     ],
   };
   const resolver: any = {

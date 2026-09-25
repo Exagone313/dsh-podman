@@ -41,9 +41,8 @@ await build({
   jsx: "automatic",
   external: EXTERNALS,
   banner: {
-    js:
-      `window.__ModuleLoader__.load({ id: ${JSON.stringify(ID)}, factory: (require) => {\n`
-      + "var module = { exports: {} }; var exports = module.exports;",
+    js: `window.__ModuleLoader__.load({ id: ${JSON.stringify(ID)}, factory: (require) => {\n` +
+      "var module = { exports: {} }; var exports = module.exports;",
   },
   footer: {
     js: "\nreturn module.exports; } });",

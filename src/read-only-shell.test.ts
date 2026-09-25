@@ -4,11 +4,7 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
-import {
-  READ_ONLY_GATED_TOOLS,
-  REMOUNT_TOOL_NAME,
-  createReadOnlyShellGate,
-} from "./index.js";
+import { createReadOnlyShellGate, READ_ONLY_GATED_TOOLS, REMOUNT_TOOL_NAME } from "./index.js";
 import { WORKSPACE_ID } from "./test-support.js";
 
 const EXEC = {
@@ -32,17 +28,15 @@ function gateFixture(
     async control(method: string, request: unknown) {
       controlCalls.push([method, request as any]);
       if (method === "listContainers") {
-        return mounts === undefined
-          ? { containers: [] }
-          : {
-              containers: [
-                {
-                  workspaceSlug: WORKSPACE_ID,
-                  containerName,
-                  mounts,
-                },
-              ],
-            };
+        return mounts === undefined ? { containers: [] } : {
+          containers: [
+            {
+              workspaceSlug: WORKSPACE_ID,
+              containerName,
+              mounts,
+            },
+          ],
+        };
       }
       return {};
     },
@@ -96,7 +90,12 @@ test("all mounts read-only allows the tool without a prompt", async () => {
 test("a read-write mount prompts and then remounts read-only", async () => {
   const { gate, controlCalls, approvals } = gateFixture([
     { projectName: "team", kind: "MOUNT_KIND_PROJECT", mode: "MOUNT_MODE_READ_WRITE" },
-    { kind: "MOUNT_KIND_VOLUME", volume: "data", destination: "/data", mode: "MOUNT_MODE_READ_WRITE" },
+    {
+      kind: "MOUNT_KIND_VOLUME",
+      volume: "data",
+      destination: "/data",
+      mode: "MOUNT_MODE_READ_WRITE",
+    },
     { kind: "MOUNT_KIND_TMPFS", destination: "/scratch", mode: "MOUNT_MODE_READ_WRITE" },
     { kind: "MOUNT_KIND_SECRET", secret: "tls", destination: "/run/secrets/tls" },
   ]);
@@ -113,9 +112,25 @@ test("a read-write mount prompts and then remounts read-only", async () => {
     container: "default",
     mounts: [
       { projectName: "team", kind: "MOUNT_KIND_PROJECT", mode: "MOUNT_MODE_READ_ONLY" },
-      { projectName: "", kind: "MOUNT_KIND_VOLUME", mode: "MOUNT_MODE_READ_ONLY", destination: "/data", volume: "data" },
-      { projectName: "", kind: "MOUNT_KIND_TMPFS", mode: "MOUNT_MODE_READ_WRITE", destination: "/scratch" },
-      { projectName: "", kind: "MOUNT_KIND_SECRET", destination: "/run/secrets/tls", secret: "tls" },
+      {
+        projectName: "",
+        kind: "MOUNT_KIND_VOLUME",
+        mode: "MOUNT_MODE_READ_ONLY",
+        destination: "/data",
+        volume: "data",
+      },
+      {
+        projectName: "",
+        kind: "MOUNT_KIND_TMPFS",
+        mode: "MOUNT_MODE_READ_WRITE",
+        destination: "/scratch",
+      },
+      {
+        projectName: "",
+        kind: "MOUNT_KIND_SECRET",
+        destination: "/run/secrets/tls",
+        secret: "tls",
+      },
     ],
   });
 });

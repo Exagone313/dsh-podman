@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: MIT
 
-import { ConfirmButton, Field, emptyMount, mountLabel } from "./container-card-shared.js";
+import { ConfirmButton, emptyMount, Field, mountLabel } from "./container-card-shared.js";
 import { greyId, imageSelect } from "./container-card-styles.js";
 import { type MountInput } from "./container-card-controller.js";
 import { DirectoryPickerModal } from "./container-card-directory.js";
@@ -11,11 +11,11 @@ import { forcedMountMode } from "../mount-enums.js";
 import {
   commitEnvDraft,
   emptyEnvDraft,
+  type EnvDraft,
   envRows,
   removeEnvRow,
   renameEnvKey,
   setEnvValue,
-  type EnvDraft,
 } from "../env-rows.js";
 import { hostPathForProjectName, projectNameFromHostPath } from "../project-path.js";
 import { type ContainerPluginKey } from "./locales.js";
@@ -103,13 +103,11 @@ export function EnvEditor(props: {
             autoFocus={row.pending}
             onChange={(event) => updateKey(index, event.target.value)}
             onBlur={row.pending ? commitDraft : undefined}
-            onKeyDown={
-              row.pending
-                ? (event) => {
-                    if (event.key === "Enter") commitDraft();
-                  }
-                : undefined
-            }
+            onKeyDown={row.pending
+              ? (event) => {
+                if (event.key === "Enter") commitDraft();
+              }
+              : undefined}
             style={{ width: "160px" }}
           />
           <Input
@@ -199,14 +197,13 @@ export function MountsEditor(props: {
   const updateDraft = (patch: Partial<MountInput>): void => {
     setDraft((prev) => ({ ...prev, ...patch }));
   };
-  const canAdd =
-    draft.kind === "project"
-      ? draft.project.trim() !== ""
-      : draft.kind === "volume"
-        ? draft.volume !== ""
-        : draft.kind === "secret"
-          ? draft.secret !== ""
-          : true;
+  const canAdd = draft.kind === "project"
+    ? draft.project.trim() !== ""
+    : draft.kind === "volume"
+    ? draft.volume !== ""
+    : draft.kind === "secret"
+    ? draft.secret !== ""
+    : true;
   const openAdd = (): void => {
     setDraft(emptyMount());
     setBrowseError("");
@@ -217,8 +214,8 @@ export function MountsEditor(props: {
     onAdd(draft);
     setAdding(false);
   };
-  const kindField =
-    draft.kind === "tmpfs" ? (
+  const kindField = draft.kind === "tmpfs"
+    ? (
       <Field label={t("mountDestination")} htmlFor={mountDestinationId}>
         <Input
           id={mountDestinationId}
@@ -227,7 +224,9 @@ export function MountsEditor(props: {
           onChange={(event) => updateDraft({ destination: event.target.value })}
         />
       </Field>
-    ) : draft.kind === "volume" ? (
+    )
+    : draft.kind === "volume"
+    ? (
       <>
         <Field label={t("mountVolume")} htmlFor={mountVolumeId}>
           <select
@@ -237,9 +236,7 @@ export function MountsEditor(props: {
             disabled={busy}
             onChange={(event) => updateDraft({ volume: event.target.value })}
           >
-            {volumes.length === 0 ? (
-              <option value="">{t("none")}</option>
-            ) : null}
+            {volumes.length === 0 ? <option value="">{t("none")}</option> : null}
             {volumes.map((volume) => (
               <option key={volume.name} value={volume.name}>
                 {volume.name}
@@ -268,7 +265,9 @@ export function MountsEditor(props: {
           </select>
         </Field>
       </>
-    ) : draft.kind === "secret" ? (
+    )
+    : draft.kind === "secret"
+    ? (
       <>
         <Field label={t("mountSecret")} htmlFor={mountSecretId}>
           <select
@@ -278,9 +277,7 @@ export function MountsEditor(props: {
             disabled={busy}
             onChange={(event) => updateDraft({ secret: event.target.value })}
           >
-            {secrets.length === 0 ? (
-              <option value="">{t("none")}</option>
-            ) : null}
+            {secrets.length === 0 ? <option value="">{t("none")}</option> : null}
             {secrets.map((secret) => (
               <option key={secret.name} value={secret.name}>
                 {secret.name}
@@ -297,7 +294,8 @@ export function MountsEditor(props: {
           />
         </Field>
       </>
-    ) : (
+    )
+    : (
       <>
         <Field label={t("mountProjectPath")} htmlFor={mountProjectId}>
           <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
@@ -307,19 +305,21 @@ export function MountsEditor(props: {
               disabled={busy}
               onChange={(event) => updateDraft({ project: event.target.value })}
             />
-            {directoryPicker !== undefined ? (
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={busy}
-                onClick={() => {
-                  setBrowseError("");
-                  setBrowsing(true);
-                }}
-              >
-                {t("browse")}
-              </Button>
-            ) : null}
+            {directoryPicker !== undefined
+              ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={busy}
+                  onClick={() => {
+                    setBrowseError("");
+                    setBrowsing(true);
+                  }}
+                >
+                  {t("browse")}
+                </Button>
+              )
+              : null}
           </div>
         </Field>
         {browseError === "" ? null : (
@@ -347,8 +347,7 @@ export function MountsEditor(props: {
         const nextMode = mount.mode === "read_write" ? "read_only" : "read_write";
         const forced = forcedMountMode(mount.kind);
         const editable = mount.kind === "project" || mount.kind === "volume";
-        const removable =
-          mount.kind !== "project" ||
+        const removable = mount.kind !== "project" ||
           primaryProject === "" ||
           mount.project !== primaryProject;
         return (
@@ -374,66 +373,64 @@ export function MountsEditor(props: {
             >
               {mountLabel(t, mount, modeControl !== "select")}
             </code>
-            {modeControl === "select" && (editable || forced !== undefined) ? (
-              <select
-                style={imageSelect}
-                value={forced ?? mount.mode}
-                disabled={!enabled || forced !== undefined}
-                aria-label={t("mountMode")}
-                onChange={(event) =>
-                  onUpdate?.({ ...mount, mode: event.target.value }, index)
-                }
-              >
-                {forced !== undefined ? (
-                  <option value={forced}>
-                    {forced === "read_write" ? t("readWrite") : t("readOnly")}
-                  </option>
-                ) : (
-                  <>
-                    <option value="read_only">{t("readOnly")}</option>
-                    <option value="read_write">{t("readWrite")}</option>
-                  </>
-                )}
-              </select>
-            ) : null}
+            {modeControl === "select" && (editable || forced !== undefined)
+              ? (
+                <select
+                  style={imageSelect}
+                  value={forced ?? mount.mode}
+                  disabled={!enabled || forced !== undefined}
+                  aria-label={t("mountMode")}
+                  onChange={(event) => onUpdate?.({ ...mount, mode: event.target.value }, index)}
+                >
+                  {forced !== undefined
+                    ? (
+                      <option value={forced}>
+                        {forced === "read_write" ? t("readWrite") : t("readOnly")}
+                      </option>
+                    )
+                    : (
+                      <>
+                        <option value="read_only">{t("readOnly")}</option>
+                        <option value="read_write">{t("readWrite")}</option>
+                      </>
+                    )}
+                </select>
+              )
+              : null}
             {modeControl === "remount" && editable && onUpdate !== undefined && (
               <ConfirmButton
                 t={t}
-                label={
-                  nextMode === "read_only"
-                    ? t("remountReadOnly")
-                    : t("remountReadWrite")
-                }
+                label={nextMode === "read_only" ? t("remountReadOnly") : t("remountReadWrite")}
                 title={t("confirmTitle")}
-                description={
-                  nextMode === "read_only"
-                    ? t("confirmRemountReadOnly")
-                    : t("confirmRemountReadWrite")
-                }
+                description={nextMode === "read_only"
+                  ? t("confirmRemountReadOnly")
+                  : t("confirmRemountReadWrite")}
                 disabled={!enabled}
                 onConfirm={() => onUpdate({ ...mount, mode: nextMode }, index)}
               />
             )}
             {removable &&
-              (confirmRemove ? (
-                <ConfirmButton
-                  t={t}
-                  label={t("remove")}
-                  title={t("confirmTitle")}
-                  description={t("confirmRemoveMount")}
-                  disabled={!enabled}
-                  onConfirm={() => onRemove(mount)}
-                />
-              ) : (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={!enabled}
-                  onClick={() => onRemove(mount)}
-                >
-                  {t("remove")}
-                </Button>
-              ))}
+              (confirmRemove
+                ? (
+                  <ConfirmButton
+                    t={t}
+                    label={t("remove")}
+                    title={t("confirmTitle")}
+                    description={t("confirmRemoveMount")}
+                    disabled={!enabled}
+                    onConfirm={() => onRemove(mount)}
+                  />
+                )
+                : (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={!enabled}
+                    onClick={() => onRemove(mount)}
+                  >
+                    {t("remove")}
+                  </Button>
+                ))}
           </div>
         );
       })}

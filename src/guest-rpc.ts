@@ -3,17 +3,13 @@
 // SPDX-License-Identifier: MIT
 
 import {
+  metadata,
   type WorkspaceBinding,
   WorkspaceResolver,
-  metadata,
   workspaceSlug,
 } from "./workspace-binding.js";
 import { grpc } from "./grpc/runtime-client.js";
-import {
-  SPILL_ROOT,
-  discardUnneededSpill,
-  outputReader,
-} from "./output-reader.js";
+import { discardUnneededSpill, outputReader, SPILL_ROOT } from "./output-reader.js";
 import { randomUUID } from "node:crypto";
 import { isAbsolute, resolve as resolvePath } from "node:path";
 
@@ -23,8 +19,7 @@ import { isAbsolute, resolve as resolvePath } from "node:path";
 // its mirrored path under DSH_PODMAN_PROJECTS_ROOT.
 function resolveAgainstSession(path: string, sessionCwd: unknown): string {
   if (isAbsolute(path)) return path;
-  const base =
-    typeof sessionCwd === "string" && sessionCwd !== "" ? sessionCwd : undefined;
+  const base = typeof sessionCwd === "string" && sessionCwd !== "" ? sessionCwd : undefined;
   if (base === undefined) {
     throw new Error(
       "relative paths need a session working directory; pass an absolute path",
@@ -106,9 +101,7 @@ export function detectLineEndings(raw: string): "CRLF" | "LF" {
 }
 
 export function restoreLineEndings(content: string, endings: "CRLF" | "LF"): string {
-  return endings === "LF"
-    ? content
-    : normalizeLineEndings(content).split("\n").join("\r\n");
+  return endings === "LF" ? content : normalizeLineEndings(content).split("\n").join("\r\n");
 }
 
 export function fsError(code: string, message: string): Error {
@@ -183,7 +176,7 @@ export async function* guestChunks(
   // the credential, but only before any byte was emitted, so a retry can never
   // duplicate output.
   let binding = target.binding as WorkspaceBinding;
-  for (let attempt = 0; ; attempt++) {
+  for (let attempt = 0;; attempt++) {
     const call = (binding.guest as any).readFile(
       request,
       metadata(binding.token),
@@ -320,8 +313,7 @@ export async function writeGuestFile(
       });
       call.write({ dataChunk: Buffer.from(content) });
       call.end();
-    }),
-  );
+    }));
 }
 
 export async function readGuestFile(
@@ -335,8 +327,7 @@ export async function readGuestFile(
       call.on("data", (chunk: any) => chunks.push(Buffer.from(chunk.data)));
       call.on("error", reject);
       call.on("end", () => resolveDone(Buffer.concat(chunks).toString("utf8")));
-    }),
-  );
+    }));
 }
 
 const READ_LIMIT = 2000;
@@ -391,10 +382,9 @@ export async function runExec(
   const maxBytes = options.maxBytes ?? EXEC_RETAIN_BYTES;
   const spillBytes = options.spillBytes ?? EXEC_SPILL_BYTES;
   const configuredGrace = Number(options.killGraceMs);
-  const killGraceMs =
-    Number.isFinite(configuredGrace) && configuredGrace > 0
-      ? configuredGrace
-      : EXEC_KILL_GRACE_MS;
+  const killGraceMs = Number.isFinite(configuredGrace) && configuredGrace > 0
+    ? configuredGrace
+    : EXEC_KILL_GRACE_MS;
   const stdoutSpec = { path: `${SPILL_ROOT}/${randomUUID()}.stdout`, maxBytes: spillBytes };
   const stderrSpec = { path: `${SPILL_ROOT}/${randomUUID()}.stderr`, maxBytes: spillBytes };
   return withGuestAuth(binding, (guest, token) =>
@@ -481,8 +471,7 @@ export async function runExec(
           abortWith(fsError("FS_ABORTED", "exec aborted"));
           return;
         }
-        const onAbort = (): void =>
-          abortWith(fsError("FS_ABORTED", "exec aborted"));
+        const onAbort = (): void => abortWith(fsError("FS_ABORTED", "exec aborted"));
         signal.addEventListener("abort", onAbort, { once: true });
         detach = () => signal.removeEventListener("abort", onAbort);
       }
@@ -512,13 +501,9 @@ export async function runExec(
               signal: output.exit.signaled ? output.exit.signal : null,
               stdout: out.text,
               stderr: err.text,
-              ...(out.spillPath === undefined
-                ? {}
-                : { stdoutSpillPath: out.spillPath }),
-              ...(err.spillPath === undefined
-                ? {}
-                : { stderrSpillPath: err.spillPath }),
-            }),
+              ...(out.spillPath === undefined ? {} : { stdoutSpillPath: out.spillPath }),
+              ...(err.spillPath === undefined ? {} : { stderrSpillPath: err.spillPath }),
+            })
           );
         }
       });
@@ -526,10 +511,7 @@ export async function runExec(
       stream.on("end", () =>
         // A stream that ends without an exit message (guest restart, dropped
         // socket) must not leave the caller pending forever.
-        settle(() =>
-          reject(new Error("exec stream ended before the process exited")),
-        ),
-      );
+        settle(() => reject(new Error("exec stream ended before the process exited"))));
       stream.write({
         start: {
           argv: remoteArgv(argv),
@@ -543,21 +525,16 @@ export async function runExec(
         },
       });
       stream.end();
-    }),
-  );
+    }));
 }
 
 // sliceLines returns the requested 1-based line range of a file's content,
 // defaulting to the first READ_LIMIT lines like the harness's read tool.
 export function sliceLines(content: string, offset: unknown, limit: unknown): string {
-  const start =
-    typeof offset === "number" && Number.isInteger(offset) && offset > 0
-      ? offset
-      : 1;
-  const max =
-    typeof limit === "number" && Number.isInteger(limit) && limit > 0
-      ? limit
-      : READ_LIMIT;
+  const start = typeof offset === "number" && Number.isInteger(offset) && offset > 0 ? offset : 1;
+  const max = typeof limit === "number" && Number.isInteger(limit) && limit > 0
+    ? limit
+    : READ_LIMIT;
   return content.split("\n").slice(start - 1, start - 1 + max).join("\n");
 }
 
@@ -570,14 +547,10 @@ export async function streamLines(
   offset: unknown,
   limit: unknown,
 ): Promise<string> {
-  const start =
-    typeof offset === "number" && Number.isInteger(offset) && offset > 0
-      ? offset
-      : 1;
-  const max =
-    typeof limit === "number" && Number.isInteger(limit) && limit > 0
-      ? limit
-      : READ_LIMIT;
+  const start = typeof offset === "number" && Number.isInteger(offset) && offset > 0 ? offset : 1;
+  const max = typeof limit === "number" && Number.isInteger(limit) && limit > 0
+    ? limit
+    : READ_LIMIT;
   const end = start - 1 + max;
   const out: string[] = [];
   let index = 0;
@@ -632,7 +605,9 @@ export async function sessionWorkspaceSlug(
     // opaque orchestrator error downstream and a fabricated container_list
     // row; fail with the same shape resolve() uses instead.
     throw new Error(
-      `cannot resolve a DH workspace without a session working directory (got ${JSON.stringify(cwd)})`,
+      `cannot resolve a DH workspace without a session working directory (got ${
+        JSON.stringify(cwd)
+      })`,
     );
   }
   return workspaceSlug(workspace.id);
@@ -674,8 +649,7 @@ export function guestStatResponse(target: any, signal?: AbortSignal): Promise<an
         },
       );
       detach = onAbortCancel(call, signal);
-    }),
-  );
+    }));
 }
 
 export async function unaryGuest(
@@ -695,14 +669,13 @@ export async function unaryGuest(
           detach();
           error
             ? reject(
-                signal?.aborted ? fsError("FS_ABORTED", `${method} aborted`) : error,
-              )
+              signal?.aborted ? fsError("FS_ABORTED", `${method} aborted`) : error,
+            )
             : resolveDone(result);
         },
       );
       detach = onAbortCancel(call, signal);
-    }),
-  );
+    }));
 }
 
 // globCwd returns the working directory a ripgrep discovery listing must run

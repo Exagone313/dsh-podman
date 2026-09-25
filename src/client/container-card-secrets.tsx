@@ -96,10 +96,9 @@ export function SecretsSection(props: {
   const submit = (): void => {
     if (!namePattern.test(name)) return;
     const parsedLength = parseInt(length, 10);
-    const normalized =
-      length.trim() === "" || Number.isNaN(parsedLength) || parsedLength < 1
-        ? undefined
-        : parsedLength;
+    const normalized = length.trim() === "" || Number.isNaN(parsedLength) || parsedLength < 1
+      ? undefined
+      : parsedLength;
     onCreate(name.trim(), normalized, charset);
     setName("");
     setLength("32");
@@ -126,9 +125,7 @@ export function SecretsSection(props: {
           {t("createSecret")}
         </Button>
       </div>
-      {secrets.length === 0 ? (
-        <p style={hint}>{t("none")}</p>
-      ) : (
+      {secrets.length === 0 ? <p style={hint}>{t("none")}</p> : (
         secrets.map((secret) => (
           <DisclosureRow
             key={secret.name}
@@ -136,9 +133,7 @@ export function SecretsSection(props: {
             title={secret.name}
             open={openSecret === secret.name}
             expandable
-            onToggle={() =>
-              setOpenSecret(openSecret === secret.name ? null : secret.name)
-            }
+            onToggle={() => setOpenSecret(openSecret === secret.name ? null : secret.name)}
           >
             <div style={wsBody}>
               <SecretRow
@@ -196,9 +191,9 @@ export function SecretsSection(props: {
                 if (event.key === "Enter") submit();
               }}
             />
-            {name !== "" && !namePattern.test(name) ? (
-              <p style={{ ...hint, margin: 0 }}>{t("invalidName")}</p>
-            ) : null}
+            {name !== "" && !namePattern.test(name)
+              ? <p style={{ ...hint, margin: 0 }}>{t("invalidName")}</p>
+              : null}
           </Field>
           <Field label={t("secretLength")} htmlFor={secretLengthId}>
             <Input

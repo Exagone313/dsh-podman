@@ -99,9 +99,7 @@ export function PathsList(props: {
           </Button>
         </div>
       </Field>
-      {entries.length === 0 ? (
-        <p style={{ ...hint, margin: 0 }}>{t("noPaths")}</p>
-      ) : (
+      {entries.length === 0 ? <p style={{ ...hint, margin: 0 }}>{t("noPaths")}</p> : (
         entries.map((entry, index) => (
           <div key={entry.id} style={pathRow}>
             <button
@@ -190,9 +188,7 @@ export function PathsEditor(props: {
   };
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-      {paths.length === 0 ? (
-        <p style={{ ...hint, margin: 0 }}>{t("noPaths")}</p>
-      ) : (
+      {paths.length === 0 ? <p style={{ ...hint, margin: 0 }}>{t("noPaths")}</p> : (
         shown.map((entry) => (
           <code
             key={entry.id}

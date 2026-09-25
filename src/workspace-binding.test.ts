@@ -12,11 +12,11 @@ import { tmpdir } from "node:os";
 import { mkdirSync } from "node:fs";
 import { controlClient, guestClient } from "./grpc/runtime-client.js";
 import {
-  workspaceSlug,
-  metadata,
-  WorkspaceResolver,
   containerNotFound,
+  metadata,
   normalizeToolError,
+  WorkspaceResolver,
+  workspaceSlug,
 } from "./workspace-binding.js";
 import { VERSION } from "./generated/version.js";
 
@@ -167,8 +167,7 @@ async function startControlServer(
       callback({ code: grpc.status.NOT_FOUND, details: "workspace not found" });
     },
     ensureContainer: (call: any, callback: any) => {
-      const agentToken =
-        options.staleToken === true && ensureCalls++ === 0 ? "stale" : "tok";
+      const agentToken = options.staleToken === true && ensureCalls++ === 0 ? "stale" : "tok";
       const row = containers.find(
         (candidate: any) =>
           candidate.workspaceSlug === call.request.workspaceSlug &&
@@ -221,7 +220,7 @@ async function startControlServer(
       `unix:${socket}`,
       grpc.ServerCredentials.createInsecure(),
       (error: any) => (error ? fail(error) : ok()),
-    ),
+    )
   );
   // Also answer on the guest socket the fake createWorkspace hands back, so a
   // resolved binding becomes ready immediately instead of waiting out the
@@ -231,7 +230,7 @@ async function startControlServer(
       `unix:${resolve(socketsRoot, "guest.sock")}`,
       grpc.ServerCredentials.createInsecure(),
       (error: any) => (error ? fail(error) : ok()),
-    ),
+    )
   );
   // Point the fake container rows at the same guest socket, so a named
   // container binding becomes ready immediately too.

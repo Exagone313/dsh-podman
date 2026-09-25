@@ -48,9 +48,7 @@ export function VolumesSection(props: {
           {t("createVolume")}
         </Button>
       </div>
-      {volumes.length === 0 ? (
-        <p style={hint}>{t("none")}</p>
-      ) : (
+      {volumes.length === 0 ? <p style={hint}>{t("none")}</p> : (
         volumes.map((volume) => (
           <DisclosureRow
             key={volume.name}
@@ -58,9 +56,7 @@ export function VolumesSection(props: {
             title={volume.name}
             open={openVolume === volume.name}
             expandable
-            onToggle={() =>
-              setOpenVolume(openVolume === volume.name ? null : volume.name)
-            }
+            onToggle={() => setOpenVolume(openVolume === volume.name ? null : volume.name)}
           >
             <div style={wsBody}>
               <div
@@ -120,9 +116,9 @@ export function VolumesSection(props: {
               if (event.key === "Enter") submit();
             }}
           />
-          {name !== "" && !namePattern.test(name) ? (
-            <p style={{ ...hint, margin: 0 }}>{t("invalidName")}</p>
-          ) : null}
+          {name !== "" && !namePattern.test(name)
+            ? <p style={{ ...hint, margin: 0 }}>{t("invalidName")}</p>
+            : null}
         </Field>
       </Modal>
     </section>

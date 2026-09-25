@@ -5,7 +5,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { EXPECTED_TOOLS } from "./test-support.js";
-import { TOOLS, imageRemoveParameters, toolHandlers } from "./index.js";
+import { imageRemoveParameters, toolHandlers, TOOLS } from "./index.js";
 
 test("tool set covers the image and container surface", () => {
   assert.deepEqual(

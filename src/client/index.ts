@@ -11,10 +11,7 @@ import type {} from "@deepseek-ai/dsh-api-remotes/client";
 import type {} from "./slot-contract.js";
 import { buildDirectoryPicker } from "./directory-picker.js";
 import { ContainerCard } from "./ContainerCard.js";
-import {
-  BUILTIN_PROMPT_PREFIX,
-  ReadOnlyApprovalPanel,
-} from "./read-only-approval.js";
+import { BUILTIN_PROMPT_PREFIX, ReadOnlyApprovalPanel } from "./read-only-approval.js";
 import { PodmanToolRow, TOOL_VIEW_KEYS } from "./tool-views.js";
 import { installTerminalStyles } from "./terminal-styles.js";
 import { installDirectoryStyles } from "./container-card-directory-styles.js";
@@ -23,7 +20,7 @@ import {
   ContainerCardController,
   type ContainerSettings,
 } from "./container-card-controller.js";
-import { NS, en, zh } from "./locales.js";
+import { en, NS, zh } from "./locales.js";
 
 export type { ContainerCardProps } from "./ContainerCard.js";
 
@@ -42,9 +39,7 @@ export function apply(ctx: ClientContext): void {
   const scope = ctx.settingsScope.bind({
     namespace: CONTAINER_NS,
     decode: (section) =>
-      typeof section === "object" && section !== null
-        ? (section as ContainerSettings)
-        : undefined,
+      typeof section === "object" && section !== null ? (section as ContainerSettings) : undefined,
   });
 
   // Record the active locale (including the browser default, which the host
@@ -88,8 +83,7 @@ export function apply(ctx: ClientContext): void {
         inject: () => controller.inject(),
       },
       ContainerCard,
-    ),
-  );
+    ));
 
   // Own the row rendering of every podman tool (instead of the generic
   // "Tool call · <name>" fallback).
@@ -98,8 +92,7 @@ export function apply(ctx: ClientContext): void {
       ctx.slots.register(
         { name: "tool.call.toolview", key, locale: NS },
         PodmanToolRow,
-      ),
-    );
+      ));
   }
 
   // Take over the composer for this plugin's read-only remount prompts only:
@@ -114,13 +107,12 @@ export function apply(ctx: ClientContext): void {
         select: ({ pendingInteraction }: any) => {
           const pending = pendingInteraction as any;
           return pending?.kind === "approval" &&
-            typeof pending.toolName === "string" &&
-            pending.toolName.startsWith(BUILTIN_PROMPT_PREFIX)
+              typeof pending.toolName === "string" &&
+              pending.toolName.startsWith(BUILTIN_PROMPT_PREFIX)
             ? pending
             : null;
         },
       },
       ReadOnlyApprovalPanel,
-    ),
-  );
+    ));
 }

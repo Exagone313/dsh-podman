@@ -61,8 +61,6 @@ export function publicDaemon(info: any): Record<string, unknown> {
     ...(info?.stoppedAt ? { stoppedAt: info.stoppedAt } : {}),
     ...(info?.uid !== undefined && info?.uid !== null ? { uid: info.uid } : {}),
     ...(info?.gid !== undefined && info?.gid !== null ? { gid: info.gid } : {}),
-    ...(Array.isArray(info?.groups) && info.groups.length > 0
-      ? { groups: info.groups }
-      : {}),
+    ...(Array.isArray(info?.groups) && info.groups.length > 0 ? { groups: info.groups } : {}),
   };
 }

@@ -4,8 +4,8 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
-import { MOUNT_EXEC, SECRET_TOOLS, WORKSPACE_ID, mountRequestRecorder } from "./test-support.js";
-import { READ_ONLY_TOOLS, TOOLS, toolHandlers } from "./index.js";
+import { MOUNT_EXEC, mountRequestRecorder, SECRET_TOOLS, WORKSPACE_ID } from "./test-support.js";
+import { READ_ONLY_TOOLS, toolHandlers, TOOLS } from "./index.js";
 
 test("secret tools are registered with the expected schemas", () => {
   assert.ok(READ_ONLY_TOOLS.has("secret_list"), "secret_list must be read-only");
@@ -108,7 +108,13 @@ test("mount tools reject a read-write secret mount", async () => {
     () =>
       toolHandlers.container_mount_add(
         resolver as never,
-        { container: "web", kind: "secret", secret: "tls", destination: "/run/secrets/tls", mode: "read_write" },
+        {
+          container: "web",
+          kind: "secret",
+          secret: "tls",
+          destination: "/run/secrets/tls",
+          mode: "read_write",
+        },
         MOUNT_EXEC,
       ),
     /secret mounts are read-only/,
@@ -120,7 +126,12 @@ test("mount tools reject a read-write secret mount", async () => {
         {
           container: "web",
           image: "img1",
-          mounts: [{ kind: "secret", secret: "tls", destination: "/run/secrets/tls", mode: "read_write" }],
+          mounts: [{
+            kind: "secret",
+            secret: "tls",
+            destination: "/run/secrets/tls",
+            mode: "read_write",
+          }],
         },
         MOUNT_EXEC,
       ),

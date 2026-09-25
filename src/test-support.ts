@@ -32,7 +32,7 @@ export class FakeTerminalCall extends EventEmitter {
       queueMicrotask(() =>
         this.emit("data", {
           foreground: { requestId, found: true, processGroupId: 7, inputWaiting: true },
-        }),
+        })
       );
       return;
     }
@@ -41,7 +41,7 @@ export class FakeTerminalCall extends EventEmitter {
       queueMicrotask(() =>
         this.emit("data", {
           signalled: { requestId, found: true, processGroupId: 7 },
-        }),
+        })
       );
     }
   }
@@ -124,7 +124,10 @@ export interface TestSessionFacts {
 
 export const testReadSession = (session: any): TestSessionFacts => session?.facts ?? {};
 
-export const sessionExec = (name: string, facts: TestSessionFacts = { mode: "read-only" }): any => ({
+export const sessionExec = (
+  name: string,
+  facts: TestSessionFacts = { mode: "read-only" },
+): any => ({
   name,
   agent: { session: { facts } },
 });
@@ -234,12 +237,12 @@ export function guestFileRecorder(content = "hello", exists = true) {
         null,
         exists
           ? {
-              exists: true,
-              isDir: false,
-              size: Buffer.byteLength(content),
-              modifiedAt: "1",
-              mode: 0o644,
-            }
+            exists: true,
+            isDir: false,
+            size: Buffer.byteLength(content),
+            modifiedAt: "1",
+            mode: 0o644,
+          }
           : { exists: false },
       );
       return { cancel() {} };
@@ -317,15 +320,9 @@ export function guestExecRecorder(defaultCwd?: string, stdout?: string) {
             argv: message.start.argv,
             cwd: message.start.cwd,
             env: message.start.env,
-            ...(message.start.uid !== undefined
-              ? { uid: message.start.uid.value }
-              : {}),
-            ...(message.start.gid !== undefined
-              ? { gid: message.start.gid.value }
-              : {}),
-            ...(message.start.groups !== undefined
-              ? { groups: message.start.groups }
-              : {}),
+            ...(message.start.uid !== undefined ? { uid: message.start.uid.value } : {}),
+            ...(message.start.gid !== undefined ? { gid: message.start.gid.value } : {}),
+            ...(message.start.groups !== undefined ? { groups: message.start.groups } : {}),
           });
         },
         end() {
@@ -402,10 +399,9 @@ export function fakeGuest(source: Buffer) {
           async *[Symbol.asyncIterator]() {
             const offset = Number(request.offset ?? 0);
             const length = Number(request.length ?? 0);
-            const slice =
-              length > 0
-                ? source.subarray(offset, offset + length)
-                : source.subarray(offset);
+            const slice = length > 0
+              ? source.subarray(offset, offset + length)
+              : source.subarray(offset);
             yield { data: slice };
           },
         };
@@ -529,7 +525,11 @@ export function spawnGuest(
       streams.push(stream);
       return stream;
     },
-    signal: (request: { processId: string; signal: string }, _metadata: unknown, callback: Function) => {
+    signal: (
+      request: { processId: string; signal: string },
+      _metadata: unknown,
+      callback: Function,
+    ) => {
       signals.push(request);
       callback(null, {});
     },

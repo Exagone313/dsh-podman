@@ -4,7 +4,7 @@
 
 import { test } from "node:test";
 import { strict as assert } from "node:assert";
-import { fakeScope, fakeContext, baseValue } from "./card-test-support.js";
+import { baseValue, fakeContext, fakeScope } from "./card-test-support.js";
 import { installCardCommandDriver } from "./card-test-support.js";
 
 test("create command sends PATH additions", async () => {

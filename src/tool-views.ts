@@ -9,12 +9,11 @@ import { TOOL_UI } from "./tool-schemas.js";
 // persisted (see the harness tool-presentation contract).
 export function toolCallView(name: string, args: any): unknown {
   if (name === "container_bash" || name === "container_exec") {
-    const command =
-      name === "container_bash"
-        ? String(args?.command ?? "")
-        : Array.isArray(args?.argv)
-          ? args.argv.map((item: unknown) => String(item)).join(" ")
-          : "";
+    const command = name === "container_bash"
+      ? String(args?.command ?? "")
+      : Array.isArray(args?.argv)
+      ? args.argv.map((item: unknown) => String(item)).join(" ")
+      : "";
     return {
       card: "terminal",
       title: command,
@@ -52,8 +51,6 @@ export function toolResultView(
   return {
     card: "terminal",
     output,
-    ...(data.signal
-      ? { signal: String(data.signal) }
-      : { exitCode: Number(data.exitCode ?? 0) }),
+    ...(data.signal ? { signal: String(data.signal) } : { exitCode: Number(data.exitCode ?? 0) }),
   };
 }

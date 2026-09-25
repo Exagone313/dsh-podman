@@ -92,13 +92,9 @@ export function WorkspaceSection(props: {
   const hasContainer = containers.length > 0;
   return (
     <DisclosureRow
-      icon={
-        hasContainer ? (
-          <StateDot state={containerStateDot(containers[0]?.status ?? "")} />
-        ) : (
-          <span />
-        )
-      }
+      icon={hasContainer
+        ? <StateDot state={containerStateDot(containers[0]?.status ?? "")} />
+        : <span />}
       title={workspace.projectName}
       open={open}
       expandable
@@ -106,56 +102,58 @@ export function WorkspaceSection(props: {
     >
       <div style={wsBody}>
         <code style={greyId}>{workspace.workspaceSlug}</code>
-        {!hasContainer ? (
-          <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-            <p style={{ ...hint, margin: 0 }}>{t("noContainers")}</p>
-            <div>
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={busy}
-                onClick={() => setCreateOpen("default")}
-              >
-                {t("createContainer")}
-              </Button>
+        {!hasContainer
+          ? (
+            <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+              <p style={{ ...hint, margin: 0 }}>{t("noContainers")}</p>
+              <div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={busy}
+                  onClick={() => setCreateOpen("default")}
+                >
+                  {t("createContainer")}
+                </Button>
+              </div>
             </div>
-          </div>
-        ) : (
-          <>
-            {containers.map((container) => (
-              <ContainerRow
-                key={container.containerName}
-                t={t}
-                container={container}
-                images={images}
-                volumes={volumes}
-                secrets={secrets}
-                busy={busy}
-                onRemove={onRemove}
-                onRecreate={onRecreate}
-                onAddContainerMount={onAddContainerMount}
-                onRemoveContainerMount={onRemoveContainerMount}
-                onUpdateContainerMount={onUpdateContainerMount}
-                onSetContainerPaths={onSetContainerPaths}
-                projectName={workspace.projectName}
-                projectsRoot={projectsRoot}
-                directoryPicker={directoryPicker}
-                onAddContainerSecret={onAddContainerSecret}
-                onRemoveContainerSecret={onRemoveContainerSecret}
-              />
-            ))}
-            <div>
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={busy}
-                onClick={() => setCreateOpen("named")}
-              >
-                {t("addContainer")}
-              </Button>
-            </div>
-          </>
-        )}
+          )
+          : (
+            <>
+              {containers.map((container) => (
+                <ContainerRow
+                  key={container.containerName}
+                  t={t}
+                  container={container}
+                  images={images}
+                  volumes={volumes}
+                  secrets={secrets}
+                  busy={busy}
+                  onRemove={onRemove}
+                  onRecreate={onRecreate}
+                  onAddContainerMount={onAddContainerMount}
+                  onRemoveContainerMount={onRemoveContainerMount}
+                  onUpdateContainerMount={onUpdateContainerMount}
+                  onSetContainerPaths={onSetContainerPaths}
+                  projectName={workspace.projectName}
+                  projectsRoot={projectsRoot}
+                  directoryPicker={directoryPicker}
+                  onAddContainerSecret={onAddContainerSecret}
+                  onRemoveContainerSecret={onRemoveContainerSecret}
+                />
+              ))}
+              <div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={busy}
+                  onClick={() => setCreateOpen("named")}
+                >
+                  {t("addContainer")}
+                </Button>
+              </div>
+            </>
+          )}
         <div>
           <ConfirmButton
             t={t}

@@ -5,10 +5,10 @@
 import { currentCwd, sessionWorkspaceSlug } from "./guest-rpc.js";
 import { mountKindFromProto, mountKindToProto } from "./mount-enums.js";
 import {
-  renderDenial,
-  renderReason,
   type MountFact,
   type ReasonLocale,
+  renderDenial,
+  renderReason,
 } from "./approval-reasons.js";
 import { type WorkspaceResolver } from "./workspace-binding.js";
 
@@ -179,21 +179,17 @@ function mountFactOf(mount: ContainerMount): MountFact {
     typeof mount.kind === "string" ? mount.kind : undefined,
   );
   const kind: MountFact["kind"] =
-    resolved === "volume" || resolved === "secret" || resolved === "tmpfs"
-      ? resolved
-      : "project";
-  const destination =
-    typeof mount.destination === "string" && mount.destination !== ""
-      ? mount.destination
-      : undefined;
-  const source =
-    kind === "volume"
-      ? String(mount.volume ?? "")
-      : kind === "secret"
-        ? String(mount.secret ?? "")
-        : kind === "tmpfs"
-          ? ""
-          : String(mount.projectName ?? "");
+    resolved === "volume" || resolved === "secret" || resolved === "tmpfs" ? resolved : "project";
+  const destination = typeof mount.destination === "string" && mount.destination !== ""
+    ? mount.destination
+    : undefined;
+  const source = kind === "volume"
+    ? String(mount.volume ?? "")
+    : kind === "secret"
+    ? String(mount.secret ?? "")
+    : kind === "tmpfs"
+    ? ""
+    : String(mount.projectName ?? "");
   return {
     kind,
     source,

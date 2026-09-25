@@ -25,7 +25,9 @@ function fakeResolver(): { resolver: any; calls: Array<[string, unknown]> } {
       if (method === "listWorkspaces") return { workspaces: [] };
       if (method === "listVolumes") return { volumes: [{ name: "data" }] };
       if (method === "listSecrets") return { secrets: [{ name: "s1" }] };
-      if (method === "listCaches") return { caches: [{ manager: "pacman", files: 1, bytes: "1024" }] };
+      if (method === "listCaches") {
+        return { caches: [{ manager: "pacman", files: 1, bytes: "1024" }] };
+      }
       if (method === "cleanCaches") return { removedFiles: 2 };
       if (method === "removeContainer") return {};
       return {};
@@ -46,7 +48,9 @@ function fakeRouteContext(): { ctx: any; routes: any[] } {
               // Mirror the harness's assertFetchRoute: the route must live
               // under the API channel, or the registration is refused.
               if (!route.path.startsWith("/api/")) {
-                throw new Error(`connection: invalid exact Fetch route ${JSON.stringify(route.path)}`);
+                throw new Error(
+                  `connection: invalid exact Fetch route ${JSON.stringify(route.path)}`,
+                );
               }
               routes.push(route);
               return async () => {};
@@ -93,7 +97,15 @@ test("the card route serves the live snapshot on GET", async () => {
   assert.equal(snapshot.caches[0].bytes, 1024);
   assert.deepEqual(
     calls.map(([method]) => method),
-    ["getVersion", "listContainers", "listImages", "listWorkspaces", "listVolumes", "listSecrets", "listCaches"],
+    [
+      "getVersion",
+      "listContainers",
+      "listImages",
+      "listWorkspaces",
+      "listVolumes",
+      "listSecrets",
+      "listCaches",
+    ],
   );
   assert.equal(typeof snapshot.dshVersion, "string");
   assert.equal(snapshot.orchestratorVersion, "9.9.9");

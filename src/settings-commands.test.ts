@@ -5,9 +5,9 @@
 import { test } from "node:test";
 import { strict as assert } from "node:assert";
 import {
-  fakeScope,
-  fakeContext,
   baseValue,
+  fakeContext,
+  fakeScope,
   installedMountScope,
   mountCommand,
 } from "./card-test-support.js";
@@ -192,7 +192,14 @@ test("secret_set command drives writeSecretValue with the name and value", async
   };
   await installCardCommandDriver(fakeContext(scope), resolver);
   await scope.update({
-    command: { op: "secret_set", workspace: "db-pass", image: "", at: 8, mounts: [], value: "s3cr3t" },
+    command: {
+      op: "secret_set",
+      workspace: "db-pass",
+      image: "",
+      at: 8,
+      mounts: [],
+      value: "s3cr3t",
+    },
   });
   await new Promise((resolve) => setImmediate(resolve));
   const setCall = calls.find(([method]) => method === "writeSecretValue");

@@ -194,9 +194,7 @@ test("spawnTerminal drives the guest terminal stream", async () => {
 
   const chunks: Buffer[] = [];
   handle.output.on("data", (chunk: Buffer) => chunks.push(Buffer.from(chunk)));
-  const outputEnded = new Promise<void>((resolve) =>
-    handle.output.on("end", resolve),
-  );
+  const outputEnded = new Promise<void>((resolve) => handle.output.on("end", resolve));
 
   fake.emitStdout(Buffer.from("hello"));
   await handle.write("ls\n");
@@ -222,8 +220,7 @@ test("spawnTerminal drives the guest terminal stream", async () => {
 test("spawnTerminal rejects an empty argv", async () => {
   const provider = createSubprocessProvider(fakeTerminalResolver(new FakeTerminalCall()));
   await assert.rejects(
-    () =>
-      provider.spawnTerminal({ argv: [], cwd: "/projects/team", rows: 24, cols: 80 }),
+    () => provider.spawnTerminal({ argv: [], cwd: "/projects/team", rows: 24, cols: 80 }),
     /argv must contain a program/,
   );
 });
@@ -339,9 +336,7 @@ test("subprocess provider tears down a failed exec stream", async () => {
   const failed = assert.rejects(handle.done, /guest vanished/);
   // A paused PassThrough only emits "end" once a consumer reads it to EOF.
   handle.stdout.resume();
-  const outputEnded = new Promise<void>((resolve) =>
-    handle.stdout.on("end", () => resolve()),
-  );
+  const outputEnded = new Promise<void>((resolve) => handle.stdout.on("end", () => resolve()));
   fake.streams[0].emit("error", new Error("guest vanished"));
   await outputEnded;
   await failed;
@@ -385,7 +380,7 @@ test("subprocess provider pauses a piped stream while the consumer is behind", a
     handle.stdout.on("data", (data: Buffer) => {
       chunks.push(Buffer.from(data));
       if (Buffer.concat(chunks).length >= chunk.length) resolve();
-    }),
+    })
   );
   await new Promise((resolve) => setImmediate(resolve));
   assert.ok(stream.resumed > 0, "draining the consumer resumes the stream");

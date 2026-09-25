@@ -5,14 +5,14 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  guestExecRecorder,
   MOUNT_EXEC,
   MOUNT_TOOLS,
-  guestExecRecorder,
   mountRequestRecorder,
   testReadSession,
   WORKSPACE_ID,
 } from "./test-support.js";
-import { TOOLS, approvalDecision, preExecutePolicy, summarizeArgs, toolHandlers } from "./index.js";
+import { approvalDecision, preExecutePolicy, summarizeArgs, toolHandlers, TOOLS } from "./index.js";
 import { forcedMountMode } from "./mount-enums.js";
 import { mountInputToProto, mountsFromInput, validateMountInput } from "./mount-input.js";
 
@@ -627,7 +627,12 @@ test("container_mount_list returns mount objects", async () => {
           containerName: "default",
           mounts: [
             { projectName: "team", mode: "MOUNT_MODE_READ_WRITE", kind: "MOUNT_KIND_PROJECT" },
-            { volume: "myvol", destination: "/data", mode: "MOUNT_MODE_READ_ONLY", kind: "MOUNT_KIND_VOLUME" },
+            {
+              volume: "myvol",
+              destination: "/data",
+              mode: "MOUNT_MODE_READ_ONLY",
+              kind: "MOUNT_KIND_VOLUME",
+            },
           ],
         },
       ],

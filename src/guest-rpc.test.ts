@@ -5,16 +5,20 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { EventEmitter } from "node:events";
-import { runExec, sessionWorkspaceSlug, sliceLines, streamLines, withGuestAuth } from "./guest-rpc.js";
+import {
+  runExec,
+  sessionWorkspaceSlug,
+  sliceLines,
+  streamLines,
+  withGuestAuth,
+} from "./guest-rpc.js";
 import { grpc } from "./grpc/runtime-client.js";
 
 // pingOnce is a stand-in for a real guest call: it invokes the guest client and
 // settles from its callback.
 function pingOnce(guest: any, _token: string): Promise<any> {
   return new Promise((resolve, reject) => {
-    guest.ping({}, undefined, (error: any, value: any) =>
-      error ? reject(error) : resolve(value),
-    );
+    guest.ping({}, undefined, (error: any, value: any) => error ? reject(error) : resolve(value));
   });
 }
 
@@ -36,8 +40,7 @@ test("withGuestAuth retries once with a refreshed binding", async () => {
   const seen: string[] = [];
   const fresh = {
     guest: {
-      ping: (_request: any, _metadata: any, callback: any) =>
-        callback(null, { version: "v" }),
+      ping: (_request: any, _metadata: any, callback: any) => callback(null, { version: "v" }),
     },
     token: "new",
   };
@@ -110,8 +113,7 @@ function execGuest(stream: FakeExecStream) {
         signals.push(request.signal);
         callback(null, {});
       },
-      delete: (_request: any, _metadata: any, callback: any) =>
-        callback(null, {}),
+      delete: (_request: any, _metadata: any, callback: any) => callback(null, {}),
     },
   };
 }
@@ -205,9 +207,10 @@ test("runExec rejects a pre-aborted call without starting it", async () => {
   const controller = new AbortController();
   controller.abort();
   await assert.rejects(
-    () => runExec(binding, ["x"], undefined, undefined, undefined, undefined, {
-      signal: controller.signal,
-    }),
+    () =>
+      runExec(binding, ["x"], undefined, undefined, undefined, undefined, {
+        signal: controller.signal,
+      }),
     /aborted/,
   );
   assert.equal(harness.stream.written.length, 0);

@@ -2,13 +2,7 @@
 //
 // SPDX-License-Identifier: MIT
 
-import {
-  guestClient,
-  controlClient,
-  closeClients,
-  grpc,
-  unary,
-} from "./grpc/runtime-client.js";
+import { closeClients, controlClient, grpc, guestClient, unary } from "./grpc/runtime-client.js";
 import { isAbsolute, join } from "node:path";
 import { VERSION } from "./generated/version.js";
 
@@ -118,7 +112,9 @@ export class WorkspaceResolver {
       throw notFoundError(`no DH workspace contains path ${JSON.stringify(path)}`);
     }
     throw new Error(
-      `cannot resolve a DH workspace for path ${JSON.stringify(path)}; pass a session working directory`,
+      `cannot resolve a DH workspace for path ${
+        JSON.stringify(path)
+      }; pass a session working directory`,
     );
   }
   private containingWorkspace(path: string): any | undefined {
@@ -137,7 +133,9 @@ export class WorkspaceResolver {
   private async workspaceForCwd(cwd: unknown): Promise<any> {
     if (typeof cwd !== "string" || cwd === "") {
       throw new Error(
-        `cannot resolve a DH workspace without a session working directory (got ${JSON.stringify(cwd)})`,
+        `cannot resolve a DH workspace without a session working directory (got ${
+          JSON.stringify(cwd)
+        })`,
       );
     }
     const workspace = await this.registry?.resolveByPath?.(cwd);
@@ -329,17 +327,29 @@ export class WorkspaceResolver {
     );
     const controlMetadata = metadata(this.config.controlToken, VERSION);
     try {
-      await unary<any>(control, "describeWorkspace", {
-        workspaceSlug: slug,
-      }, controlMetadata, signal);
+      await unary<any>(
+        control,
+        "describeWorkspace",
+        {
+          workspaceSlug: slug,
+        },
+        controlMetadata,
+        signal,
+      );
     } catch (error: any) {
       if (error.code !== grpc.status.NOT_FOUND) throw error;
-      await unary<any>(control, "createWorkspace", {
-        workspaceSlug: slug,
-        projectName,
-        imageId: this.config.defaultImage,
-        mounts: [{ projectName, mode: "MOUNT_MODE_READ_WRITE" }],
-      }, controlMetadata, signal);
+      await unary<any>(
+        control,
+        "createWorkspace",
+        {
+          workspaceSlug: slug,
+          projectName,
+          imageId: this.config.defaultImage,
+          mounts: [{ projectName, mode: "MOUNT_MODE_READ_WRITE" }],
+        },
+        controlMetadata,
+        signal,
+      );
     }
     const row = await this.ensureContainer(slug, "default", signal);
     return this.bindingFor(row, () => {
@@ -387,18 +397,17 @@ export class WorkspaceResolver {
   private invalidateAfter(method: string, request: unknown): void {
     const scope = CONTAINER_MUTATIONS[method];
     if (scope === undefined) return;
-    const fields = (typeof request === "object" && request !== null
-      ? request
-      : {}) as { workspaceSlug?: unknown; container?: unknown };
-    const slug =
-      typeof fields.workspaceSlug === "string" ? fields.workspaceSlug : "";
+    const fields = (typeof request === "object" && request !== null ? request : {}) as {
+      workspaceSlug?: unknown;
+      container?: unknown;
+    };
+    const slug = typeof fields.workspaceSlug === "string" ? fields.workspaceSlug : "";
     if (slug === "") return;
     if (scope === "workspace") {
       this.forgetWorkspace(slug);
       return;
     }
-    const container =
-      typeof fields.container === "string" ? fields.container : "";
+    const container = typeof fields.container === "string" ? fields.container : "";
     if (container === "") return;
     this.forgetContainer(slug, container);
   }
@@ -435,14 +444,12 @@ export function normalizeToolError(error: unknown): Error {
   const numericCode = typeof code === "number" ? code : undefined;
   // Only a real gRPC status renders the "<code> <NAME>: " prefix; a plain
   // message that merely looks like one must stay intact.
-  const message =
-    numericCode === undefined ? raw : raw.replace(/^\d+\s+[A-Z_]+:\s*/, "");
-  const name =
-    numericCode !== undefined
-      ? (grpc.status as unknown as Record<number, string>)[numericCode]
-      : typeof code === "string"
-        ? code
-        : undefined;
+  const message = numericCode === undefined ? raw : raw.replace(/^\d+\s+[A-Z_]+:\s*/, "");
+  const name = numericCode !== undefined
+    ? (grpc.status as unknown as Record<number, string>)[numericCode]
+    : typeof code === "string"
+    ? code
+    : undefined;
   const normalized = new Error(message);
   if (name !== undefined) (normalized as { code?: string }).code = name;
   return normalized;
@@ -450,9 +457,7 @@ export function normalizeToolError(error: unknown): Error {
 
 function waitForReady(agent: grpc.Client, timeoutMs = 15000): Promise<void> {
   return new Promise((resolve, reject) => {
-    agent.waitForReady(Date.now() + timeoutMs, (error) =>
-      error ? reject(error) : resolve(),
-    );
+    agent.waitForReady(Date.now() + timeoutMs, (error) => error ? reject(error) : resolve());
   });
 }
 
@@ -482,8 +487,7 @@ export function workspaceSlug(id: unknown): string {
   }
   return value.toLowerCase();
 }
-const UUID_PATTERN =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 // metadata builds the call metadata. The plugin version is sent on control
 // calls so the orchestrator can refuse an incompatible plugin; guest calls omit
 // it, since the guest agent does not check it.
@@ -515,7 +519,9 @@ function projectNameForPath(projectsRoot: string, path: unknown): string {
   if (root === "" || value === root) return "";
   if (!value.startsWith(`${root}/`)) {
     throw new Error(
-      `workspace path ${JSON.stringify(value)} is not under the projects root ${JSON.stringify(root)}`,
+      `workspace path ${JSON.stringify(value)} is not under the projects root ${
+        JSON.stringify(root)
+      }`,
     );
   }
   return value.slice(root.length + 1);

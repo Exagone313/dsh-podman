@@ -8,11 +8,11 @@ import { defaultMountMode } from "./mount-enums.js";
 import { type ReadOnlyShellDecision } from "./read-only-shell.js";
 import { TOOLS } from "./tool-schemas.js";
 import {
-  renderDenial,
-  renderReason,
   type MountFact,
   type ReasonFact,
   type ReasonLocale,
+  renderDenial,
+  renderReason,
 } from "./approval-reasons.js";
 
 // Build the mount fact for one mount object, or undefined when it names no
@@ -24,23 +24,19 @@ function mountFact(
 ): MountFact | undefined {
   const inferred = inferMountKind(mount);
   const kind: MountFact["kind"] =
-    inferred === "volume" || inferred === "secret" || inferred === "tmpfs"
-      ? inferred
-      : "project";
-  const destination =
-    typeof mount.destination === "string" && mount.destination !== ""
-      ? mount.destination
-      : undefined;
-  const source =
-    kind === "tmpfs"
-      ? ""
-      : kind === "volume"
-        ? typeof mount.volume === "string" ? mount.volume : ""
-        : kind === "secret"
-          ? typeof mount.secret === "string" ? mount.secret : ""
-          : typeof mount.project === "string"
-            ? mount.project
-            : "";
+    inferred === "volume" || inferred === "secret" || inferred === "tmpfs" ? inferred : "project";
+  const destination = typeof mount.destination === "string" && mount.destination !== ""
+    ? mount.destination
+    : undefined;
+  const source = kind === "tmpfs"
+    ? ""
+    : kind === "volume"
+    ? typeof mount.volume === "string" ? mount.volume : ""
+    : kind === "secret"
+    ? typeof mount.secret === "string" ? mount.secret : ""
+    : typeof mount.project === "string"
+    ? mount.project
+    : "";
   if (kind !== "tmpfs" && source === "") return undefined;
   return {
     kind,
@@ -61,9 +57,7 @@ export function reasonFact(
     typeof args[key] === "string" && args[key] !== "" ? (args[key] as string) : undefined;
   const listOf = (key: string): string[] | undefined => {
     const value = args[key];
-    return Array.isArray(value) && value.length > 0
-      ? value.map((item) => String(item))
-      : undefined;
+    return Array.isArray(value) && value.length > 0 ? value.map((item) => String(item)) : undefined;
   };
   const mountItems = (): MountFact[] | undefined => {
     const value = args.mounts;
@@ -72,10 +66,9 @@ export function reasonFact(
       .map((item) => {
         if (typeof item !== "object" || item === null) return undefined;
         const mount = item as Record<string, unknown>;
-        const mode =
-          typeof mount.mode === "string" && mount.mode !== ""
-            ? mount.mode
-            : defaultMountMode(inferMountKind(mount));
+        const mode = typeof mount.mode === "string" && mount.mode !== ""
+          ? mount.mode
+          : defaultMountMode(inferMountKind(mount));
         return mountFact(mount, mode !== "read_write");
       })
       .filter((item): item is MountFact => item !== undefined);
@@ -92,9 +85,7 @@ export function reasonFact(
   const envKeys = (): string[] | undefined => mapKeys("env");
   const numberListOf = (key: string): number[] | undefined => {
     const value = args[key];
-    return Array.isArray(value) && value.length > 0
-      ? value.map((item) => Number(item))
-      : undefined;
+    return Array.isArray(value) && value.length > 0 ? value.map((item) => Number(item)) : undefined;
   };
   // The optional process identity a tool may carry, shared by the tools that
   // can run a process as another user.
@@ -185,12 +176,11 @@ export function reasonFact(
       if (container === undefined) return undefined;
       // Removal carries no mode, so its reason names none; add and update name
       // the mode the call asks for (add defaults it like the mount schema).
-      const readOnly =
-        name === "container_mount_remove"
-          ? undefined
-          : (typeof args.mode === "string" && args.mode !== ""
-              ? args.mode
-              : defaultMountMode(inferMountKind(args))) !== "read_write";
+      const readOnly = name === "container_mount_remove"
+        ? undefined
+        : (typeof args.mode === "string" && args.mode !== ""
+          ? args.mode
+          : defaultMountMode(inferMountKind(args))) !== "read_write";
       const mount = mountFact(args, readOnly);
       if (mount === undefined) return undefined;
       return { kind: name, container, mount };
@@ -198,9 +188,7 @@ export function reasonFact(
     case "container_path_set": {
       const container = str("container");
       if (container === undefined) return undefined;
-      const paths = Array.isArray(args.paths)
-        ? args.paths.map((path) => String(path))
-        : [];
+      const paths = Array.isArray(args.paths) ? args.paths.map((path) => String(path)) : [];
       return { kind: "container_path_set", container, paths };
     }
     case "container_path_add":
@@ -415,8 +403,9 @@ export async function preExecutePolicy(
     };
   }
   const args = exec.arguments;
-  const parsed =
-    typeof args === "object" && args !== null ? (args as Record<string, unknown>) : undefined;
+  const parsed = typeof args === "object" && args !== null
+    ? (args as Record<string, unknown>)
+    : undefined;
   const projectsRoot = getProjectsRoot?.();
   const denyReason = mountDestinationsReason(name, parsed, projectsRoot, locale);
   if (denyReason !== undefined) {
@@ -441,7 +430,10 @@ export function mountDestinationsReason(
   locale: ReasonLocale = "en",
 ): string | undefined {
   if (args === undefined) return undefined;
-  if (name === "container_mount_add" || name === "container_mount_remove" || name === "container_mount_update") {
+  if (
+    name === "container_mount_add" || name === "container_mount_remove" ||
+    name === "container_mount_update"
+  ) {
     return projectMountDestinationReason(projectsRoot, args, locale);
   }
   if (name === "container_start" || name === "container_recreate") {

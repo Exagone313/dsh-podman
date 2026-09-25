@@ -285,19 +285,15 @@ export const en: Record<ContainerPluginKey, string> = {
   confirmTitle: "Confirm action",
   confirm: "Confirm",
   confirmRemoveContainer: "Remove the default container of this workspace?",
-  confirmRecreate:
-    "Recreate this container? Its ephemeral state is lost.",
+  confirmRecreate: "Recreate this container? Its ephemeral state is lost.",
   confirmRemoveImage:
     "Remove this image? Containers using it must be recreated from another image.",
   confirmRebuildImage: "Rebuild this image in place?",
-  confirmRebuildAllImages:
-    "Rebuild every image in dependency order (base first)?",
+  confirmRebuildAllImages: "Rebuild every image in dependency order (base first)?",
   confirmRemoveVolume: "Remove this volume and its data?",
   confirmSetSecret: "Overwrite this secret's value?",
-  confirmRemoveSecret:
-    "Remove this secret? Containers using it must drop it first.",
-  confirmDetachSecret:
-    "Detach this secret environment variable from the container?",
+  confirmRemoveSecret: "Remove this secret? Containers using it must drop it first.",
+  confirmDetachSecret: "Detach this secret environment variable from the container?",
   mountsTitle: "Mounts",
   addMount: "Add mount",
   mountKind: "Kind",
@@ -336,25 +332,20 @@ export const en: Record<ContainerPluginKey, string> = {
   mountReadWriteSuffix: "(rw)",
   remountReadOnly: "Remount as read-only",
   remountReadWrite: "Remount as read-write",
-  confirmRemountReadOnly:
-    "Remount this mount as read-only and recreate the container?",
-  confirmRemountReadWrite:
-    "Remount this mount as read-write and recreate the container?",
+  confirmRemountReadOnly: "Remount this mount as read-only and recreate the container?",
+  confirmRemountReadWrite: "Remount this mount as read-write and recreate the container?",
   confirmRemoveMount: "Remove this mount from the container and recreate it?",
   cachesTitle: "Package caches",
   noCaches: "No package cache is configured.",
   cacheUsage: "{size} · {n} files",
   cacheKeepLatest: "Keep latest versions",
-  confirmCacheKeepLatest:
-    "Remove older cached package versions? Current versions are kept.",
+  confirmCacheKeepLatest: "Remove older cached package versions? Current versions are kept.",
   cacheRemoveAll: "Remove all",
-  confirmCacheRemoveAll:
-    "Remove every cached package? The next build re-downloads what it needs.",
+  confirmCacheRemoveAll: "Remove every cached package? The next build re-downloads what it needs.",
   addContainer: "Add container",
   invalidContainerName: "Invalid container name",
   containerNameTaken: "Container name already exists",
-  invalidName:
-    "Start with a letter or digit; only letters, digits, '.', '_', '-' (max 64).",
+  invalidName: "Start with a letter or digit; only letters, digits, '.', '_', '-' (max 64).",
   invalidImageId:
     "Start with a letter, digit, or '_'; only letters, digits, '.', '_', '-', '/', ':' (max 128).",
   terminalSignal: "signal {signal}",
@@ -410,8 +401,7 @@ export const zh: Record<ContainerPluginKey, string> = {
   cardDescription: "管理工作区容器及其镜像。",
   versionMismatchMajor:
     "此插件与 orchestrator 的主版本不同；请更新 dsh 镜像或 orchestrator 镜像，使两者一致。",
-  versionMismatchMinor:
-    "此插件与 orchestrator 的版本不同但兼容；建议同时更新两个镜像。",
+  versionMismatchMinor: "此插件与 orchestrator 的版本不同但兼容；建议同时更新两个镜像。",
   versionsTitle: "版本",
   orchestrator: "dsh-podman-orchestrator",
   versionUnknown: "未知",
@@ -551,7 +541,8 @@ export const zh: Record<ContainerPluginKey, string> = {
   invalidContainerName: "容器名称无效",
   containerNameTaken: "容器名称已存在",
   invalidName: "以字母或数字开头，仅可使用字母、数字、'.'、'_'、'-'（最长 64 个字符）。",
-  invalidImageId: "以字母、数字或 '_' 开头，仅可使用字母、数字、'.'、'_'、'-'、'/'、':'（最长 128 个字符）。",
+  invalidImageId:
+    "以字母、数字或 '_' 开头，仅可使用字母、数字、'.'、'_'、'-'、'/'、':'（最长 128 个字符）。",
   terminalSignal: "信号 {signal}",
   terminalExitCode: "退出码 {code}",
   terminalRunning: "运行中",

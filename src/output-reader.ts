@@ -78,10 +78,9 @@ export function outputReader(
       const requested = Math.max(0, Number.isFinite(offset) ? offset : 0);
       const local = Math.max(0, requested - start);
       const lossy = requested < start;
-      const window =
-        head >= chunks.length
-          ? Buffer.alloc(0)
-          : Buffer.concat(chunks.slice(head), retained);
+      const window = head >= chunks.length
+        ? Buffer.alloc(0)
+        : Buffer.concat(chunks.slice(head), retained);
       return {
         text: window.subarray(local).toString("utf8"),
         nextOffset: total,
@@ -89,9 +88,9 @@ export function outputReader(
         // Advertise the full-stream file only while it can still hold the
         // complete stream, matching the local backend's reader.
         ...(lossy &&
-        spill !== undefined &&
-        spillValid &&
-        total <= spill.maxBytes
+            spill !== undefined &&
+            spillValid &&
+            total <= spill.maxBytes
           ? { spillPath: spill.path }
           : {}),
       };

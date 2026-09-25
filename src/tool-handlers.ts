@@ -3,9 +3,9 @@
 // SPDX-License-Identifier: MIT
 
 import {
-  type ExecIdentity,
   bytesText,
   currentCwd,
+  type ExecIdentity,
   fsError,
   guestCwd,
   outputLines,
@@ -22,9 +22,9 @@ import { publicContainer, publicDaemon, publicImage, publicMount } from "./publi
 import { grpc } from "./grpc/runtime-client.js";
 import { defaultMountMode, mountKindToProto, mountModeToProto } from "./mount-enums.js";
 import {
-  WorkspaceResolver,
   containerNotFound,
   metadata,
+  WorkspaceResolver,
   workspaceSlug,
 } from "./workspace-binding.js";
 
@@ -60,7 +60,9 @@ function withSpillNote<T extends { stdoutSpillPath?: string; stderrSpillPath?: s
   if (paths.length === 0) return result;
   return {
     ...result,
-    note: `output was truncated; the full stream is at ${paths.join(", ")} (read it with container_read)`,
+    note: `output was truncated; the full stream is at ${
+      paths.join(", ")
+    } (read it with container_read)`,
   };
 }
 
@@ -136,8 +138,8 @@ function identityFromInput(input: any): ExecIdentity | undefined {
     identity.groups = input.groups;
   }
   return identity.uid === undefined &&
-    identity.gid === undefined &&
-    identity.groups === undefined
+      identity.gid === undefined &&
+      identity.groups === undefined
     ? undefined
     : identity;
 }
@@ -353,8 +355,9 @@ export const toolHandlers: Record<
       files: capped ? files.slice(0, GLOB_MAX_RESULTS) : files,
       ...(capped
         ? {
-            note: `showing ${GLOB_MAX_RESULTS} of ${files.length} files in modification-time order; narrow pattern or path to see more`,
-          }
+          note:
+            `showing ${GLOB_MAX_RESULTS} of ${files.length} files in modification-time order; narrow pattern or path to see more`,
+        }
         : {}),
     };
   },
@@ -511,7 +514,9 @@ export const toolHandlers: Record<
     if (!current.paths.includes(input.path)) {
       if (current.defaultPaths.includes(input.path)) {
         throw new Error(
-          `path ${JSON.stringify(input.path)} is part of the container's default PATH and cannot be removed`,
+          `path ${
+            JSON.stringify(input.path)
+          } is part of the container's default PATH and cannot be removed`,
         );
       }
       throw new Error(
@@ -611,8 +616,7 @@ export const toolHandlers: Record<
       unaryGuest({ binding }, "stopDaemon", {
         name: input.name,
         signal: input.signal,
-      }),
-    );
+      }));
     return { stopped: input.name };
   },
   daemon_restart: async (resolver, input, exec) => {
@@ -622,8 +626,9 @@ export const toolHandlers: Record<
       input.container,
       exec?.signal,
     );
-    const info = await daemonCall(input.name, () =>
-      unaryGuest({ binding }, "restartDaemon", { name: input.name }),
+    const info = await daemonCall(
+      input.name,
+      () => unaryGuest({ binding }, "restartDaemon", { name: input.name }),
     );
     return publicDaemon(info);
   },
@@ -638,8 +643,7 @@ export const toolHandlers: Record<
       unaryGuest({ binding }, "daemonLogs", {
         name: input.name,
         tailBytes: input.tailBytes,
-      }),
-    )) as { stdout?: unknown; stderr?: unknown };
+      }))) as { stdout?: unknown; stderr?: unknown };
     return {
       stdout: bytesText(result.stdout),
       stderr: bytesText(result.stderr),
@@ -663,8 +667,7 @@ async function containerPathState(binding: {
   const paths = Array.isArray(result?.paths)
     ? result.paths.map((path: unknown) => String(path))
     : [];
-  const defaultPath =
-    typeof result?.defaultPath === "string" ? result.defaultPath : "";
+  const defaultPath = typeof result?.defaultPath === "string" ? result.defaultPath : "";
   return {
     paths,
     defaultPaths: defaultPath === "" ? [] : defaultPath.split(":"),

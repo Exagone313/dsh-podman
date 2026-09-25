@@ -36,9 +36,7 @@ export function CachesSection(props: {
     <>
       <div style={sectionTitle}>{t("cachesTitle")}</div>
       <div style={wsBody}>
-        {caches.length === 0 ? (
-          <p style={{ ...hint, margin: 0 }}>{t("noCaches")}</p>
-        ) : (
+        {caches.length === 0 ? <p style={{ ...hint, margin: 0 }}>{t("noCaches")}</p> : (
           caches.map((cache) => (
             <div
               key={cache.manager}

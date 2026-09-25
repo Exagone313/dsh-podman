@@ -44,9 +44,7 @@ test("filesystem provider rejects unsafe paths", async () => {
   const provider = createFilesystemProvider(stubResolver);
   await assert.rejects(() => provider.resolve("/a/../b"));
   await assert.rejects(() => provider.resolve("/a/b/../../etc"));
-  await assert.rejects(() =>
-    provider.resolve("../escape", { cwd: "/projects/team/app" }),
-  );
+  await assert.rejects(() => provider.resolve("../escape", { cwd: "/projects/team/app" }));
 });
 
 test("filesystem provider maps targets", () => {
@@ -153,44 +151,48 @@ test("filesystem provider editText reports the harness error codes", async () =>
   const binary = editProvider(editGuest({}, Buffer.from([0x68, 0x00, 0x69])));
   const binaryTarget = await binary.resolve("/a", { cwd: "/x" });
   await assert.rejects(
-    () => binary.editText(binaryTarget, {
-      oldString: "h",
-      newString: "H",
-      replaceAll: false,
-    }),
+    () =>
+      binary.editText(binaryTarget, {
+        oldString: "h",
+        newString: "H",
+        replaceAll: false,
+      }),
     (error: unknown) => (error as { code?: string }).code === "FS_NOT_TEXT",
   );
 
   const notFound = editProvider(editGuest({}, Buffer.from("hello")));
   const notFoundTarget = await notFound.resolve("/a", { cwd: "/x" });
   await assert.rejects(
-    () => notFound.editText(notFoundTarget, {
-      oldString: "zzz",
-      newString: "x",
-      replaceAll: false,
-    }),
+    () =>
+      notFound.editText(notFoundTarget, {
+        oldString: "zzz",
+        newString: "x",
+        replaceAll: false,
+      }),
     (error: unknown) => (error as { code?: string }).code === "FS_EDIT_NOT_FOUND",
   );
 
   const ambiguous = editProvider(editGuest({}, Buffer.from("aa")));
   const ambiguousTarget = await ambiguous.resolve("/a", { cwd: "/x" });
   await assert.rejects(
-    () => ambiguous.editText(ambiguousTarget, {
-      oldString: "a",
-      newString: "b",
-      replaceAll: false,
-    }),
+    () =>
+      ambiguous.editText(ambiguousTarget, {
+        oldString: "a",
+        newString: "b",
+        replaceAll: false,
+      }),
     (error: unknown) => (error as { code?: string }).code === "FS_AMBIGUOUS_EDIT",
   );
 
   const stale = editProvider(editGuest({}, Buffer.from("hello")));
   const staleTarget = await stale.resolve("/a", { cwd: "/x" });
   await assert.rejects(
-    () => stale.editText(
-      staleTarget,
-      { oldString: "h", newString: "H", replaceAll: false },
-      { version: "other" },
-    ),
+    () =>
+      stale.editText(
+        staleTarget,
+        { oldString: "h", newString: "H", replaceAll: false },
+        { version: "other" },
+      ),
     (error: unknown) => (error as { code?: string }).code === "FS_STALE_VERSION",
   );
 });

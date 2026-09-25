@@ -8,11 +8,7 @@ import type {
 } from "@deepseek-ai/dsh-api-workspace-controller/types";
 import { type DirectoryPickerFace } from "./directory-picker.js";
 import { DIRECTORY_CLASS } from "./container-card-directory-styles.js";
-import {
-  confineToRoot,
-  crumbLabel,
-  rootCrumbs,
-} from "../project-path.js";
+import { confineToRoot, crumbLabel, rootCrumbs } from "../project-path.js";
 import { type ContainerPluginKey } from "./locales.js";
 import {
   Button,
@@ -245,16 +241,20 @@ export function DirectoryPickerModal(props: {
               {error}
             </p>
           )}
-          {error === "" && truncated ? (
-            <p className="dsh-podman-directory-status" role="status">
-              {t("browseTruncated")}
-            </p>
-          ) : null}
-          {slow ? (
-            <span className="dsh-podman-directory-loading" role="status">
-              {t("browseLoading")}
-            </span>
-          ) : null}
+          {error === "" && truncated
+            ? (
+              <p className="dsh-podman-directory-status" role="status">
+                {t("browseTruncated")}
+              </p>
+            )
+            : null}
+          {slow
+            ? (
+              <span className="dsh-podman-directory-loading" role="status">
+                {t("browseLoading")}
+              </span>
+            )
+            : null}
         </div>
         <div className="dsh-podman-directory-footer">
           <button
@@ -301,23 +301,21 @@ function DirectoryRow(props: {
     <li className="dsh-podman-directory-seat">
       <button
         type="button"
-        className={
-          selected
-            ? "dsh-podman-directory-row dsh-podman-directory-row-selected"
-            : "dsh-podman-directory-row"
-        }
+        className={selected
+          ? "dsh-podman-directory-row dsh-podman-directory-row-selected"
+          : "dsh-podman-directory-row"}
         aria-current={selected ? true : undefined}
         disabled={busy}
         onClick={() => onPick(entry)}
       >
-        {selected ? (
-          <IconFolderOpen16
-            size={16}
-            className="dsh-podman-directory-rowicon-selected"
-          />
-        ) : (
-          <IconFolderClose16 size={16} className="dsh-podman-directory-rowicon" />
-        )}
+        {selected
+          ? (
+            <IconFolderOpen16
+              size={16}
+              className="dsh-podman-directory-rowicon-selected"
+            />
+          )
+          : <IconFolderClose16 size={16} className="dsh-podman-directory-rowicon" />}
         <span className="dsh-podman-directory-rowname">{entry.name}</span>
         <IconChevronRightOutline14
           size={12}

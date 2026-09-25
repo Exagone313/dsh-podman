@@ -10,8 +10,8 @@ import {
   banner,
   cardBodyStyle,
   cardDescriptionStyle,
-  cardHeadTextStyle,
   cardHeaderStyle,
+  cardHeadTextStyle,
   cardHoverStyle,
   cardNameStyle,
   cardOpenStyle,
@@ -25,31 +25,21 @@ import { VolumesSection } from "./container-card-volumes.js";
 import { WorkspaceSection } from "./container-card-workspace.js";
 import { type ContainerCardFace } from "./container-card-controller.js";
 import { NS } from "./locales.js";
-import {
-  Button,
-  Input,
-  Modal,
-  writeClipboard,
-} from "@deepseek-ai/dsh-client-ui-primitives";
+import { Button, Input, Modal, writeClipboard } from "@deepseek-ai/dsh-client-ui-primitives";
 import {
   type InjectFace,
   type PropsLocale,
   type PropsRuntime,
 } from "@deepseek-ai/dsh-client-ui-slots";
-import {
-  type ReactNode,
-  useEffect,
-  useId,
-  useRef,
-  useState,
-} from "react";
+import { type ReactNode, useEffect, useId, useRef, useState } from "react";
 
 // The labels of the version lines, emphasised against their values.
 const versionLabel: React.CSSProperties = { fontWeight: 600 };
 
-export type ContainerCardProps = PropsRuntime<"settings.plugin.item"> &
-  PropsLocale<typeof NS> &
-  InjectFace<ContainerCardFace>;
+export type ContainerCardProps =
+  & PropsRuntime<"settings.plugin.item">
+  & PropsLocale<typeof NS>
+  & InjectFace<ContainerCardFace>;
 
 export function ContainerCard(props: ContainerCardProps): ReactNode {
   const { t } = props;
@@ -144,340 +134,335 @@ export function ContainerCard(props: ContainerCardProps): ReactNode {
         </span>
         <CardChevron open={open} />
       </button>
-      {open ? (
-        <div style={cardBodyStyle}>
-          {state.notice === "" ? null : (
-            <div style={banner} role="status">
-              {t("notice")}: {state.notice}
-            </div>
-          )}
-          {state.versionState === "ok" ? null : (
-            <div
-              style={
-                state.versionState === "major-mismatch"
+      {open
+        ? (
+          <div style={cardBodyStyle}>
+            {state.notice === "" ? null : (
+              <div style={banner} role="status">
+                {t("notice")}: {state.notice}
+              </div>
+            )}
+            {state.versionState === "ok" ? null : (
+              <div
+                style={state.versionState === "major-mismatch"
                   ? { ...banner, borderColor: "var(--dsw-alias-state-error-primary)" }
-                  : banner
-              }
-              role={state.versionState === "major-mismatch" ? "alert" : "status"}
-            >
-              {t(
-                state.versionState === "major-mismatch"
-                  ? "versionMismatchMajor"
-                  : "versionMismatchMinor",
-              )}
-            </div>
-          )}
-          <div style={sectionTitle}>{t("workspacesTitle")}</div>
-          {state.workspaces.length === 0 ? (
-            <p style={hint}>{t("none")}</p>
-          ) : (
-            state.workspaces.map((workspace) => (
-              <WorkspaceSection
-                key={workspace.workspaceSlug}
-                t={t}
-                workspace={workspace}
-                containers={state.containers.filter(
-                  (container) =>
-                    container.workspaceSlug === workspace.workspaceSlug,
+                  : banner}
+                role={state.versionState === "major-mismatch" ? "alert" : "status"}
+              >
+                {t(
+                  state.versionState === "major-mismatch"
+                    ? "versionMismatchMajor"
+                    : "versionMismatchMinor",
                 )}
-                images={state.images}
-                volumes={state.volumes}
-                secrets={state.secrets}
-                busy={state.busy}
-                defaultImage={state.defaultImage}
-                projectsRoot={state.projectsRoot}
-                directoryPicker={state.directoryPicker}
-                onRemove={props.remove}
-                onRemoveWorkspace={props.removeWorkspace}
-                onRecreate={props.recreate}
-                onCreate={props.createContainer}
-                onStartContainer={props.startContainer}
-                onAddContainerMount={props.addContainerMount}
-                onRemoveContainerMount={props.removeContainerMount}
-                onUpdateContainerMount={props.updateContainerMount}
-                onSetContainerPaths={props.setContainerPaths}
-                onAddContainerSecret={props.addContainerSecret}
-                onRemoveContainerSecret={props.removeContainerSecret}
-              />
-            ))
-          )}
-          <div
-            style={{
-              display: "flex",
-              flexWrap: "wrap",
-              alignItems: "center",
-              gap: "8px",
-            }}
-          >
-            <div style={{ ...sectionTitle, flex: 1 }}>{t("imagesTitle")}</div>
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={state.busy}
-              onClick={() => {
-                setDefaultImage(state.defaultImage);
-                setDefaultOpen(true);
-              }}
-            >
-              {t("setDefaultImage")}
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={state.busy}
-              onClick={() => {
-                setImageId("");
-                setParent(baseImages[0]?.imageId ?? customImages[0]?.imageId ?? "");
-                setPackages([]);
-                setBuildOpen(true);
-              }}
-            >
-              {t("buildImage")}
-            </Button>
-            <ConfirmButton
-              t={t}
-              label={t("rebuildAllImages")}
-              title={t("confirmTitle")}
-              description={t("confirmRebuildAllImages")}
-              disabled={state.busy}
-              onConfirm={props.rebuildAllImages}
-            />
-          </div>
-          <div style={sectionTitle}>{t("baseImagesTitle")}</div>
-          {baseImages.length === 0 ? (
-            <p style={hint}>{t("none")}</p>
-          ) : (
-            baseImages.map((image) => (
-              <BaseImageRow
-                key={image.imageId}
-                t={t}
-                image={image}
-                busy={state.busy}
-                defaultImage={state.defaultImage}
-                onRebuild={props.rebuildBaseImage}
-                onPull={props.pullBaseImage}
-                onSetDefault={props.setDefaultImage}
-              />
-            ))
-          )}
-          <div style={sectionTitle}>{t("customImagesTitle")}</div>
-          {customImages.length === 0 ? (
-            <p style={hint}>{t("none")}</p>
-          ) : (
-            customImages.map((image) => (
-              <ImageItem
-                key={image.imageId}
-                t={t}
-                image={image}
-                busy={state.busy}
-                defaultImage={state.defaultImage}
-                onRemove={props.removeImage}
-                onRebuild={props.rebuildImage}
-                onSetDefault={props.setDefaultImage}
-              />
-            ))
-          )}
-          <ImageBuildModal
-            t={t}
-            images={state.images}
-            open={buildOpen}
-            imageId={imageId}
-            parent={parent}
-            packages={packages}
-            onImageId={setImageId}
-            onParent={setParent}
-            onPackages={setPackages}
-            onClose={() => setBuildOpen(false)}
-            onBuild={() => {
-              props.buildImage(imageId.trim(), parent.trim(), packages);
-              setImageId("");
-              setParent("");
-              setPackages([]);
-              setBuildOpen(false);
-            }}
-          />
-          <Modal
-            open={defaultOpen}
-            onClose={() => setDefaultOpen(false)}
-            title={t("setDefaultImageTitle")}
-            closeLabel={t("cancel")}
-            footer={
-              <>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setDefaultOpen(false)}
-                >
-                  {t("cancel")}
-                </Button>
-                <Button
-                  variant="primary"
-                  size="sm"
-                  disabled={defaultImage === ""}
-                  onClick={() => {
-                    props.setDefaultImage(defaultImage);
-                    setDefaultOpen(false);
-                  }}
-                >
-                  {t("setDefaultImage")}
-                </Button>
-              </>
-            }
-          >
-            <select
-              style={imageSelect}
-              value={defaultImage}
-              onChange={(event) => setDefaultImage(event.target.value)}
-            >
-              {defaultCandidates.length === 0 ? (
-                <option value="">{t("none")}</option>
-              ) : null}
-              {defaultCandidates.map((name) => (
-                <option key={name} value={name}>
-                  {name}
-                </option>
-              ))}
-            </select>
-            <p style={hint}>{t("defaultImageHint")}</p>
-          </Modal>
-          <CachesSection
-            t={t}
-            caches={state.caches}
-            busy={state.busy}
-            onClean={props.cleanCaches}
-          />
-          <VolumesSection
-            t={t}
-            volumes={state.volumes}
-            busy={state.busy}
-            writable={state.writable}
-            onCreate={props.createVolume}
-            onRemove={props.removeVolume}
-          />
-          <SecretsSection
-            t={t}
-            secrets={state.secrets}
-            busy={state.busy}
-            writable={state.writable}
-            onCreate={props.createSecret}
-            onRemove={props.removeSecret}
-            onSet={props.setSecret}
-          />
-          <div style={sectionTitle}>{t("configTitle")}</div>
-          <div
-            style={{
-              display: "flex",
-              flexWrap: "wrap",
-              alignItems: "center",
-              gap: "8px",
-              padding: "8px 0",
-            }}
-          >
-            <label
-              htmlFor={projectsRootId}
+              </div>
+            )}
+            <div style={sectionTitle}>{t("workspacesTitle")}</div>
+            {state.workspaces.length === 0 ? <p style={hint}>{t("none")}</p> : (
+              state.workspaces.map((workspace) => (
+                <WorkspaceSection
+                  key={workspace.workspaceSlug}
+                  t={t}
+                  workspace={workspace}
+                  containers={state.containers.filter(
+                    (container) => container.workspaceSlug === workspace.workspaceSlug,
+                  )}
+                  images={state.images}
+                  volumes={state.volumes}
+                  secrets={state.secrets}
+                  busy={state.busy}
+                  defaultImage={state.defaultImage}
+                  projectsRoot={state.projectsRoot}
+                  directoryPicker={state.directoryPicker}
+                  onRemove={props.remove}
+                  onRemoveWorkspace={props.removeWorkspace}
+                  onRecreate={props.recreate}
+                  onCreate={props.createContainer}
+                  onStartContainer={props.startContainer}
+                  onAddContainerMount={props.addContainerMount}
+                  onRemoveContainerMount={props.removeContainerMount}
+                  onUpdateContainerMount={props.updateContainerMount}
+                  onSetContainerPaths={props.setContainerPaths}
+                  onAddContainerSecret={props.addContainerSecret}
+                  onRemoveContainerSecret={props.removeContainerSecret}
+                />
+              ))
+            )}
+            <div
               style={{
-                fontSize: "13px",
-                color: "var(--dsw-alias-label-secondary)",
-                minWidth: "110px",
+                display: "flex",
+                flexWrap: "wrap",
+                alignItems: "center",
+                gap: "8px",
               }}
             >
-              {t("projectsRoot")}
-            </label>
-            <Input
-              id={projectsRootId}
-              value={state.projectsRoot}
-              disabled
-              style={{ width: "200px" }}
+              <div style={{ ...sectionTitle, flex: 1 }}>{t("imagesTitle")}</div>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={state.busy}
+                onClick={() => {
+                  setDefaultImage(state.defaultImage);
+                  setDefaultOpen(true);
+                }}
+              >
+                {t("setDefaultImage")}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={state.busy}
+                onClick={() => {
+                  setImageId("");
+                  setParent(baseImages[0]?.imageId ?? customImages[0]?.imageId ?? "");
+                  setPackages([]);
+                  setBuildOpen(true);
+                }}
+              >
+                {t("buildImage")}
+              </Button>
+              <ConfirmButton
+                t={t}
+                label={t("rebuildAllImages")}
+                title={t("confirmTitle")}
+                description={t("confirmRebuildAllImages")}
+                disabled={state.busy}
+                onConfirm={props.rebuildAllImages}
+              />
+            </div>
+            <div style={sectionTitle}>{t("baseImagesTitle")}</div>
+            {baseImages.length === 0 ? <p style={hint}>{t("none")}</p> : (
+              baseImages.map((image) => (
+                <BaseImageRow
+                  key={image.imageId}
+                  t={t}
+                  image={image}
+                  busy={state.busy}
+                  defaultImage={state.defaultImage}
+                  onRebuild={props.rebuildBaseImage}
+                  onPull={props.pullBaseImage}
+                  onSetDefault={props.setDefaultImage}
+                />
+              ))
+            )}
+            <div style={sectionTitle}>{t("customImagesTitle")}</div>
+            {customImages.length === 0 ? <p style={hint}>{t("none")}</p> : (
+              customImages.map((image) => (
+                <ImageItem
+                  key={image.imageId}
+                  t={t}
+                  image={image}
+                  busy={state.busy}
+                  defaultImage={state.defaultImage}
+                  onRemove={props.removeImage}
+                  onRebuild={props.rebuildImage}
+                  onSetDefault={props.setDefaultImage}
+                />
+              ))
+            )}
+            <ImageBuildModal
+              t={t}
+              images={state.images}
+              open={buildOpen}
+              imageId={imageId}
+              parent={parent}
+              packages={packages}
+              onImageId={setImageId}
+              onParent={setParent}
+              onPackages={setPackages}
+              onClose={() => setBuildOpen(false)}
+              onBuild={() => {
+                props.buildImage(imageId.trim(), parent.trim(), packages);
+                setImageId("");
+                setParent("");
+                setPackages([]);
+                setBuildOpen(false);
+              }}
             />
-          </div>
-          <ConfigField
-            t={t}
-            label={t("socketsRoot")}
-            value={state.socketsRootDraft}
-            current={state.socketsRoot}
-            writable={state.writable}
-            onChange={props.editSocketsRoot}
-            onSave={props.saveSocketsRoot}
-            onDiscard={props.discardSocketsRoot}
-          />
-          <div
-            style={{
-              display: "flex",
-              flexWrap: "wrap",
-              alignItems: "center",
-              gap: "8px",
-            }}
-          >
-            <div style={{ ...sectionTitle, flex: 1 }}>{t("versionsTitle")}</div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => void copyVersions()}
+            <Modal
+              open={defaultOpen}
+              onClose={() => setDefaultOpen(false)}
+              title={t("setDefaultImageTitle")}
+              closeLabel={t("cancel")}
+              footer={
+                <>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setDefaultOpen(false)}
+                  >
+                    {t("cancel")}
+                  </Button>
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    disabled={defaultImage === ""}
+                    onClick={() => {
+                      props.setDefaultImage(defaultImage);
+                      setDefaultOpen(false);
+                    }}
+                  >
+                    {t("setDefaultImage")}
+                  </Button>
+                </>
+              }
             >
-              {copyState === "copied"
-                ? t("copied")
-                : copyState === "failed"
+              <select
+                style={imageSelect}
+                value={defaultImage}
+                onChange={(event) => setDefaultImage(event.target.value)}
+              >
+                {defaultCandidates.length === 0 ? <option value="">{t("none")}</option> : null}
+                {defaultCandidates.map((name) => (
+                  <option key={name} value={name}>
+                    {name}
+                  </option>
+                ))}
+              </select>
+              <p style={hint}>{t("defaultImageHint")}</p>
+            </Modal>
+            <CachesSection
+              t={t}
+              caches={state.caches}
+              busy={state.busy}
+              onClean={props.cleanCaches}
+            />
+            <VolumesSection
+              t={t}
+              volumes={state.volumes}
+              busy={state.busy}
+              writable={state.writable}
+              onCreate={props.createVolume}
+              onRemove={props.removeVolume}
+            />
+            <SecretsSection
+              t={t}
+              secrets={state.secrets}
+              busy={state.busy}
+              writable={state.writable}
+              onCreate={props.createSecret}
+              onRemove={props.removeSecret}
+              onSet={props.setSecret}
+            />
+            <div style={sectionTitle}>{t("configTitle")}</div>
+            <div
+              style={{
+                display: "flex",
+                flexWrap: "wrap",
+                alignItems: "center",
+                gap: "8px",
+                padding: "8px 0",
+              }}
+            >
+              <label
+                htmlFor={projectsRootId}
+                style={{
+                  fontSize: "13px",
+                  color: "var(--dsw-alias-label-secondary)",
+                  minWidth: "110px",
+                }}
+              >
+                {t("projectsRoot")}
+              </label>
+              <Input
+                id={projectsRootId}
+                value={state.projectsRoot}
+                disabled
+                style={{ width: "200px" }}
+              />
+            </div>
+            <ConfigField
+              t={t}
+              label={t("socketsRoot")}
+              value={state.socketsRootDraft}
+              current={state.socketsRoot}
+              writable={state.writable}
+              onChange={props.editSocketsRoot}
+              onSave={props.saveSocketsRoot}
+              onDiscard={props.discardSocketsRoot}
+            />
+            <div
+              style={{
+                display: "flex",
+                flexWrap: "wrap",
+                alignItems: "center",
+                gap: "8px",
+              }}
+            >
+              <div style={{ ...sectionTitle, flex: 1 }}>{t("versionsTitle")}</div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => void copyVersions()}
+              >
+                {copyState === "copied"
+                  ? t("copied")
+                  : copyState === "failed"
                   ? t("copyFailed")
                   : t("copyVersions")}
-            </Button>
-          </div>
-          <div
-            style={{
-              ...hint,
-              display: "flex",
-              flexDirection: "column",
-              gap: "2px",
-              margin: 0,
-            }}
-          >
-            <span>
-              <span style={versionLabel}>{t("dsh")}</span>
-              {state.dshVersion ? (
-                ` ${state.dshVersion}`
-              ) : (
-                <>
-                  {" "}
-                  <span
-                    style={{ color: "var(--dsw-alias-state-error-primary)" }}
-                  >
-                    {t("versionUnknown")}
-                  </span>
-                </>
-              )}
-            </span>
-            <span>
-              <span style={versionLabel}>{t("cardTitle")}</span>
-              {state.version ? ` ${state.version}` : ""}
-              {state.commit ? ` · ${state.commit}` : ""}
-            </span>
-            <span>
-              <span style={versionLabel}>{t("orchestrator")}</span>
-              {state.orchestratorVersion ? (
-                ` ${state.orchestratorVersion}`
-              ) : (
-                <>
-                  {" "}
-                  <span
-                    style={{ color: "var(--dsw-alias-state-error-primary)" }}
-                  >
-                    {t("versionUnknown")}
-                  </span>
-                </>
-              )}
-            </span>
-          </div>
-          <div style={footerRow}>
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={state.busy}
-              onClick={props.reload}
+              </Button>
+            </div>
+            <div
+              style={{
+                ...hint,
+                display: "flex",
+                flexDirection: "column",
+                gap: "2px",
+                margin: 0,
+              }}
             >
-              {state.busy ? t("busy") : t("reload")}
-            </Button>
+              <span>
+                <span style={versionLabel}>{t("dsh")}</span>
+                {state.dshVersion
+                  ? (
+                    ` ${state.dshVersion}`
+                  )
+                  : (
+                    <>
+                      {" "}
+                      <span
+                        style={{ color: "var(--dsw-alias-state-error-primary)" }}
+                      >
+                        {t("versionUnknown")}
+                      </span>
+                    </>
+                  )}
+              </span>
+              <span>
+                <span style={versionLabel}>{t("cardTitle")}</span>
+                {state.version ? ` ${state.version}` : ""}
+                {state.commit ? ` · ${state.commit}` : ""}
+              </span>
+              <span>
+                <span style={versionLabel}>{t("orchestrator")}</span>
+                {state.orchestratorVersion
+                  ? (
+                    ` ${state.orchestratorVersion}`
+                  )
+                  : (
+                    <>
+                      {" "}
+                      <span
+                        style={{ color: "var(--dsw-alias-state-error-primary)" }}
+                      >
+                        {t("versionUnknown")}
+                      </span>
+                    </>
+                  )}
+              </span>
+            </div>
+            <div style={footerRow}>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={state.busy}
+                onClick={props.reload}
+              >
+                {state.busy ? t("busy") : t("reload")}
+              </Button>
+            </div>
           </div>
-        </div>
-      ) : null}
+        )
+        : null}
     </li>
   );
 }

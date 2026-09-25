@@ -10,7 +10,7 @@ import {
 } from "./container-card-controller.js";
 import { EnvEditor, MountsEditor } from "./container-card-editors.js";
 import { type DirectoryPickerFace } from "./directory-picker.js";
-import { PathsList, type PathEntry } from "./container-card-paths.js";
+import { type PathEntry, PathsList } from "./container-card-paths.js";
 import { Field, namePattern, sanitizeName } from "./container-card-shared.js";
 import { greyId, hint, imageSelect, sectionTitle } from "./container-card-styles.js";
 import { type ContainerPluginKey } from "./locales.js";
@@ -157,9 +157,7 @@ export function CreateContainerModal(props: {
             disabled={busy}
             onChange={(event) => setImage(event.target.value)}
           >
-            {candidates.length === 0 ? (
-              <option value="">{t("none")}</option>
-            ) : null}
+            {candidates.length === 0 ? <option value="">{t("none")}</option> : null}
             {candidates.map((imageId) => (
               <option key={imageId} value={imageId}>
                 {imageId}
@@ -167,23 +165,25 @@ export function CreateContainerModal(props: {
             ))}
           </select>
         </Field>
-        {named ? (
-          <Field label={t("containerName")} htmlFor={nameLabel}>
-            <Input
-              id={nameLabel}
-              value={name}
-              disabled={busy}
-              onChange={(event) => setName(sanitizeName(event.target.value))}
-            />
-            {name !== "" && !validName ? (
-              <p style={{ ...hint, margin: 0 }}>
-                {nameTaken
-                  ? t("containerNameTaken")
-                  : t("invalidContainerName")}
-              </p>
-            ) : null}
-          </Field>
-        ) : null}
+        {named
+          ? (
+            <Field label={t("containerName")} htmlFor={nameLabel}>
+              <Input
+                id={nameLabel}
+                value={name}
+                disabled={busy}
+                onChange={(event) => setName(sanitizeName(event.target.value))}
+              />
+              {name !== "" && !validName
+                ? (
+                  <p style={{ ...hint, margin: 0 }}>
+                    {nameTaken ? t("containerNameTaken") : t("invalidContainerName")}
+                  </p>
+                )
+                : null}
+            </Field>
+          )
+          : null}
         <div style={sectionTitle}>{t("envTitle")}</div>
         <EnvEditor t={t} env={env} busy={busy} onChange={setEnv} />
         <div style={sectionTitle}>{t("mountsTitle")}</div>
@@ -198,12 +198,9 @@ export function CreateContainerModal(props: {
           directoryPicker={directoryPicker}
           modeControl="select"
           onAdd={(mount) => setMounts([...mounts, mount])}
-          onRemove={(mount) =>
-            setMounts(mounts.filter((item) => item !== mount))
-          }
+          onRemove={(mount) => setMounts(mounts.filter((item) => item !== mount))}
           onUpdate={(updated, index) =>
-            setMounts(mounts.map((item, at) => (at === index ? updated : item)))
-          }
+            setMounts(mounts.map((item, at) => (at === index ? updated : item)))}
         />
         <div style={sectionTitle}>{t("pathsTitle")}</div>
         <PathsList t={t} entries={paths} busy={busy} onChange={setPaths} />
@@ -257,9 +254,7 @@ export function CreateContainerModal(props: {
             onChange={(event) => setAttachSecret(event.target.value)}
             aria-label={t("attachSecret")}
           >
-            {secrets.length === 0 ? (
-              <option value="">{t("none")}</option>
-            ) : null}
+            {secrets.length === 0 ? <option value="">{t("none")}</option> : null}
             {secrets.map((secret) => (
               <option key={secret.name} value={secret.name}>
                 {secret.name}
@@ -279,9 +274,7 @@ export function CreateContainerModal(props: {
           <Button
             variant="outline"
             size="sm"
-            disabled={
-              busy || attachVar.trim() === "" || attachSecret === ""
-            }
+            disabled={busy || attachVar.trim() === "" || attachSecret === ""}
             onClick={attach}
           >
             {t("attachSecret")}

@@ -5,7 +5,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { DAEMON_TOOLS } from "./test-support.js";
-import { TOOLS, publicDaemon, toolHandlers } from "./index.js";
+import { publicDaemon, toolHandlers, TOOLS } from "./index.js";
 
 test("daemon_start accepts optional uid, gid and groups", () => {
   const tool = TOOLS.find((entry) => entry.name === "daemon_start");

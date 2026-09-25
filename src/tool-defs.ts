@@ -2,7 +2,45 @@
 //
 // SPDX-License-Identifier: MIT
 
-import { containerBashParameters, containerEditParameters, containerExecParameters, containerGlobParameters, containerGrepParameters, containerListParameters, containerMountAddParameters, containerMountListParameters, containerMountRemoveParameters, containerMountUpdateParameters, containerPathAddParameters, containerPathRemoveParameters, containerPathSetParameters, containerReadParameters, containerRecreateParameters, containerRemoveParameters, containerSecretAddParameters, containerSecretRemoveParameters, containerStartParameters, containerWriteParameters, daemonListParameters, daemonLogsParameters, daemonRestartParameters, daemonStartParameters, daemonStopParameters, imageBuildParameters, imageGetParameters, imageListParameters, imageRebuildAllParameters, imageRebuildParameters, imageRemoveParameters, secretCreateParameters, secretListParameters, secretRemoveParameters, volumeCreateParameters, volumeListParameters, volumeRemoveParameters } from "./tool-params.js";
+import {
+  containerBashParameters,
+  containerEditParameters,
+  containerExecParameters,
+  containerGlobParameters,
+  containerGrepParameters,
+  containerListParameters,
+  containerMountAddParameters,
+  containerMountListParameters,
+  containerMountRemoveParameters,
+  containerMountUpdateParameters,
+  containerPathAddParameters,
+  containerPathRemoveParameters,
+  containerPathSetParameters,
+  containerReadParameters,
+  containerRecreateParameters,
+  containerRemoveParameters,
+  containerSecretAddParameters,
+  containerSecretRemoveParameters,
+  containerStartParameters,
+  containerWriteParameters,
+  daemonListParameters,
+  daemonLogsParameters,
+  daemonRestartParameters,
+  daemonStartParameters,
+  daemonStopParameters,
+  imageBuildParameters,
+  imageGetParameters,
+  imageListParameters,
+  imageRebuildAllParameters,
+  imageRebuildParameters,
+  imageRemoveParameters,
+  secretCreateParameters,
+  secretListParameters,
+  secretRemoveParameters,
+  volumeCreateParameters,
+  volumeListParameters,
+  volumeRemoveParameters,
+} from "./tool-params.js";
 
 export function defineTool<T>(definition: T): T {
   return definition;
@@ -164,7 +202,7 @@ export const TOOL_DESCRIPTIONS: Record<string, string> = {
   container_write: "Write a file inside a container of the current workspace.",
   container_edit: "Edit a file inside a container of the current workspace.",
   container_glob:
-    "List files inside a container of the current workspace matching a glob pattern. A pattern with no \"/\" matches basenames at any depth. Results are files only, include hidden and ignored files, and exclude VCS metadata directories. Defaults to the session working directory when it is mounted; pass path to override.",
+    'List files inside a container of the current workspace matching a glob pattern. A pattern with no "/" matches basenames at any depth. Results are files only, include hidden and ignored files, and exclude VCS metadata directories. Defaults to the session working directory when it is mounted; pass path to override.',
   container_grep:
     "Search file contents inside a container of the current workspace. Defaults to the session working directory when it is mounted; pass cwd to override.",
   container_mount_list:
@@ -181,8 +219,7 @@ export const TOOL_DESCRIPTIONS: Record<string, string> = {
     "Prepend one directory to the container's PATH additions, moving it to the front when it is already there. Applied immediately without recreating the container; already-running daemons keep their old PATH. Requires approval: changing PATH changes which binaries run.",
   container_path_remove:
     "Remove one directory from the container's PATH additions. A directory that is only part of the container's default PATH cannot be removed. Applied immediately without recreating the container; already-running daemons keep their old PATH. Requires approval: changing PATH changes which binaries run.",
-  volume_list:
-    "List the named volumes available to the current workspace.",
+  volume_list: "List the named volumes available to the current workspace.",
   volume_create: "Create a named volume in the current workspace.",
   volume_remove:
     "Remove a named volume from the current workspace. Refused while a container still mounts it; detach the mount first.",
@@ -201,10 +238,8 @@ export const TOOL_DESCRIPTIONS: Record<string, string> = {
   daemon_list:
     "List the daemons running inside a container of the current workspace. Daemons live in the container's guest agent and do not survive a container recreate.",
   daemon_stop: "Stop a daemon inside a container of the current workspace.",
-  daemon_restart:
-    "Restart a daemon inside a container of the current workspace.",
-  daemon_logs:
-    "Read the captured logs of a daemon inside a container of the current workspace.",
+  daemon_restart: "Restart a daemon inside a container of the current workspace.",
+  daemon_logs: "Read the captured logs of a daemon inside a container of the current workspace.",
 };
 
 // UI title and icon category per tool, used by the host presenters so a UI can

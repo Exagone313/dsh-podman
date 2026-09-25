@@ -13,17 +13,15 @@ import type { ContainerCardFace } from "./container-card-controller.js";
 import { fieldLabel, hint } from "./container-card-styles.js";
 import { NS } from "./locales.js";
 import { ContainerField } from "./podman-terminal.js";
-import type { PodmanTerminalParams } from "./terminal-tab.js";
+import { PODMAN_TERMINAL_KIND } from "./terminal-tab.js";
 import type { TerminalShellView, TerminalTargetView } from "./terminal-protocol.js";
 import { fetchTerminalShells, fetchTerminalTarget } from "./terminal-transport.js";
 import type {} from "@deepseek-ai/dsh-client-ui-sidebar-right/client";
 
-/** The card snapshot plus the open action the guide needs. */
+/** The card snapshot the guide reads; the tab's own actions open the terminal. */
 export interface PodmanTerminalGuideInjected extends ContainerCardFace {
   /** Owning session, used by the shells route and the injection contract. */
   readonly sessionId: string;
-  /** Open a new terminal tab for one verified target. */
-  readonly openTab: (params: PodmanTerminalParams) => void;
 }
 
 export type PodmanTerminalGuideProps =
@@ -45,6 +43,7 @@ export function PodmanTerminalGuide(
   props: PodmanTerminalGuideProps,
 ): ReactNode {
   const { t, sessionId } = props;
+  const { tab } = props.useTabInfo();
   const state = props.useContainerCard((snapshot) => snapshot);
   // The host resolves the Session's workspace and reports it when it cannot.
   const [target, setTarget] = useState<TargetState>({ phase: "loading" });
@@ -172,7 +171,12 @@ export function PodmanTerminalGuide(
                   size="sm"
                   disabled={!ready}
                   onClick={() => {
-                    props.openTab({ container, shell: entry.path });
+                    // Replace the guide tab in place, exactly like the built-in
+                    // guide cards, instead of adding a second terminal tab.
+                    tab.actions.openTab(PODMAN_TERMINAL_KIND, {
+                      replaceTab: true,
+                      params: { container, shell: entry.path },
+                    });
                   }}
                 >
                   {entry.name}

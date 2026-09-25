@@ -22,7 +22,6 @@ import {
   PODMAN_TERMINAL_KIND,
   PODMAN_TERMINAL_SHORTCUT_DEFAULTS,
   PODMAN_TERMINAL_TAB_ID,
-  type PodmanTerminalParams,
 } from "./terminal-tab.js";
 import { PodmanToolRow, TOOL_VIEW_KEYS } from "./tool-views.js";
 import { installTerminalStyles } from "./terminal-styles.js";
@@ -212,9 +211,6 @@ export function apply(ctx: ClientContext): void {
             inject: (sessionId) => ({
               ...controller.inject(),
               sessionId,
-              openTab: (params: PodmanTerminalParams) => {
-                ctx.sidebarRight.openTab(PODMAN_TERMINAL_KIND, { params });
-              },
             }),
           },
           PodmanTerminalGuide,

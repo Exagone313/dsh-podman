@@ -34,6 +34,17 @@ dsh 的 **设置 → 插件** 卡片中暴露了一些 **UI 设置**，与环境
 | `defaultImage` | `archlinux`               | 用于新工作区的镜像**短名称**；可通过 Set-default 弹窗从基础镜像和自定义镜像中选择                                    |
 | `socketsRoot`  | `DSH_PODMAN_SOCKETS_ROOT` | 插件用于连接 orchestrator 的套接字根目录；回退到环境变量                                                             |
 | `uiLocale`     | `""`                      | 插件管理的当前语言，由浏览器客户端写入，以便主机以会话语言呈现审批文本（见[审批](usage.zh.md#审批)）；不可由用户编辑 |
+| `containerEnv` | `{}`                      | 容器创建时注入的默认环境变量；见[默认环境变量](#默认环境变量)                                                        |
+
+### 默认环境变量
+
+`containerEnv` 是一个在容器创建时注入的环境变量映射：新工作区的默认容器与每个命名容器都会收到它。容器自身的
+`env` 按变量逐个优先，而重建容器时会完全采用传入的环境变量，因此在容器的环境变量里删除某一项并重建该容器，即可彻底移除它。
+
+卡片中的**默认环境变量**一行用于编辑它：**编辑**打开键/值编辑器；**Git
+身份**用一份姓名与邮箱填入 `GIT_AUTHOR_NAME`、`GIT_AUTHOR_EMAIL`、`GIT_COMMITTER_NAME` 与
+`GIT_COMMITTER_EMAIL`；**应用到现有容器**会把缺少的变量补给尚未具备它们的运行中容器，只重建这些容器，且绝不覆盖已有值；已停止的容器留待下次启动。每个工作区行也提供同样的操作，只作用于该工作区。保留的
+`DSH_PODMAN*` 键会被忽略，且这些值并非机密——机密请使用 `secretEnv`（见[机密](usage.zh.md#机密)）。
 
 ## Orchestrator（`dsh-podman-orchestrator`）
 

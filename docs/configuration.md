@@ -35,6 +35,25 @@ section and the images' Set-default popup):
 | `defaultImage` | `archlinux`               | Image **short name** used for new workspaces; chosen from base and custom images via the Set-default popup                                                                      |
 | `socketsRoot`  | `DSH_PODMAN_SOCKETS_ROOT` | Socket root the plugin uses to reach the orchestrator; falls back to the env var                                                                                                |
 | `uiLocale`     | `""`                      | Plugin-managed active locale, written by the browser client so the host can render approval text in the session language (see [Approval](usage.md#approval)); not user-editable |
+| `containerEnv` | `{}`                      | Default environment seeded into a container when it is created; see [Default environment](#default-environment)                                                                 |
+
+### Default environment
+
+`containerEnv` is one map of variables seeded into a container when it is
+created: the default container of a new workspace and every named container. A
+container's own `env` wins per key, and a recreate stores exactly the
+environment it is given, so removing a value from a container's environment and
+recreating it removes that value for good.
+
+The card's **Default environment** row edits it: **Edit** opens a key/value
+editor, **Git identity** fills `GIT_AUTHOR_NAME`, `GIT_AUTHOR_EMAIL`,
+`GIT_COMMITTER_NAME` and `GIT_COMMITTER_EMAIL` from one name and one email, and
+**Apply to existing containers** adds the missing values to the running
+containers that lack them, recreating only those and never overwriting an
+existing value; stopped containers are left for their next start. Every
+workspace row offers the same action for its own containers. Reserved
+`DSH_PODMAN*` keys are ignored, and the values are not secret — use `secretEnv`
+for secrets (see [Secrets](usage.md#secrets)).
 
 ## Orchestrator (`dsh-podman-orchestrator`)
 

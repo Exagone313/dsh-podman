@@ -43,3 +43,9 @@ glob so deno expands it, not the shell); a docs-only workflow enforces this on
   variable works around a reuse bug that otherwise false-positives certain UTF-8
   files, e.g. the Chinese `.zh.md` docs).
 - Prefer implementing with subagents when possible.
+- Name proto fields in `lower_snake_case` and read them in TypeScript through
+  proto-loader's camelCase projection (`secret_env` → `secretEnv`); never spell
+  a proto field in snake_case in TS, because proto-loader silently drops unknown
+  properties. Tool parameters are camelCase except the ones mirroring the
+  harness's built-in tools (`file_path`, `old_string`, `new_string`,
+  `replace_all`).

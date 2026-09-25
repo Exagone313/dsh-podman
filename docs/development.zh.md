@@ -64,6 +64,17 @@ JS 端在运行时通过 `@grpc/proto-loader` 加载原始 `.proto` 文件（构
 `dist/grpc/proto/`）；不生成 TypeScript 绑定。也可以使用 `buf lint` 和
 `buf breaking` 校验 schema。
 
+## 命名
+
+`.proto` 字段名为 `lower_snake_case`（Buf 的 `BASIC` lint 会强制检查），JS
+端通过 proto-loader 的 camelCase 投影读取，因此 `secret_env` 变为
+`secretEnv`、`image_id` 变为 `imageId`。切勿在 TypeScript 中使用下划线形式的
+proto 字段名：proto-loader 会忽略未知属性，该值会被静默丢弃。
+
+工具参数使用 camelCase，只有刻意与 harness
+内置工具保持一致的名字除外（`file_path`、`old_string`、`new_string`、`replace_all`）。设置项使用
+camelCase；持久化的 TOML 状态使用下划线标签。
+
 ## 安装开发构建
 
 ### 构建

@@ -66,6 +66,19 @@ The JS side loads the raw `.proto` files at runtime via `@grpc/proto-loader`
 (copied to `dist/grpc/proto/` at build time); no TypeScript bindings are
 generated. Optionally validate the schema with `buf lint` and `buf breaking`.
 
+## Naming
+
+Proto field names are `lower_snake_case` (Buf's `BASIC` lint enforces it), and
+the JS side reads them through proto-loader's camelCase projection, so
+`secret_env` becomes `secretEnv` and `image_id` becomes `imageId`. Never spell a
+proto field in its snake_case form in TypeScript: proto-loader ignores an
+unknown property, so the value would be silently dropped.
+
+Tool parameters are camelCase, except the ones that deliberately mirror the
+harness's built-in tools (`file_path`, `old_string`, `new_string`,
+`replace_all`). Settings are camelCase; the persisted TOML state uses snake_case
+tags.
+
 ## Install development builds
 
 ### Build

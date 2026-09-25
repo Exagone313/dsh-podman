@@ -114,8 +114,8 @@ New containers are also seeded with the plugin's **default environment** (the
 `containerEnv` setting), so a git identity can be configured once instead of per
 project — see [Default environment](configuration.md#default-environment). The
 card's **Git identity** popup fills the four `GIT_AUTHOR_*`/`GIT_COMMITTER_*`
-variables from one name and one email, and **Apply to existing containers** adds
-them to the running containers that lack them.
+variables from one name and one email, and **Apply default environment
+variables** adds them to the running containers that lack them.
 
 `container_bash` and `container_exec` run with the same command-visible
 environment as the built-in `bash`: the harness's managed `DSH_*` facts

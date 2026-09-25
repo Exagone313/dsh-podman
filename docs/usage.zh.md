@@ -84,7 +84,7 @@ bash 进程）的 `env` 映射；`container_exec` 和 `daemon_start` 已经接�
 新容器还会注入插件的**默认环境变量**（`containerEnv` 设置），因此 Git
 身份只需配置一次，而不必按项目重复设置——见[默认环境变量](configuration.zh.md#默认环境变量)。卡片中的
 **Git 身份**弹窗用一份姓名与邮箱填入四个 `GIT_AUTHOR_*`/`GIT_COMMITTER_*`
-变量，**应用到现有容器**会把它们补给尚未具备的现有运行中容器。
+变量，**应用默认环境变量**会把它们补给尚未具备的现有运行中容器。
 
 `container_bash` 和 `container_exec` 使用与内置 `bash`
 相同的命令可见环境运行：harness 托管的 `DSH_*`

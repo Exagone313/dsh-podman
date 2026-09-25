@@ -23,20 +23,21 @@ cordis, then the environment variables below, then built-in defaults.
 | `DSH_PODMAN_PROJECTS_ROOT`      | `/projects`       | Project root used to resolve session working directories into a workspace                        |
 | `DSH_PODMAN_SOCKETS_ROOT`       | `/run/dsh-podman` | Socket root the plugin derives the orchestrator control socket (`orchestrator.sock`) from        |
 
-`projectsRoot` is env-only so it matches the orchestrator; `controlToken` comes
-from the plugin `config` or `DSH_PODMAN_ORCHESTRATOR_TOKEN`.
+`projectsRoot` and `socketsRoot` are env-only so they match the orchestrator;
+`controlToken` comes from the plugin `config` or
+`DSH_PODMAN_ORCHESTRATOR_TOKEN`.
 
 ## Plugin (dsh client) — UI settings
 
 Editable on the **dsh-podman** page (sidebar **Plugins** panel →
-**Installed**; the Configuration section and the images' Set-default popup):
+**Installed**; the images' Set-default popup and the **Default environment**
+section):
 
-| Setting        | Default                   | Description                                                                                                                                                                     |
-| -------------- | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `defaultImage` | `archlinux`               | Image **short name** used for new workspaces; chosen from base and custom images via the Set-default popup                                                                      |
-| `socketsRoot`  | `DSH_PODMAN_SOCKETS_ROOT` | Socket root the plugin uses to reach the orchestrator; falls back to the env var                                                                                                |
-| `uiLocale`     | `""`                      | Plugin-managed active locale, written by the browser client so the host can render approval text in the session language (see [Approval](usage.md#approval)); not user-editable |
-| `containerEnv` | `{}`                      | Default environment seeded into a container when it is created; see [Default environment](#default-environment)                                                                 |
+| Setting        | Default     | Description                                                                                                                                                                     |
+| -------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `defaultImage` | `archlinux` | Image **short name** used for new workspaces; chosen from base and custom images via the Set-default popup                                                                      |
+| `uiLocale`     | `""`        | Plugin-managed active locale, written by the browser client so the host can render approval text in the session language (see [Approval](usage.md#approval)); not user-editable |
+| `containerEnv` | `{}`        | Default environment seeded into a container when it is created; see [Default environment](#default-environment)                                                                 |
 
 ### Default environment
 

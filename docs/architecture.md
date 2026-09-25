@@ -185,8 +185,8 @@ the carrier applies its Host/Origin fence and browser authentication first:
   ops) against the orchestrator and returns the notice to show.
 
 The plugin's own config therefore holds **only real preferences**: the default
-image, the sockets root, and the page's active locale (`uiLocale`, so the host
-can render approval text in the session language — see
+image, the default environment, and the page's active locale (`uiLocale`, so the
+host can render approval text in the session language — see
 [Approval](usage.md#approval)). They are volatile fields, so an edit applies
 without reloading the plugin. Nothing derived from the orchestrator is
 persisted, and no command round-trips through the config document.

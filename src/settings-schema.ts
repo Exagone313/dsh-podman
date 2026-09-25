@@ -13,10 +13,11 @@ export const CONTAINER_NS = "podman";
 //
 // Every field is volatile: an edit commits in place without reloading the
 // plugin, so every consumer reads a value through its `Volatile` reference
-// instead of caching what it held at apply time.
+// instead of caching what it held at apply time. The socket and projects roots
+// are not preferences: the orchestrator reads them from the environment, so
+// they stay env-only on the plugin side too.
 export interface Config {
   defaultImage: Volatile<string>;
-  socketsRoot: Volatile<string>;
   uiLocale: Volatile<string>;
   // The environment seeded into a container when it is created; a recreate is
   // authoritative, so a value can be removed again. See container-env.ts.
@@ -25,7 +26,6 @@ export interface Config {
 
 export const Config = z.object({
   defaultImage: z.string().default("").volatile(),
-  socketsRoot: z.string().default("").volatile(),
   uiLocale: z.string().default("").volatile(),
   containerEnv: z.dict(z.string()).default({}).volatile(),
 }) as unknown as z<Config>;

@@ -6,19 +6,19 @@ import { BaseImageRow, ImageBuildModal, ImageItem } from "./container-card-image
 import { CachesSection } from "./container-card-caches.js";
 import { DefaultEnvironmentSection } from "./container-card-default-env.js";
 import { SecretsSection } from "./container-card-secrets.js";
-import { ConfigField, ConfirmButton } from "./container-card-shared.js";
+import { ConfirmButton } from "./container-card-shared.js";
 import { banner, footerRow, hint, imageSelect, sectionTitle } from "./container-card-styles.js";
 import { VolumesSection } from "./container-card-volumes.js";
 import { WorkspaceSection } from "./container-card-workspace.js";
 import { type ContainerCardFace } from "./container-card-controller.js";
 import { NS } from "./locales.js";
-import { Button, Input, Modal, writeClipboard } from "@deepseek-ai/dsh-client-ui-primitives";
+import { Button, Modal, writeClipboard } from "@deepseek-ai/dsh-client-ui-primitives";
 import {
   type InjectFace,
   type PropsLocale,
   type PropsRuntime,
 } from "@deepseek-ai/dsh-client-ui-slots";
-import { type ReactNode, useEffect, useId, useRef, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 
 // The labels of the version lines, emphasised against their values.
 const versionLabel: React.CSSProperties = { fontWeight: 600 };
@@ -41,7 +41,6 @@ export function ContainerCard(props: ContainerCardProps): ReactNode {
     "idle",
   );
   const copyResetTimer = useRef<ReturnType<typeof setTimeout>>();
-  const projectsRootId = useId();
   // Copies the version lines as displayed, so a user can paste them into a bug
   // report without transcribing anything.
   const copyVersions = async (): Promise<void> => {
@@ -310,43 +309,6 @@ export function ContainerCard(props: ContainerCardProps): ReactNode {
         onCreate={props.createSecret}
         onRemove={props.removeSecret}
         onSet={props.setSecret}
-      />
-      <div style={sectionTitle}>{t("configTitle")}</div>
-      <div
-        style={{
-          display: "flex",
-          flexWrap: "wrap",
-          alignItems: "center",
-          gap: "8px",
-          padding: "8px 0",
-        }}
-      >
-        <label
-          htmlFor={projectsRootId}
-          style={{
-            fontSize: "13px",
-            color: "var(--dsw-alias-label-secondary)",
-            minWidth: "110px",
-          }}
-        >
-          {t("projectsRoot")}
-        </label>
-        <Input
-          id={projectsRootId}
-          value={state.projectsRoot}
-          disabled
-          style={{ width: "200px" }}
-        />
-      </div>
-      <ConfigField
-        t={t}
-        label={t("socketsRoot")}
-        value={state.socketsRootDraft}
-        current={state.socketsRoot}
-        writable={state.writable}
-        onChange={props.editSocketsRoot}
-        onSave={props.saveSocketsRoot}
-        onDiscard={props.discardSocketsRoot}
       />
       <DefaultEnvironmentSection
         t={t}

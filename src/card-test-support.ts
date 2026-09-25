@@ -52,7 +52,6 @@ export function fakeContext(scope: FakeScope): any {
 export function baseValue(): Record<string, unknown> {
   return {
     defaultImage: "archlinux",
-    socketsRoot: "/run/dsh-podman",
     uiLocale: "",
     notice: "",
     command: null,

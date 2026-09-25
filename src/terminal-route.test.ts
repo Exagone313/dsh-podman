@@ -78,13 +78,20 @@ function routeHarness(sessions: TerminalSessions, resolver: any) {
 test("shell discovery parses the probe, dedups and orders sh/bash first", async () => {
   const { binding } = fakeGuest({
     stdout:
-      "sh\t/usr/bin/sh\nbash\t/usr/bin/bash\nzsh\t/opt/tools/bin/zsh\nnot a path\nshell\t/bin/bash\n",
+      "sh\t/usr/bin/sh\nbash\t/usr/bin/bash\nzsh\t/opt/tools/bin/zsh\nnot a path\nbash\t/bin/bash\nfish\t/usr/bin/fish\n",
   });
   const shells = await discoverShells(binding as any, ROOT);
   assert.deepEqual(
     shells.map((shell) => `${shell.name}=${shell.path}`),
-    ["sh=/usr/bin/sh", "bash=/usr/bin/bash", "shell=/bin/bash", "zsh=/opt/tools/bin/zsh"],
+    ["sh=/usr/bin/sh", "bash=/usr/bin/bash", "fish=/usr/bin/fish", "zsh=/opt/tools/bin/zsh"],
   );
+});
+
+test("shell discovery ignores names outside the candidate list", async () => {
+  const { binding } = fakeGuest({
+    stdout: "rbash\t/usr/bin/rbash\ngit-shell\t/usr/bin/git-shell\n",
+  });
+  assert.deepEqual(await discoverShells(binding as any, ROOT), []);
 });
 
 test("a shell missing from the probe is refused", async () => {

@@ -75,20 +75,25 @@ export async function discoverShells(
     undefined,
     { signal, maxBytes: PROBE_MAX_BYTES },
   );
-  const byPath = new Map<string, string>();
+  // The probe prints PATH hits first, then $SHELL and /etc/shells, so keeping
+  // the first path per candidate name prefers the PATH answer and drops both
+  // symlinked duplicates (/bin/sh vs /usr/bin/sh) and anything /etc/shells
+  // lists that is not one of our candidate names (rbash, git-shell, …).
+  const candidates = new Set<string>(SHELL_CANDIDATES);
+  const byName = new Map<string, string>();
   for (const line of result.stdout.split("\n")) {
     const [rawName, rawPath] = line.split("\t");
     const name = (rawName ?? "").trim();
     const path = (rawPath ?? "").trim();
     if (name === "" || !path.startsWith("/")) continue;
-    if (!byPath.has(path)) byPath.set(path, name);
+    if (!candidates.has(name)) continue;
+    if (!byName.has(name)) byName.set(name, path);
   }
-  return [...byPath]
-    .map(([path, name]) => ({ name, path }))
+  return [...byName]
+    .map(([name, path]) => ({ name, path }))
     .sort((left, right) =>
       rank(left.name) - rank(right.name) ||
-      left.name.localeCompare(right.name) ||
-      left.path.localeCompare(right.path)
+      left.name.localeCompare(right.name)
     );
 }
 

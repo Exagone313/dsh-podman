@@ -40,13 +40,13 @@ make test-go        # go test with the build tags
 make test           # test-go + pnpm test (JS tests, which run against dist/)
 make fmt            # gofmt -s + deno fmt (TypeScript and Markdown)
 make fmt-check      # verify the formatting without rewriting anything
-make download-licenses  # generate LICENSE.pkg from the project and third-party Go licenses
+make download-licenses  # generate third-party-licenses.pkg from the project and third-party Go licenses
 make image          # build the orchestrator, guest-agent and dsh container images
 ```
 
-`make image` 依赖 `LICENSE.pkg`：`download-licenses` 目标会运行
+`make image` 依赖 `third-party-licenses.pkg`：`download-licenses` 目标会运行
 `scripts/download-licenses` 中的 Go 收集器，它调用 `go-licenses save` 并将项目的
-MIT 许可证以及所有第三方 Go 许可证和 Apache `NOTICE` 汇总到 `LICENSE.pkg`
+MIT 许可证以及所有第三方 Go 许可证和 Apache `NOTICE` 汇总到 `third-party-licenses.pkg`
 中。该文件被 gitignore （从不提交），并被烘焙进 orchestrator 和 guest-agent
 镜像，位于 `/usr/share/licenses/dsh-podman/LICENSE`；由于工作区容器会挂载
 guest-agent 镜像，因此它也会随之进入每个工作区容器。

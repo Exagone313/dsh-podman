@@ -8,4 +8,4 @@
 !bin/linux-arm64/
 !bin/linux-amd64/dsh-podman-guest-agent
 !bin/linux-arm64/dsh-podman-guest-agent
-!LICENSE.pkg
+!third-party-licenses.pkg

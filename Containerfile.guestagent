@@ -7,5 +7,5 @@ ENV PATH=/bin
 ARG TARGETOS
 ARG TARGETARCH
 COPY bin/${TARGETOS}-${TARGETARCH}/dsh-podman-guest-agent /bin/dsh-podman-guest-agent
-COPY LICENSE.pkg /usr/share/licenses/dsh-podman/LICENSE
+COPY third-party-licenses.pkg /usr/share/licenses/dsh-podman/LICENSE
 ENTRYPOINT ["/bin/dsh-podman-guest-agent"]

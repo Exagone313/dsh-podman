@@ -41,14 +41,14 @@ make test-go        # go test with the build tags
 make test           # test-go + pnpm test (JS tests, which run against dist/)
 make fmt            # gofmt -s + deno fmt (TypeScript and Markdown)
 make fmt-check      # verify the formatting without rewriting anything
-make download-licenses  # generate LICENSE.pkg from the project and third-party Go licenses
+make download-licenses  # generate third-party-licenses.pkg from the project and third-party Go licenses
 make image          # build the orchestrator, guest-agent and dsh container images
 ```
 
-`make image` depends on `LICENSE.pkg`: the `download-licenses` target runs the
+`make image` depends on `third-party-licenses.pkg`: the `download-licenses` target runs the
 Go collector in `scripts/download-licenses`, which shells out to
 `go-licenses save` and gathers the project's MIT license plus every third-party
-Go license and Apache `NOTICE` into `LICENSE.pkg`. That file is gitignored
+Go license and Apache `NOTICE` into `third-party-licenses.pkg`. That file is gitignored
 (never committed) and is baked into the orchestrator and guest-agent images at
 `/usr/share/licenses/dsh-podman/LICENSE`; because workspace containers mount the
 guest-agent image, it also rides along into every workspace container.

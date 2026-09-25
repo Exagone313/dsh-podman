@@ -152,8 +152,8 @@ configured one — which happens with the version-tagged release reference, but
 not with the local `:latest` tag. After rebuilding the guest agent, recreate the
 containers yourself:
 
-- from the settings card, per container: **Recreate** (same image) or **Recreate
-  with image**;
+- from the Podman page (sidebar **Plugins** panel), per container: **Recreate**
+  (same image) or **Recreate with image**;
 - with `container_recreate`, for a named container or the default one.
 
 To rebuild a whole workspace instead, use **Remove pod** on its row (or
@@ -188,9 +188,10 @@ sourcing anything:
 | PATH additions    | `/opt/toolchain/gopath/bin`, `/opt/toolchain/npm-global/bin`, `/opt/toolchain/pnpm-home`                                                                                                                                                                                                                                   |
 | Environment       | `GOCACHE=/opt/toolchain/gocache`, `GOMODCACHE=/opt/toolchain/gomodcache`, `GOPATH=/opt/toolchain/gopath`, `npm_config_cache=/opt/toolchain/npm-cache`, `npm_config_prefix=/opt/toolchain/npm-global`, `PNPM_HOME=/opt/toolchain/pnpm-home`, `DENO_DIR=/opt/toolchain/deno-dir`, `GOENV=/opt/toolchain/home/.config/go/env` |
 
-Set the commit identity once in the settings card's
-[Default environment](configuration.md#default-environment) → **Git identity**,
-so containers get `GIT_AUTHOR_*`/`GIT_COMMITTER_*` without a `~/.gitconfig`.
+Set the commit identity once on the Podman page (sidebar **Plugins** panel)
+under [Default environment](configuration.md#default-environment) → **Git
+identity**, so containers get `GIT_AUTHOR_*`/`GIT_COMMITTER_*` without a
+`~/.gitconfig`.
 
 The prompt applies all of this from inside dsh and can be pasted again to repair
 a workspace. Podman stores managed volumes with `DSH_PODMAN_VOLUME_PREFIX`

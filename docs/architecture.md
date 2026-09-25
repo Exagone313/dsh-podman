@@ -31,7 +31,7 @@ call from a plugin whose **major** version differs, naming both versions and
 which side is behind — an out-of-sync deployment fails loudly instead of being
 misread. A missing or unparseable version is refused as well. A minor or patch
 difference is compatible: the call proceeds, the orchestrator logs it once per
-plugin version, and the settings card shows it. `GetVersion` is exempt from the
+plugin version, and the Podman page shows it. `GetVersion` is exempt from the
 check, so a plugin can always learn the orchestrator's version.
 
 The orchestrator service exposes these gRPC methods (backing both the UI and the
@@ -51,7 +51,7 @@ workspace's current image), `RemoveContainer`, `AddContainerMount`,
 `UpdateContainerMount`, `RemoveContainerMount`, `SetContainerPaths`,
 `AddContainerSecret`, and `RemoveContainerSecret`. The service also exposes the
 workspace, volume, secret, image (build, rebuild, remove and base-image pull),
-and cache (list and clean) operations that back the settings card, plus
+and cache (list and clean) operations that back the Podman page, plus
 `GetVersion`.
 
 ## Workspaces and pods
@@ -71,7 +71,7 @@ model reads the artifact back with the container file tools instead of a host
 path the container cannot reach.
 
 A workspace's pod is torn down when its last container is removed, or directly
-through `RemoveWorkspace` (the settings card's **Remove pod** action), which
+through `RemoveWorkspace` (the Podman page's **Remove pod** action), which
 stops the containers' daemons, removes the pod and its containers, cleans their
 socket directories, and drops the stored workspace. Volumes, secrets, and
 project data are left untouched.
@@ -167,16 +167,16 @@ lists only the custom images, so it never names a base the call had to ensure.
 
 When a host cache is configured (`DSH_PODMAN_HOST_*_CACHE`, mounted into both
 the build container and the orchestrator), builds reuse downloaded packages. The
-settings card reports each cache's size and can clean it — keep the newest
+Podman page reports each cache's size and can clean it — keep the newest
 version of every package, or empty the cache. The builder serializes a cleanup
 against builds with a read/write lock, so a cleanup never deletes a package out
 from under a running build.
 
-## Settings card transport
+## Podman page transport
 
-The card talks to the host over one authenticated fetch route below the harness
-API path (`/api/podman/card`), registered on the connection service so the
-carrier applies its Host/Origin fence and browser authentication first:
+The Podman page talks to the host over one authenticated fetch route below the
+harness API path (`/api/podman/card`), registered on the connection service so
+the carrier applies its Host/Origin fence and browser authentication first:
 
 - `GET` returns the live orchestrator snapshot (containers, images, workspaces,
   volumes, secrets, caches), built fresh on every request.
@@ -185,7 +185,7 @@ carrier applies its Host/Origin fence and browser authentication first:
   ops) against the orchestrator and returns the notice to show.
 
 The plugin's own config therefore holds **only real preferences**: the default
-image, the sockets root, and the card's active locale (`uiLocale`, so the host
+image, the sockets root, and the page's active locale (`uiLocale`, so the host
 can render approval text in the session language — see
 [Approval](usage.md#approval)). They are volatile fields, so an edit applies
 without reloading the plugin. Nothing derived from the orchestrator is

@@ -6,7 +6,7 @@ SPDX-License-Identifier: MIT
 
 # Usage
 
-This page documents the model-facing tools, the settings card, and the image
+This page documents the model-facing tools, the Podman page, and the image
 model. See [Architecture](architecture.md) for how the pieces fit together.
 
 ## Model context
@@ -38,8 +38,8 @@ dsh-podman organizes the images its containers run into three tiers:
   manager. By default they are **built locally** from the primitive (installing
   the default packages); when `DSH_PODMAN_BASE_IMAGE_PREFIX` points at a
   registry (anything not starting with `localhost/`), they are **pulled**
-  instead. Base images are listed in the settings UI even when not yet
-  built/pulled, are rebuilt or pulled from the card, and their short names are
+  instead. Base images are listed on the Podman page even when not yet
+  built/pulled, are rebuilt or pulled from there, and their short names are
   reserved — they cannot be built over, rebuilt, or removed as custom images.
 - **Custom images** are user-built images created from a **parent** — a base
   image or another custom image — inheriting its package manager and adding
@@ -91,11 +91,11 @@ touches, quoting every identifier — for example
 `Add mount to container "web": volume "data" (read-only)`. It covers the
 container image, each mount's kind and destination, the environment variable
 keys, the secret env var names, and the resolved file path. It follows the UI
-language: the browser client records the active locale in the plugin settings,
-with the durable locale preference as the fallback (English when neither is
-set). A policy denial — a read-only sandbox, or a destination on a project mount
-— is reported in the same language. The settings-card actions are direct control
-calls and are not gated.
+language: the browser client records the active locale in the plugin's
+`uiLocale` preference, which the Host persists in the plugin config (English
+when unset). A policy denial — a read-only sandbox, or a destination on a
+project mount — is reported in the same language. The Podman page's actions are
+direct control calls and are not gated.
 
 `container_start`, `container_recreate`, and `container_bash` accept an `env`
 map applied to the container (or the bash process); `container_exec` and
@@ -113,7 +113,8 @@ guest-agent wiring.
 New containers are also seeded with the plugin's **default environment** (the
 `containerEnv` setting), so a git identity can be configured once instead of per
 project — see [Default environment](configuration.md#default-environment). The
-card's **Git identity** popup fills the four `GIT_AUTHOR_*`/`GIT_COMMITTER_*`
+Podman page's **Git identity** popup fills the four
+`GIT_AUTHOR_*`/`GIT_COMMITTER_*`
 variables from one name and one email, and **Apply default environment
 variables** adds them to the running containers that lack them.
 
@@ -217,7 +218,7 @@ Project mounts do not take a `destination`: a project directory is always
 mounted at its mirrored path under the projects root. `destination` applies only
 to `tmpfs`, `volume` and `secret` mounts.
 
-In the settings card, the project path field of the add-mount and
+On the Podman page, the project path field of the add-mount and
 create-container dialogs has a **Browse…** button. It opens a directory picker
 that reads the projects root through dsh's own host-side directory listing — the
 same service behind dsh's workspace directory selection — not through the
@@ -295,7 +296,7 @@ read tool. A secret can be attached to a container either as a **mount**
 (`container_mount_add kind="secret"` + `secret` + `destination`, read-only, at
 an absolute path never under the projects root) or as an **environment
 variable** (`container_secret_add`; the env var name must not start with
-`DSH_PODMAN`). The settings card can **overwrite** a secret with user-typed
+`DSH_PODMAN`). The Podman page can **overwrite** a secret with user-typed
 content (write-only) but never reads it.
 
 A secret mounted at a path is created as a root-owned **file** (not a directory)
@@ -335,9 +336,9 @@ started with.
 
 ## Container management UI
 
-The plugin ships a browser half that registers a card in the dsh **Settings →
-Plugins** page. The card lists the orchestrator-created guest containers and the
-built images. A workspace with no container gets a **Create container** button
+The plugin ships a browser half that registers a page on the dsh sidebar's
+**Plugins** panel. The page lists the orchestrator-created guest containers and
+the built images. A workspace with no container gets a **Create container** button
 that opens a configuration modal — image, environment, mounts (project, tmpfs,
 volume, and secret), PATH additions, and secret environment variables — and
 workspaces that already have containers offer an **Add container** button for
@@ -353,8 +354,8 @@ also offers **Remove**, **Recreate** (same image), and **Recreate with image**.
 Every workspace row also offers **Remove pod**, which removes the workspace's
 pod, all of its containers, and the orchestrator's record for it (volumes,
 secrets, and project data are kept); removing a workspace's last container
-removes its pod as well, so an empty pod is never left behind. The card re-reads
-the live state whenever the Plugins page is opened, and its header has a
+removes its pod as well, so an empty pod is never left behind. The page re-reads
+the live state whenever the Plugins panel opens it, and its footer has a
 **Reload this view** button. The images section can rebuild a single image or
 **rebuild all** in dependency order; **Build image** opens a popup with an
 image-id/base-image form and a chip input for the package list (type a name and

@@ -261,8 +261,8 @@ export async function runCommand(
       );
       if (mounts.length > 0) payload.mounts = mounts;
       if (Object.keys(command.env).length > 0) payload.env = command.env;
-      if (Object.keys(command.secretEnvMap).length > 0) {
-        payload.secretEnv = command.secretEnvMap;
+      if (Object.keys(command.secretEnv).length > 0) {
+        payload.secretEnv = command.secretEnv;
       }
       if (command.paths.length > 0) payload.paths = [...command.paths];
       if (command.container !== "") {
@@ -420,7 +420,7 @@ export async function runCommand(
       await resolver.control("addContainerSecret", {
         workspaceSlug: command.workspace,
         container: command.container || "default",
-        env: command.secretEnv,
+        env: command.secretEnvName,
         secret: command.secret,
       });
       break;
@@ -428,7 +428,7 @@ export async function runCommand(
       await resolver.control("removeContainerSecret", {
         workspaceSlug: command.workspace,
         container: command.container || "default",
-        env: command.secretEnv,
+        env: command.secretEnvName,
       });
       break;
     case "image_build":
@@ -521,11 +521,11 @@ function normalizeCommand(raw: Record<string, unknown>): CommandRequest {
     env: stringMap(raw.env),
     container: stringField(raw.container),
     secret: stringField(raw.secret),
-    secretEnv: stringField(raw.secretEnv),
+    secretEnvName: stringField(raw.secretEnvName),
     length: typeof raw.length === "number" ? raw.length : 0,
     charset: stringField(raw.charset),
     packages: Array.isArray(raw.packages) ? raw.packages.map(String) : [],
-    secretEnvMap: stringMap(raw.secretEnvMap),
+    secretEnv: stringMap(raw.secretEnv),
     cacheMode: stringField(raw.cacheMode),
     mount: mountField(raw.mount),
   };

@@ -141,7 +141,7 @@ test("create command drives createWorkspace with env", async () => {
       mounts: [],
       env: { A: "1", B: "2" },
       container: "",
-      secretEnvMap: {},
+      secretEnv: {},
       mount: null,
     },
   });
@@ -181,7 +181,7 @@ test("create command drives createWorkspace without env when empty", async () =>
       mounts: [],
       env: {},
       container: "",
-      secretEnvMap: {},
+      secretEnv: {},
       mount: null,
     },
   });

@@ -33,7 +33,7 @@ test("create command sends PATH additions", async () => {
       paths: ["/opt/bin"],
       env: {},
       container: "",
-      secretEnvMap: {},
+      secretEnv: {},
       mount: null,
     },
   });
@@ -70,7 +70,7 @@ test("create command sends PATH additions", async () => {
       mounts: [],
       paths: ["/opt/bin", "/usr/local/bin"],
       env: {},
-      secretEnvMap: {},
+      secretEnv: {},
       mount: null,
     },
   });
@@ -271,7 +271,7 @@ test("create command with a container name routes to startContainer", async () =
       at: 1,
       mounts: [],
       env: {},
-      secretEnvMap: {},
+      secretEnv: {},
       mount: null,
     },
   });
@@ -315,7 +315,7 @@ test("create command sends secret env", async () => {
       mounts: [],
       env: {},
       container: "",
-      secretEnvMap: { VALKEY_PASSWORD: "valkey-tls" },
+      secretEnv: { VALKEY_PASSWORD: "valkey-tls" },
       mount: null,
     },
   });
@@ -353,7 +353,7 @@ test("create command sends secret env", async () => {
       mounts: [],
       env: {},
       container: "",
-      secretEnvMap: {},
+      secretEnv: {},
       mount: null,
     },
   });

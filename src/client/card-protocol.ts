@@ -55,11 +55,11 @@ export interface CommandRequest {
   env: Record<string, string>;
   container: string;
   secret: string;
-  secretEnv: string;
+  secretEnvName: string;
   length: number;
   charset: string;
   packages: string[];
-  secretEnvMap: Record<string, string>;
+  secretEnv: Record<string, string>;
   cacheMode: string;
   mount: MountInput | null;
 }

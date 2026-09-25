@@ -219,11 +219,11 @@ export class ContainerCardController {
       env?: Record<string, string>;
       container?: string;
       secret?: string;
-      secretEnv?: string;
+      secretEnvName?: string;
       length?: number;
       charset?: string;
       packages?: string[];
-      secretEnvMap?: Record<string, string>;
+      secretEnv?: Record<string, string>;
       cacheMode?: string;
       mount?: MountInput | null;
     } = {},
@@ -239,11 +239,11 @@ export class ContainerCardController {
       env: extra.env ?? {},
       container: extra.container ?? "",
       secret: extra.secret ?? "",
-      secretEnv: extra.secretEnv ?? "",
+      secretEnvName: extra.secretEnvName ?? "",
       length: extra.length ?? 0,
       charset: extra.charset ?? "",
       packages: extra.packages ?? [],
-      secretEnvMap: extra.secretEnvMap ?? {},
+      secretEnv: extra.secretEnv ?? {},
       cacheMode: extra.cacheMode ?? "",
       mount: extra.mount ?? null,
     });
@@ -330,7 +330,7 @@ export class ContainerCardController {
             ...(config?.mounts && config.mounts.length > 0 ? { mounts: config.mounts } : {}),
             ...(config?.env && Object.keys(config.env).length > 0 ? { env: config.env } : {}),
             ...(config?.paths && config.paths.length > 0 ? { paths: config.paths } : {}),
-            ...(config?.secretEnv && Object.keys(config.secretEnv).length > 0 ? { secretEnvMap: config.secretEnv } : {}),
+            ...(config?.secretEnv && Object.keys(config.secretEnv).length > 0 ? { secretEnv: config.secretEnv } : {}),
           },
         ),
       startContainer: (workspace, container, config) =>
@@ -343,7 +343,7 @@ export class ContainerCardController {
             ...(config?.mounts && config.mounts.length > 0 ? { mounts: config.mounts } : {}),
             ...(config?.env && Object.keys(config.env).length > 0 ? { env: config.env } : {}),
             ...(config?.paths && config.paths.length > 0 ? { paths: config.paths } : {}),
-            ...(config?.secretEnv && Object.keys(config.secretEnv).length > 0 ? { secretEnvMap: config.secretEnv } : {}),
+            ...(config?.secretEnv && Object.keys(config.secretEnv).length > 0 ? { secretEnv: config.secretEnv } : {}),
           },
         ),
       addContainerMount: (workspace, container, mount) =>
@@ -378,13 +378,13 @@ export class ContainerCardController {
       addContainerSecret: (workspace, envVar, secret) =>
         this.command("container_secret_add", workspace, "", {
           container: "default",
-          secretEnv: envVar,
+          secretEnvName: envVar,
           secret,
         }),
       removeContainerSecret: (workspace, envVar) =>
         this.command("container_secret_remove", workspace, "", {
           container: "default",
-          secretEnv: envVar,
+          secretEnvName: envVar,
         }),
       editSocketsRoot: (text) => this.edit("socketsRoot", text),
       saveSocketsRoot: () => this.save("socketsRoot"),

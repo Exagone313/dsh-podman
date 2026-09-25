@@ -38,7 +38,7 @@ test("create command drives createWorkspace with mounts and image", async () => 
       mounts: [{ kind: "project", project: "team", mode: "read_write", destination: "", volume: "", secret: "" }],
       env: {},
       container: "",
-      secretEnvMap: {},
+      secretEnv: {},
       mount: null,
     },
   });
@@ -407,7 +407,7 @@ test("create command reports an unknown mount kind as a notice", async () => {
       }],
       env: {},
       container: "",
-      secretEnvMap: {},
+      secretEnv: {},
       mount: null,
     },
   });
@@ -439,7 +439,7 @@ test("create command reports an unknown mount mode as a notice", async () => {
       }],
       env: {},
       container: "",
-      secretEnvMap: {},
+      secretEnv: {},
       mount: null,
     },
   });

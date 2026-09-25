@@ -129,7 +129,7 @@ test("mount tools reject a read-write secret mount", async () => {
   assert.deepEqual(requests, [], "a rejected mount must not reach the orchestrator");
 });
 
-test("container_list returns secret_env maps on container rows", async () => {
+test("container_list returns secretEnv maps on container rows", async () => {
   const resolver = {
     registry: {
       resolveByPath: async () => ({ id: WORKSPACE_ID }),

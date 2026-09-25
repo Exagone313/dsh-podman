@@ -33,6 +33,7 @@
   "files": [
     "dist",
     "docs",
+    "quadlet",
     "cordis.patch.yml",
     "LICENSE",
     "README.md",

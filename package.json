@@ -34,7 +34,9 @@
     "dist",
     "docs",
     "cordis.patch.yml",
-    "README.md"
+    "LICENSE",
+    "README.md",
+    "README.zh.md"
   ],
   "scripts": {
     "build": "node scripts/generate-version.mjs && tsc -p tsconfig.json && tsc -p tsconfig.client.json && node scripts/copy-proto.mjs && node scripts/build-client-bundle.mjs",

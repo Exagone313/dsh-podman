@@ -33,6 +33,20 @@ test("every @deepseek-ai specifier is an exact version", () => {
   }
 });
 
+test("every peer dependency is declared optional", () => {
+  const pkg = manifest() as unknown as {
+    peerDependencies?: Record<string, string>;
+    peerDependenciesMeta?: Record<string, { optional?: boolean }>;
+  };
+  for (const name of Object.keys(pkg.peerDependencies ?? {})) {
+    assert.equal(
+      pkg.peerDependenciesMeta?.[name]?.optional,
+      true,
+      `peerDependenciesMeta["${name}"].optional must be true`,
+    );
+  }
+});
+
 test("every @deepseek-ai/dsh-* specifier matches ARG DSH_VERSION", (context) => {
   const containerfile = new URL("../Containerfile.dsh", import.meta.url);
   if (!existsSync(containerfile)) {

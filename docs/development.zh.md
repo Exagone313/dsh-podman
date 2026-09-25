@@ -143,6 +143,10 @@ guest-agent 镜像引用与当前配置不一致时，orchestrator 才会自行�
 若要重建整个工作区，可在其行上使用 **Remove pod**（或 `RemoveWorkspace`）：pod
 及其所有容器都会被移除，下次接入时会重新创建 pod 与默认容器。重启这两个服务绝不会触及工作区容器，上述两种操作也都不会删除卷、机密或项目数据。
 
+仍在运行旧镜像中 guest agent 的容器会让 dsh 为其 guest 套接字记录
+`rejected by server because of excess pings`。该消息无害（grpc-js 会退避并重连），重建该容器后即消失；若同样的消息出现在
+`orchestrator.sock` 上，则说明 orchestrator 服务仍在运行上一个镜像。
+
 ### 安装本地插件构建
 
 dsh 镜像会在容器启动时自行安装插件，因此本地开发构建通过将安装源指向 bind mount

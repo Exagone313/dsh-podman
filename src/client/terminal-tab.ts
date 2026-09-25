@@ -37,17 +37,31 @@ export interface PodmanTerminalParams {
   readonly shell?: string;
 }
 
-// Default keyboard profiles for opening a Podman terminal. The shortcuts
-// registry validates every declared default and THROWS on one it does not
-// admit, inside apply(), which fails the whole client entry and the web boot —
-// so these profiles are load-bearing, not cosmetic:
+// Keyboard profiles for opening a Podman terminal. The shortcuts registry
+// validates every declared default and THROWS on one it does not admit, inside
+// apply(), which fails the whole client entry and the web boot — so these
+// profiles are load-bearing, not cosmetic:
 // - Linux Web admits only Ctrl+/, Ctrl+Shift+, and Ctrl+Shift+. (the browser and
-//   system reservation rules), so no `web:linux` default can exist; the harness's
-//   own terminal ships none either and is opened from the guide there.
+//   system reservation rules), so no `web:linux` default can exist.
 // - macOS Web admits Ctrl+` and Meta+Shift+`, but not Ctrl+Shift+`; Windows Web
-//   admits Ctrl+Shift+`. Hence the split between the two Web profiles.
-// - The same binding on Desktop is accepted on every platform.
+//   admits both Ctrl+` and Ctrl+Shift+`.
+// - Desktop accepts Ctrl+` on every platform.
+//
+// The preferred binding is the built-in terminal's own Ctrl+`; this plugin's
+// bundle patch disables that client UI, which is what frees it.
 export const PODMAN_TERMINAL_SHORTCUT_DEFAULTS = {
+  "desktop:macos": { code: "Backquote", modifiers: ["control"] },
+  "desktop:windows": { code: "Backquote", modifiers: ["control"] },
+  "desktop:linux": { code: "Backquote", modifiers: ["control"] },
+  "web:macos": { code: "Backquote", modifiers: ["control"] },
+  "web:windows": { code: "Backquote", modifiers: ["control"] },
+} satisfies Partial<
+  Record<`${ShortcutRuntime}:${ShortcutPlatform}`, ShortcutBinding>
+>;
+
+// Registered when the preferred binding is refused — the built-in terminal UI
+// is enabled again and still owns Ctrl+`, or another command claimed it.
+export const PODMAN_TERMINAL_SHORTCUT_FALLBACK_DEFAULTS = {
   "desktop:macos": { code: "Backquote", modifiers: ["control", "shift"] },
   "desktop:windows": { code: "Backquote", modifiers: ["control", "shift"] },
   "desktop:linux": { code: "Backquote", modifiers: ["control", "shift"] },

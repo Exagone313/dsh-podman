@@ -10,7 +10,7 @@ SPDX-License-Identifier: MIT
 运行在 dsh-podman 镜像中，并与编排器一同由 Quadlet 单元启动。
 
 dsh 镜像会在容器启动时安装 dsh-podman 插件，而该插件的 bundle 层正是禁用 dsh
-自带的 `subprocess`、`fs-sandbox` 与 `spill-local`
+自带的 `subprocess`、`fs-sandbox`、`spill-local` 与内置终端界面（`ui-sidebar-terminal`）
 插件的原因。因此，卸载也意味着不再使用 dsh-podman 运行 dsh：其内置的 shell
 与文件系统工具会重新启用，并以 dsh 用户的身份**在主机上**运行，不再有容器隔离。
 

@@ -75,7 +75,8 @@ policy):
   `read`, `glob`, and `grep` always run.
 - **Workspace Write** — the `✱` tools ask through DSH's approval service (the
   call shows the standard approval prompt and is denied when no approval channel
-  is available); `container_start` asks only when `mounts` is passed.
+  is available); `container_start` asks only when `mounts` is passed or
+  `secretEnv` attaches secrets.
 - **Full access** — tools run without approval prompts.
 
 The harness's `sandbox_permissions` argument (a one-shot sandbox widening, e.g.
@@ -86,11 +87,12 @@ The prompt's reason is a full sentence naming the action and the objects it
 touches, quoting every identifier — for example
 `Add mount to container "web": volume "data" (read-only)`. It covers the
 container image, each mount's kind and destination, the environment variable
-keys, and the resolved file path. It follows the UI language: the browser client
-records the active locale in the plugin settings, with the durable locale
-preference as the fallback (English when neither is set). A policy denial — a
-read-only sandbox, or a destination on a project mount — is reported in the same
-language. The settings-card actions are direct control calls and are not gated.
+keys, the secret env var names, and the resolved file path. It follows the UI
+language: the browser client records the active locale in the plugin settings,
+with the durable locale preference as the fallback (English when neither is
+set). A policy denial — a read-only sandbox, or a destination on a project mount
+— is reported in the same language. The settings-card actions are direct control
+calls and are not gated.
 
 `container_start`, `container_recreate`, and `container_bash` accept an `env`
 map applied to the container (or the bash process); `container_exec` and
@@ -136,7 +138,7 @@ managed `DSH_*` fact.
 | `container_read`       | `container`, `file_path`, optional `offset`, `limit`                                                  | Read a file                                                                                                                                 |
 | `container_recreate` ✱ | `container`, optional `image`, `mounts`, `env`, `secretEnv`, `paths`                                  | Recreate a container, keeping its current image when `image` is omitted, optionally with new project mounts, environment, or PATH additions |
 | `container_remove` ✱   | `container`                                                                                           | Remove a container (stops its daemons gracefully first)                                                                                     |
-| `container_start` ✱    | `container`, optional `image`, `mounts`, `env`, `secretEnv`, `paths`                                  | Start a container (default image when `image` is omitted); approval required only when `mounts` is passed                                   |
+| `container_start` ✱    | `container`, optional `image`, `mounts`, `env`, `secretEnv`, `paths`                                  | Start a container (default image when `image` is omitted); approval required only when `mounts` or `secretEnv` is passed                    |
 | `container_write`      | `container`, `file_path`, `content`                                                                   | Write a file                                                                                                                                |
 
 The `container_bash`, `container_exec`, `container_read`, `container_write`,
@@ -377,7 +379,8 @@ are global and all remain available, split as:
 - **Direct:** `image_list`, `image_get`, `container_list`, `container_read`,
   `container_glob`, `container_grep`, `container_mount_list`, `volume_list`,
   `secret_list`, `secret_create`, `daemon_list`, `daemon_logs`, `daemon_stop`,
-  `daemon_restart`, `container_start` (asks only when `mounts` is passed).
+  `daemon_restart`, `container_start` (asks only when `mounts` or `secretEnv` is
+  passed).
 - **Approval-gated** (the usual `✱` tools): `image_build`, `image_rebuild`,
   `image_rebuild_all`, `image_remove`, `container_recreate`, `container_remove`,
   `container_mount_add`, `container_mount_remove`, `container_mount_update`,

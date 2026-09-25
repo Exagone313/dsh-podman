@@ -60,14 +60,14 @@ dsh-podman 将容器运行的镜像组织为三个层级：
   和 `grep` 始终可运行。
 - **Workspace Write** — 带 `✱` 的工具通过 DSH
   的审批服务询问（调用会显示标准审批提示，当没有可用的审批通道时被拒绝）；`container_start`
-  仅在传入 `mounts` 时询问。
+  仅在传入 `mounts` 或 `secretEnv` 时询问。
 - **Full access** — 工具运行时不显示审批提示。
 
 harness 的 `sandbox_permissions` 参数（例如 `bash`
 上的一次性沙箱放宽）会被接受但在此处没有效果：沙箱在容器内被绕过，因此插件会直接授予该升权而不询问。
 
 审批提示的原因是一句话，说明操作及其涉及的对象，并对每个标识符加引号——例如
-`Add mount to container "web": volume "data" (read-only)`。它涵盖容器镜像、每个挂载的类型与目标路径、环境变量的键，以及解析后的文件路径。它会跟随界面语言：浏览器客户端将当前语言记录到插件设置中，并以持久化的语言偏好作为回退（两者都未设置时为英文）。策略拒绝——只读沙箱，或项目挂载上指定了目标路径——也会使用相同的语言。设置卡片操作是直接的控制调用，不进行门控。
+`Add mount to container "web": volume "data" (read-only)`。它涵盖容器镜像、每个挂载的类型与目标路径、环境变量的键、机密环境变量名，以及解析后的文件路径。它会跟随界面语言：浏览器客户端将当前语言记录到插件设置中，并以持久化的语言偏好作为回退（两者都未设置时为英文）。策略拒绝——只读沙箱，或项目挂载上指定了目标路径——也会使用相同的语言。设置卡片操作是直接的控制调用，不进行门控。
 
 `container_start`、`container_recreate` 和 `container_bash` 接受应用于容器（或
 bash 进程）的 `env` 映射；`container_exec` 和 `daemon_start` 已经接受 `env`，而
@@ -97,19 +97,19 @@ bash 进程）的 `env` 映射；`container_exec` 和 `daemon_start` 已经接�
 
 ### 容器
 
-| 工具                   | 参数                                                                                                  | 描述                                                                                |
-| ---------------------- | ----------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
-| `container_bash`       | `container`, `command`, `description`, optional `workdir`, `timeoutMs`, `env`, `uid`, `gid`, `groups` | 运行 shell 命令                                                                     |
-| `container_edit`       | `container`, `file_path`, `old_string`, `new_string`, optional `replace_all`                          | 编辑文件                                                                            |
-| `container_exec`       | `container`, `argv`, `description`, optional `workdir`, `timeoutMs`, `env`, `uid`, `gid`, `groups`    | 运行程序                                                                            |
-| `container_glob`       | `container`, `pattern`, optional `path`                                                               | 列出匹配模式的文件                                                                  |
-| `container_grep`       | `container`, `pattern`, optional `path`, `include`                                                    | 按正则表达式搜索文件                                                                |
-| `container_list`       | —                                                                                                     | 列出当前工作区的容器                                                                |
-| `container_read`       | `container`, `file_path`, optional `offset`, `limit`                                                  | 读取文件                                                                            |
-| `container_recreate` ✱ | `container`, optional `image`, `mounts`, `env`, `secretEnv`, `paths`                                  | 重建容器，省略 `image` 时保留其当前镜像，可选地使用新的项目挂载、环境或 PATH 附加项 |
-| `container_remove` ✱   | `container`                                                                                           | 移除容器（先优雅地停止其守护进程）                                                  |
-| `container_start` ✱    | `container`, optional `image`, `mounts`, `env`, `secretEnv`, `paths`                                  | 启动容器（省略 `image` 时使用默认镜像）；仅在传入 `mounts` 时需要审批               |
-| `container_write`      | `container`, `file_path`, `content`                                                                   | 写入文件                                                                            |
+| 工具                   | 参数                                                                                                  | 描述                                                                                 |
+| ---------------------- | ----------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| `container_bash`       | `container`, `command`, `description`, optional `workdir`, `timeoutMs`, `env`, `uid`, `gid`, `groups` | 运行 shell 命令                                                                      |
+| `container_edit`       | `container`, `file_path`, `old_string`, `new_string`, optional `replace_all`                          | 编辑文件                                                                             |
+| `container_exec`       | `container`, `argv`, `description`, optional `workdir`, `timeoutMs`, `env`, `uid`, `gid`, `groups`    | 运行程序                                                                             |
+| `container_glob`       | `container`, `pattern`, optional `path`                                                               | 列出匹配模式的文件                                                                   |
+| `container_grep`       | `container`, `pattern`, optional `path`, `include`                                                    | 按正则表达式搜索文件                                                                 |
+| `container_list`       | —                                                                                                     | 列出当前工作区的容器                                                                 |
+| `container_read`       | `container`, `file_path`, optional `offset`, `limit`                                                  | 读取文件                                                                             |
+| `container_recreate` ✱ | `container`, optional `image`, `mounts`, `env`, `secretEnv`, `paths`                                  | 重建容器，省略 `image` 时保留其当前镜像，可选地使用新的项目挂载、环境或 PATH 附加项  |
+| `container_remove` ✱   | `container`                                                                                           | 移除容器（先优雅地停止其守护进程）                                                   |
+| `container_start` ✱    | `container`, optional `image`, `mounts`, `env`, `secretEnv`, `paths`                                  | 启动容器（省略 `image` 时使用默认镜像）；仅在传入 `mounts` 或 `secretEnv` 时需要审批 |
+| `container_write`      | `container`, `file_path`, `content`                                                                   | 写入文件                                                                             |
 
 `container_bash`、`container_exec`、`container_read`、`container_write`、
 `container_edit`、`container_glob` 和 `container_grep` 的参数与 harness 内置的
@@ -304,7 +304,7 @@ mode、jobs）。插件自身的工具是全局的，全部保持可用，分为
 
 - **直接：**
   `image_list`、`image_get`、`container_list`、`container_read`、`container_glob`、`container_grep`、`container_mount_list`、`volume_list`、`secret_list`、`secret_create`、`daemon_list`、`daemon_logs`、`daemon_stop`、`daemon_restart`、`container_start`（仅在传入
-  `mounts` 时询问）。
+  `mounts` 或 `secretEnv` 时询问）。
 - **需审批**（通常的 `✱`
   工具）：`image_build`、`image_rebuild`、`image_rebuild_all`、`image_remove`、`container_recreate`、`container_remove`、`container_mount_add`、`container_mount_remove`、`container_mount_update`、`container_path_set`、`container_path_add`、`container_path_remove`、`volume_remove`、`secret_remove`、`container_secret_add`、`container_secret_remove`。
 - **仅在此预设中需审批：**

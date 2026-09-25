@@ -217,7 +217,8 @@ container's PATH (including the deployment's PATH additions) and merged with
 `/etc/shells` and `$SHELL`, so only shells the container really provides are
 offered, most capable first — the order mirrors the harness's own candidate
 preference and ends with the minimal POSIX shells, and the first entry is the
-client's default. The tab's workspace is derived from the session's working
-directory and is never chosen, shown or defaulted: a session outside every
-workspace is reported, so the host still receives a project name it resolves by
-path. The selected path is re-verified before the shell starts.
+client's default. The tab's workspace is resolved by the host from the session's
+own working directory — never chosen, shown or defaulted in the browser: a
+session outside every workspace is reported, and the client only uses the project
+name and workspace slug it is given. The selected path is re-verified before the
+shell starts.

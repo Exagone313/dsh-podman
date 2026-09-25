@@ -161,4 +161,4 @@ volatile 字段，修改后无需重新加载插件即可生效。orchestrator
 
 Podman 终端标签页通过自身在同一 connection 服务上的已认证路由（`/api/podman/terminal`、`/api/podman/terminal/shells`、`/api/podman/terminal/retained`）与 guest pty 通信。打开路由以换行分隔的 JSON 帧（ready、snapshot、base64 输出、title、exit、error、detached）进行流式传输，并通过 POST 接收控制请求（input、resize、rename、close）；承载层会像卡片路由一样应用 Host/Origin 校验和浏览器认证。
 
-每个终端以 `(sessionId, tabId)` 为键并由主机保留：没有浏览器接入时 guest pty 仍然存活，同时每个输出块都会写入一个无头终端模拟器，重新接入时回放其序列化屏幕，因此刷新页面不会丢失 shell 及其回滚缓冲。shell 探测在目标容器内进行：以 POSIX `command -v` 在该容器的 PATH（含部署的 PATH 追加项）中解析候选名称，并与 `/etc/shells` 和 `$SHELL` 合并，因此只提供容器确实拥有的 shell；顺序按能力从强到弱（与 harness 自身的候选顺序一致，最精简的 POSIX shell 排在最后），第一项即客户端的默认值。标签页的工作区由会话的工作目录推导，既不可选择、不会显示，也不会回退：会话不在任何工作区内时会直接提示，因此主机仍会收到用于按路径解析的项目名。所选路径在启动前会再次校验。
+每个终端以 `(sessionId, tabId)` 为键并由主机保留：没有浏览器接入时 guest pty 仍然存活，同时每个输出块都会写入一个无头终端模拟器，重新接入时回放其序列化屏幕，因此刷新页面不会丢失 shell 及其回滚缓冲。shell 探测在目标容器内进行：以 POSIX `command -v` 在该容器的 PATH（含部署的 PATH 追加项）中解析候选名称，并与 `/etc/shells` 和 `$SHELL` 合并，因此只提供容器确实拥有的 shell；顺序按能力从强到弱（与 harness 自身的候选顺序一致，最精简的 POSIX shell 排在最后），第一项即客户端的默认值。标签页的工作区由主机根据会话自身的工作目录解析，浏览器既不可选择、不会显示，也不会回退：会话不在任何工作区内时会直接提示，客户端只使用主机给出的项目名与工作区 slug。所选路径在启动前会再次校验。

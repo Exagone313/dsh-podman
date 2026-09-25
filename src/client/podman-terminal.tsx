@@ -18,17 +18,13 @@ import type { ContainerCardFace } from "./container-card-controller.js";
 import { fieldLabel, imageSelect } from "./container-card-styles.js";
 import { NS } from "./locales.js";
 import type { PodmanTerminalParams } from "./terminal-tab.js";
-import type { TerminalFrame, TerminalShellView } from "./terminal-protocol.js";
-import {
-  containerOptions,
-  type SessionStandardShare,
-  sessionWorkspace,
-  useSessionCwd,
-} from "./terminal-targets.js";
+import type { TerminalFrame, TerminalShellView, TerminalTargetView } from "./terminal-protocol.js";
+import { containerOptions } from "./terminal-targets.js";
 import {
   base64ToBytes,
   bytesToBase64,
   fetchTerminalShells,
+  fetchTerminalTarget,
   openTerminalStream,
   sendTerminalControl,
 } from "./terminal-transport.js";
@@ -89,8 +85,12 @@ export interface PodmanTerminalInjected extends ContainerCardFace {
 export type PodmanTerminalProps =
   & PropsRuntime<"sidebar.right.pane.tab">
   & PropsLocale<typeof NS>
-  & InjectFace<PodmanTerminalInjected>
-  & SessionStandardShare;
+  & InjectFace<PodmanTerminalInjected>;
+
+type TargetState =
+  | { readonly phase: "loading" }
+  | { readonly phase: "ready"; readonly target: TerminalTargetView }
+  | { readonly phase: "failed"; readonly message: string };
 
 type ShellsState =
   | { readonly phase: "loading" }
@@ -148,17 +148,13 @@ export function PodmanTerminal(props: PodmanTerminalProps): ReactNode {
   const params = info.tab.navigation.params as
     | PodmanTerminalParams
     | undefined;
-  // The Session's own workspace: never chosen and never guessed. `undefined`
-  // means either the snapshot is still loading or the Session's directory names
-  // no known workspace, and the render below tells those two apart.
-  const workspace = sessionWorkspace(
-    state.workspaces,
-    useSessionCwd(props.useSession),
-    state.projectsRoot,
-  );
-  const workspaceSlug = state.workspaces.find((row) => row.projectName === workspace)
-    ?.workspaceSlug;
-  const unknownWorkspace = state.workspaces.length > 0 && workspace === undefined;
+  // The workspace comes from the host, which resolves it from the Session
+  // itself: the browser neither chooses nor guesses one. `failed` means the
+  // host cannot place this session in a workspace.
+  const [target, setTarget] = useState<TargetState>({ phase: "loading" });
+  const workspace = target.phase === "ready" ? target.target.workspace : undefined;
+  const workspaceSlug = target.phase === "ready" ? target.target.workspaceSlug : undefined;
+  const unknownWorkspace = target.phase === "failed";
   const [container, setContainer] = useState<string | undefined>(
     params?.container,
   );
@@ -176,11 +172,31 @@ export function PodmanTerminal(props: PodmanTerminalProps): ReactNode {
   const alive = useRef(true);
   const reopen = useRef(false);
 
-  // The card snapshot is the only source of workspaces/containers, and the
-  // settings scope may not have loaded yet.
+  // The card snapshot is the only source of containers, and the settings scope
+  // may not have loaded yet.
   useEffect(() => {
     props.reload();
   }, [props.reload]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    setTarget({ phase: "loading" });
+    void fetchTerminalTarget(sessionId, controller.signal).then(
+      (resolved) => {
+        if (!controller.signal.aborted) setTarget({ phase: "ready", target: resolved });
+      },
+      (error: unknown) => {
+        if (controller.signal.aborted) return;
+        setTarget({
+          phase: "failed",
+          message: error instanceof Error ? error.message : String(error),
+        });
+      },
+    );
+    return () => {
+      controller.abort();
+    };
+  }, [sessionId]);
 
   // Default container: the empty value means the workspace's default container
   // to the host. The workspace row carries that container's podman name, which
@@ -475,11 +491,7 @@ export function PodmanTerminal(props: PodmanTerminalProps): ReactNode {
           {state.busy ? t("terminalLoading") : t("unavailable")}
         </p>
       )}
-      {unknownWorkspace && (
-        <p style={ERROR_STYLE} role="alert">
-          {t("terminalWorkspaceUnknown")}
-        </p>
-      )}
+      {target.phase === "failed" && <p style={ERROR_STYLE} role="alert">{target.message}</p>}
       {shells.phase === "failed" && (
         <p style={ERROR_STYLE} role="alert">
           {t("terminalShellsFailed", { message: shells.message })}

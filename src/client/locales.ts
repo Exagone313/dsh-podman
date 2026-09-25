@@ -209,7 +209,6 @@ export type ContainerPluginKey =
   | "terminalGuideDescription"
   | "terminalShortcut"
   | "terminalShortcutNoSession"
-  | "terminalWorkspaceUnknown"
   | "terminalContainer"
   | "terminalShell"
   | "terminalDefaultContainer"
@@ -434,7 +433,6 @@ export const en: Record<ContainerPluginKey, string> = {
   terminalGuideDescription: "Open a shell in a workspace container",
   terminalShortcut: "New Podman terminal",
   terminalShortcutNoSession: "Select a session first",
-  terminalWorkspaceUnknown: "Cannot determine this session's workspace",
   terminalContainer: "Container",
   terminalShell: "Shell",
   terminalDefaultContainer: "Default container",
@@ -657,7 +655,6 @@ export const zh: Record<ContainerPluginKey, string> = {
   terminalGuideDescription: "在工作区容器中打开 Shell",
   terminalShortcut: "新建 Podman 终端",
   terminalShortcutNoSession: "请先选择会话",
-  terminalWorkspaceUnknown: "无法确定该会话所在的工作区",
   terminalContainer: "容器",
   terminalShell: "Shell",
   terminalDefaultContainer: "默认容器",

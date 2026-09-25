@@ -11,13 +11,15 @@ import {
   TERMINAL_PATH,
   TERMINAL_RETAINED_PATH,
   TERMINAL_SHELLS_PATH,
+  TERMINAL_TARGET_PATH,
   type TerminalControl,
   type TerminalFrame,
   type TerminalOpenQuery,
+  type TerminalTargetView,
 } from "./client/terminal-protocol.js";
 import { discoverShells } from "./terminal-shells.js";
 import { type TerminalSessions } from "./terminal-sessions.js";
-import { type WorkspaceResolver } from "./workspace-binding.js";
+import { type WorkspaceResolver, workspaceSlug } from "./workspace-binding.js";
 
 const MIN_COLS = 2;
 const MAX_COLS = 500;
@@ -62,6 +64,52 @@ function workspaceCwd(
   }
   const cwd = ctx?.get?.("sessions")?.get?.(sessionId)?.header?.cwd;
   return typeof cwd === "string" && cwd !== "" ? cwd : undefined;
+}
+
+// The workspace one session runs in, resolved from the session's own working
+// directory: a Session belongs to one workspace, so the client never asks for
+// one. The longest matching registry path wins, which keeps nested workspace
+// roots unambiguous. Everything the client needs about the target comes from
+// here, so the browser never reads harness Session internals.
+function sessionWorkspace(
+  ctx: any,
+  workspaceRegistry: any,
+  projectsRoot: string,
+  sessionId: string,
+): TerminalTargetView | undefined {
+  const cwd = ctx?.get?.("sessions")?.get?.(sessionId)?.header?.cwd;
+  if (typeof cwd !== "string" || cwd === "") return undefined;
+  let best: { path: string; projectName: string; slug: string } | undefined;
+  for (const workspace of workspaceRegistry?.list?.() ?? []) {
+    const path = String(workspace.path ?? "");
+    if (path === "" || (cwd !== path && !cwd.startsWith(`${path}/`))) continue;
+    if (best !== undefined && path.length <= best.path.length) continue;
+    const projectName = path.startsWith(`${projectsRoot}/`)
+      ? path.slice(projectsRoot.length + 1)
+      : path;
+    best = { path, projectName, slug: workspaceSlug(workspace.id) };
+  }
+  return best === undefined ? undefined : { workspace: best.projectName, workspaceSlug: best.slug };
+}
+
+function handleTarget(
+  request: Request,
+  ctx: any,
+  resolver: WorkspaceResolver,
+  workspaceRegistry: any,
+): Response {
+  const sessionId = new URL(request.url).searchParams.get("sessionId") ?? "";
+  if (sessionId === "") return json(400, { error: "sessionId is required" });
+  const target = sessionWorkspace(
+    ctx,
+    workspaceRegistry,
+    resolver.getConfig().projectsRoot,
+    sessionId,
+  );
+  if (target === undefined) {
+    return json(400, { error: "Cannot determine this session's workspace" });
+  }
+  return json(200, target);
 }
 
 function controlOf(body: any): TerminalControl | undefined {
@@ -268,6 +316,12 @@ export function registerTerminalRoutes(
       methods: ["GET"],
       requestBody: "buffered",
       fetch: (request: Request) => handleShells(request, ctx, resolver, workspaceRegistry),
+    });
+    connectionCtx.connection.fetch.register({
+      path: TERMINAL_TARGET_PATH,
+      methods: ["GET"],
+      requestBody: "buffered",
+      fetch: (request: Request) => handleTarget(request, ctx, resolver, workspaceRegistry),
     });
     connectionCtx.connection.fetch.register({
       path: TERMINAL_RETAINED_PATH,

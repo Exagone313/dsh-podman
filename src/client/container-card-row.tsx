@@ -6,7 +6,7 @@ import { type ContainerView, type MountInput } from "./container-card-controller
 import { EnvEditor, MountsEditor } from "./container-card-editors.js";
 import { type DirectoryPickerFace } from "./directory-picker.js";
 import { PathsEditor } from "./container-card-paths.js";
-import { ConfirmButton, mountViewToInput } from "./container-card-shared.js";
+import { ConfirmButton, mountKindShort, mountViewToInput } from "./container-card-shared.js";
 import {
   actions,
   containerHeader,
@@ -21,6 +21,48 @@ import {
 import { type ContainerPluginKey } from "./locales.js";
 import { Button, DisclosureRow, Input, Pill } from "@deepseek-ai/dsh-client-ui-primitives";
 import { type ReactNode, useEffect, useState } from "react";
+
+// The order the summary table lists mount kinds in.
+const MOUNT_ROWS: readonly { key: ContainerPluginKey; kind: string }[] = [
+  { key: "projects", kind: "project" },
+  { key: "volumesTitle", kind: "volume" },
+  { key: "mountTmpfs", kind: "tmpfs" },
+  { key: "secretsTitle", kind: "secret" },
+];
+
+// One summary row per mount kind present on a container, so a volume, tmpfs or
+// secret never contributes an empty project name to the Projects line. A mount
+// whose identifying field is empty is skipped, and a kind with no mount left
+// gets no row at all.
+export function mountSummaries(
+  mounts: readonly ContainerView["mounts"][number][],
+): { key: ContainerPluginKey; values: string[] }[] {
+  const buckets = new Map<string, string[]>(
+    MOUNT_ROWS.map(({ kind }) => [kind, []]),
+  );
+  for (const mount of mounts) {
+    const kind = mountKindShort(mount.kind);
+    const values = buckets.get(kind);
+    if (values === undefined) continue;
+    const identifier = kind === "project"
+      ? mount.projectName
+      : kind === "volume"
+      ? mount.volume
+      : kind === "secret"
+      ? mount.secret
+      : mount.destination;
+    if (identifier === "") continue;
+    values.push(
+      kind === "tmpfs" || mount.destination === ""
+        ? identifier
+        : `${identifier} → ${mount.destination}`,
+    );
+  }
+  return MOUNT_ROWS.flatMap(({ key, kind }) => {
+    const values = buckets.get(kind) ?? [];
+    return values.length === 0 ? [] : [{ key, values }];
+  });
+}
 
 export function ContainerRow(props: {
   t: (key: ContainerPluginKey) => string;
@@ -89,9 +131,7 @@ export function ContainerRow(props: {
   const [attachSecret, setAttachSecret] = useState("");
   const [attachVar, setAttachVar] = useState("");
   const enabled = container.workspaceSlug !== "" && !busy;
-  const projects = container.mounts
-    .map((mount) => mount.projectName)
-    .join(", ");
+  const mountRows = mountSummaries(container.mounts);
   const envEntries = Object.entries(container.env);
   const secretEntries = Object.entries(container.secretEnv);
   const attach = (): void => {
@@ -118,14 +158,12 @@ export function ContainerRow(props: {
             <th style={thStyle} scope="row">{t("created")}</th>
             <td style={tdStyle}>{container.createdAt}</td>
           </tr>
-          {projects !== ""
-            ? (
-              <tr>
-                <th style={thStyle} scope="row">{t("projects")}</th>
-                <td style={tdStyle}>{projects}</td>
-              </tr>
-            )
-            : null}
+          {mountRows.map(({ key, values }) => (
+            <tr key={key}>
+              <th style={thStyle} scope="row">{t(key)}</th>
+              <td style={tdStyle}>{values.join(", ")}</td>
+            </tr>
+          ))}
           {envEntries.length > 0
             ? (
               <tr>

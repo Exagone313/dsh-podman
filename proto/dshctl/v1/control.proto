@@ -83,6 +83,11 @@ message ListImagesResponse { repeated Image images = 1; }
 message Image { string image_id = 1; string parent = 2; repeated string packages = 3; string image_tag = 4; string built_at = 5; bool is_base = 6; string status = 7; string primitive = 8; string package_manager = 9; bool base_public = 10; }
 message RebuildImageRequest { string image_id = 1; }
 message RebuildAllImagesRequest {}
+// The images one RebuildAllImages call rebuilt or could not provide. `rebuilt`
+// names the stored custom images that were rebuilt, in dependency order; a base
+// image ensured beforehand is not listed. `skipped` names every image the call
+// could not make available: base short names first, then the custom images
+// whose rebuild failed and the images that depend on them.
 message RebuildAllImagesResponse { repeated string rebuilt = 1; repeated string skipped = 2; }
 message RemoveImageRequest { string image_id = 1; }
 message RemoveImageResponse {}

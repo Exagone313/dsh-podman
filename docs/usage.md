@@ -119,14 +119,14 @@ managed `DSH_*` fact.
 
 ### Images
 
-| Tool                  | Params                          | Description                                                                                                                       |
-| --------------------- | ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| `image_build` ✱       | `imageId`, `parent`, `packages` | Build a new custom image from a base or custom parent and package list                                                            |
-| `image_get`           | `imageId`                       | Details for one image                                                                                                             |
-| `image_list`          | —                               | List the built workspace images, base images first                                                                                |
-| `image_rebuild_all` ✱ | —                               | Ensure every base, then rebuild every custom image in dependency order, skipping any image whose rebuild fails and its dependents |
-| `image_rebuild` ✱     | `imageId`                       | Rebuild an existing custom image in place                                                                                         |
-| `image_remove` ✱      | `imageId`                       | Remove a built image; refused while a workspace or container still references it                                                  |
+| Tool                  | Params                          | Description                                                                                                                                                                                       |
+| --------------------- | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `image_build` ✱       | `imageId`, `parent`, `packages` | Build a new custom image from a base or custom parent and package list                                                                                                                            |
+| `image_get`           | `imageId`                       | Details for one image                                                                                                                                                                             |
+| `image_list`          | —                               | List the built workspace images, base images first                                                                                                                                                |
+| `image_rebuild_all` ✱ | —                               | Ensure every base, then rebuild every custom image in dependency order, skipping any image whose rebuild fails and its dependents; a base it cannot ensure is reported in `skipped` by short name |
+| `image_rebuild` ✱     | `imageId`                       | Rebuild an existing custom image in place                                                                                                                                                         |
+| `image_remove` ✱      | `imageId`                       | Remove a built image; refused while a workspace or container still references it                                                                                                                  |
 
 ### Containers
 

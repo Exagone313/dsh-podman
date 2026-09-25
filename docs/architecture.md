@@ -161,7 +161,9 @@ Containerfile, so a build writes nothing to the orchestrator's state directory.
 from a public registry per `DSH_PODMAN_BASE_IMAGE_PREFIX`), then rebuilds the
 stored custom images **in dependency order** — each parent before the images
 derived from it. An image whose rebuild fails, and every image that depends on
-it, is reported in `skipped` while the rest continue.
+it, is reported in `skipped` while the rest continue. A base image the call
+could not build or pull is reported there too, by its short name; `rebuilt`
+lists only the custom images, so it never names a base the call had to ensure.
 
 When a host cache is configured (`DSH_PODMAN_HOST_*_CACHE`, mounted into both
 the build container and the orchestrator), builds reuse downloaded packages. The

@@ -39,9 +39,11 @@ func main() {
 	socketsRoot := getenv("DSH_PODMAN_SOCKETS_ROOT", "/run/dsh-podman")
 	socket := filepath.Join(socketsRoot, "orchestrator.sock")
 	root := getenv("DSH_PODMAN_PROJECTS_ROOT", "/projects")
-	stateDir := getenv("DSH_PODMAN_ORCHESTRATOR_STATE", "/var/lib/dsh-orchestrator")
+	stateDir := requireAbsEnv("DSH_PODMAN_ORCHESTRATOR_STATE",
+		"the absolute host path of a persistent directory mounted into the orchestrator (the shipped Quadlet mounts %h/.dsh/dsh-podman/state)")
 	hostProjectsRoot := getenv("DSH_PODMAN_HOST_PROJECTS_ROOT", root)
-	hostSocketsRoot := getenv("DSH_PODMAN_HOST_SOCKETS_ROOT", socketsRoot)
+	hostSocketsRoot := requireAbsEnv("DSH_PODMAN_HOST_SOCKETS_ROOT",
+		"the absolute host path of the directory bind-mounted at DSH_PODMAN_SOCKETS_ROOT (the shipped Quadlet uses %t/dsh-podman)")
 	hostGuestBinary := getenv("DSH_PODMAN_HOST_GUEST_AGENT_BIN", "")
 	hostPacmanCache := getenv("DSH_PODMAN_HOST_PACMAN_CACHE", "")
 	hostAptCache := getenv("DSH_PODMAN_HOST_APT_CACHE", "")
@@ -52,6 +54,11 @@ func main() {
 	guestAgentMount := getenv("DSH_PODMAN_GUEST_AGENT_IMAGE_MOUNT", "/opt/dsh-podman/guest-agent")
 	if getenvBool("DSH_PODMAN_GUEST_AGENT_IMAGE_USE_VERSION_TAG") && guestAgentImage != "" {
 		guestAgentImage = imageRefWithTag(guestAgentImage, version.Version)
+	}
+	// Fail at boot rather than on the first workspace creation: without an
+	// agent source every guest container is unusable.
+	if guestAgentImage == "" && hostGuestBinary == "" {
+		panic("no guest agent source configured: set DSH_PODMAN_GUEST_AGENT_IMAGE or DSH_PODMAN_HOST_GUEST_AGENT_BIN")
 	}
 	if err := requireDirectory(filepath.Dir(socket)); err != nil {
 		panic(err)
@@ -130,6 +137,28 @@ func getenv(name, fallback string) string {
 		return value
 	}
 	return fallback
+}
+
+// requireEnv returns a required environment variable's value, panicking with an
+// actionable message when it is unset or empty. These name paths only the
+// deployment knows — a persistent state directory, a host-side socket root — so
+// a built-in default would be silently wrong.
+func requireEnv(name, hint string) string {
+	value := os.Getenv(name)
+	if value == "" {
+		panic(fmt.Sprintf("%s is required: set it to %s", name, hint))
+	}
+	return value
+}
+
+// requireAbsEnv is requireEnv plus an absolute-path check: a relative path would
+// silently resolve against the process working directory.
+func requireAbsEnv(name, hint string) string {
+	value := requireEnv(name, hint)
+	if !filepath.IsAbs(value) {
+		panic(fmt.Sprintf("%s must be an absolute path, got %q", name, value))
+	}
+	return value
 }
 
 // getenvBool reports whether an env var is set to a truthy value ("1",

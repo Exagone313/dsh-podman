@@ -62,6 +62,11 @@ export interface FilesystemProvider {
     expected?: any,
     signal?: AbortSignal,
   ): Promise<any>;
+  watch(
+    target: any,
+    changed: (error?: Error) => void,
+    signal?: AbortSignal,
+  ): Promise<() => Promise<void>>;
 }
 
 export function createFilesystemProvider(resolver: WorkspaceResolver): FilesystemProvider {
@@ -318,6 +323,25 @@ export function createFilesystemProvider(resolver: WorkspaceResolver): Filesyste
         before,
         after,
       };
+    },
+    // Watching would need a watcher inside each workspace's container (inotify
+    // in the guest, or host-side polling of every open tree node), and every
+    // container here is remote and disposable. Report the seam's typed
+    // "unsupported" failure instead, as the harness's SSH provider does: the
+    // workspace file tree then refreshes on demand rather than live. `changed`
+    // is never called — the promise rejects before a watcher becomes active.
+    watch: (
+      _target: any,
+      _changed: (error?: Error) => void,
+      signal?: AbortSignal,
+    ): Promise<() => Promise<void>> => {
+      throwIfAborted(signal, "watch");
+      return Promise.reject(
+        fsError(
+          "FS_IO_ERROR",
+          "Filesystem watching is not supported by this provider.",
+        ),
+      );
     },
   };
 }

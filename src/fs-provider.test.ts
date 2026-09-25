@@ -339,3 +339,26 @@ test("filesystem provider writeText normalizes the diff basis", async () => {
   assert.equal(outcome.after, "c\nd\n");
   assert.equal(Buffer.concat(binding.writes).toString(), "c\r\nd\r\n");
 });
+
+test("filesystem provider reports watching as unsupported", async () => {
+  const provider = createFilesystemProvider(stubResolver);
+  const target = await provider.resolve("/projects/team/app", { cwd: "/x" });
+  let notified = false;
+  await assert.rejects(
+    () =>
+      provider.watch(target, () => {
+        notified = true;
+      }, new AbortController().signal),
+    (error: any) =>
+      error.code === "FS_IO_ERROR" &&
+      error.message === "Filesystem watching is not supported by this provider.",
+  );
+  assert.equal(notified, false, "changed must not fire when watching is unsupported");
+
+  const aborted = new AbortController();
+  aborted.abort();
+  assert.throws(
+    () => provider.watch(target, () => {}, aborted.signal),
+    (error: any) => error.code === "FS_ABORTED",
+  );
+});

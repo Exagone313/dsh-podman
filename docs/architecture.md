@@ -117,6 +117,13 @@ and writes files. Each guest container gets exactly one socket directory
 bind-mounted into it, so a guest never sees the orchestrator's control socket
 nor any other workspace's socket directory.
 
+The guest API exposes no watcher, so the plugin's `ctx.fs` provider reports
+`FS_IO_ERROR` (`Filesystem watching is not supported by this provider.`) for
+`watch`. The harness's workspace-file change stream therefore answers
+`workspace-file/watch-unsupported`, and the browser's file tree refreshes on
+demand instead of live — the same stance the harness's SSH filesystem provider
+takes for a remote path.
+
 Commands and daemons inherit the guest agent's environment, minus the reserved
 `DSH_PODMAN` namespace: the agent's own token stays with the agent instead of
 being copied into everything it starts. A daemon started with `inheritEnv=false`

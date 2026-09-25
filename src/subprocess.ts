@@ -3,9 +3,9 @@
 // SPDX-License-Identifier: MIT
 
 import { discardUnneededSpill, outputReader, spillTargetFor, splitEnv } from "./output-reader.js";
+import { openGuestTerminal } from "./guest-terminal.js";
 import { globCwd, remoteArgv, unaryGuest } from "./guest-rpc.js";
 import { metadata, type WorkspaceResolver } from "./workspace-binding.js";
-import { randomUUID } from "node:crypto";
 import { PassThrough } from "node:stream";
 import { SubprocessExecutableNotFoundError } from "@deepseek-ai/dsh-subprocess";
 
@@ -294,191 +294,45 @@ export function createSubprocessProvider(resolver: WorkspaceResolver): Subproces
       }
       spec.signal?.throwIfAborted();
       const binding = await resolver.resolveForPath(spec.cwd, spec.cwd);
-      const call = (binding.guest as any).terminal(metadata(binding.token));
-
+      const terminal = openGuestTerminal(binding, {
+        argv: spec.argv,
+        cwd: spec.cwd,
+        env: spec.env,
+        cols: spec.cols,
+        rows: spec.rows,
+        terminalType: spec.terminalType,
+      });
       const output = new PassThrough();
-      let exited = false;
-      let terminated = false;
-      // Bumped whenever this handle observes input, output, a size change or a
-      // foreground observation, so a retention policy can tell an actively used
-      // terminal from a quiet one. Shell idleness itself stays unknown: the
-      // guest cannot prove a prompt is waiting for input.
-      let activityRevision = 0;
-      let resolveExit!: (outcome: {
-        exitCode: number | null;
-        signal: string | null;
-      }) => void;
-      let rejectExit!: (error: unknown) => void;
-      const done = new Promise<{
-        exitCode: number | null;
-        signal: string | null;
-      }>((resolveDone, rejectDone) => {
-        resolveExit = resolveDone;
-        rejectExit = rejectDone;
-      });
-      // A caller that never receives the handle (startup failure) must not
-      // leave `done` as an unhandled rejection.
-      done.catch(() => {});
-
-      let resolveStarted!: (pid: number) => void;
-      let rejectStarted!: (error: unknown) => void;
-      const started = new Promise<number>((resolvePid, rejectPid) => {
-        resolveStarted = resolvePid;
-        rejectStarted = rejectPid;
-      });
-
-      const pending = new Map<
-        string,
-        { resolve: (message: any) => void; reject: (error: unknown) => void }
-      >();
-      const failPending = (error: unknown): void => {
-        for (const waiter of pending.values()) waiter.reject(error);
-        pending.clear();
+      terminal.onOutput((chunk) => output.write(chunk));
+      // Startup failure rejects here, before the caller receives a handle.
+      const pid = await terminal.started;
+      const done = terminal.done;
+      // The handle's output ends however the stream settles, so a consumer
+      // reading it is released on exit exactly as it was on a clean close.
+      const endOutput = (): void => {
+        if (!output.writableEnded) output.end();
       };
-
-      call.on("data", (message: any) => {
-        if (message.started) {
-          resolveStarted(Number(message.started.pid));
-          return;
-        }
-        if (message.stdoutChunk) {
-          activityRevision++;
-          output.write(Buffer.from(message.stdoutChunk));
-          return;
-        }
-        if (message.exit) {
-          exited = true;
-          output.end();
-          resolveExit({
-            exitCode: message.exit.exitCode,
-            signal: message.exit.signaled ? message.exit.signal : null,
-          });
-          return;
-        }
-        if (message.foreground) {
-          activityRevision++;
-          const waiter = pending.get(message.foreground.requestId);
-          if (waiter !== undefined) {
-            pending.delete(message.foreground.requestId);
-            waiter.resolve(message.foreground);
-          }
-          return;
-        }
-        if (message.signalled) {
-          const waiter = pending.get(message.signalled.requestId);
-          if (waiter !== undefined) {
-            pending.delete(message.signalled.requestId);
-            waiter.resolve(message.signalled);
-          }
-        }
-      });
-      call.on("error", (error: unknown) => {
-        rejectStarted(error);
-        if (!exited) {
-          exited = true;
-          output.end();
-          rejectExit(error);
-        }
-        failPending(error);
-      });
-      call.on("end", () => {
-        if (exited) return;
-        const error = new Error("terminal stream ended before the process exited");
-        rejectStarted(error);
-        exited = true;
-        output.end();
-        rejectExit(error);
-        failPending(error);
-      });
-
-      // The spawn spec advertises the terminal emulation the child should see;
-      // it becomes TERM unless the caller already set one.
-      const terminalEnv = { ...(spec.env ?? {}) };
-      if (
-        typeof spec.terminalType === "string" && spec.terminalType !== "" &&
-        terminalEnv.TERM === undefined
-      ) {
-        terminalEnv.TERM = spec.terminalType;
-      }
-      call.write({
-        start: {
-          argv: remoteArgv(spec.argv),
-          cwd: spec.cwd,
-          env: terminalEnv,
-          rows: spec.rows,
-          cols: spec.cols,
-        },
-      });
-      const pid = await started;
-
-      const request = (message: (requestId: string) => any): Promise<any> => {
-        const requestId = randomUUID();
-        return new Promise<any>((resolveWaiter, rejectWaiter) => {
-          pending.set(requestId, { resolve: resolveWaiter, reject: rejectWaiter });
-          try {
-            call.write(message(requestId));
-          } catch (error) {
-            pending.delete(requestId);
-            rejectWaiter(error);
-          }
-        });
-      };
+      void done.then(endOutput, endOutput).catch(() => {});
 
       const handle = {
         pid,
         output,
         done,
         write: async (data: string) => {
-          if (exited) throw new Error("terminal has exited");
-          activityRevision++;
-          call.write({ stdinChunk: Buffer.from(data) });
+          terminal.write(data);
         },
         resize: async (cols: number, rows: number) => {
-          if (exited) throw new Error("terminal has exited");
-          activityRevision++;
-          call.write({ resize: { rows, cols } });
+          terminal.resize(cols, rows);
         },
         inspectActivity: async () => ({
           state: "unknown" as const,
-          revision: activityRevision,
+          revision: terminal.activityRevision(),
         }),
-        inspectForeground: async () => {
-          if (exited) return undefined;
-          const response = await request((requestId) => ({
-            inspectRequestId: requestId,
-          }));
-          return response.found
-            ? {
-              processGroupId: response.processGroupId,
-              inputWaiting: response.inputWaiting,
-            }
-            : undefined;
-        },
-        signalForeground: async (signal: string) => {
-          if (exited) throw new Error("terminal has exited");
-          const response = await request((requestId) => ({
-            signal: { signal, requestId },
-          }));
-          if (!response.found) {
-            throw new Error(`no foreground process group to signal ${signal}`);
-          }
-          return response.processGroupId;
-        },
+        inspectForeground: async () => terminal.inspectForeground(),
+        signalForeground: async (signal: string) => terminal.signalForeground(signal),
         terminate: async () => {
-          if (terminated) return;
-          terminated = true;
-          try {
-            call.write({ close: true });
-            call.end();
-          } catch {
-            // A finished call cannot be closed again; nothing to do.
-          }
-          try {
-            await done;
-          } catch {
-            // Termination is idempotent and never rejects.
-          }
-          if (!output.writableEnded) output.end();
+          await terminal.terminate();
+          endOutput();
         },
       };
 
@@ -501,7 +355,6 @@ export function createSubprocessProvider(resolver: WorkspaceResolver): Subproces
       };
       live.add(stop);
       void done.finally(() => live.delete(stop)).catch(() => {});
-
       return handle;
     },
   };

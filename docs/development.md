@@ -168,6 +168,34 @@ is harmless (grpc-js backs off and reconnects) and disappears once the container
 is recreated; the same message for `orchestrator.sock` means the orchestrator
 service is still running the previous image.
 
+### Development container toolchain
+
+A workspace container's root filesystem is read-only and disposable, so the
+toolchain a contributor builds with needs a workspace volume. No development
+image is distributed: build a custom one — the
+[setup prompt](development-prompt.md) builds `dsh-podman-tooling` from the
+`archlinux` base with `go`, `nodejs-lts-jod`, `npm`, `deno`, `reuse` and
+`python-chardet` — and create a workspace volume for the state an image cannot
+keep: the Go and npm caches, `gopath` with the `go install`ed tools, and pnpm,
+which `package.json` pins to a version the Arch repositories do not carry.
+
+The prompt mounts that volume as `dsh-podman-toolchain` at `/opt/toolchain`
+(read-write) and points the container's caches at it, so commands work without
+sourcing anything:
+
+| Container setting | Value                                                                                                                                                                                                                                                                                                                      |
+| ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| PATH additions    | `/opt/toolchain/gopath/bin`, `/opt/toolchain/npm-global/bin`, `/opt/toolchain/pnpm-home`                                                                                                                                                                                                                                   |
+| Environment       | `GOCACHE=/opt/toolchain/gocache`, `GOMODCACHE=/opt/toolchain/gomodcache`, `GOPATH=/opt/toolchain/gopath`, `npm_config_cache=/opt/toolchain/npm-cache`, `npm_config_prefix=/opt/toolchain/npm-global`, `PNPM_HOME=/opt/toolchain/pnpm-home`, `DENO_DIR=/opt/toolchain/deno-dir`, `GOENV=/opt/toolchain/home/.config/go/env` |
+
+Set the commit identity once in the settings card's
+[Default environment](configuration.md#default-environment) → **Git identity**,
+so containers get `GIT_AUTHOR_*`/`GIT_COMMITTER_*` without a `~/.gitconfig`.
+
+The prompt applies all of this from inside dsh and can be pasted again to repair
+a workspace. Podman stores managed volumes with `DSH_PODMAN_VOLUME_PREFIX`
+prepended, so it lists the volume as `dsh-podman-dsh-podman-toolchain`.
+
 ### Install a local plugin build
 
 The dsh image installs the plugin itself at container start, so a development

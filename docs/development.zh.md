@@ -147,6 +147,27 @@ guest-agent 镜像引用与当前配置不一致时，orchestrator 才会自行�
 `rejected by server because of excess pings`。该消息无害（grpc-js 会退避并重连），重建该容器后即消失；若同样的消息出现在
 `orchestrator.sock` 上，则说明 orchestrator 服务仍在运行上一个镜像。
 
+### 开发容器工具链
+
+工作区容器的根文件系统是只读且一次性的，因此贡献者构建所用的工具链需要工作区的一个卷。项目并不分发开发镜像：请自行构建一个自定义镜像——[设置提示词](development-prompt.zh.md)
+会以 `archlinux` 为父镜像构建 `dsh-podman-tooling`，包含 `go`、`nodejs-lts-jod`、`npm`、`deno`、`reuse` 和
+`python-chardet`——并为镜像无法保存的状态创建工作区卷：Go 与 npm 缓存、含 `go install` 工具的 `gopath`，
+以及 `package.json` 固定版本、Arch 仓库没有的 pnpm。
+
+提示词会把该卷以 `dsh-podman-toolchain` 挂载到 `/opt/toolchain`（读写），并让容器的缓存都指向它，因此无需 source
+任何脚本即可使用：
+
+| 容器设置    | 值                                                                                                                                                                                                                                                                                                                         |
+| ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| PATH 追加项 | `/opt/toolchain/gopath/bin`、`/opt/toolchain/npm-global/bin`、`/opt/toolchain/pnpm-home`                                                                                                                                                                                                                                   |
+| 环境变量    | `GOCACHE=/opt/toolchain/gocache`、`GOMODCACHE=/opt/toolchain/gomodcache`、`GOPATH=/opt/toolchain/gopath`、`npm_config_cache=/opt/toolchain/npm-cache`、`npm_config_prefix=/opt/toolchain/npm-global`、`PNPM_HOME=/opt/toolchain/pnpm-home`、`DENO_DIR=/opt/toolchain/deno-dir`、`GOENV=/opt/toolchain/home/.config/go/env` |
+
+在设置卡片的[默认环境变量](configuration.zh.md#默认环境变量) → **Git 身份** 中设置一次提交身份，容器便无需
+`~/.gitconfig` 即可获得 `GIT_AUTHOR_*`/`GIT_COMMITTER_*`。
+
+提示词会在 dsh 内完成上述全部配置，并且可以反复粘贴以修复工作区。Podman 存储受管卷时会加上 `DSH_PODMAN_VOLUME_PREFIX`
+前缀，因此该卷显示为 `dsh-podman-dsh-podman-toolchain`。
+
 ### 安装本地插件构建
 
 dsh 镜像会在容器启动时自行安装插件，因此本地开发构建通过将安装源指向 bind mount

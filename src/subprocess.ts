@@ -91,6 +91,36 @@ export function createSubprocessProvider(resolver: WorkspaceResolver): Subproces
           killTimer.unref?.();
         }
       };
+      let settled = false;
+      // A piped consumer that falls behind applies backpressure: the guest
+      // stream is paused until every outstanding drain (or close) has fired, so
+      // a fast producer cannot grow a PassThrough without bound.
+      let pendingDrains = 0;
+      const applyBackpressure = (stream: any, target: PassThrough): void => {
+        pendingDrains++;
+        stream.pause?.();
+        let released = false;
+        const release = (): void => {
+          if (released) return;
+          released = true;
+          target.removeListener("drain", release);
+          target.removeListener("close", release);
+          pendingDrains--;
+          if (pendingDrains === 0) stream.resume?.();
+        };
+        target.once("drain", release);
+        // A destroyed target never drains; its close must release the pause or
+        // the exit message would stay stuck behind it.
+        target.once("close", release);
+      };
+      const writeChunk = (
+        stream: any,
+        target: PassThrough | undefined,
+        data: Buffer,
+      ): void => {
+        if (target === undefined) return;
+        if (!target.write(data)) applyBackpressure(stream, target);
+      };
       // A ripgrep discovery listing runs from its search root, so a pattern
       // containing "/" anchors to the path the harness passed; the workspace
       // binding still resolves from the caller's cwd.
@@ -100,11 +130,40 @@ export function createSubprocessProvider(resolver: WorkspaceResolver): Subproces
           new Promise<any>((resolveDone, reject) => {
             processBinding = binding;
             const stream = (binding.guest as any).exec(metadata(binding.token));
+            // finish settles the handle exactly once and tears it down however
+            // the process ends: an exit message, a stream error, or a stream
+            // that ends without one. The output pipes and spill files are
+            // resolved on every path, so a failed exec leaves no half-open
+            // handle, no hung reader, and no orphaned spill.
+            const finish = (
+              error: Error | undefined,
+              exit?: { exitCode: number; signal: string | null },
+            ): void => {
+              if (settled) return;
+              settled = true;
+              exited = true;
+              if (killTimer !== undefined) {
+                clearTimeout(killTimer);
+                killTimer = undefined;
+              }
+              // A pause applied for backpressure must not outlive the process,
+              // or the exit/error message could stay stuck behind it.
+              if (pendingDrains > 0) {
+                pendingDrains = 0;
+                stream.resume?.();
+              }
+              state.stdout?.end();
+              state.stderr?.end();
+              discardUnneededSpill(binding, stdoutReader);
+              discardUnneededSpill(binding, stderrReader);
+              if (error === undefined) resolveDone(exit);
+              else reject(error);
+            };
             stream.on("data", (output: any) => {
               if (output.stdoutChunk) {
                 const data = Buffer.from(output.stdoutChunk);
                 stdoutReader?.append(data);
-                state.stdout?.write(data);
+                writeChunk(stream, state.stdout, data);
                 if (spec.stdio?.stdout === "inherit") process.stdout.write(data);
               }
               if (output.processId) {
@@ -114,29 +173,36 @@ export function createSubprocessProvider(resolver: WorkspaceResolver): Subproces
               if (output.stderrChunk) {
                 const data = Buffer.from(output.stderrChunk);
                 stderrReader?.append(data);
-                state.stderr?.write(data);
+                writeChunk(stream, state.stderr, data);
                 if (spec.stdio?.stderr === "inherit") process.stderr.write(data);
               }
               if (output.exit) {
-                exited = true;
-                if (killTimer !== undefined) clearTimeout(killTimer);
                 stdoutReader?.setSpillValid(
                   Boolean(output.exit.stdoutSpillValid),
                 );
                 stderrReader?.setSpillValid(
                   Boolean(output.exit.stderrSpillValid),
                 );
-                state.stdout?.end();
-                state.stderr?.end();
-                discardUnneededSpill(binding, stdoutReader);
-                discardUnneededSpill(binding, stderrReader);
-                resolveDone({
+                finish(undefined, {
                   exitCode: output.exit.exitCode,
                   signal: output.exit.signaled ? output.exit.signal : null,
                 });
               }
             });
-            stream.on("error", reject);
+            stream.on("error", (error: unknown) => {
+              // The guest connection failed: stop the process if it is still
+              // reachable, then release the caller instead of leaving it
+              // pending on a stream that will never carry an exit message.
+              terminate();
+              finish(error instanceof Error ? error : new Error(String(error)));
+            });
+            stream.on("end", () => {
+              // A stream that ends without an exit message (guest restart,
+              // dropped socket) must not leave the caller pending forever.
+              if (settled) return;
+              terminate();
+              finish(new Error("exec stream ended before the process exited"));
+            });
             const env = splitEnv(spec.env);
             stream.write({
               start: {
@@ -385,6 +451,18 @@ export function createSubprocessProvider(resolver: WorkspaceResolver): Subproces
         if (spec.signal.aborted) onAbort();
         else spec.signal.addEventListener("abort", onAbort, { once: true });
       }
+      // Register the terminal with the provider's live handles, so disposing
+      // the service stops a terminal the caller never closed. Termination is
+      // idempotent and never rejects.
+      const stop = (): void => {
+        try {
+          void handle.terminate();
+        } catch {
+          // Terminal teardown is best-effort.
+        }
+      };
+      live.add(stop);
+      void done.finally(() => live.delete(stop)).catch(() => {});
 
       return handle;
     },

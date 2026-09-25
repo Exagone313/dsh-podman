@@ -322,3 +322,90 @@ test("subprocess provider keeps a spill that holds dropped output", async () => 
   assert.equal(read.lossy, true);
   assert.equal(read.spillPath, fake.starts[0].start.spillStdout.path);
 });
+
+test("subprocess provider tears down a failed exec stream", async () => {
+  const fake = spawnGuest({ emitExit: false });
+  const provider = createSubprocessProvider(fake.resolver as any);
+  const handle = provider.spawn(
+    spawnSpec({
+      stdio: {
+        stdin: "ignore",
+        stdout: "pipe",
+        stderr: { maxBytes: 4, spill: { maxBytes: 64 } },
+      },
+    }),
+  );
+  await new Promise((resolve) => setImmediate(resolve));
+  const failed = assert.rejects(handle.done, /guest vanished/);
+  // A paused PassThrough only emits "end" once a consumer reads it to EOF.
+  handle.stdout.resume();
+  const outputEnded = new Promise<void>((resolve) =>
+    handle.stdout.on("end", () => resolve()),
+  );
+  fake.streams[0].emit("error", new Error("guest vanished"));
+  await outputEnded;
+  await failed;
+  assert.ok(
+    fake.signals.some((signal) => signal.signal === "SIGTERM"),
+    "the process is asked to stop when its stream fails",
+  );
+  const spill = fake.starts[0].start.spillStderr.path;
+  assert.ok(
+    fake.deletes.some((request) => request.path === spill),
+    "the spill is deleted on the failure path",
+  );
+});
+
+test("subprocess provider rejects a stream that ends without an exit", async () => {
+  const fake = spawnGuest({ emitExit: false });
+  const provider = createSubprocessProvider(fake.resolver as any);
+  const handle = provider.spawn(spawnSpec());
+  await new Promise((resolve) => setImmediate(resolve));
+  const failed = assert.rejects(handle.done, /ended before the process exited/);
+  fake.streams[0].emit("end");
+  await failed;
+  assert.ok(
+    fake.signals.some((signal) => signal.signal === "SIGTERM"),
+    "a lost stream still asks the process to stop",
+  );
+});
+
+test("subprocess provider pauses a piped stream while the consumer is behind", async () => {
+  const chunk = "x".repeat(64 * 1024);
+  const fake = spawnGuest({ emitExit: false, stdout: chunk });
+  const provider = createSubprocessProvider(fake.resolver as any);
+  const handle = provider.spawn(
+    spawnSpec({ stdio: { stdin: "ignore", stdout: "pipe", stderr: "pipe" } }),
+  );
+  await new Promise((resolve) => setImmediate(resolve));
+  const stream = fake.streams[0];
+  assert.ok(stream.paused > 0, "a full PassThrough pauses the guest stream");
+  const chunks: Buffer[] = [];
+  await new Promise<void>((resolve) =>
+    handle.stdout.on("data", (data: Buffer) => {
+      chunks.push(Buffer.from(data));
+      if (Buffer.concat(chunks).length >= chunk.length) resolve();
+    }),
+  );
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.ok(stream.resumed > 0, "draining the consumer resumes the stream");
+  const exited = handle.done;
+  stream.emitData({ exit: { exitCode: 0, signaled: false } });
+  assert.deepEqual(await exited, { exitCode: 0, signal: null });
+});
+
+test("subprocess provider disposes a live terminal", async () => {
+  const fake = new FakeTerminalCall();
+  const provider = createSubprocessProvider(fakeTerminalResolver(fake));
+  const handle = await provider.spawnTerminal({
+    argv: ["bash"],
+    cwd: "/projects/team",
+    rows: 24,
+    cols: 80,
+    graceMs: 1000,
+  });
+  assert.equal(handle.pid, 42);
+  provider.dispose();
+  assert.equal(fake.closed, true, "disposal closes the terminal");
+  assert.equal(fake.ended, true, "disposal ends the terminal stream");
+});

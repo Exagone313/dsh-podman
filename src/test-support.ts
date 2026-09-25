@@ -11,8 +11,14 @@ export const WORKSPACE_ID = "2c573001-4171-4900-904b-12a5cc02737a";
 
 export class FakeTerminalCall extends EventEmitter {
   readonly stdinChunks: Buffer[] = [];
+  closed = false;
+  ended = false;
 
   write(message: any): void {
+    if (message.close) {
+      this.closed = true;
+      return;
+    }
     if (message.start) {
       queueMicrotask(() => this.emit("data", { started: { pid: 42 } }));
       return;
@@ -40,7 +46,9 @@ export class FakeTerminalCall extends EventEmitter {
     }
   }
 
-  end(): void {}
+  end(): void {
+    this.ended = true;
+  }
 
   cancel(): void {}
 
@@ -455,6 +463,53 @@ export function editProvider(binding: unknown) {
   } as any);
 }
 
+// The guest Exec bidi stream the subprocess provider drives, with the
+// backpressure and failure controls its tests need. `write()` records the start
+// message; `end()` replays the process id, the configured stdout and (unless
+// disabled) the exit message, mirroring a guest that answered immediately.
+export class FakeExecStream extends EventEmitter {
+  paused = 0;
+  resumed = 0;
+  cancelled = false;
+  constructor(
+    private readonly starts: Array<Record<string, any>>,
+    private readonly options: {
+      emitExit?: boolean;
+      exit?: Record<string, unknown>;
+      stdout?: string;
+    },
+  ) {
+    super();
+  }
+  write(message: any): boolean {
+    this.starts.push(message);
+    return true;
+  }
+  end(): void {
+    this.emitData({ processId: "7" });
+    if (this.options.stdout !== undefined) {
+      this.emitData({ stdoutChunk: Buffer.from(this.options.stdout) });
+    }
+    if (this.options.emitExit !== false) {
+      this.emitData({
+        exit: { exitCode: 0, signaled: false, ...this.options.exit },
+      });
+    }
+  }
+  pause(): void {
+    this.paused++;
+  }
+  resume(): void {
+    this.resumed++;
+  }
+  cancel(): void {
+    this.cancelled = true;
+  }
+  emitData(message: Record<string, unknown>): void {
+    this.emit("data", message);
+  }
+}
+
 // A fake guest for the subprocess provider: exec emits a process id (and
 // optionally an exit), and the unary signal/delete RPCs are recorded.
 export function spawnGuest(
@@ -467,30 +522,12 @@ export function spawnGuest(
   const signals: Array<{ processId: string; signal: string }> = [];
   const starts: Array<Record<string, any>> = [];
   const deletes: Array<Record<string, unknown>> = [];
+  const streams: FakeExecStream[] = [];
   const guest = {
     exec: () => {
-      const handlers: Record<string, Function[]> = {};
-      return {
-        on(event: string, handler: Function) {
-          (handlers[event] ??= []).push(handler);
-        },
-        write(message: any) {
-          starts.push(message);
-        },
-        end() {
-          for (const handler of handlers.data ?? []) {
-            handler({ processId: "7" });
-            if (options.stdout !== undefined) {
-              handler({ stdoutChunk: Buffer.from(options.stdout) });
-            }
-            if (options.emitExit !== false) {
-              handler({
-                exit: { exitCode: 0, signaled: false, ...options.exit },
-              });
-            }
-          }
-        },
-      };
+      const stream = new FakeExecStream(starts, options);
+      streams.push(stream);
+      return stream;
     },
     signal: (request: { processId: string; signal: string }, _metadata: unknown, callback: Function) => {
       signals.push(request);
@@ -505,6 +542,8 @@ export function spawnGuest(
     signals,
     starts,
     deletes,
+    streams,
+    guest,
     resolver: { resolve: async () => ({ guest, token: "t" }) },
   };
 }

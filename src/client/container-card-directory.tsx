@@ -9,7 +9,7 @@ import type {
 import { type DirectoryPickerFace } from "./directory-picker.js";
 import { DIRECTORY_CLASS } from "./container-card-directory-styles.js";
 import { confineToRoot, crumbLabel, rootCrumbs } from "../project-path.js";
-import { type ContainerPluginKey } from "./locales.js";
+import type { Translate } from "./locales.js";
 import {
   Button,
   IconCheckOutlineRegular,
@@ -37,7 +37,7 @@ const SLOW_SCAN_DELAY_MS = 300;
 // navigates above it, and so it can only ever produce a path a project mount
 // accepts.
 export function DirectoryPickerModal(props: {
-  t: (key: ContainerPluginKey) => string;
+  t: Translate;
   open: boolean;
   root: string;
   start: string;

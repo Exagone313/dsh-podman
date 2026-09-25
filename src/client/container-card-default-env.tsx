@@ -11,12 +11,12 @@ import { EnvEditor } from "./container-card-editors.js";
 import { ConfirmButton, Field } from "./container-card-shared.js";
 import { hint, sectionTitle, wsBody } from "./container-card-styles.js";
 import { readGitIdentity, setGitIdentity } from "../container-env.js";
-import { type ContainerPluginKey } from "./locales.js";
+import type { Translate } from "./locales.js";
 import { Button, Input, Modal } from "@deepseek-ai/dsh-client-ui-primitives";
 import { type ReactNode, useEffect, useId, useState } from "react";
 
 export function DefaultEnvironmentSection(props: {
-  t: (key: ContainerPluginKey) => string;
+  t: Translate;
   env: Record<string, string>;
   busy: boolean;
   writable: boolean;

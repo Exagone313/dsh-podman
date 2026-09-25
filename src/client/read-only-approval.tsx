@@ -5,7 +5,7 @@
 import { type PendingApproval } from "@deepseek-ai/dsh-client-ui-approval/client";
 import { Button } from "@deepseek-ai/dsh-client-ui-primitives";
 import { type ReactNode, useState } from "react";
-import { type ContainerPluginKey } from "./locales.js";
+import type { Translate } from "./locales.js";
 
 // The reserved tool-name prefix for prompts this plugin raises about built-in
 // operations. The panel takes over the composer for those only, so the
@@ -13,7 +13,7 @@ import { type ContainerPluginKey } from "./locales.js";
 export const BUILTIN_PROMPT_PREFIX = "dsh_podman_builtin_";
 
 export function ReadOnlyApprovalPanel(props: {
-  t: (key: ContainerPluginKey) => string;
+  t: Translate;
   matched: PendingApproval;
 }): ReactNode {
   // Keying the flow on the request remounts it for each new prompt, so the
@@ -25,7 +25,7 @@ function ReadOnlyApprovalFlow({
   t,
   matched,
 }: {
-  t: (key: ContainerPluginKey) => string;
+  t: Translate;
   matched: PendingApproval;
 }): ReactNode {
   const [answered, setAnswered] = useState(false);

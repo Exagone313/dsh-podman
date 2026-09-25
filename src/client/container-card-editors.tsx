@@ -18,7 +18,7 @@ import {
   setEnvValue,
 } from "../env-rows.js";
 import { hostPathForProjectName, projectNameFromHostPath } from "../project-path.js";
-import { type ContainerPluginKey } from "./locales.js";
+import type { Translate } from "./locales.js";
 import { Button, Input, Modal } from "@deepseek-ai/dsh-client-ui-primitives";
 import { type ReactNode, useId, useRef, useState } from "react";
 
@@ -28,7 +28,7 @@ import { type ReactNode, useId, useRef, useState } from "react";
 let nextEnvId = 0;
 
 export function EnvEditor(props: {
-  t: (key: ContainerPluginKey) => string;
+  t: Translate;
   env: Record<string, string>;
   busy: boolean;
   onChange: (env: Record<string, string>) => void;
@@ -144,7 +144,7 @@ export function EnvEditor(props: {
 }
 
 export function MountsEditor(props: {
-  t: (key: ContainerPluginKey) => string;
+  t: Translate;
   mounts: readonly MountInput[];
   volumes: readonly { name: string }[];
   secrets: readonly { name: string }[];
@@ -403,8 +403,8 @@ export function MountsEditor(props: {
                 label={nextMode === "read_only" ? t("remountReadOnly") : t("remountReadWrite")}
                 title={t("confirmTitle")}
                 description={nextMode === "read_only"
-                  ? t("confirmRemountReadOnly")
-                  : t("confirmRemountReadWrite")}
+                  ? t("confirmRemountReadOnly", { mount: mountLabel(t, mount, false) })
+                  : t("confirmRemountReadWrite", { mount: mountLabel(t, mount, false) })}
                 disabled={!enabled}
                 onConfirm={() => onUpdate({ ...mount, mode: nextMode }, index)}
               />
@@ -416,7 +416,7 @@ export function MountsEditor(props: {
                     t={t}
                     label={t("remove")}
                     title={t("confirmTitle")}
-                    description={t("confirmRemoveMount")}
+                    description={t("confirmRemoveMount", { mount: mountLabel(t, mount, false) })}
                     disabled={!enabled}
                     onConfirm={() => onRemove(mount)}
                   />

@@ -13,12 +13,12 @@ import { type DirectoryPickerFace } from "./directory-picker.js";
 import { type PathEntry, PathsList } from "./container-card-paths.js";
 import { Field, namePattern, sanitizeName } from "./container-card-shared.js";
 import { greyId, hint, imageSelect, sectionTitle } from "./container-card-styles.js";
-import { type ContainerPluginKey } from "./locales.js";
+import type { Translate } from "./locales.js";
 import { Button, Input, Modal } from "@deepseek-ai/dsh-client-ui-primitives";
 import { type ReactNode, useEffect, useId, useState } from "react";
 
 export function CreateContainerModal(props: {
-  t: (key: ContainerPluginKey) => string;
+  t: Translate;
   workspace: WorkspaceView;
   images: readonly ImageView[];
   volumes: readonly { name: string }[];

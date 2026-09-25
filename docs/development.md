@@ -162,6 +162,12 @@ attach creates the pod and its default container again. Restarting the two
 services never touches workspace containers, and neither action removes volumes,
 secrets, or project data.
 
+A container that still runs an agent from an older image makes dsh log
+`rejected by server because of excess pings` for its guest socket. The message
+is harmless (grpc-js backs off and reconnects) and disappears once the container
+is recreated; the same message for `orchestrator.sock` means the orchestrator
+service is still running the previous image.
+
 ### Install a local plugin build
 
 The dsh image installs the plugin itself at container start, so a development

@@ -172,12 +172,21 @@ test("outputReader honors in-window offsets", () => {
   assert.equal(pastEnd.lossy, false);
 });
 
-test("resolveExecutable rejects every request without a workspace context", async () => {
+test("resolveExecutable returns absolute paths and rejects bare names", async () => {
   const provider = createSubprocessProvider({} as any);
+  assert.equal(await provider.resolveExecutable("/usr/bin/ls"), "/usr/bin/ls");
+  assert.equal(await provider.resolveExecutable("/bin/sh"), "/bin/sh");
   await assert.rejects(() => provider.resolveExecutable(""));
   await assert.rejects(() => provider.resolveExecutable("bin/tool"));
   await assert.rejects(() => provider.resolveExecutable("ls"));
-  await assert.rejects(() => provider.resolveExecutable("/usr/bin/ls"));
+});
+
+test("terminalEnvironment reports the container's shell family", async () => {
+  const provider = createSubprocessProvider({} as any);
+  assert.deepEqual(await provider.terminalEnvironment(), {
+    platform: "posix",
+    defaultShell: "/bin/sh",
+  });
 });
 
 test("spawnTerminal drives the guest terminal stream", async () => {
@@ -188,9 +197,11 @@ test("spawnTerminal drives the guest terminal stream", async () => {
     cwd: "/projects/team",
     rows: 24,
     cols: 80,
+    terminalType: "xterm-256color",
     graceMs: 1000,
   });
   assert.equal(handle.pid, 42);
+  assert.equal(fake.start.env.TERM, "xterm-256color");
 
   const chunks: Buffer[] = [];
   handle.output.on("data", (chunk: Buffer) => chunks.push(Buffer.from(chunk)));
@@ -202,6 +213,12 @@ test("spawnTerminal drives the guest terminal stream", async () => {
     fake.stdinChunks.map((chunk) => chunk.toString("utf8")),
     ["ls\n"],
   );
+
+  await handle.resize(100, 40);
+  assert.deepEqual(fake.resizes, [{ rows: 40, cols: 100 }]);
+  const activity = await handle.inspectActivity();
+  assert.equal(activity.state, "unknown");
+  assert.ok(activity.revision > 0, "observed activity must advance the revision");
 
   assert.deepEqual(await handle.inspectForeground(), {
     processGroupId: 7,

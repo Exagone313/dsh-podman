@@ -11,6 +11,8 @@ export const WORKSPACE_ID = "2c573001-4171-4900-904b-12a5cc02737a";
 
 export class FakeTerminalCall extends EventEmitter {
   readonly stdinChunks: Buffer[] = [];
+  readonly resizes: Array<{ rows: number; cols: number }> = [];
+  start: any;
   closed = false;
   ended = false;
 
@@ -20,7 +22,12 @@ export class FakeTerminalCall extends EventEmitter {
       return;
     }
     if (message.start) {
+      this.start = message.start;
       queueMicrotask(() => this.emit("data", { started: { pid: 42 } }));
+      return;
+    }
+    if (message.resize) {
+      this.resizes.push({ rows: message.resize.rows, cols: message.resize.cols });
       return;
     }
     if (message.stdinChunk) {

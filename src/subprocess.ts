@@ -10,6 +10,10 @@ import { PassThrough } from "node:stream";
 
 export interface SubprocessProvider {
   resolveExecutable(command: string): Promise<string>;
+  terminalEnvironment(signal?: AbortSignal): Promise<{
+    platform: "posix";
+    defaultShell: string;
+  }>;
   spawn(spec: any): any;
   spawnTerminal(spec: any): Promise<any>;
   dispose(): void;
@@ -25,14 +29,24 @@ export function createSubprocessProvider(resolver: WorkspaceResolver): Subproces
     },
     // The harness's resolveExecutable carries no cwd, and this provider's
     // execution world is per-workspace (each workspace is its own container),
-    // so there is no context in which an executable can be verified or looked
-    // up. Report every request as unresolvable instead of returning an
-    // unverified path.
+    // so a bare command name cannot be looked up here. An absolute path is
+    // returned unchanged: the guest resolves and spawns it inside the target
+    // container, which is the only place it can be checked. Shell selection
+    // (see terminalEnvironment) depends on this for an environment-default
+    // shell.
     resolveExecutable: async (command: string): Promise<string> => {
+      if (typeof command === "string" && command.startsWith("/")) return command;
       throw new Error(
         `cannot resolve executable ${JSON.stringify(command)}: no workspace context is available`,
       );
     },
+    // Shell selection happens before a workspace is chosen, so the provider
+    // reports the family every container it starts belongs to. `/bin/sh` is the
+    // portable default; a configured shell overrides it.
+    terminalEnvironment: async (_signal?: AbortSignal) => ({
+      platform: "posix" as const,
+      defaultShell: "/bin/sh",
+    }),
     spawn: (spec: any) => {
       // A pre-aborted spawn is rejected synchronously with a stable Error,
       // mirroring the local backend, rather than starting a process that would
@@ -232,6 +246,9 @@ export function createSubprocessProvider(resolver: WorkspaceResolver): Subproces
       void done.finally(() => live.delete(terminate)).catch(() => {});
       return {
         ...state,
+        // The harness's SubprocessHandle declares a control channel; this
+        // provider runs every process over gRPC, so none exists.
+        control: undefined,
         collected: {
           ...(stdoutReader === undefined ? {} : { stdout: stdoutReader }),
           ...(stderrReader === undefined ? {} : { stderr: stderrReader }),
@@ -281,6 +298,11 @@ export function createSubprocessProvider(resolver: WorkspaceResolver): Subproces
       const output = new PassThrough();
       let exited = false;
       let terminated = false;
+      // Bumped whenever this handle observes input, output, a size change or a
+      // foreground observation, so a retention policy can tell an actively used
+      // terminal from a quiet one. Shell idleness itself stays unknown: the
+      // guest cannot prove a prompt is waiting for input.
+      let activityRevision = 0;
       let resolveExit!: (outcome: {
         exitCode: number | null;
         signal: string | null;
@@ -319,6 +341,7 @@ export function createSubprocessProvider(resolver: WorkspaceResolver): Subproces
           return;
         }
         if (message.stdoutChunk) {
+          activityRevision++;
           output.write(Buffer.from(message.stdoutChunk));
           return;
         }
@@ -332,6 +355,7 @@ export function createSubprocessProvider(resolver: WorkspaceResolver): Subproces
           return;
         }
         if (message.foreground) {
+          activityRevision++;
           const waiter = pending.get(message.foreground.requestId);
           if (waiter !== undefined) {
             pending.delete(message.foreground.requestId);
@@ -366,11 +390,20 @@ export function createSubprocessProvider(resolver: WorkspaceResolver): Subproces
         failPending(error);
       });
 
+      // The spawn spec advertises the terminal emulation the child should see;
+      // it becomes TERM unless the caller already set one.
+      const terminalEnv = { ...(spec.env ?? {}) };
+      if (
+        typeof spec.terminalType === "string" && spec.terminalType !== "" &&
+        terminalEnv.TERM === undefined
+      ) {
+        terminalEnv.TERM = spec.terminalType;
+      }
       call.write({
         start: {
           argv: remoteArgv(spec.argv),
           cwd: spec.cwd,
-          env: spec.env ?? {},
+          env: terminalEnv,
           rows: spec.rows,
           cols: spec.cols,
         },
@@ -396,8 +429,18 @@ export function createSubprocessProvider(resolver: WorkspaceResolver): Subproces
         done,
         write: async (data: string) => {
           if (exited) throw new Error("terminal has exited");
+          activityRevision++;
           call.write({ stdinChunk: Buffer.from(data) });
         },
+        resize: async (cols: number, rows: number) => {
+          if (exited) throw new Error("terminal has exited");
+          activityRevision++;
+          call.write({ resize: { rows, cols } });
+        },
+        inspectActivity: async () => ({
+          state: "unknown" as const,
+          revision: activityRevision,
+        }),
         inspectForeground: async () => {
           if (exited) return undefined;
           const response = await request((requestId) => ({

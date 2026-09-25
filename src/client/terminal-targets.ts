@@ -73,3 +73,14 @@ export function validShell(
   if (remembered === undefined || remembered === "") return undefined;
   return shells.some((shell) => shell.path === remembered) ? remembered : undefined;
 }
+
+/**
+ * The program name of a shell path.
+ * @param path - an absolute shell path such as `/usr/bin/bash`, or absent.
+ * @returns the basename, or `undefined` when there is nothing to name.
+ */
+export function shellName(path: string | undefined): string | undefined {
+  if (path === undefined || path === "") return undefined;
+  const name = path.slice(path.lastIndexOf("/") + 1);
+  return name === "" ? undefined : name;
+}

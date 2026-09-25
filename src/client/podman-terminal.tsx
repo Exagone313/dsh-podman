@@ -20,6 +20,7 @@ import { NS } from "./locales.js";
 import type { PodmanTerminalParams } from "./terminal-tab.js";
 import type { TerminalFrame, TerminalShellView, TerminalTargetView } from "./terminal-protocol.js";
 import { containerOptions } from "./terminal-targets.js";
+import { forgetTerminalTitle, publishTerminalTitle } from "./terminal-titles.js";
 import {
   base64ToBytes,
   bytesToBase64,
@@ -287,6 +288,7 @@ export function PodmanTerminal(props: PodmanTerminalProps): ReactNode {
     observer.observe(element);
     return () => {
       alive.current = false;
+      forgetTerminalTitle(tabId);
       stream.current?.abort();
       stream.current = undefined;
       observer.disconnect();
@@ -321,7 +323,10 @@ export function PodmanTerminal(props: PodmanTerminalProps): ReactNode {
       switch (frame.type) {
         case "ready":
           terminalId.current = frame.terminalId;
-          if (frame.title !== "") setTitle(frame.title);
+          if (frame.title !== "") {
+            setTitle(frame.title);
+            publishTerminalTitle(tabId, frame.title);
+          }
           setStatus({ kind: "running" });
           break;
         case "snapshot":
@@ -332,6 +337,7 @@ export function PodmanTerminal(props: PodmanTerminalProps): ReactNode {
           break;
         case "title":
           setTitle(frame.title);
+          publishTerminalTitle(tabId, frame.title);
           break;
         case "exit":
           terminalId.current = undefined;

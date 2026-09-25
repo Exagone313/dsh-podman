@@ -4,7 +4,12 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
-import { containerOptions, validContainer, validShell } from "./client/terminal-targets.js";
+import {
+  containerOptions,
+  shellName,
+  validContainer,
+  validShell,
+} from "./client/terminal-targets.js";
 import type { ContainerView } from "./client/card-protocol.js";
 
 function row(containerName: string, workspaceSlug: string): ContainerView {
@@ -38,4 +43,13 @@ test("remembered targets are reused only while they are still offered", () => {
   assert.equal(validShell("", shells), undefined);
   assert.equal(validShell("/usr/bin/bash", shells), "/usr/bin/bash");
   assert.equal(validShell("/bin/zsh", shells), undefined);
+});
+
+test("a shell path is named by its basename", () => {
+  assert.equal(shellName("/usr/bin/bash"), "bash");
+  assert.equal(shellName("/bin/sh"), "sh");
+  assert.equal(shellName("pwsh"), "pwsh");
+  assert.equal(shellName("/opt/tools/bin/"), undefined);
+  assert.equal(shellName(""), undefined);
+  assert.equal(shellName(undefined), undefined);
 });

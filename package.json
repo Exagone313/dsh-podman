@@ -15,6 +15,7 @@
       "types": "./dist/client/index.d.ts",
       "default": "./dist/client/index.js"
     },
+    "./locale/*.json": "./locale/*.json",
     "./package.json": "./package.json"
   },
   "dsh": {
@@ -35,6 +36,7 @@
   "files": [
     "dist",
     "docs",
+    "locale/*.json",
     "quadlet",
     "cordis.patch.yml",
     "LICENSE",

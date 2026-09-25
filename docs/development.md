@@ -153,7 +153,7 @@ not with the local `:latest` tag. After rebuilding the guest agent, recreate the
 containers yourself:
 
 - from the Podman page (sidebar **Plugins** panel → **Installed** →
-  **@exagone313/dsh-podman**), per container: **Recreate** (same image) or
+  **dsh-podman**), per container: **Recreate** (same image) or
   **Recreate with image**;
 - with `container_recreate`, for a named container or the default one.
 
@@ -190,7 +190,7 @@ sourcing anything:
 | Environment       | `GOCACHE=/opt/toolchain/gocache`, `GOMODCACHE=/opt/toolchain/gomodcache`, `GOPATH=/opt/toolchain/gopath`, `npm_config_cache=/opt/toolchain/npm-cache`, `npm_config_prefix=/opt/toolchain/npm-global`, `PNPM_HOME=/opt/toolchain/pnpm-home`, `DENO_DIR=/opt/toolchain/deno-dir`, `GOENV=/opt/toolchain/home/.config/go/env` |
 
 Set the commit identity once on the Podman page (sidebar **Plugins** panel →
-**Installed** → **@exagone313/dsh-podman**) under
+**Installed** → **dsh-podman**) under
 [Default environment](configuration.md#default-environment) → **Git identity**,
 so containers get `GIT_AUTHOR_*`/`GIT_COMMITTER_*` without a `~/.gitconfig`.
 

@@ -3,22 +3,17 @@
 // SPDX-License-Identifier: MIT
 
 // The default container environment: the map seeded into every new container,
-// plus the git shortcut that fills the four identity variables from one name
-// and one email.
+// edited with the same EnvEditor a container row uses. The setting is
+// persisted, so the draft is committed with Save, and the git shortcut fills
+// the four identity variables in that same draft.
 
 import { EnvEditor } from "./container-card-editors.js";
 import { ConfirmButton, Field } from "./container-card-shared.js";
-import { greyId, hint } from "./container-card-styles.js";
+import { hint, sectionTitle, wsBody } from "./container-card-styles.js";
 import { readGitIdentity, setGitIdentity } from "../container-env.js";
 import { type ContainerPluginKey } from "./locales.js";
 import { Button, Input, Modal } from "@deepseek-ai/dsh-client-ui-primitives";
-import { type ReactNode, useId, useState } from "react";
-
-function formatEnv(env: Record<string, string>): string {
-  const entries = Object.entries(env);
-  if (entries.length === 0) return "";
-  return entries.map(([key, value]) => `${key}=${value}`).join(", ");
-}
+import { type ReactNode, useEffect, useId, useState } from "react";
 
 export function DefaultEnvironmentSection(props: {
   t: (key: ContainerPluginKey) => string;
@@ -29,33 +24,33 @@ export function DefaultEnvironmentSection(props: {
   onSync: (workspace: string) => void;
 }): ReactNode {
   const { t, env, busy, writable, onSave, onSync } = props;
-  const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<Record<string, string>>(env);
   const [gitOpen, setGitOpen] = useState(false);
   const [gitName, setGitName] = useState("");
   const [gitEmail, setGitEmail] = useState("");
   const nameId = useId();
   const emailId = useId();
-  const summary = formatEnv(env);
-  const openEditor = (): void => {
+  // An external settings change resyncs the draft; an unrelated refresh does
+  // not, so an edit in progress is never clobbered. Same rule as a container
+  // row's environment editor.
+  const serverEnv = JSON.stringify(env);
+  useEffect(() => {
     setDraft(env);
-    setEditing(true);
-  };
+  }, [serverEnv]);
+  const dirty = JSON.stringify(draft) !== serverEnv;
+  const disabled = busy || !writable;
   const openGit = (): void => {
-    const identity = readGitIdentity(env);
+    const identity = readGitIdentity(draft);
     setGitName(identity.name);
     setGitEmail(identity.email);
     setGitOpen(true);
   };
   return (
-    <div
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        gap: "6px",
-        padding: "8px 0",
-      }}
-    >
+    <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+      <div style={sectionTitle}>{t("defaultEnvironment")}</div>
+      <div style={wsBody}>
+        <EnvEditor t={t} env={draft} busy={disabled} onChange={setDraft} />
+      </div>
       <div
         style={{
           display: "flex",
@@ -64,81 +59,42 @@ export function DefaultEnvironmentSection(props: {
           gap: "8px",
         }}
       >
-        <label
-          style={{
-            fontSize: "13px",
-            color: "var(--dsw-alias-label-secondary)",
-            minWidth: "110px",
-          }}
-        >
-          {t("defaultEnvironment")}
-        </label>
-        <code
-          style={{
-            ...greyId,
-            flex: 1,
-            fontSize: "13px",
-            minWidth: "160px",
-          }}
-        >
-          {summary === "" ? t("none") : summary}
-        </code>
         <Button
           variant="outline"
           size="sm"
-          disabled={busy || !writable}
-          onClick={openEditor}
-        >
-          {t("edit")}
-        </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          disabled={busy || !writable}
+          disabled={disabled}
           onClick={openGit}
         >
           {t("gitIdentity")}
         </Button>
+        <Button
+          variant="primary"
+          size="sm"
+          disabled={disabled || !dirty}
+          onClick={() => onSave(draft)}
+        >
+          {t("save")}
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          disabled={busy || !dirty}
+          onClick={() => setDraft(env)}
+        >
+          {t("discard")}
+        </Button>
+      </div>
+      <div>
         <ConfirmButton
           t={t}
           label={t("applyDefaults")}
           title={t("confirmTitle")}
           description={t("confirmApplyDefaults")}
-          disabled={busy || !writable || summary === ""}
+          disabled={disabled || dirty || Object.keys(env).length === 0}
           onConfirm={() => onSync("")}
         />
       </div>
       <p style={{ ...hint, margin: 0 }}>{t("defaultEnvironmentHint")}</p>
-      <Modal
-        open={editing}
-        onClose={() => setEditing(false)}
-        title={t("defaultEnvironment")}
-        closeLabel={t("cancel")}
-        footer={
-          <>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setEditing(false)}
-            >
-              {t("cancel")}
-            </Button>
-            <Button
-              variant="primary"
-              size="sm"
-              disabled={busy}
-              onClick={() => {
-                onSave(draft);
-                setEditing(false);
-              }}
-            >
-              {t("save")}
-            </Button>
-          </>
-        }
-      >
-        <EnvEditor t={t} env={draft} busy={busy} onChange={setDraft} />
-      </Modal>
       <Modal
         open={gitOpen}
         onClose={() => setGitOpen(false)}
@@ -149,9 +105,9 @@ export function DefaultEnvironmentSection(props: {
             <Button
               variant="outline"
               size="sm"
-              disabled={busy || readGitIdentity(env).name === ""}
+              disabled={busy || readGitIdentity(draft).name === ""}
               onClick={() => {
-                onSave(setGitIdentity(env, "", ""));
+                setDraft(setGitIdentity(draft, "", ""));
                 setGitOpen(false);
               }}
             >
@@ -165,11 +121,11 @@ export function DefaultEnvironmentSection(props: {
               size="sm"
               disabled={busy || gitName === "" || gitEmail === ""}
               onClick={() => {
-                onSave(setGitIdentity(env, gitName, gitEmail));
+                setDraft(setGitIdentity(draft, gitName, gitEmail));
                 setGitOpen(false);
               }}
             >
-              {t("save")}
+              {t("apply")}
             </Button>
           </>
         }

@@ -66,6 +66,10 @@ export interface CommandRequest {
 }
 
 export interface ContainerView {
+  // The container's LOGICAL name ("default", "dev", …): the only identifier the
+  // orchestrator accepts in a container field and the one every card action and
+  // control request uses. The podman name (dsh-podman-<slug>-<logical>) is
+  // internal and is rejected with INVALID_ARGUMENT if it is sent instead.
   containerName: string;
   workspaceSlug: string;
   imageId: string;
@@ -115,6 +119,10 @@ export interface CacheView {
 export interface WorkspaceView {
   workspaceSlug: string;
   projectName: string;
+  // NOT a usable container target: this is the workspace's default container's
+  // PODMAN name (dsh-podman-<slug>-default), which comes straight from the
+  // orchestrator's legacy workspace row and is rejected with INVALID_ARGUMENT
+  // when sent back. Use ContainerView.containerName (logical) instead.
   containerName: string;
   imageId: string;
   status: string;

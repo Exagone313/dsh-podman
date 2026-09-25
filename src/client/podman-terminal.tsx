@@ -18,6 +18,7 @@ import { imageSelect } from "./container-card-styles.js";
 import { NS } from "./locales.js";
 import type { PodmanTerminalParams } from "./terminal-tab.js";
 import type { TerminalFrame, TerminalShellView } from "./terminal-protocol.js";
+import { containerOptions } from "./terminal-targets.js";
 import {
   base64ToBytes,
   bytesToBase64,
@@ -146,26 +147,6 @@ function defaultWorkspace(
   return workspaces[0]?.projectName;
 }
 
-/** The container names selectable for one workspace, default first. */
-function containerNames(
-  containers: readonly ContainerView[],
-  workspace: WorkspaceView | undefined,
-): string[] {
-  const names = new Set<string>();
-  if (workspace !== undefined && workspace.containerName !== "") {
-    names.add(workspace.containerName);
-  }
-  for (const container of containers) {
-    if (
-      workspace !== undefined &&
-      container.workspaceSlug === workspace.workspaceSlug
-    ) {
-      names.add(container.containerName);
-    }
-  }
-  return [...names].sort((left, right) => left.localeCompare(right));
-}
-
 /** The workspace/container pickers shared by the body and the guide card. */
 interface TerminalTargetFieldsProps {
   readonly workspaces: readonly WorkspaceView[];
@@ -212,7 +193,7 @@ export function TerminalTargetFields(
         }}
       >
         <option value="">{props.defaultLabel}</option>
-        {containerNames(props.containers, selected).map((name) => (
+        {containerOptions(props.containers, selected?.workspaceSlug).map((name) => (
           <option key={name} value={name}>{name}</option>
         ))}
       </select>
@@ -265,12 +246,13 @@ export function PodmanTerminal(props: PodmanTerminalProps): ReactNode {
     if (next !== undefined) setWorkspace(next);
   }, [workspace, cwd, state.workspaces, state.projectsRoot]);
 
-  // Default container: the workspace's own, else the default container.
+  // Default container: the empty value means the workspace's default container
+  // to the host. The workspace row carries that container's podman name, which
+  // the orchestrator rejects, so it is never used as a target.
   useEffect(() => {
     if (workspace === undefined || container !== undefined) return;
-    const target = state.workspaces.find((row) => row.projectName === workspace);
-    setContainer(target?.containerName ?? "");
-  }, [workspace, container, state.workspaces]);
+    setContainer("");
+  }, [workspace, container]);
 
   // The shells a container really offers; refetched whenever the target moves.
   useEffect(() => {

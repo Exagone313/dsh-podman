@@ -55,11 +55,13 @@ export function PodmanTerminalGuide(
     setWorkspace(state.workspaces[0]?.projectName);
   }, [workspace, state.workspaces]);
 
+  // The empty value means the workspace's default container; the workspace
+  // row's own containerName is that container's podman name, which the
+  // orchestrator rejects, so it is never used as a target.
   useEffect(() => {
     if (workspace === undefined || container !== undefined) return;
-    const target = state.workspaces.find((row) => row.projectName === workspace);
-    setContainer(target?.containerName ?? "");
-  }, [workspace, container, state.workspaces]);
+    setContainer("");
+  }, [workspace, container]);
 
   useEffect(() => {
     if (workspace === undefined || workspace === "" || container === undefined) {

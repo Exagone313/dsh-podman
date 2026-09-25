@@ -374,6 +374,26 @@ versions** removes every cached package file except the newest of each package
 safe — a cached package is only ever re-downloaded — and neither runs while an
 image build is in progress.
 
+## Podman terminal
+
+The plugin owns a **Podman terminal** right-Sidebar tab, separate from dsh's own
+Terminal tab. Open it from the right Sidebar's new-tab guide, or press
+**Ctrl+Shift+`**. Its header picks a workspace and any container of that
+workspace, so a shell can run in the default container or in a named one; the
+harness's own Terminal always uses the session workspace's default container.
+
+The shell list is discovered **inside the chosen container**: candidate names
+are looked up on that container's PATH (`command -v`) and merged with
+`/etc/shells` and `$SHELL`, so a shell installed through a PATH addition or a
+mounted volume appears while one the image lacks does not. The selected shell is
+verified again before it starts.
+
+Terminals are retained on the host: switching tabs, closing the Sidebar or
+reloading the page keeps the shell and its scrollback, and reattaching replays
+the screen. Closing the tab leaves the shell retained for a while (until the
+host reaps it); **Reconnect** starts a fresh shell in the current selection.
+Closing or recreating a container drops its terminals, so reconnect afterwards.
+
 ## Podman operator mode
 
 The plugin ships an **agent preset** named _Podman operator mode_ (id

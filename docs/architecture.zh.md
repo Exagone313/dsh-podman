@@ -156,3 +156,9 @@ Podman 页面通过 harness API 路径（`/api/podman/card`）之下的一个已
 因此插件自身的配置中**只保留真正的偏好**：默认镜像、默认环境变量，以及 Podman 页面的当前语言（`uiLocale`，以便主机以会话语言呈现审批文本——参见[审批](usage.zh.md#审批)）。它们是
 volatile 字段，修改后无需重新加载插件即可生效。orchestrator
 派生的任何内容都不会被持久化，也不会有命令经由配置文档往返。
+
+## Podman 终端传输
+
+Podman 终端标签页通过自身在同一 connection 服务上的已认证路由（`/api/podman/terminal`、`/api/podman/terminal/shells`、`/api/podman/terminal/retained`）与 guest pty 通信。打开路由以换行分隔的 JSON 帧（ready、snapshot、base64 输出、title、exit、error、detached）进行流式传输，并通过 POST 接收控制请求（input、resize、rename、close）；承载层会像卡片路由一样应用 Host/Origin 校验和浏览器认证。
+
+每个终端以 `(sessionId, tabId)` 为键并由主机保留：没有浏览器接入时 guest pty 仍然存活，同时每个输出块都会写入一个无头终端模拟器，重新接入时回放其序列化屏幕，因此刷新页面不会丢失 shell 及其回滚缓冲。shell 探测在目标容器内进行：以 POSIX `command -v` 在该容器的 PATH（含部署的 PATH 追加项）中解析候选名称，并与 `/etc/shells` 和 `$SHELL` 合并，因此只提供容器确实拥有的 shell；所选路径在启动前会再次校验。

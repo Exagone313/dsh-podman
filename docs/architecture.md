@@ -197,3 +197,22 @@ host can render approval text in the session language — see
 [Approval](usage.md#approval)). They are volatile fields, so an edit applies
 without reloading the plugin. Nothing derived from the orchestrator is
 persisted, and no command round-trips through the config document.
+
+## Podman terminal transport
+
+The Podman terminal tab talks to guest ptys through its own authenticated routes
+on the same connection service (`/api/podman/terminal`,
+`/api/podman/terminal/shells`, `/api/podman/terminal/retained`). The open route
+streams newline-delimited JSON frames (ready, snapshot, base64 output, title,
+exit, error, detached) and takes control requests (input, resize, rename,
+close) over a POST; the carrier applies the same Host/Origin fence and browser
+authentication as the card route.
+
+Each terminal is keyed by `(sessionId, tabId)` and retained by the host: the
+guest pty stays alive while no browser is attached, and every chunk is also fed
+to a headless terminal emulator whose serialized screen is replayed on reattach,
+so a reload keeps the shell and its scrollback. Shell discovery runs inside the
+target container: candidate names are resolved with POSIX `command -v` on the
+container's PATH (including the deployment's PATH additions) and merged with
+`/etc/shells` and `$SHELL`, so only shells the container really provides are
+offered; the selected path is re-verified before the shell starts.

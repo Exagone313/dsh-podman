@@ -20,6 +20,11 @@ const clients = new Map<string, grpc.Client>();
 // themselves carry no deadline: several control operations (image pull/build,
 // cache clean) are legitimately long, so cancellation is driven by the turn's
 // AbortSignal instead.
+//
+// Both servers permit exactly this policy (internal/grpcopts.KeepalivePolicy);
+// grpc-go's default (5 minutes, no pings without streams) answers these pings
+// with GOAWAY "too many pings", which grpc-js logs as "rejected by server
+// because of excess pings". Keep the interval in sync with that policy.
 const CHANNEL_OPTIONS = {
   "grpc.keepalive_time_ms": 30_000,
   "grpc.keepalive_timeout_ms": 10_000,

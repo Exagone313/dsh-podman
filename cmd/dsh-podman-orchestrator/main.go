@@ -18,6 +18,7 @@ import (
 	"github.com/Exagone313/dsh-podman/internal/auth"
 	ctl "github.com/Exagone313/dsh-podman/internal/genproto/dshctl/v1"
 	"github.com/Exagone313/dsh-podman/internal/grpclog"
+	"github.com/Exagone313/dsh-podman/internal/grpcopts"
 	"github.com/Exagone313/dsh-podman/internal/orchestrator/grpcserver"
 	"github.com/Exagone313/dsh-podman/internal/orchestrator/images"
 	"github.com/Exagone313/dsh-podman/internal/orchestrator/podman"
@@ -85,7 +86,10 @@ func main() {
 		logger.Warn("control-plane authentication is disabled; set DSH_PODMAN_ORCHESTRATOR_TOKEN")
 	}
 	unary = append(unary, grpcserver.UnaryVersion(logger), grpclog.Sanitize(), grpclog.Unary(logger), recovery.Unary(logger))
-	server := grpc.NewServer(grpc.ChainUnaryInterceptor(unary...))
+	server := grpc.NewServer(
+		grpc.ChainUnaryInterceptor(unary...),
+		grpcopts.KeepalivePolicy(),
+	)
 	var podmanClient *podman.Client
 	var imageBuilder *images.Builder
 	podmanSocket := os.Getenv("DSH_PODMAN_ORCHESTRATOR_PODMAN_SOCKET")

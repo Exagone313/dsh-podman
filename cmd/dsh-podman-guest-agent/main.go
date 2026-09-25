@@ -14,6 +14,7 @@ import (
 	"github.com/Exagone313/dsh-podman/internal/auth"
 	guest "github.com/Exagone313/dsh-podman/internal/genproto/dshguest/v1"
 	"github.com/Exagone313/dsh-podman/internal/grpclog"
+	"github.com/Exagone313/dsh-podman/internal/grpcopts"
 	workspacefs "github.com/Exagone313/dsh-podman/internal/guestagent/fs"
 	"github.com/Exagone313/dsh-podman/internal/guestagent/grpcserver"
 	"github.com/Exagone313/dsh-podman/internal/recovery"
@@ -65,6 +66,7 @@ func main() {
 	server := grpc.NewServer(
 		grpc.ChainUnaryInterceptor(grpclog.Unary(logger), auth.Unary(token), recovery.Unary(logger)),
 		grpc.ChainStreamInterceptor(grpclog.Stream(logger), auth.Stream(token), recovery.Stream(logger)),
+		grpcopts.KeepalivePolicy(),
 	)
 	agent := grpcserver.New().WithFS(filesystem)
 	agent.Paths.Set(paths)

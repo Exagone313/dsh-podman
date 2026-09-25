@@ -90,17 +90,85 @@ make  # builds plugin and go binaries
 make image  # build images
 ```
 
-### Recreate containers
+### Run the local images (Quadlet)
+
+The shipped units pull the release images. Point them at the images built by
+`make image` to run a local build as the real services; comment the original
+line out so switching back is a one-line edit.
+
+In `~/.config/containers/systemd/dsh.container`:
+
+```ini
+#Image=ghcr.io/exagone313/dsh-podman/dsh:1
+Image=localhost/dsh-podman-dsh:latest
+Environment=DSH_PODMAN_PLUGIN_SOURCE=%h/project/dsh-podman
+```
+
+The unit already mounts `%h/project` read-only, so a repository checked out
+under `~/project` needs no extra `Volume=`. `npm pack` leaves the archive the
+entrypoint installs next to `package.json` (see
+[Install a local plugin build](#install-a-local-plugin-build)).
+
+In `~/.config/containers/systemd/dsh-podman-orchestrator.container`:
+
+```ini
+#Image=ghcr.io/exagone313/dsh-podman/orchestrator:1
+Image=localhost/dsh-podman-orchestrator:latest
+#Environment=DSH_PODMAN_GUEST_AGENT_IMAGE=ghcr.io/exagone313/dsh-podman/guest-agent
+#Environment=DSH_PODMAN_GUEST_AGENT_IMAGE_USE_VERSION_TAG=true
+Environment=DSH_PODMAN_GUEST_AGENT_IMAGE=localhost/dsh-podman-guest-agent:latest
+```
+
+The release reference is version-tagged, so every release gets a distinct image
+reference. The local build reuses a single `:latest` tag instead; the
+orchestrator then cannot tell that the agent was rebuilt, which is what
+[Update workspace containers](#update-workspace-containers) is about.
+
+Reload systemd after editing the units:
 
 ```bash
+systemctl --user daemon-reload
+```
+
+### Deploy a change
+
+```bash
+make            # Go binaries + the plugin bundle
+make image      # orchestrator, guest-agent and dsh images
+npm pack        # the plugin archive the dsh entrypoint installs
 systemctl --user restart dsh dsh-podman-orchestrator
 ```
+
+The dsh image installs the plugin at container start, so restarting dsh is what
+reinstalls the freshly packed archive; restarting the orchestrator picks up the
+new orchestrator and guest-agent images.
+
+### Update workspace containers
+
+The guest-agent image is mounted into each container when it is created, so a
+running container keeps the agent it started with. The orchestrator recreates a
+container by itself only when its guest-agent image reference differs from the
+configured one — which happens with the version-tagged release reference, but
+not with the local `:latest` tag. After rebuilding the guest agent, recreate the
+containers yourself:
+
+- from the settings card, per container: **Recreate** (same image) or **Recreate
+  with image**;
+- with `container_recreate`, for a named container or the default one.
+
+To rebuild a whole workspace instead, use **Remove pod** on its row (or
+`RemoveWorkspace`): the pod and all its containers are removed, and the next
+attach creates the pod and its default container again. Restarting the two
+services never touches workspace containers, and neither action removes volumes,
+secrets, or project data.
 
 ### Install a local plugin build
 
 The dsh image installs the plugin itself at container start, so a development
-build is served by pointing that install at a bind-mounted package. Build the
-plugin and pack it:
+build is served by pointing that install at a bind-mounted package. The Quadlet
+setup above is the first form below, with the repository directory itself
+(`%h/project/dsh-podman`) already visible through the unit's read-only
+`%h/project` mount. Build the plugin and pack it:
 
 ```bash
 pnpm build

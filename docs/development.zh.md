@@ -86,16 +86,68 @@ make  # builds plugin and go binaries
 make image  # build images
 ```
 
-### 重建容器
+### 运行本地镜像（Quadlet）
+
+随附的单元会拉取发布镜像。把它们指向 `make image` 构建的镜像，就能把本地构建当作正式服务来运行；把原来的行注释掉，切回时只需改一行。
+
+在 `~/.config/containers/systemd/dsh.container` 中：
+
+```ini
+#Image=ghcr.io/exagone313/dsh-podman/dsh:1
+Image=localhost/dsh-podman-dsh:latest
+Environment=DSH_PODMAN_PLUGIN_SOURCE=%h/project/dsh-podman
+```
+
+该单元已经把 `%h/project` 以只读方式挂载，因此检出在 `~/project` 下的仓库无需额外的 `Volume=`。`npm pack` 会把入口脚本要安装的归档放在 `package.json` 旁边（见[安装本地插件构建](#安装本地插件构建)）。
+
+在 `~/.config/containers/systemd/dsh-podman-orchestrator.container` 中：
+
+```ini
+#Image=ghcr.io/exagone313/dsh-podman/orchestrator:1
+Image=localhost/dsh-podman-orchestrator:latest
+#Environment=DSH_PODMAN_GUEST_AGENT_IMAGE=ghcr.io/exagone313/dsh-podman/guest-agent
+#Environment=DSH_PODMAN_GUEST_AGENT_IMAGE_USE_VERSION_TAG=true
+Environment=DSH_PODMAN_GUEST_AGENT_IMAGE=localhost/dsh-podman-guest-agent:latest
+```
+
+发布引用带有版本标签，因此每个发布版本都有各自不同的镜像引用。本地构建则复用同一个
+`:latest` 标签；orchestrator 因此无法察觉 guest agent 已被重建，详见[更新工作区容器](#更新工作区容器)。
+
+编辑单元后重新加载 systemd：
 
 ```bash
+systemctl --user daemon-reload
+```
+
+### 部署改动
+
+```bash
+make            # Go binaries + the plugin bundle
+make image      # orchestrator, guest-agent and dsh images
+npm pack        # the plugin archive the dsh entrypoint installs
 systemctl --user restart dsh dsh-podman-orchestrator
 ```
+
+dsh 镜像会在容器启动时安装插件，因此重启 dsh 才会重新安装刚打包的归档；重启 orchestrator
+则会采用新的 orchestrator 与 guest-agent 镜像。
+
+### 更新工作区容器
+
+guest-agent 镜像会在容器创建时挂载进去，因此正在运行的容器仍使用它启动时的那份 agent。只有当容器的
+guest-agent 镜像引用与当前配置不一致时，orchestrator 才会自行重建该容器——带版本标签的发布引用会如此，本地
+`:latest` 标签则不会。重建 guest agent 之后，请自行重建容器：
+
+- 在设置卡片中按容器操作：**Recreate**（沿用当前镜像）或 **Recreate with image**；
+- 或使用 `container_recreate`，作用于命名容器或默认容器。
+
+若要重建整个工作区，可在其行上使用 **Remove pod**（或 `RemoveWorkspace`）：pod
+及其所有容器都会被移除，下次接入时会重新创建 pod 与默认容器。重启这两个服务绝不会触及工作区容器，上述两种操作也都不会删除卷、机密或项目数据。
 
 ### 安装本地插件构建
 
 dsh 镜像会在容器启动时自行安装插件，因此本地开发构建通过将安装源指向 bind mount
-的包来使用。先构建并打包插件：
+的包来使用。上面的 Quadlet 配置就是下面第一种形式，仓库目录本身
+（`%h/project/dsh-podman`）已经通过单元的只读 `%h/project` 挂载可见。先构建并打包插件：
 
 ```bash
 pnpm build

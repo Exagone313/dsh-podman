@@ -357,12 +357,18 @@ const EXEC_RETAIN_BYTES = 1 << 20;
 const EXEC_SPILL_BYTES = 8 << 20;
 
 // The optional per-call controls runExec accepts. `signal` cancels the turn's
-// command; the byte caps override the retention/spill bounds.
+// command; the byte caps override the retention/spill bounds; `killGraceMs` is
+// the SIGTERM-to-SIGKILL grace period for a cancelled command.
 export interface RunExecOptions {
   signal?: AbortSignal;
   maxBytes?: number;
   spillBytes?: number;
+  killGraceMs?: number;
 }
+
+// The grace a cancelled command is given between SIGTERM and SIGKILL, matching
+// the harness's own termination grace.
+const EXEC_KILL_GRACE_MS = 5000;
 
 export async function runExec(
   binding: WorkspaceBinding,
@@ -384,6 +390,11 @@ export async function runExec(
   throwIfAborted(signal, "exec");
   const maxBytes = options.maxBytes ?? EXEC_RETAIN_BYTES;
   const spillBytes = options.spillBytes ?? EXEC_SPILL_BYTES;
+  const configuredGrace = Number(options.killGraceMs);
+  const killGraceMs =
+    Number.isFinite(configuredGrace) && configuredGrace > 0
+      ? configuredGrace
+      : EXEC_KILL_GRACE_MS;
   const stdoutSpec = { path: `${SPILL_ROOT}/${randomUUID()}.stdout`, maxBytes: spillBytes };
   const stderrSpec = { path: `${SPILL_ROOT}/${randomUUID()}.stderr`, maxBytes: spillBytes };
   return withGuestAuth(binding, (guest, token) =>
@@ -397,10 +408,13 @@ export async function runExec(
       const stream = (guest as any).exec(metadata(token));
       let processId: string | undefined;
       let timer: ReturnType<typeof setTimeout> | undefined;
+      let killTimer: ReturnType<typeof setTimeout> | undefined;
       let settled = false;
       let detach: () => void = () => {};
-      // settle runs one final action exactly once and tears down the timer and
-      // the abort listener, so a timeout, an abort, and an exit cannot race.
+      // settle runs one final action exactly once and tears down the timeout
+      // and the abort listener, so a timeout, an abort, and an exit cannot
+      // race. The kill timer deliberately outlives settle: it is the
+      // escalation for a command that ignored the cancellation's SIGTERM.
       const settle = (finish: () => void): void => {
         if (settled) return;
         settled = true;
@@ -411,6 +425,12 @@ export async function runExec(
         detach();
         finish();
       };
+      const clearKillTimer = (): void => {
+        if (killTimer !== undefined) {
+          clearTimeout(killTimer);
+          killTimer = undefined;
+        }
+      };
       const stopProcess = (sig: string): void => {
         if (processId === undefined) return;
         // Best effort: ask the guest to terminate the running process tree.
@@ -419,13 +439,35 @@ export async function runExec(
           signal: sig,
         }).catch(() => {});
       };
-      const abortWith = (error: Error): void => {
-        stopProcess("SIGTERM");
+      const cancelStream = (): void => {
         try {
           stream.cancel?.();
         } catch {
           // The stream already ended; nothing to cancel.
         }
+      };
+      // A cancellation asks the command to stop with SIGTERM, then kills its
+      // process group once the grace period elapses without an exit. The
+      // stream stays open for that grace so the guest still knows the process;
+      // the guest also escalates a cancelled stream to a group SIGKILL, so a
+      // lost connection stops the tree too.
+      const escalateStop = (): void => {
+        if (processId === undefined) {
+          // Nothing to signal yet: cancelling the stream is all that is left.
+          cancelStream();
+          return;
+        }
+        stopProcess("SIGTERM");
+        if (killTimer !== undefined) return;
+        killTimer = setTimeout(() => {
+          killTimer = undefined;
+          stopProcess("SIGKILL");
+          cancelStream();
+        }, killGraceMs);
+        killTimer.unref?.();
+      };
+      const abortWith = (error: Error): void => {
+        escalateStop();
         settle(() => reject(error));
       };
       if (typeof timeoutMs === "number" && timeoutMs > 0) {
@@ -453,6 +495,9 @@ export async function runExec(
           stderrReader.append(Buffer.from(output.stderrChunk));
         }
         if (output.exit) {
+          // The command stopped on its own within the grace period: nothing is
+          // left to escalate.
+          clearKillTimer();
           stdoutReader.setSpillValid(Boolean(output.exit.stdoutSpillValid));
           stderrReader.setSpillValid(Boolean(output.exit.stderrSpillValid));
           const out = stdoutReader.readFrom(0);

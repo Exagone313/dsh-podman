@@ -148,19 +148,55 @@ test("runExec rejects when the stream ends without an exit message", async () =>
   await assert.rejects(promise, /ended before the process exited/);
 });
 
-test("runExec aborts with the turn signal, cancelling and signalling the process", async () => {
+test("runExec aborts with the turn signal, then escalates to SIGKILL", async () => {
+  const harness = execGuest(new FakeExecStream());
+  const binding: any = { guest: harness.guest, token: "t" };
+  const controller = new AbortController();
+  const promise = runExec(binding, ["sleep", "99"], undefined, undefined, undefined, undefined, {
+    signal: controller.signal,
+    killGraceMs: 60,
+  });
+  harness.stream.emit("data", { processId: "7" });
+  controller.abort();
+  await assert.rejects(promise, /aborted/);
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.deepEqual(harness.signals, ["SIGTERM"]);
+  // The stream stays open for the grace period, so a command that ignores
+  // SIGTERM can still be killed by its process group.
+  assert.equal(harness.stream.cancelled, false);
+  await new Promise((resolve) => setTimeout(resolve, 100));
+  assert.deepEqual(harness.signals, ["SIGTERM", "SIGKILL"]);
+  assert.equal(harness.stream.cancelled, true);
+});
+
+test("runExec leaves a command that exits within the grace period alone", async () => {
+  const harness = execGuest(new FakeExecStream());
+  const binding: any = { guest: harness.guest, token: "t" };
+  const controller = new AbortController();
+  const promise = runExec(binding, ["sleep", "99"], undefined, undefined, undefined, undefined, {
+    signal: controller.signal,
+    killGraceMs: 30,
+  });
+  harness.stream.emit("data", { processId: "7" });
+  controller.abort();
+  await assert.rejects(promise, /aborted/);
+  harness.stream.emit("data", { exit: EXIT_OK });
+  await new Promise((resolve) => setTimeout(resolve, 50));
+  assert.deepEqual(harness.signals, ["SIGTERM"]);
+  assert.equal(harness.stream.cancelled, false);
+});
+
+test("runExec cancels an abort that arrives before the process id", async () => {
   const harness = execGuest(new FakeExecStream());
   const binding: any = { guest: harness.guest, token: "t" };
   const controller = new AbortController();
   const promise = runExec(binding, ["sleep", "99"], undefined, undefined, undefined, undefined, {
     signal: controller.signal,
   });
-  harness.stream.emit("data", { processId: "7" });
   controller.abort();
   await assert.rejects(promise, /aborted/);
   assert.equal(harness.stream.cancelled, true);
-  await new Promise((resolve) => setImmediate(resolve));
-  assert.deepEqual(harness.signals, ["SIGTERM"]);
+  assert.deepEqual(harness.signals, []);
 });
 
 test("runExec rejects a pre-aborted call without starting it", async () => {

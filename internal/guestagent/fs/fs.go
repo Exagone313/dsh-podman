@@ -15,6 +15,7 @@ type Mount struct {
 	Virtual, Host string
 	ReadOnly      bool
 }
+
 // WorkspaceFS confines the guest file API to its configured mounts.
 //
 // Resolve checks the path and returns the resolved host path; the caller then

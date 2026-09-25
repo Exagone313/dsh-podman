@@ -238,5 +238,3 @@ func TestContainerRequestsRejectInvalidPathAdditions(t *testing.T) {
 		t.Errorf("create: expected InvalidArgument, got %v", err)
 	}
 }
-
-

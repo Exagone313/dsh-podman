@@ -203,7 +203,25 @@ export type ContainerPluginKey =
   | "toolTitle_daemon_list"
   | "toolTitle_daemon_logs"
   | "toolTitle_daemon_restart"
-  | "toolTitle_daemon_stop";
+  | "toolTitle_daemon_stop"
+  | "terminalTabTitle"
+  | "terminalGuideTitle"
+  | "terminalGuideDescription"
+  | "terminalShortcut"
+  | "terminalShortcutNoSession"
+  | "terminalWorkspace"
+  | "terminalContainer"
+  | "terminalShell"
+  | "terminalDefaultContainer"
+  | "terminalConnect"
+  | "terminalReconnect"
+  | "terminalStatusConnecting"
+  | "terminalStatusRunning"
+  | "terminalStatusExited"
+  | "terminalStatusDetached"
+  | "terminalNoShells"
+  | "terminalShellsFailed"
+  | "terminalLoading";
 
 export const en: Record<ContainerPluginKey, string> = {
   cardTitle: "dsh-podman",
@@ -411,6 +429,24 @@ export const en: Record<ContainerPluginKey, string> = {
   toolTitle_daemon_logs: "Daemon logs",
   toolTitle_daemon_restart: "Restart daemon",
   toolTitle_daemon_stop: "Stop daemon",
+  terminalTabTitle: "Podman terminal",
+  terminalGuideTitle: "Podman terminal",
+  terminalGuideDescription: "Open a shell in a workspace container",
+  terminalShortcut: "New Podman terminal",
+  terminalShortcutNoSession: "Select a session first",
+  terminalWorkspace: "Workspace",
+  terminalContainer: "Container",
+  terminalShell: "Shell",
+  terminalDefaultContainer: "Default container",
+  terminalConnect: "Connect",
+  terminalReconnect: "Reconnect",
+  terminalStatusConnecting: "Connecting…",
+  terminalStatusRunning: "Connected",
+  terminalStatusExited: "Process exited ({code})",
+  terminalStatusDetached: "Detached (opened elsewhere)",
+  terminalNoShells: "No shells available",
+  terminalShellsFailed: "Could not list shells: {message}",
+  terminalLoading: "Loading…",
 };
 
 export const zh: Record<ContainerPluginKey, string> = {
@@ -616,6 +652,24 @@ export const zh: Record<ContainerPluginKey, string> = {
   toolTitle_daemon_logs: "守护进程日志",
   toolTitle_daemon_restart: "重启守护进程",
   toolTitle_daemon_stop: "停止守护进程",
+  terminalTabTitle: "Podman 终端",
+  terminalGuideTitle: "Podman 终端",
+  terminalGuideDescription: "在工作区容器中打开 Shell",
+  terminalShortcut: "新建 Podman 终端",
+  terminalShortcutNoSession: "请先选择会话",
+  terminalWorkspace: "工作区",
+  terminalContainer: "容器",
+  terminalShell: "Shell",
+  terminalDefaultContainer: "默认容器",
+  terminalConnect: "连接",
+  terminalReconnect: "重新连接",
+  terminalStatusConnecting: "正在连接…",
+  terminalStatusRunning: "已连接",
+  terminalStatusExited: "进程已退出（{code}）",
+  terminalStatusDetached: "已在其他位置打开",
+  terminalNoShells: "没有可用的 Shell",
+  terminalShellsFailed: "读取 Shell 失败：{message}",
+  terminalLoading: "正在加载…",
 };
 
 declare module "@deepseek-ai/dsh-client-ui-slots" {

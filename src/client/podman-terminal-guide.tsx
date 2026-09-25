@@ -1,0 +1,234 @@
+// SPDX-FileCopyrightText: 2026 Elouan Martinet <exa@elou.world>
+//
+// SPDX-License-Identifier: MIT
+
+// The Podman terminal's guide card: pick a workspace, a container and one of
+// the shells that container really offers, then open a new terminal tab bound
+// to that target. It reads the same settings-card snapshot as the tab body.
+import { Button, PluginArtworkTerminal } from "@deepseek-ai/dsh-client-ui-primitives";
+import type { InjectFace, PropsLocale, PropsRuntime } from "@deepseek-ai/dsh-client-ui-slots";
+import { type ReactNode, useEffect, useState } from "react";
+import type { ContainerCardFace } from "./container-card-controller.js";
+import { hint } from "./container-card-styles.js";
+import { NS } from "./locales.js";
+import { TerminalTargetFields } from "./podman-terminal.js";
+import type { PodmanTerminalParams } from "./terminal-tab.js";
+import type { TerminalShellView } from "./terminal-protocol.js";
+import { fetchTerminalShells } from "./terminal-transport.js";
+import type {} from "@deepseek-ai/dsh-client-ui-sidebar-right/client";
+
+/** The card snapshot plus the open action the guide needs. */
+export interface PodmanTerminalGuideInjected extends ContainerCardFace {
+  /** Owning session, used by the shells route and the injection contract. */
+  readonly sessionId: string;
+  /** Open a new terminal tab for one verified target. */
+  readonly openTab: (params: PodmanTerminalParams) => void;
+}
+
+export type PodmanTerminalGuideProps =
+  & PropsRuntime<"sidebar.right.tab.guide.entry">
+  & PropsLocale<typeof NS>
+  & InjectFace<PodmanTerminalGuideInjected>;
+
+type ShellsState =
+  | { readonly phase: "loading" }
+  | { readonly phase: "ready"; readonly shells: readonly TerminalShellView[] }
+  | { readonly phase: "failed"; readonly message: string };
+
+export function PodmanTerminalGuide(
+  props: PodmanTerminalGuideProps,
+): ReactNode {
+  const { t, sessionId } = props;
+  const state = props.useContainerCard((snapshot) => snapshot);
+  const [workspace, setWorkspace] = useState<string | undefined>(undefined);
+  const [container, setContainer] = useState<string | undefined>(undefined);
+  const [shells, setShells] = useState<ShellsState>({ phase: "loading" });
+
+  useEffect(() => {
+    props.reload();
+  }, [props.reload]);
+
+  // The guide has no session cwd to match against, so the first workspace is
+  // the default; picking another one is one click away.
+  useEffect(() => {
+    if (workspace !== undefined || state.workspaces.length === 0) return;
+    setWorkspace(state.workspaces[0]?.projectName);
+  }, [workspace, state.workspaces]);
+
+  useEffect(() => {
+    if (workspace === undefined || container !== undefined) return;
+    const target = state.workspaces.find((row) => row.projectName === workspace);
+    setContainer(target?.containerName ?? "");
+  }, [workspace, container, state.workspaces]);
+
+  useEffect(() => {
+    if (workspace === undefined || workspace === "" || container === undefined) {
+      return;
+    }
+    const controller = new AbortController();
+    setShells({ phase: "loading" });
+    void fetchTerminalShells(
+      workspace,
+      container,
+      sessionId,
+      controller.signal,
+    ).then(
+      (list) => {
+        if (!controller.signal.aborted) setShells({ phase: "ready", shells: list });
+      },
+      (error: unknown) => {
+        if (controller.signal.aborted) return;
+        setShells({
+          phase: "failed",
+          message: error instanceof Error ? error.message : String(error),
+        });
+      },
+    );
+    return () => {
+      controller.abort();
+    };
+  }, [workspace, container, sessionId]);
+
+  const shellList = shells.phase === "ready" ? shells.shells : [];
+  const ready = workspace !== undefined && workspace !== "" &&
+    container !== undefined && shellList.length > 0;
+  return (
+    <div style={CARD_STYLE} data-sidebar-right-guide-entry={props.kind}>
+      <div style={HEADER_STYLE}>
+        <span style={ICON_STYLE} aria-hidden="true">
+          <PluginArtworkTerminal size={22} />
+        </span>
+        <span style={TEXT_STYLE}>
+          <span style={TITLE_STYLE}>{props.title}</span>
+          {props.description === undefined
+            ? null
+            : <span style={DESCRIPTION_STYLE}>{props.description}</span>}
+        </span>
+      </div>
+      {state.workspaces.length === 0
+        ? (
+          <p style={hint} role="status">
+            {state.busy ? t("terminalLoading") : t("unavailable")}
+          </p>
+        )
+        : (
+          <>
+            <div style={FIELDS_STYLE}>
+              <TerminalTargetFields
+                workspaces={state.workspaces}
+                containers={state.containers}
+                workspace={workspace}
+                container={container}
+                disabled={false}
+                workspaceLabel={t("terminalWorkspace")}
+                containerLabel={t("terminalContainer")}
+                defaultLabel={t("terminalDefaultContainer")}
+                onWorkspace={(value) => {
+                  setWorkspace(value === "" ? undefined : value);
+                  setContainer(undefined);
+                }}
+                onContainer={setContainer}
+              />
+            </div>
+            {shells.phase === "failed" && (
+              <p style={hint} role="alert">
+                {t("terminalShellsFailed", { message: shells.message })}
+              </p>
+            )}
+            {shells.phase === "loading" && <p style={hint} role="status">{t("terminalLoading")}</p>}
+            {shells.phase === "ready" && shellList.length === 0 && (
+              <p style={hint} role="status">{t("terminalNoShells")}</p>
+            )}
+            <div style={ACTIONS_STYLE}>
+              {shellList.map((entry) => (
+                <Button
+                  key={entry.path}
+                  variant="outline"
+                  size="sm"
+                  disabled={!ready}
+                  onClick={() => {
+                    props.openTab({
+                      workspace,
+                      container,
+                      shell: entry.path,
+                    });
+                  }}
+                >
+                  {entry.name}
+                </Button>
+              ))}
+            </div>
+          </>
+        )}
+    </div>
+  );
+}
+
+const CARD_STYLE: React.CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  gap: "8px",
+  boxSizing: "border-box",
+  width: "100%",
+  padding: "12px 14px",
+  border: "0.5px solid var(--dsw-alias-border-l3)",
+  borderRadius: "10px",
+  background: "var(--dsw-alias-bg-layer-1)",
+};
+
+const HEADER_STYLE: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: "12px",
+  minWidth: 0,
+};
+
+const ICON_STYLE: React.CSSProperties = {
+  display: "flex",
+  flex: "none",
+  alignItems: "center",
+  justifyContent: "center",
+  width: "26px",
+  height: "26px",
+  color: "var(--dsw-alias-label-secondary)",
+};
+
+const TEXT_STYLE: React.CSSProperties = {
+  display: "flex",
+  flex: 1,
+  flexDirection: "column",
+  gap: "2px",
+  minWidth: 0,
+};
+
+const TITLE_STYLE: React.CSSProperties = {
+  overflow: "hidden",
+  color: "var(--dsw-alias-label-primary)",
+  fontSize: "14px",
+  lineHeight: 1.4,
+  whiteSpace: "nowrap",
+  textOverflow: "ellipsis",
+};
+
+const DESCRIPTION_STYLE: React.CSSProperties = {
+  overflow: "hidden",
+  color: "var(--dsw-alias-label-tertiary)",
+  fontSize: "11px",
+  lineHeight: 1.4,
+  whiteSpace: "nowrap",
+  textOverflow: "ellipsis",
+};
+
+const FIELDS_STYLE: React.CSSProperties = {
+  display: "flex",
+  flexWrap: "wrap",
+  gap: "8px",
+  alignItems: "center",
+};
+
+const ACTIONS_STYLE: React.CSSProperties = {
+  display: "flex",
+  flexWrap: "wrap",
+  gap: "8px",
+  alignItems: "center",
+};

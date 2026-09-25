@@ -15,15 +15,14 @@ dsh 的 **设置 → 插件** 卡片中暴露了一些 **UI 设置**，与环境
 
 ## 插件（dsh 客户端）— 环境变量
 
-| 变量                            | 默认值                  | 说明                                                                      |
-| ------------------------------- | ----------------------- | ------------------------------------------------------------------------- |
-| `DSH_PODMAN_IMAGE_PREFIX`       | `localhost/dsh-podman/` | 前置到工作区镜像引用上的前缀                                              |
-| `DSH_PODMAN_ORCHESTRATOR_TOKEN` | —                       | 用于认证控制平面 gRPC 调用的共享机密；见[变量详解](#变量详解)             |
-| `DSH_PODMAN_PROJECTS_ROOT`      | `/projects`             | 用于将会话工作目录解析为工作区的项目根目录                                |
-| `DSH_PODMAN_SOCKETS_ROOT`       | `/run/dsh-podman`       | 插件据此推导 orchestrator 控制套接字（`orchestrator.sock`）的套接字根目录 |
+| 变量                            | 默认值            | 说明                                                                      |
+| ------------------------------- | ----------------- | ------------------------------------------------------------------------- |
+| `DSH_PODMAN_ORCHESTRATOR_TOKEN` | —                 | 用于认证控制平面 gRPC 调用的共享机密；见[变量详解](#变量详解)             |
+| `DSH_PODMAN_PROJECTS_ROOT`      | `/projects`       | 用于将会话工作目录解析为工作区的项目根目录                                |
+| `DSH_PODMAN_SOCKETS_ROOT`       | `/run/dsh-podman` | 插件据此推导 orchestrator 控制套接字（`orchestrator.sock`）的套接字根目录 |
 
-`projectsRoot` 和 `imagePrefix` 仅来自环境变量，以确保与 orchestrator
-一致；`controlToken` 来自插件 `config` 或 `DSH_PODMAN_ORCHESTRATOR_TOKEN`。
+`projectsRoot` 仅来自环境变量，以确保与 orchestrator 一致；`controlToken`
+来自插件 `config` 或 `DSH_PODMAN_ORCHESTRATOR_TOKEN`。
 
 ## 插件（dsh 客户端）— UI 设置
 
@@ -50,10 +49,10 @@ dsh 的 **设置 → 插件** 卡片中暴露了一些 **UI 设置**，与环境
 | `DSH_PODMAN_HOST_GUEST_AGENT_BIN`              | —                             | 主机侧的 guest agent 二进制路径；设置后会绑定挂载；见[变量详解](#变量详解)                                                                                          |
 | `DSH_PODMAN_HOST_PACMAN_CACHE`                 | —                             | 挂载在 `/var/cache/pacman/pkg` 的主机绝对路径目录，用于在 pacman 构建之间持久化已下载的软件包；未设置时禁用缓存                                                     |
 | `DSH_PODMAN_HOST_PROJECTS_ROOT`                | `DSH_PODMAN_PROJECTS_ROOT`    | 用作绑定挂载源的主机侧项目根目录                                                                                                                                    |
-| `DSH_PODMAN_HOST_SOCKETS_ROOT`                 | `DSH_PODMAN_SOCKETS_ROOT`     | 用于 guest 套接字绑定挂载的主机侧套接字根目录                                                                                                                       |
+| `DSH_PODMAN_HOST_SOCKETS_ROOT`                 | required                      | 用于 guest 套接字绑定挂载的主机侧套接字根目录；见[变量详解](#变量详解)                                                                                              |
 | `DSH_PODMAN_IMAGE_PREFIX`                      | `localhost/dsh-podman/`       | 前置到已构建的工作区镜像引用上的前缀                                                                                                                                |
 | `DSH_PODMAN_ORCHESTRATOR_PODMAN_SOCKET`        | required                      | Podman API 套接字，例如 `unix:///run/podman/podman.sock`                                                                                                            |
-| `DSH_PODMAN_ORCHESTRATOR_STATE`                | `/var/lib/dsh-orchestrator`   | 持久化状态目录（二进制默认值；随附的 Quadlet 会将其覆盖为 `%h/.dsh/dsh-podman/state`）                                                                              |
+| `DSH_PODMAN_ORCHESTRATOR_STATE`                | required                      | 持久化状态目录；见[变量详解](#变量详解)                                                                                                                             |
 | `DSH_PODMAN_ORCHESTRATOR_TOKEN`                | —                             | 用于认证控制平面 gRPC 调用的共享机密；见[变量详解](#变量详解)                                                                                                       |
 | `DSH_PODMAN_PROJECTS_ROOT`                     | `/projects`                   | 每个 guest 容器内的项目根目录                                                                                                                                       |
 | `DSH_PODMAN_SECRET_PREFIX`                     | `dsh-podman-`                 | 应用于受管 podman 机密的前缀（见[使用](usage.zh.md#机密)）                                                                                                          |
@@ -92,8 +91,7 @@ orchestrator
 二进制在_主机上_的路径。设置它会将该二进制以只读方式绑定挂载到容器内相同路径，而不是挂载
 guest-agent 镜像；这是一个可选的开发回退方案，优先于镜像挂载。默认情况下未设置。
 
-如果两个变量都未配置，guest 容器将没有可运行的 guest
-agent，创建工作区容器将会失败。
+如果两个变量都未配置，orchestrator 将拒绝启动。
 
 ### `DSH_PODMAN_GUEST_AGENT_IMAGE`, `DSH_PODMAN_GUEST_AGENT_IMAGE_AGENT_BIN`, `DSH_PODMAN_GUEST_AGENT_IMAGE_MOUNT` and `DSH_PODMAN_GUEST_AGENT_IMAGE_USE_VERSION_TAG`
 
@@ -133,12 +131,25 @@ orchestrator 和插件必须约定的任意共享机密字符串；每个控制�
 未设置令牌时，它接受未经认证的控制平面调用（转而依赖套接字的文件权限）；当设置了令牌时，不带匹配头的请求会被以
 `Unauthenticated` 拒绝。
 
+### `DSH_PODMAN_ORCHESTRATOR_STATE`
+
+orchestrator
+持久化其状态（工作区、容器和镜像记录）的目录。该变量为必填，且必须是绑定挂载到
+orchestrator
+的目录的绝对路径，以便状态在容器重启后仍然保留——只有部署方知道该路径。随附的
+Quadlet 会挂载 `%h/.dsh/dsh-podman/state`。orchestrator
+会在需要时创建该目录，缺少该变量时拒绝启动。
+
 ### `DSH_PODMAN_SOCKETS_ROOT` and `DSH_PODMAN_HOST_SOCKETS_ROOT`
 
 `DSH_PODMAN_SOCKETS_ROOT` 是 orchestrator 与 guest
 容器共享的套接字根目录。它包含 orchestrator
 控制套接字（`orchestrator.sock`）和每个工作区的一个子目录，每个 guest agent
-在其中创建自己的 `guest.sock`。
+在其中创建自己的 `guest.sock`。它保留 `/run/dsh-podman` 默认值。
+
+`DSH_PODMAN_HOST_SOCKETS_ROOT`
+为必填：它是同一目录在主机上的路径，无法从容器路径推导——随附的 Quadlet 将
+`%t/dsh-podman` 挂载到 `/run/dsh-podman`。缺少该变量时 orchestrator 拒绝启动。
 
 该目录需要绑定挂载到 orchestrator 容器中。其权限模式必须是
 `0700`：当套接字根目录对组或其他用户可访问时，orchestrator

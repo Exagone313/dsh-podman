@@ -16,16 +16,14 @@ cordis, then the environment variables below, then built-in defaults.
 
 ## Plugin (dsh client) — environment variables
 
-| Variable                        | Default                 | Description                                                                                      |
-| ------------------------------- | ----------------------- | ------------------------------------------------------------------------------------------------ |
-| `DSH_PODMAN_IMAGE_PREFIX`       | `localhost/dsh-podman/` | Prefix prepended to workspace image references                                                   |
-| `DSH_PODMAN_ORCHESTRATOR_TOKEN` | —                       | Shared secret authenticating control-plane gRPC calls; see [Variable details](#variable-details) |
-| `DSH_PODMAN_PROJECTS_ROOT`      | `/projects`             | Project root used to resolve session working directories into a workspace                        |
-| `DSH_PODMAN_SOCKETS_ROOT`       | `/run/dsh-podman`       | Socket root the plugin derives the orchestrator control socket (`orchestrator.sock`) from        |
+| Variable                        | Default           | Description                                                                                      |
+| ------------------------------- | ----------------- | ------------------------------------------------------------------------------------------------ |
+| `DSH_PODMAN_ORCHESTRATOR_TOKEN` | —                 | Shared secret authenticating control-plane gRPC calls; see [Variable details](#variable-details) |
+| `DSH_PODMAN_PROJECTS_ROOT`      | `/projects`       | Project root used to resolve session working directories into a workspace                        |
+| `DSH_PODMAN_SOCKETS_ROOT`       | `/run/dsh-podman` | Socket root the plugin derives the orchestrator control socket (`orchestrator.sock`) from        |
 
-`projectsRoot` and `imagePrefix` are env-only so they match the orchestrator;
-`controlToken` comes from the plugin `config` or
-`DSH_PODMAN_ORCHESTRATOR_TOKEN`.
+`projectsRoot` is env-only so it matches the orchestrator; `controlToken` comes
+from the plugin `config` or `DSH_PODMAN_ORCHESTRATOR_TOKEN`.
 
 ## Plugin (dsh client) — UI settings
 
@@ -52,10 +50,10 @@ section and the images' Set-default popup):
 | `DSH_PODMAN_HOST_GUEST_AGENT_BIN`              | —                             | Host-side guest agent binary path; bind-mounted when set; see [Variable details](#variable-details)                                                                                                                |
 | `DSH_PODMAN_HOST_PACMAN_CACHE`                 | —                             | Host-absolute directory mounted at `/var/cache/pacman/pkg` to persist downloaded packages across pacman builds; unset disables caching                                                                             |
 | `DSH_PODMAN_HOST_PROJECTS_ROOT`                | `DSH_PODMAN_PROJECTS_ROOT`    | Host-side projects root used as the source of bind mounts                                                                                                                                                          |
-| `DSH_PODMAN_HOST_SOCKETS_ROOT`                 | `DSH_PODMAN_SOCKETS_ROOT`     | Host-side sockets root for guest socket bind mounts                                                                                                                                                                |
+| `DSH_PODMAN_HOST_SOCKETS_ROOT`                 | required                      | Host-side sockets root for guest socket bind mounts; see [Variable details](#variable-details)                                                                                                                     |
 | `DSH_PODMAN_IMAGE_PREFIX`                      | `localhost/dsh-podman/`       | Prefix prepended to built workspace image references                                                                                                                                                               |
 | `DSH_PODMAN_ORCHESTRATOR_PODMAN_SOCKET`        | required                      | Podman API socket, e.g. `unix:///run/podman/podman.sock`                                                                                                                                                           |
-| `DSH_PODMAN_ORCHESTRATOR_STATE`                | `/var/lib/dsh-orchestrator`   | Persisted state directory (binary default; the shipped Quadlet overrides it to `%h/.dsh/dsh-podman/state`)                                                                                                         |
+| `DSH_PODMAN_ORCHESTRATOR_STATE`                | required                      | Persisted state directory; see [Variable details](#variable-details)                                                                                                                                               |
 | `DSH_PODMAN_ORCHESTRATOR_TOKEN`                | —                             | Shared secret authenticating control-plane gRPC calls; see [Variable details](#variable-details)                                                                                                                   |
 | `DSH_PODMAN_PROJECTS_ROOT`                     | `/projects`                   | Project root inside every guest container                                                                                                                                                                          |
 | `DSH_PODMAN_SECRET_PREFIX`                     | `dsh-podman-`                 | Prefix applied to managed podman secrets (see [Usage](usage.md#secrets))                                                                                                                                           |
@@ -97,8 +95,7 @@ binary. Setting it bind-mounts that binary read-only to the same in-container
 path instead of mounting the guest-agent image; it is an optional development
 fallback and takes precedence over the image mount. It is unset by default.
 
-If neither variable is configured, the guest container has no guest agent to
-run, and creating a workspace container fails.
+If neither variable is configured, the orchestrator refuses to start.
 
 ### `DSH_PODMAN_GUEST_AGENT_IMAGE`, `DSH_PODMAN_GUEST_AGENT_IMAGE_AGENT_BIN`, `DSH_PODMAN_GUEST_AGENT_IMAGE_MOUNT` and `DSH_PODMAN_GUEST_AGENT_IMAGE_USE_VERSION_TAG`
 
@@ -146,12 +143,26 @@ orchestrator has no token set, it accepts unauthenticated control-plane calls
 (relying on the socket's file permissions instead); when a token is set,
 requests without the matching header are rejected with `Unauthenticated`.
 
+### `DSH_PODMAN_ORCHESTRATOR_STATE`
+
+The directory the orchestrator persists its state in (workspaces, containers,
+and image records). It is required, and must be an absolute path to a directory
+bind-mounted into the orchestrator so the state survives a container restart:
+only the deployment knows where that is. The shipped Quadlet mounts
+`%h/.dsh/dsh-podman/state`. The orchestrator creates the directory if needed and
+refuses to start without the variable.
+
 ### `DSH_PODMAN_SOCKETS_ROOT` and `DSH_PODMAN_HOST_SOCKETS_ROOT`
 
 `DSH_PODMAN_SOCKETS_ROOT` is the socket root directory shared by the
 orchestrator and the guest containers. It holds the orchestrator control socket
 (`orchestrator.sock`) and one subdirectory per workspace, where each guest agent
-creates its `guest.sock`.
+creates its `guest.sock`. It keeps its `/run/dsh-podman` default.
+
+`DSH_PODMAN_HOST_SOCKETS_ROOT` is required: it is the same directory as it
+appears on the host, and it cannot be derived from the container path — the
+shipped Quadlet mounts `%t/dsh-podman` at `/run/dsh-podman`. The orchestrator
+refuses to start without it.
 
 The directory needs to be bind-mounted in the orchestrator container. Its mode
 must be `0700`: the orchestrator refuses to start when the socket root is group-

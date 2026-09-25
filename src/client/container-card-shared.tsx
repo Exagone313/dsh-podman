@@ -8,32 +8,6 @@ import { type ContainerPluginKey } from "./locales.js";
 import { Button, Input, Modal, type StateDotState } from "@deepseek-ai/dsh-client-ui-primitives";
 import { type ReactNode, useId, useState } from "react";
 
-export function CardChevron({ open }: { open: boolean }): ReactNode {
-  return (
-    <svg
-      viewBox="0 0 14 14"
-      width="14"
-      height="14"
-      aria-hidden="true"
-      style={{
-        flex: "none",
-        color: "var(--dsw-alias-label-tertiary)",
-        transition: "transform .16s",
-        transform: open ? "rotate(180deg)" : undefined,
-      }}
-    >
-      <path
-        d="M3 5l4 4 4-4"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
 export function containerStateDot(status: string): StateDotState {
   return status === "running" ? "done" : "error";
 }

@@ -2,66 +2,6 @@
 //
 // SPDX-License-Identifier: MIT
 
-export const cardStyle: React.CSSProperties = {
-  listStyle: "none",
-  border: "1px solid var(--dsw-alias-border-l2)",
-  borderRadius: "12px",
-  background: "var(--dsw-alias-bg-layer-3)",
-  transition: "border-color .16s, background .16s",
-};
-
-export const cardOpenStyle: React.CSSProperties = {
-  background: "var(--dsw-alias-bg-layer-2)",
-  borderColor: "var(--dsw-alias-label-dimmed)",
-};
-
-export const cardHoverStyle: React.CSSProperties = {
-  borderColor: "var(--dsw-alias-label-dimmed)",
-};
-
-export const cardHeaderStyle: React.CSSProperties = {
-  width: "100%",
-  appearance: "none",
-  border: 0,
-  background: "none",
-  font: "inherit",
-  color: "inherit",
-  textAlign: "left",
-  cursor: "pointer",
-  display: "flex",
-  alignItems: "center",
-  gap: "12px",
-  padding: "14px 16px",
-  borderRadius: "12px",
-};
-
-export const cardHeadTextStyle: React.CSSProperties = {
-  flex: 1,
-  minWidth: 0,
-  display: "flex",
-  flexDirection: "column",
-  gap: "4px",
-};
-
-export const cardNameStyle: React.CSSProperties = {
-  fontSize: "15px",
-  fontWeight: 600,
-  lineHeight: 1.4,
-  color: "var(--dsw-alias-label-primary)",
-};
-
-export const cardDescriptionStyle: React.CSSProperties = {
-  fontSize: "13px",
-  lineHeight: 1.5,
-  color: "var(--dsw-alias-label-tertiary)",
-};
-
-export const cardBodyStyle: React.CSSProperties = {
-  borderTop: "1px solid var(--dsw-alias-border-l2)",
-  margin: "0 16px",
-  paddingBottom: "8px",
-};
-
 export const sectionTitle: React.CSSProperties = {
   fontWeight: 600,
   margin: "16px 0 8px",

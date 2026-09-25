@@ -11,8 +11,8 @@ assumes dsh runs from the dsh-podman image with the orchestrator, both started
 from Quadlet units.
 
 The dsh image installs the dsh-podman plugin at container start, and the
-plugin's bundle layer is what disables dsh's own `subprocess`, `fs-sandbox` and
-`spill-local` plugins. Uninstalling therefore also means running dsh without
+plugin's bundle layer is what disables dsh's own `subprocess`, `fs-sandbox`,
+`spill-local` and built-in Terminal UI (`ui-sidebar-terminal`) plugins. Uninstalling therefore also means running dsh without
 dsh-podman: its built-in shell and filesystem tools are active again, and they
 run **on the host** as the dsh user, with no container isolation.
 

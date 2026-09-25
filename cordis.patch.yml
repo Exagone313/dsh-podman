@@ -12,6 +12,9 @@
   disabled: true
 - id: spill-local
   disabled: true
+# disable built-in terminal.
+- id: ui-sidebar-terminal
+  disabled: true
 - insert:
     - id: podman
       name: '@exagone313/dsh-podman'

@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: MIT
 
 import type { Context as ClientContext } from "@deepseek-ai/cordis";
-import type { ShortcutCommandId } from "@deepseek-ai/dsh-client-shortcuts/client";
+import type { ShortcutCommand, ShortcutCommandId } from "@deepseek-ai/dsh-client-shortcuts/client";
 import type {} from "@deepseek-ai/dsh-client-ui-renderer/client";
 import type {} from "@deepseek-ai/dsh-client-ui-settings/client";
 import type {} from "@deepseek-ai/dsh-client-ui-conversation/client";
@@ -21,6 +21,7 @@ import { BUILTIN_PROMPT_PREFIX, ReadOnlyApprovalPanel } from "./read-only-approv
 import {
   PODMAN_TERMINAL_KIND,
   PODMAN_TERMINAL_SHORTCUT_DEFAULTS,
+  PODMAN_TERMINAL_SHORTCUT_FALLBACK_DEFAULTS,
   PODMAN_TERMINAL_TAB_ID,
 } from "./terminal-tab.js";
 import { PodmanToolRow, TOOL_VIEW_KEYS } from "./tool-views.js";
@@ -222,31 +223,43 @@ export function apply(ctx: ClientContext): void {
     "podman: terminal guide",
   );
 
-  // Ctrl+Shift+` opens a terminal on the session the focused pane belongs to.
+  // Ctrl+` opens a terminal on the session the focused pane belongs to: the
+  // built-in terminal's own binding, freed by disabling that client UI. A
+  // refused registration (the built-in enabled again, or another command
+  // owning the keys) falls back to a distinct binding instead of failing the
+  // whole client entry.
+  const terminalShortcut: Omit<ShortcutCommand, "defaults"> = {
+    id: "podman.terminal.new" as ShortcutCommandId,
+    label: () => t("terminalShortcut"),
+    aliases: ["new terminal", "shell"],
+    regions: ["page", "editable", "terminal"],
+    modals: [],
+    resolve: ({ target }) => {
+      const captured = ctx.sidebarRight.commandTarget(target);
+      return captured === undefined
+        ? { status: "blocked", reason: t("terminalShortcutNoSession") }
+        : {
+          status: "handled",
+          run: () => {
+            ctx.sidebarRight.openTabFromTarget(PODMAN_TERMINAL_KIND, captured);
+          },
+        };
+    },
+  };
   ctx.effect(
-    () =>
-      ctx.shortcuts.register({
-        id: "podman.terminal.new" as ShortcutCommandId,
-        label: () => t("terminalShortcut"),
-        aliases: ["new podman terminal"],
-        defaults: PODMAN_TERMINAL_SHORTCUT_DEFAULTS,
-        regions: ["page", "editable", "terminal"],
-        modals: [],
-        resolve: ({ target }) => {
-          const captured = ctx.sidebarRight.commandTarget(target);
-          return captured === undefined
-            ? { status: "blocked", reason: t("terminalShortcutNoSession") }
-            : {
-              status: "handled",
-              run: () => {
-                ctx.sidebarRight.openTabFromTarget(
-                  PODMAN_TERMINAL_KIND,
-                  captured,
-                );
-              },
-            };
-        },
-      }),
+    () => {
+      try {
+        return ctx.shortcuts.register({
+          ...terminalShortcut,
+          defaults: PODMAN_TERMINAL_SHORTCUT_DEFAULTS,
+        });
+      } catch {
+        return ctx.shortcuts.register({
+          ...terminalShortcut,
+          defaults: PODMAN_TERMINAL_SHORTCUT_FALLBACK_DEFAULTS,
+        });
+      }
+    },
     "podman: terminal shortcut",
   );
 }

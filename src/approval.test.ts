@@ -839,3 +839,9 @@ test("container_start asks for approval when it attaches secrets", () => {
   assert.equal(withSecret?.kind, "ask");
   assert.match(withSecret?.reason ?? "", /secret env: TOKEN/);
 });
+
+test("the bundle patch disables the built-in terminal UI", () => {
+  // The Podman terminal replaces the built-in one; its client row must stay off
+  // so the guide offers a single terminal card and Ctrl+` is free.
+  assert.match(podmanOpsPatch(), /- id: ui-sidebar-terminal\n\s+disabled: true/);
+});

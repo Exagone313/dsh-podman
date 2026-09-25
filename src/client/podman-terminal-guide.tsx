@@ -10,7 +10,7 @@ import { Button, PluginArtworkTerminal } from "@deepseek-ai/dsh-client-ui-primit
 import type { InjectFace, PropsLocale, PropsRuntime } from "@deepseek-ai/dsh-client-ui-slots";
 import { type ReactNode, useEffect, useState } from "react";
 import type { ContainerCardFace } from "./container-card-controller.js";
-import { fieldLabel, hint, imageSelect } from "./container-card-styles.js";
+import { fieldLabel, fieldSelect, hint } from "./container-card-styles.js";
 import { NS } from "./locales.js";
 import { ContainerField } from "./podman-terminal.js";
 import { PODMAN_TERMINAL_KIND } from "./terminal-tab.js";
@@ -169,6 +169,7 @@ export function PodmanTerminalGuide(
                 disabled={unknownWorkspace}
                 label={t("terminalContainer")}
                 defaultLabel={t("terminalDefaultContainer")}
+                selectStyle={fieldSelect}
                 onContainer={(value) => {
                   // The new container may not offer the current shell, so the
                   // shells effect re-picks one (remembered when still valid).
@@ -176,32 +177,32 @@ export function PodmanTerminalGuide(
                   setShell(undefined);
                 }}
               />
+              <span style={fieldLabel}>{t("terminalShell")}</span>
+              <select
+                style={fieldSelect}
+                aria-label={t("terminalShell")}
+                value={shell ?? ""}
+                disabled={unknownWorkspace || shells.phase !== "ready" ||
+                  shellList.length === 0}
+                onChange={(event) => {
+                  setShell(event.target.value);
+                }}
+              >
+                {shellList.length === 0
+                  ? (
+                    <option value="">
+                      {unknownWorkspace
+                        ? ""
+                        : shells.phase === "loading"
+                        ? t("terminalLoading")
+                        : t("terminalNoShells")}
+                    </option>
+                  )
+                  : shellList.map((entry) => (
+                    <option key={entry.path} value={entry.path}>{entry.name}</option>
+                  ))}
+              </select>
             </div>
-            <span style={fieldLabel}>{t("terminalShell")}</span>
-            <select
-              style={imageSelect}
-              aria-label={t("terminalShell")}
-              value={shell ?? ""}
-              disabled={unknownWorkspace || shells.phase !== "ready" ||
-                shellList.length === 0}
-              onChange={(event) => {
-                setShell(event.target.value);
-              }}
-            >
-              {shellList.length === 0
-                ? (
-                  <option value="">
-                    {unknownWorkspace
-                      ? ""
-                      : shells.phase === "loading"
-                      ? t("terminalLoading")
-                      : t("terminalNoShells")}
-                  </option>
-                )
-                : shellList.map((entry) => (
-                  <option key={entry.path} value={entry.path}>{entry.name}</option>
-                ))}
-            </select>
             {!unknownWorkspace && shells.phase === "failed" && (
               <p style={hint} role="alert">
                 {t("terminalShellsFailed", { message: shells.message })}
@@ -297,11 +298,14 @@ const DESCRIPTION_STYLE: React.CSSProperties = {
   textOverflow: "ellipsis",
 };
 
+// A label/select grid: each pair is one row, so a narrow card can never wrap a
+// label away from its control, and the auto column keeps both selects aligned.
 const FIELDS_STYLE: React.CSSProperties = {
-  display: "flex",
-  flexWrap: "wrap",
+  display: "grid",
+  gridTemplateColumns: "auto minmax(0, 1fr)",
   gap: "8px",
   alignItems: "center",
+  width: "100%",
 };
 
 const ACTIONS_STYLE: React.CSSProperties = {

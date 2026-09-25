@@ -113,6 +113,8 @@ interface ContainerFieldProps {
   readonly disabled: boolean;
   readonly label: string;
   readonly defaultLabel: string;
+  /** Select skin; stacked cards pass a full-width variant. */
+  readonly selectStyle?: React.CSSProperties;
   readonly onContainer: (container: string) => void;
 }
 
@@ -121,7 +123,7 @@ export function ContainerField(props: ContainerFieldProps): ReactNode {
     <>
       <span style={fieldLabel}>{props.label}</span>
       <select
-        style={imageSelect}
+        style={props.selectStyle ?? imageSelect}
         aria-label={props.label}
         value={props.container ?? ""}
         disabled={props.disabled || props.workspaceSlug === undefined}

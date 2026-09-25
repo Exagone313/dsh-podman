@@ -166,22 +166,26 @@ export function PodmanTerminalGuide(
   );
 }
 
+// The card mirrors the harness guide capsule skin (`GuideBody .entry`): same
+// padding, radius token, border and background as the entries beside it, so the
+// glyph and title line up; the column layout and the internal gaps are ours
+// because this card carries controls rather than being one clickable capsule.
 const CARD_STYLE: React.CSSProperties = {
   display: "flex",
   flexDirection: "column",
   gap: "8px",
   boxSizing: "border-box",
   width: "100%",
-  padding: "12px 14px",
+  padding: "14px 20px",
   border: "0.5px solid var(--dsw-alias-border-l3)",
-  borderRadius: "10px",
+  borderRadius: "var(--dsl-guide-entry-radius)",
   background: "var(--dsw-alias-bg-layer-1)",
 };
 
 const HEADER_STYLE: React.CSSProperties = {
   display: "flex",
   alignItems: "center",
-  gap: "12px",
+  gap: "14px",
   minWidth: 0,
 };
 

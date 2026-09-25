@@ -16,7 +16,9 @@ Harness 会添加一个提示词区段，指明其自身的磁盘检出目录，
 
 dsh-podman 还会添加自己的提示词区段，说明内置的 shell
 与文件系统工具（`bash`、`read`、`write`、`edit`、`glob`、`grep`）在工作区的默认容器内运行，而非宿主机，并说明它们与
-`container_*` 工具的关系。
+`container_*` 工具的关系。同一区段还会引导模型：安装软件时用 `image_build`
+构建自定义镜像（再用 `container_start` 或 `container_recreate`
+启动），需要跨容器重建保留的数据应使用命名卷而非 `tmpfs`。
 
 ## 镜像模型
 

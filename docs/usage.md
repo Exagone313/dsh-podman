@@ -19,7 +19,10 @@ the assembled system prompt; the model is never told a misleading path.
 dsh-podman also adds its own prompt section clarifying that the built-in shell
 and filesystem tools (`bash`, `read`, `write`, `edit`, `glob`, `grep`) run
 inside the workspace's default container rather than on the host, and how they
-relate to the `container_*` tools.
+relate to the `container_*` tools. The same section steers the model toward
+building a custom image with `image_build` (then `container_start` or
+`container_recreate`) for software installs, and toward named volumes rather
+than `tmpfs` for data that must survive a container recreate.
 
 ## Image model
 

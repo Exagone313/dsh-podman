@@ -13,7 +13,7 @@ ENV DO_NOT_TRACK=1
 ENV DSH_TELEMETRY_MODE=DISABLED
 ENV DSH_TELEMETRY_OTLP_URL=https://dsh-telemetry-disabled.invalid/v1/logs
 
-ARG DSH_VERSION=0.1.5-rc.3
+ARG DSH_VERSION=0.1.7-rc.2
 # Keep in sync with package.json's packageManager field: the profiles dsh
 # manages install their plugins with this pnpm.
 ARG PNPM_VERSION=12.4.1

@@ -19,6 +19,7 @@ import {
   type WorkspaceView,
 } from "./client/card-protocol.js";
 import {
+  type ReasonLocale,
   renderCacheCleanNotice,
   renderDefaultEnvSyncNotice,
   resolveReasonLocale,
@@ -245,10 +246,12 @@ export async function cardSnapshot(
  * the settings-injected context, read only for the session locale.
  */
 export async function runCommand(
-  ctx: any,
+  _ctx: any,
   resolver: WorkspaceResolver,
   workspaceRegistry: any,
   raw: Record<string, unknown>,
+  // The live UI locale, read per notice; absent in tests, which render English.
+  readLocale?: () => ReasonLocale,
 ): Promise<string> {
   const command = normalizeCommand(raw);
   let notice = "";
@@ -480,7 +483,7 @@ export async function runCommand(
         applied++;
       }
       notice = renderDefaultEnvSyncNotice(
-        resolveReasonLocale(ctx?.settings),
+        resolveReasonLocale(readLocale?.()),
         applied,
         skipped,
       );
@@ -491,7 +494,7 @@ export async function runCommand(
         mode: cacheCleanModeToProto(command.cacheMode),
       })) as { removedFiles?: unknown };
       notice = renderCacheCleanNotice(
-        resolveReasonLocale(ctx?.settings),
+        resolveReasonLocale(readLocale?.()),
         Number(result.removedFiles ?? 0),
       );
       break;
@@ -578,6 +581,7 @@ async function handleCardRequest(
   ctx: any,
   resolver: WorkspaceResolver,
   workspaceRegistry: any,
+  readLocale?: () => ReasonLocale,
 ): Promise<Response> {
   if (request.method === "GET") {
     try {
@@ -607,6 +611,7 @@ async function handleCardRequest(
       resolver,
       workspaceRegistry,
       command as Record<string, unknown>,
+      readLocale,
     );
     const result: CardCommandResult = notice === "" ? {} : { notice };
     return jsonResponse(200, result);
@@ -626,14 +631,15 @@ export function registerCardRoute(
   ctx: any,
   resolver: WorkspaceResolver,
   workspaceRegistry?: any,
+  readLocale?: () => ReasonLocale,
 ): void {
-  ctx.inject(["connection", "settings"], (connectionCtx: any) => {
+  ctx.inject(["connection"], (connectionCtx: any) => {
     connectionCtx.connection.fetch.register({
       path: CARD_PATH,
       methods: ["GET", "POST"],
       requestBody: "buffered",
       fetch: (request: Request) =>
-        handleCardRequest(request, connectionCtx, resolver, workspaceRegistry),
+        handleCardRequest(request, connectionCtx, resolver, workspaceRegistry, readLocale),
     });
   });
 }

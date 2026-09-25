@@ -148,6 +148,7 @@ API，因此构建不会向 orchestrator 的状态目录写入任何内容。
   `image_rebuild` / `image_rebuild_all` / volume / secret / secret-env / mount
   操作），并返回要显示的提示。
 
-因此设置命名空间中**只保留真正的偏好**：默认镜像、sockets
-根目录，以及卡片的当前语言（`uiLocale`，以便主机以会话语言呈现审批文本——参见[审批](usage.zh.md#审批)）。orchestrator
-派生的任何内容都不会被持久化，也不会有命令经由设置文档往返。
+因此插件自身的配置中**只保留真正的偏好**：默认镜像、sockets
+根目录，以及卡片的当前语言（`uiLocale`，以便主机以会话语言呈现审批文本——参见[审批](usage.zh.md#审批)）。它们是
+volatile 字段，修改后无需重新加载插件即可生效。orchestrator
+派生的任何内容都不会被持久化，也不会有命令经由配置文档往返。

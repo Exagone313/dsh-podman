@@ -2,38 +2,30 @@
 //
 // SPDX-License-Identifier: MIT
 
+import { type Volatile } from "@deepseek-ai/cordis";
 import z from "@deepseek-ai/schemastery";
 
 export const CONTAINER_NS = "podman";
 
-// Only real preferences live in the settings namespace, so the settings
-// document holds user choices and nothing derived. The live orchestrator state
-// and the card's commands travel over the card route instead (see
-// card-protocol.ts).
-export const settingsSchema = z.object({
-  defaultImage: z.string().default(""),
-  socketsRoot: z.string().default(""),
-  uiLocale: z.string().default(""),
+// Only real preferences live in the plugin config, so the profile document
+// holds user choices and nothing derived. The live orchestrator state and the
+// card's commands travel over the card route instead (see card-protocol.ts).
+//
+// Every field is volatile: an edit commits in place without reloading the
+// plugin, so every consumer reads a value through its `Volatile` reference
+// instead of caching what it held at apply time.
+export interface Config {
+  defaultImage: Volatile<string>;
+  socketsRoot: Volatile<string>;
+  uiLocale: Volatile<string>;
   // The environment seeded into a container when it is created; a recreate is
   // authoritative, so a value can be removed again. See container-env.ts.
-  containerEnv: z.dict(z.string()).default({}),
-}) as unknown as z<ContainerSettings>;
-
-export interface ContainerSettings {
-  defaultImage: string;
-  socketsRoot: string;
-  uiLocale: string;
-  containerEnv: Record<string, string>;
+  containerEnv: Volatile<Record<string, string>>;
 }
 
-export interface ContainerSettingsScope {
-  get(): ContainerSettings;
-  watch(
-    callback: (
-      next: ContainerSettings,
-      prev: ContainerSettings,
-    ) => void | Promise<void>,
-  ): () => void;
-  update(patch: object): Promise<void>;
-  replace(section: object): Promise<void>;
-}
+export const Config = z.object({
+  defaultImage: z.string().default("").volatile(),
+  socketsRoot: z.string().default("").volatile(),
+  uiLocale: z.string().default("").volatile(),
+  containerEnv: z.dict(z.string()).default({}).volatile(),
+}) as unknown as z<Config>;

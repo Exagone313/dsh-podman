@@ -63,67 +63,6 @@ test("refresh on install publishes containers, images and workspaces", async () 
   assert.deepEqual(scope.value.secrets, [{ name: "db-pass" }, { name: "api-key" }]);
 });
 
-test("handle never writes projectsRoot into setConfig", async () => {
-  const scope = fakeScope(baseValue());
-  const setConfigCalls: Array<Record<string, unknown>> = [];
-  const resolver: any = {
-    getConfig: () => ({}),
-    setConfig: (patch: Record<string, unknown>) => setConfigCalls.push(patch),
-    async control(method: string) {
-      if (method === "listContainers") return { containers: [] };
-      if (method === "listImages") return { images: [] };
-      if (method === "listWorkspaces") return { workspaces: [] };
-      return {};
-    },
-  };
-  await installCardCommandDriver(fakeContext(scope), resolver);
-  await scope.update({});
-  await new Promise((resolve) => setImmediate(resolve));
-  assert.ok(setConfigCalls.length > 0, "handle must write resolver config");
-  for (const patch of setConfigCalls) {
-    assert.ok(
-      !Object.prototype.hasOwnProperty.call(patch, "projectsRoot"),
-      "projectsRoot must not be written via setConfig",
-    );
-  }
-});
-
-test("settings seed the image and sockets root from the resolver config", async () => {
-  let registeredBase: Record<string, unknown> | undefined;
-  const scope = fakeScope(baseValue());
-  const context: any = {
-    inject(deps: string[], callback: (sctx: any) => void): void {
-      assert.deepEqual(deps, ["settings"]);
-      callback({
-        settings: {
-          register(
-            _namespace: string,
-            _schema: unknown,
-            options: { base?: Record<string, unknown> },
-          ) {
-            registeredBase = options?.base ?? {};
-            return scope;
-          },
-        },
-      });
-    },
-  };
-  const resolver: any = {
-    getConfig: () => ({
-      defaultImage: "archlinux",
-      socketsRoot: "/run/dsh-podman",
-      projectsRoot: "/projects",
-    }),
-    setConfig: () => {},
-    async control() {
-      return {};
-    },
-  };
-  await installCardCommandDriver(context, resolver);
-  assert.equal(registeredBase?.defaultImage, "archlinux");
-  assert.equal(registeredBase?.socketsRoot, "/run/dsh-podman");
-});
-
 test("create command drives createWorkspace with env", async () => {
   const scope = fakeScope(baseValue());
   const calls: Array<[string, unknown]> = [];

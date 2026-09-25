@@ -8,8 +8,6 @@
 // the command tests stay focused on the command-to-control mapping. The HTTP
 // layer itself is covered by card-route.test.ts.
 
-import { strict as assert } from "node:assert";
-import { CONTAINER_NS, settingsSchema } from "./settings-schema.js";
 import { cardSnapshot, runCommand } from "./card-route.js";
 
 export interface FakeScope {
@@ -45,21 +43,10 @@ export function fakeScope(initial: Record<string, unknown>): FakeScope {
 }
 
 export function fakeContext(scope: FakeScope): any {
-  return {
-    inject(deps: string[], callback: (sctx: any) => void): void {
-      assert.deepEqual(deps, ["settings"]);
-      callback({
-        settings: {
-          register() {
-            return scope;
-          },
-          get() {
-            return undefined;
-          },
-        },
-      });
-    },
-  };
+  // The host half no longer registers a settings namespace: the card's
+  // preferences are volatile plugin-config fields, so the fake document is
+  // handed to the driver directly.
+  return { fakeScope: scope };
 }
 
 export function baseValue(): Record<string, unknown> {
@@ -78,7 +65,7 @@ export function baseValue(): Record<string, unknown> {
   };
 }
 
-// installCardCommandDriver wires a fake settings scope to the real command
+// installCardCommandDriver wires a fake settings document to the real command
 // runner and snapshot builder, standing in for the browser transport: it
 // mirrors what the card does per request — run the command, then refresh the
 // live snapshot and record the notice.
@@ -87,54 +74,41 @@ export function installCardCommandDriver(
   resolver: any,
   registry?: any,
 ): Promise<void> {
-  let installed: Promise<void> = Promise.resolve();
-  ctx.inject(["settings"], (sctx: any) => {
-    const scope = sctx.settings.register(CONTAINER_NS, settingsSchema, {
-      base: {
-        defaultImage: resolver.getConfig().defaultImage,
-        socketsRoot: resolver.getConfig().socketsRoot,
-      },
-    }) as FakeScope;
-    const refresh = async (notice = ""): Promise<void> => {
-      let view: Record<string, unknown> = {};
+  const scope: FakeScope = ctx.fakeScope;
+  const refresh = async (notice = ""): Promise<void> => {
+    let view: Record<string, unknown> = {};
+    try {
+      const snapshot = await cardSnapshot(resolver, registry);
+      view = {
+        workspaces: snapshot.workspaces,
+        containers: snapshot.containers,
+        images: snapshot.images,
+        volumes: snapshot.volumes,
+        secrets: snapshot.secrets,
+        caches: snapshot.caches,
+      };
+    } catch {
+      // Command tests do not always stub every list call.
+    }
+    await scope.update({ ...view, notice });
+  };
+  scope.watch((next: any) => {
+    const command = next.command;
+    if (command === null || command === undefined) return;
+    void (async () => {
+      // Clear the command before running it, so the refresh below cannot
+      // re-deliver it.
+      await scope.update({ command: null });
+      let notice = "";
       try {
-        const snapshot = await cardSnapshot(resolver, registry);
-        view = {
-          workspaces: snapshot.workspaces,
-          containers: snapshot.containers,
-          images: snapshot.images,
-          volumes: snapshot.volumes,
-          secrets: snapshot.secrets,
-          caches: snapshot.caches,
-        };
-      } catch {
-        // Command tests do not always stub every list call.
+        notice = await runCommand(ctx, resolver, registry, command);
+      } catch (error) {
+        notice = error instanceof Error ? error.message : String(error);
       }
-      await scope.update({ ...view, notice });
-    };
-    scope.watch((next: any) => {
-      resolver.setConfig({
-        defaultImage: next.defaultImage,
-        socketsRoot: next.socketsRoot,
-      });
-      const command = next.command;
-      if (command === null || command === undefined) return;
-      void (async () => {
-        // Clear the command before running it, so the refresh below cannot
-        // re-deliver it.
-        await scope.update({ command: null });
-        let notice = "";
-        try {
-          notice = await runCommand(sctx, resolver, registry, command);
-        } catch (error) {
-          notice = error instanceof Error ? error.message : String(error);
-        }
-        await refresh(notice);
-      })();
-    });
-    installed = refresh();
+      await refresh(notice);
+    })();
   });
-  return installed;
+  return refresh();
 }
 
 export async function installedMountScope(): Promise<{

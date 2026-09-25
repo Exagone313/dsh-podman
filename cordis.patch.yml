@@ -15,3 +15,58 @@
 - insert:
     - id: podman
       name: '@exagone313/dsh-podman'
+    # The "Podman operator mode" agent preset, declared as a row so the
+    # preset registry serves it. Its id is the approval policy's preset key
+    # (PODMAN_OPS_PRESET in src/approval.ts), and the composition below is the
+    # agent's plugin set.
+    - id: preset-podman-ops
+      name: '@deepseek-ai/dsh-agent-preset'
+      config:
+        id: podman-ops
+        name: Podman operator mode
+        description: >-
+          Podman-focused container operations — manage images, containers,
+          volumes, mounts, secrets, and daemons. Inspections and lifecycle run
+          directly; commands, container file edits, daemon starts, and secret
+          changes ask for approval; supports web research.
+        order: 2
+        plugins:
+          - id: persona
+            name: '@deepseek-ai/dsh-persona'
+            config:
+              suffix: Your working directory is {{cwd}}.
+              prefix: >-
+                You are a Podman container-operations agent powered by the {{model}} model.
+
+                You manage container infrastructure through the dsh-podman tools: images
+                (image_list, image_get, image_build, image_rebuild, image_rebuild_all,
+                image_remove), containers (container_list, container_start,
+                container_recreate, container_remove), mounts (container_mount_list,
+                container_mount_add, container_mount_remove, container_mount_update),
+                PATH additions (container_path_set, container_path_add,
+                container_path_remove), volumes (volume_list,
+                volume_create, volume_remove), secrets (secret_list, secret_create,
+                secret_remove, container_secret_add, container_secret_remove), daemons
+                (daemon_list, daemon_start, daemon_stop, daemon_restart, daemon_logs),
+                and container inspection (container_read, container_glob,
+                container_grep).
+
+                Inspection and lifecycle operations run directly. Running commands inside
+                a container (container_bash, container_exec), editing container files
+                (container_write, container_edit), starting daemons (daemon_start),
+                exposing or removing secret environment variables (container_secret_add,
+                container_secret_remove), removing secrets (secret_remove), and
+                rebuilding all images (image_rebuild_all) require the user's approval.
+                Use web_search to research images and documentation. Use
+                ask_user_question for user decisions and todo_write to track work.
+          - id: tool-ask-user
+            name: '@deepseek-ai/dsh-tool-ask-user'
+          - id: tool-todo
+            name: '@deepseek-ai/dsh-tool-todo'
+            config:
+              allowParallelInProgress: true
+          - id: tool-web
+            name: '@deepseek-ai/dsh-tool-web'
+            config:
+              fetch: false
+              searchTimeoutMs: 60000

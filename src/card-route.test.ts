@@ -6,7 +6,6 @@ import { test } from "node:test";
 import { strict as assert } from "node:assert";
 import { CARD_PATH } from "./client/card-protocol.js";
 import { registerCardRoute } from "./card-route.js";
-import { installContainerPreferences } from "./preferences.js";
 
 function fakeResolver(): { resolver: any; calls: Array<[string, unknown]> } {
   const calls: Array<[string, unknown]> = [];
@@ -40,7 +39,7 @@ function fakeRouteContext(): { ctx: any; routes: any[] } {
   const routes: any[] = [];
   const ctx = {
     inject(deps: string[], callback: (c: any) => void): void {
-      assert.deepEqual(deps, ["connection", "settings"]);
+      assert.deepEqual(deps, ["connection"]);
       callback({
         connection: {
           fetch: {
@@ -56,10 +55,6 @@ function fakeRouteContext(): { ctx: any; routes: any[] } {
               return async () => {};
             },
           },
-        },
-        settings: {
-          register: () => ({ watch: () => () => {} }),
-          get: () => undefined,
         },
       });
     },
@@ -193,51 +188,4 @@ test("the card route reports a failed command as an error", async () => {
   }));
   assert.equal(response.status, 500);
   assert.deepEqual(await response.json(), { error: "control plane unavailable" });
-});
-
-test("installContainerPreferences seeds the base and syncs the resolver config", () => {
-  let base: any;
-  let watcher: ((next: any) => void) | undefined;
-  const ctx = {
-    inject(deps: string[], callback: (c: any) => void): void {
-      assert.deepEqual(deps, ["settings"]);
-      callback({
-        settings: {
-          register(_ns: string, _schema: unknown, options: { base: any }) {
-            base = options.base;
-            return {
-              watch(callback: (next: any) => void) {
-                watcher = callback;
-                return () => {};
-              },
-            };
-          },
-        },
-      });
-    },
-  };
-  const configs: Array<Record<string, unknown>> = [];
-  const resolver: any = {
-    getConfig: () => ({ defaultImage: "archlinux", socketsRoot: "/run/dsh-podman" }),
-    setConfig: (patch: Record<string, unknown>) => configs.push(patch),
-  };
-  installContainerPreferences(ctx, resolver);
-  assert.deepEqual(base, {
-    defaultImage: "archlinux",
-    socketsRoot: "/run/dsh-podman",
-    containerEnv: {},
-  });
-  assert.ok(watcher !== undefined);
-  watcher({
-    defaultImage: "ubuntu",
-    socketsRoot: "/run/other",
-    containerEnv: { A: "1" },
-  });
-  assert.deepEqual(configs, [
-    {
-      defaultImage: "ubuntu",
-      socketsRoot: "/run/other",
-      containerEnv: { A: "1" },
-    },
-  ]);
 });

@@ -26,7 +26,7 @@ export type { ContainerCardProps } from "./ContainerCard.js";
 
 export const name = "podman";
 
-export const inject = ["slots", "locale", "settingsScope"];
+export const inject = ["slots", "locale", "configForms"];
 
 export function apply(ctx: ClientContext): void {
   installTerminalStyles(ctx);
@@ -36,11 +36,10 @@ export function apply(ctx: ClientContext): void {
     "podman: dictionaries",
   );
 
-  const scope = ctx.settingsScope.bind({
-    namespace: CONTAINER_NS,
-    decode: (section) =>
-      typeof section === "object" && section !== null ? (section as ContainerSettings) : undefined,
-  });
+  // The shared configuration form for this plugin's own profile entry: the
+  // entry id is the plugin row id ("podman"), which is also the namespace the
+  // host serves its volatile preferences under.
+  const scope = ctx.configForms.get<ContainerSettings>(CONTAINER_NS);
 
   // Record the active locale (including the browser default, which the host
   // cannot observe) so approval text renders in the session language. The
@@ -74,16 +73,29 @@ export function apply(ctx: ClientContext): void {
     }, "podman: directory picker");
   });
 
-  ctx.slots.inject("settings.plugin.item", () =>
-    ctx.slots.register(
-      {
-        name: "settings.plugin.item",
-        key: CONTAINER_NS,
-        locale: NS,
-        inject: () => controller.inject(),
-      },
-      ContainerCard,
-    ));
+  // The Plugins page renders the card as this plugin's own configuration page
+  // while the host serves the namespace.
+  const t = ctx.locale.bind(NS);
+  ctx.effect(
+    () =>
+      ctx.configForms.whileServed(
+        [CONTAINER_NS],
+        () =>
+          ctx.slots.inject("plugins.item", () =>
+            ctx.slots.register(
+              {
+                name: "plugins.item",
+                id: CONTAINER_NS,
+                order: 20,
+                label: () => t("cardTitle"),
+                locale: NS,
+                inject: () => controller.inject(),
+              },
+              ContainerCard,
+            )),
+      ),
+    "podman: settings page",
+  );
 
   // Own the row rendering of every podman tool (instead of the generic
   // "Tool call · <name>" fallback).

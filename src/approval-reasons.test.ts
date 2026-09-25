@@ -26,16 +26,13 @@ test("reasonLocale normalizes a locale id to a shipped language", () => {
   assert.equal(reasonLocale(42), "en");
 });
 
-test("resolveReasonLocale prefers the client-observed locale over the preference", () => {
-  const settings = (container: unknown, locale: unknown) => ({
-    get: (ns: string) => (ns === "podman" ? container : ns === "locale" ? locale : undefined),
-  });
+test("resolveReasonLocale reads the plugin's recorded locale", () => {
   assert.equal(resolveReasonLocale(undefined), "en");
-  assert.equal(resolveReasonLocale(settings({ uiLocale: "zh" }, { preference: "en" })), "zh");
-  assert.equal(resolveReasonLocale(settings({ uiLocale: "" }, { preference: "zh" })), "zh");
-  assert.equal(resolveReasonLocale(settings({}, { preference: "zh" })), "zh");
-  assert.equal(resolveReasonLocale(settings({ uiLocale: "en" }, { preference: "zh" })), "en");
-  assert.equal(resolveReasonLocale(settings({}, {})), "en");
+  assert.equal(resolveReasonLocale(""), "en");
+  assert.equal(resolveReasonLocale("zh"), "zh");
+  assert.equal(resolveReasonLocale("zh-Hans"), "zh");
+  assert.equal(resolveReasonLocale("en"), "en");
+  assert.equal(resolveReasonLocale(42), "en");
 });
 
 test("summarizeArgs renders reasons in Chinese when asked", () => {

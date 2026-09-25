@@ -3,6 +3,8 @@
 # SPDX-License-Identifier: MIT
 
 GO ?= go
+GOFMT ?= gofmt
+DENO ?= deno
 GO_BUILD_TAGS = containers_image_openpgp exclude_graphdriver_btrfs exclude_graphdriver_devicemapper
 GO_BUILD_FLAGS = -tags "$(GO_BUILD_TAGS)"
 GOOS ?= linux
@@ -21,20 +23,57 @@ GO_SOURCES := $(shell find cmd internal -type f -name '*.go' -print)
 JS_SOURCES := $(shell find src -type f \( -name '*.ts' -o -name '*.tsx' \) -print)
 PROTO_SOURCES := $(shell find proto -type f -name '*.proto' -print)
 NODE_MODULES_TSC := node_modules/.bin/tsc
+# Go sources the project owns; third_party/ is an upstream replacement module
+# (the replace directive in go.mod) and is left exactly as published.
+GOFMT_SOURCES := $(shell find cmd internal scripts -type f -name '*.go' -print)
+# Quoted so Deno expands the globs, not the shell. deno.json pins the width and
+# the wrapped-prose policy, which keeps the existing Markdown untouched.
+TS_SOURCES = "src/**/*.ts" "src/**/*.tsx" "scripts/**/*.mjs"
+MD_SOURCES = "**/*.md"
 
-.PHONY: all build build-go vet test test-go image image-orchestrator image-guestagent image-dsh download-licenses pnpm-install pnpm-build pnpm-test pnpm-prune clean
+.PHONY: all build build-go vet test test-go fmt fmt-go fmt-ts fmt-md fmt-check fmt-check-go fmt-check-ts fmt-check-md image image-orchestrator image-guestagent image-dsh download-licenses pnpm-install pnpm-build pnpm-test pnpm-prune clean
 
 all: build
 
 build: build-go pnpm-build
 
-vet:
+vet: fmt-check-go
 	$(GO) vet $(GO_BUILD_FLAGS) ./...
 
 test: test-go pnpm-test
 
 test-go:
 	$(GO) test $(GO_BUILD_FLAGS) ./...
+
+# Formatting. fmt rewrites in place, fmt-check verifies; both cover every
+# language the project formats (Go, TypeScript, Markdown). JSON, YAML and
+# .proto sources are not formatted.
+fmt: fmt-go fmt-ts fmt-md
+
+fmt-go:
+	$(GOFMT) -s -w $(GOFMT_SOURCES)
+
+fmt-ts:
+	$(DENO) fmt $(TS_SOURCES)
+
+fmt-md:
+	$(DENO) fmt $(MD_SOURCES)
+
+fmt-check: fmt-check-go fmt-check-ts fmt-check-md
+
+fmt-check-go:
+	@out="$$($(GOFMT) -s -l $(GOFMT_SOURCES) 2>&1)"; status=$$?; \
+	if [ $$status -ne 0 ] || [ -n "$$out" ]; then \
+		printf '%s\n' "$$out" >&2; \
+		printf "run 'make fmt-go' to rewrite the unformatted files\n" >&2; \
+		exit 1; \
+	fi
+
+fmt-check-ts:
+	$(DENO) fmt --check $(TS_SOURCES)
+
+fmt-check-md:
+	$(DENO) fmt --check $(MD_SOURCES)
 
 build-go: $(BIN_DIR)/$(GOOS)-$(GOARCH)/dsh-podman-guest-agent $(BIN_DIR)/$(GOOS)-$(GOARCH)/dsh-podman-orchestrator
 

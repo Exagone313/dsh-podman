@@ -33,8 +33,8 @@ jobs:
           persist-credentials: false
       - uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed # v2.0.5
         with:
-          deno-version: v2.9.6
+          deno-version: v2.9.7
       - name: Check documentation formatting
-        # Quoted so deno expands the glob: unquoted, the shell treats "**" as
-        # "*" and markdown outside docs/ is never checked.
-        run: deno fmt --check "**/*.md"
+        # The Makefile owns the quoted glob, and deno.json the line width and
+        # the wrapped-prose policy.
+        run: make fmt-check-md

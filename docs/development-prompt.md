@@ -60,7 +60,8 @@ container tools; never run `make` or edit files on the host.
    `npm install -g pnpm@<that version>` and check again.
 5. Git identity: do not write a `~/.gitconfig`. If no Git identity is
    configured, tell me to set it once on the Podman page (sidebar **Plugins**
-   panel): **Default environment → Git identity**.
+   panel → **Installed** → **@exagone313/dsh-podman**): **Default
+   environment → Git identity**.
 6. Verify from inside the container, without sourcing anything: `make build`,
    `make vet` and `pnpm test` must succeed in the repository.
 7. Report what you created or changed, or that everything was already in place.

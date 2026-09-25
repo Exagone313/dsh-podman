@@ -8,9 +8,9 @@ SPDX-License-Identifier: MIT
 
 Environment variables use the `DSH_PODMAN_` prefix and are listed under the
 component that reads them (a variable read by several components appears in each
-of their sections). The plugin also exposes a few **UI settings** on the
-**dsh-podman** page of the sidebar's **Plugins** panel, listed separately from
-env vars.
+of their sections). The plugin also exposes a few **UI settings** on its
+**@exagone313/dsh-podman** page (sidebar **Plugins** panel → **Installed**),
+listed separately from env vars.
 
 The plugin reads its configuration from, in order: the plugin `config` in
 cordis, then the environment variables below, then built-in defaults.
@@ -28,8 +28,8 @@ from the plugin `config` or `DSH_PODMAN_ORCHESTRATOR_TOKEN`.
 
 ## Plugin (dsh client) — UI settings
 
-Editable on the **dsh-podman** page of the sidebar's **Plugins** panel (the
-Configuration section and the images' Set-default popup):
+Editable on the **@exagone313/dsh-podman** page (sidebar **Plugins** panel →
+**Installed**; the Configuration section and the images' Set-default popup):
 
 | Setting        | Default                   | Description                                                                                                                                                                     |
 | -------------- | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

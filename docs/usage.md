@@ -336,8 +336,9 @@ started with.
 
 ## Container management UI
 
-The plugin ships a browser half that registers a page on the dsh sidebar's
-**Plugins** panel. The page lists the orchestrator-created guest containers and
+The plugin ships a browser half that registers its card on the
+**@exagone313/dsh-podman** page (sidebar **Plugins** panel → **Installed**). The
+page lists the orchestrator-created guest containers and
 the built images. A workspace with no container gets a **Create container** button
 that opens a configuration modal — image, environment, mounts (project, tmpfs,
 volume, and secret), PATH additions, and secret environment variables — and

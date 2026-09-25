@@ -26,6 +26,11 @@ export type { ContainerCardProps } from "./ContainerCard.js";
 
 export const name = "podman";
 
+// The plugin's installed package name. The Plugins page keys
+// `plugins.bundle.config` by the bundle package name, so it must match
+// package.json's `name`.
+const PLUGIN_PACKAGE = "@exagone313/dsh-podman";
+
 export const inject = ["slots", "locale", "configForms"];
 
 export function apply(ctx: ClientContext): void {
@@ -73,21 +78,21 @@ export function apply(ctx: ClientContext): void {
     }, "podman: directory picker");
   });
 
-  // The Plugins page renders the card as this plugin's own configuration page
-  // while the host serves the namespace.
-  const t = ctx.locale.bind(NS);
+  // The card is the configuration of this plugin's own bundle, so the Plugins
+  // page renders it on the installed `@exagone313/dsh-podman` page, above the
+  // Components section that lists the rows the bundle declares. The host keys
+  // the slot by the package name, so the constant must match package.json.
+  // It is contributed only while the Host serves the preferences namespace.
   ctx.effect(
     () =>
       ctx.configForms.whileServed(
         [CONTAINER_NS],
         () =>
-          ctx.slots.inject("plugins.item", () =>
+          ctx.slots.inject("plugins.bundle.config", () =>
             ctx.slots.register(
               {
-                name: "plugins.item",
-                id: CONTAINER_NS,
-                order: 20,
-                label: () => t("cardTitle"),
+                name: "plugins.bundle.config",
+                key: PLUGIN_PACKAGE,
                 locale: NS,
                 inject: () => controller.inject(),
               },

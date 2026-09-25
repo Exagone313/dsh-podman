@@ -24,7 +24,7 @@ import { type ReactNode, useEffect, useId, useRef, useState } from "react";
 const versionLabel: React.CSSProperties = { fontWeight: 600 };
 
 export type ContainerCardProps =
-  & PropsRuntime<"plugins.item">
+  & PropsRuntime<"plugins.bundle.config">
   & PropsLocale<typeof NS>
   & InjectFace<ContainerCardFace>;
 

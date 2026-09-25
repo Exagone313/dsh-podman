@@ -118,7 +118,7 @@ func run() error {
 		}
 	}
 
-	if err := os.WriteFile("LICENSE.pkg", []byte(out.String()), 0600); err != nil {
+	if err := os.WriteFile("third-party-licenses.pkg", []byte(out.String()), 0600); err != nil {
 		return err
 	}
 	return nil

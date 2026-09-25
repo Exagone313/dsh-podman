@@ -8,4 +8,4 @@
 !bin/linux-arm64/
 !bin/linux-amd64/dsh-podman-orchestrator
 !bin/linux-arm64/dsh-podman-orchestrator
-!LICENSE.pkg
+!third-party-licenses.pkg

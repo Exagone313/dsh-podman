@@ -1,7 +1,7 @@
 /dist/
 /node_modules/
 /bin/
-/LICENSE.pkg
+/third-party-licenses.pkg
 /src/generated/
 *.test
 *.out

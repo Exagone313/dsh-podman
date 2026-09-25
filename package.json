@@ -124,6 +124,9 @@
     "@deepseek-ai/dsh-client-ui-tool": {
       "optional": true
     },
+    "@deepseek-ai/dsh-subprocess": {
+      "optional": true
+    },
     "@deepseek-ai/schemastery": {
       "optional": true
     },

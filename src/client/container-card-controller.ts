@@ -3,10 +3,7 @@
 // SPDX-License-Identifier: MIT
 
 import { createSnapshotStore, type SnapshotStore } from "@deepseek-ai/dsh-client-store";
-import type {
-  SettingsScope,
-  SettingsScopeSnapshot,
-} from "@deepseek-ai/dsh-client-ui-settings/client";
+import type { ConfigForm, ConfigFormSnapshot } from "@deepseek-ai/dsh-client-ui-settings/client";
 import type {
   CacheView,
   CardSnapshot,
@@ -167,7 +164,7 @@ export class ContainerCardController {
   private directoryPicker: DirectoryPickerFace | undefined;
 
   constructor(
-    private readonly scope: SettingsScope<ContainerSettings>,
+    private readonly scope: ConfigForm<ContainerSettings>,
     client: CardClient = createCardClient(),
   ) {
     this.client = client;
@@ -418,4 +415,4 @@ export class ContainerCardController {
   }
 }
 
-export type { SettingsScopeSnapshot };
+export type { ConfigFormSnapshot };

@@ -184,8 +184,9 @@ carrier applies its Host/Origin fence and browser authentication first:
   `image_rebuild` / `image_rebuild_all` / volume / secret / secret-env / mount
   ops) against the orchestrator and returns the notice to show.
 
-The settings namespace therefore holds **only real preferences**: the default
+The plugin's own config therefore holds **only real preferences**: the default
 image, the sockets root, and the card's active locale (`uiLocale`, so the host
 can render approval text in the session language — see
-[Approval](usage.md#approval)). Nothing derived from the orchestrator is
-persisted, and no command round-trips through the settings document.
+[Approval](usage.md#approval)). They are volatile fields, so an edit applies
+without reloading the plugin. Nothing derived from the orchestrator is
+persisted, and no command round-trips through the config document.

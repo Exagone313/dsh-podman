@@ -12,10 +12,10 @@ import { confineToRoot, crumbLabel, rootCrumbs } from "../project-path.js";
 import { type ContainerPluginKey } from "./locales.js";
 import {
   Button,
-  IconCheckOutline16,
-  IconChevronRightOutline14,
-  IconFolderClose16,
-  IconFolderOpen16,
+  IconCheckOutlineRegular,
+  IconChevronRightOutlineRegular,
+  IconFolderCloseRegular,
+  IconFolderOpenRegular,
   Modal,
 } from "@deepseek-ai/dsh-client-ui-primitives";
 import { type ReactNode, useEffect, useRef, useState } from "react";
@@ -187,7 +187,7 @@ export function DirectoryPickerModal(props: {
               </span>
               {crumbs.map((crumb) => (
                 <span key={crumb} className="dsh-podman-directory-crumbseat">
-                  <IconChevronRightOutline14
+                  <IconChevronRightOutlineRegular
                     size={12}
                     className="dsh-podman-directory-crumbchevron"
                   />
@@ -265,7 +265,7 @@ export function DirectoryPickerModal(props: {
             onClick={() => setShowHidden((previous) => !previous)}
           >
             {t("browseHidden")}
-            {showHidden ? <IconCheckOutline16 size={14} /> : null}
+            {showHidden ? <IconCheckOutlineRegular size={14} /> : null}
           </button>
           <span className="dsh-podman-directory-gap" />
           <Button
@@ -310,14 +310,14 @@ function DirectoryRow(props: {
       >
         {selected
           ? (
-            <IconFolderOpen16
+            <IconFolderOpenRegular
               size={16}
               className="dsh-podman-directory-rowicon-selected"
             />
           )
-          : <IconFolderClose16 size={16} className="dsh-podman-directory-rowicon" />}
+          : <IconFolderCloseRegular size={16} className="dsh-podman-directory-rowicon" />}
         <span className="dsh-podman-directory-rowname">{entry.name}</span>
-        <IconChevronRightOutline14
+        <IconChevronRightOutlineRegular
           size={12}
           className="dsh-podman-directory-rowchevron"
         />

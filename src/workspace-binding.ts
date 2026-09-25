@@ -57,14 +57,13 @@ export class WorkspaceResolver {
     Promise<{ binding: WorkspaceBinding; mounts: readonly any[] }>
   >();
   constructor(
-    private readonly config: BindingConfig,
+    // A reader rather than a snapshot: the plugin's preferences are volatile
+    // config fields, so every call must observe their current values.
+    private readonly config: BindingConfig | (() => BindingConfig),
     private readonly registry: any,
   ) {}
-  setConfig(patch: Partial<BindingConfig>): void {
-    Object.assign(this.config, patch);
-  }
   getConfig(): Readonly<BindingConfig> {
-    return this.config;
+    return typeof this.config === "function" ? this.config() : this.config;
   }
   // dispose closes every cached gRPC channel and drops the cached bindings.
   // Called when the plugin is disposed so a reload does not leak unix sockets.
@@ -89,7 +88,7 @@ export class WorkspaceResolver {
   async resolve(cwd: unknown, signal?: AbortSignal): Promise<WorkspaceBinding> {
     const workspace = await this.workspaceForCwd(cwd);
     const key = workspaceSlug(workspace.id);
-    const projectName = projectNameForPath(this.config.projectsRoot, workspace.path);
+    const projectName = projectNameForPath(this.getConfig().projectsRoot, workspace.path);
     const binding = await this.ready(key, projectName, signal);
     // The default container always keeps its project mount, so the session
     // directory is always mounted in it.
@@ -177,7 +176,7 @@ export class WorkspaceResolver {
     const session = defaultCwdOf(cwd);
     if (
       session !== undefined &&
-      projectMountCovers(this.config.projectsRoot, entry.mounts, session)
+      projectMountCovers(this.getConfig().projectsRoot, entry.mounts, session)
     ) {
       return { ...entry.binding, defaultCwd: session };
     }
@@ -247,7 +246,7 @@ export class WorkspaceResolver {
     }
   }
   private readyTimeoutMs(): number {
-    const configured = Number(this.config.readyTimeoutMs);
+    const configured = Number(this.getConfig().readyTimeoutMs);
     return Number.isFinite(configured) && configured > 0 ? configured : 15000;
   }
   // bindingFor builds a binding from an orchestrator container row. refresh
@@ -327,9 +326,9 @@ export class WorkspaceResolver {
     signal?: AbortSignal,
   ): Promise<WorkspaceBinding> {
     const control = controlClient(
-      join(this.config.socketsRoot, "orchestrator.sock"),
+      join(this.getConfig().socketsRoot, "orchestrator.sock"),
     );
-    const controlMetadata = metadata(this.config.controlToken, VERSION);
+    const controlMetadata = metadata(this.getConfig().controlToken, VERSION);
     try {
       await unary<any>(
         control,
@@ -344,14 +343,14 @@ export class WorkspaceResolver {
       if (error.code !== grpc.status.NOT_FOUND) throw error;
       // A new workspace's default container is a creation: seed the default
       // environment. An existing one keeps its stored env instead.
-      const env = mergeDefaultEnv(this.config.containerEnv, undefined);
+      const env = mergeDefaultEnv(this.getConfig().containerEnv, undefined);
       await unary<any>(
         control,
         "createWorkspace",
         {
           workspaceSlug: slug,
           projectName,
-          imageId: this.config.defaultImage,
+          imageId: this.getConfig().defaultImage,
           mounts: [{ projectName, mode: "MOUNT_MODE_READ_WRITE" }],
           ...(Object.keys(env).length > 0 ? { env } : {}),
         },
@@ -390,10 +389,10 @@ export class WorkspaceResolver {
     signal?: AbortSignal,
   ): Promise<T> {
     const result = await unary<T>(
-      controlClient(join(this.config.socketsRoot, "orchestrator.sock")),
+      controlClient(join(this.getConfig().socketsRoot, "orchestrator.sock")),
       method,
       request,
-      metadata(this.config.controlToken, VERSION),
+      metadata(this.getConfig().controlToken, VERSION),
       signal,
     );
     this.invalidateAfter(method, request);

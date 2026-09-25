@@ -2,13 +2,10 @@
 //
 // SPDX-License-Identifier: MIT
 
-import { CONTAINER_NS } from "./settings-schema.js";
-
 // Localized text for the plugin's user-facing messages: approval reasons,
 // policy denials, and the cache-cleanup notice. The host has no locale service,
-// so the UI language arrives through settings: the browser client writes its
-// active locale into the plugin namespace (`uiLocale`) and the durable user
-// preference (`locale.preference`) is the fallback.
+// so the UI language arrives through the plugin's own volatile `uiLocale`
+// preference, which the browser client writes.
 export type ReasonLocale = "en" | "zh";
 
 // One mount as a reason renders it.
@@ -93,24 +90,11 @@ export type DenialFact =
   | { kind: "read_only_remount_declined"; tool: string }
   | { kind: "project_destination"; source?: string; mirror?: string };
 
-// Settings namespace owned by the browser locale plugin; only read here.
-const LOCALE_NS = "locale";
-const LOCALE_PREFERENCE_FIELD = "preference";
-
-// A reader over registered settings namespaces (the host SettingsProvider's
-// `get(ns)`); typed structurally so this module stays dependency-free.
-export interface SettingsReader {
-  get(ns: string): unknown;
-}
-
-// The locale to render approval text in: the client-observed active locale
-// first (it also captures the browser default), then the durable user
-// preference, then English.
-export function resolveReasonLocale(settings: SettingsReader | undefined): ReasonLocale {
-  if (settings === undefined) return "en";
-  const observed = field(settings.get(CONTAINER_NS), "uiLocale");
-  if (typeof observed === "string" && observed !== "") return reasonLocale(observed);
-  return reasonLocale(field(settings.get(LOCALE_NS), LOCALE_PREFERENCE_FIELD));
+// The locale to render approval text in, from the plugin's own volatile
+// `uiLocale` preference (the browser client writes it); an unset value renders
+// in English.
+export function resolveReasonLocale(value: unknown): ReasonLocale {
+  return reasonLocale(value);
 }
 
 // Normalize a BCP 47-style locale id to a shipped language; `zh-Hans`, `zh_CN`
@@ -119,12 +103,6 @@ export function reasonLocale(value: unknown): ReasonLocale {
   if (typeof value !== "string") return "en";
   const primary = value.toLowerCase().split(/[-_]/, 1)[0];
   return primary === "zh" ? "zh" : "en";
-}
-
-function field(value: unknown, key: string): unknown {
-  return typeof value === "object" && value !== null
-    ? (value as Record<string, unknown>)[key]
-    : undefined;
 }
 
 // Pick the locale's variant of one string.

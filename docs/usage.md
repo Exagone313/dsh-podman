@@ -375,10 +375,10 @@ image build is in progress.
 ## Podman operator mode
 
 The plugin ships an **agent preset** named _Podman operator mode_ (id
-`podman-ops`). On every load it (re)writes the preset into the harness's
-user-presets root (`~/.dsh/.agent-presets/podman-ops/`), overwriting any local
-copy so the shipped content stays authoritative. It appears in the session's
-agent-preset picker next to the shipped presets.
+`podman-ops`). The plugin's bundle patch declares it as a
+`@deepseek-ai/dsh-agent-preset` row, so the harness's preset registry serves it
+directly. It appears in the session's agent-preset picker next to the shipped
+presets.
 
 The preset composes a Podman-focused persona with the built-in task tools
 (`ask_user_question`, `todo_write`) and `web_search` (web fetch disabled). It

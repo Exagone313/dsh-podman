@@ -300,8 +300,8 @@ chips）。卷和机密以独立的可展开行列出，每行都有自己的操
 ## Podman 操作员模式
 
 插件附带一个名为 _Podman operator mode_（id `podman-ops`）的 **agent
-预设**。每次加载时，它都会将预设（重新）写入 harness
-的用户预设根目录（`~/.dsh/.agent-presets/podman-ops/`），覆盖任何本地副本，使发布的内容保持权威。它出现在会话的
+预设**。插件的 bundle patch 会把它声明为一行
+`@deepseek-ai/dsh-agent-preset`，因此 harness 的预设注册表会直接提供它。它出现在会话的
 agent 预设选择器中，紧挨着内置预设。
 
 该预设将聚焦 Podman 的人格与内置任务工具（`ask_user_question`、`todo_write`）和

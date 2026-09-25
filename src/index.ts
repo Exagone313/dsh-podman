@@ -6,39 +6,25 @@ import { isSandboxEscalation, preExecutePolicy, type SessionFacts } from "./appr
 import { type ReasonLocale, resolveReasonLocale } from "./approval-reasons.js";
 import { createFilesystemProvider } from "./fs-provider.js";
 import { createSpillStore } from "./spill-store.js";
-import {
-  ensurePodmanOpsPreset,
-  podmanRuntimeSection,
-  withoutHarnessSourceSection,
-} from "./prompts.js";
+import { podmanRuntimeSection, withoutHarnessSourceSection } from "./prompts.js";
 import { createSubprocessProvider } from "./subprocess.js";
 import { createReadOnlyShellGate, REMOUNT_TOOL_NAME } from "./read-only-shell.js";
 import { toolHandlers } from "./tool-handlers.js";
 import { defineTool, TOOL_DESCRIPTIONS, toolOutput, TOOLS } from "./tool-schemas.js";
 import { toolCallView, toolResultView } from "./tool-views.js";
-import { installContainerPreferences } from "./preferences.js";
 import { registerCardRoute } from "./card-route.js";
+import { type Config } from "./settings-schema.js";
 import { normalizeToolError, WorkspaceResolver } from "./workspace-binding.js";
 
 export const name = "podman";
 
 export const inject = ["tools", "workspaceRegistry"];
 
-export interface PluginConfig {
-  socketsRoot?: string;
-  defaultImage?: string;
-  projectsRoot?: string;
-  controlToken?: string;
-}
-
-export function apply(ctx: any, config: PluginConfig = {}): void {
+export function apply(ctx: any, config: Config): void {
   // Approval text follows the session language: the browser client records its
-  // active locale in the plugin namespace, with the durable user preference as
-  // the fallback. Without a settings provider everything renders in English.
-  let readLocale: () => ReasonLocale = () => "en";
-  ctx.inject(["settings"], (settingsCtx: any) => {
-    readLocale = () => resolveReasonLocale(settingsCtx.settings);
-  });
+  // active locale in the plugin's own volatile `uiLocale` preference, so the
+  // value is always read live and an unset one renders in English.
+  const readLocale = (): ReasonLocale => resolveReasonLocale(config.uiLocale.get());
   // The session's permission knobs live in the harness's own services: the
   // sandbox policy resolves the effective mode (approved override, last logged
   // mode, then the deployment default), the approval service reports the logged
@@ -104,18 +90,18 @@ export function apply(ctx: any, config: PluginConfig = {}): void {
       isSandboxEscalation(request) ? Promise.resolve("allowed-once") : next(),
     { prepend: true },
   );
-  ensurePodmanOpsPreset(ctx);
   const resolver = new WorkspaceResolver(
-    {
-      socketsRoot: config.socketsRoot ??
-        process.env.DSH_PODMAN_SOCKETS_ROOT ??
+    // A reader, not a snapshot: every preference is a volatile config field an
+    // edit commits in place, so the resolver observes changes without a reload.
+    () => ({
+      socketsRoot: config.socketsRoot.get() ||
+        process.env.DSH_PODMAN_SOCKETS_ROOT ||
         "/run/dsh-podman",
-      defaultImage: config.defaultImage ?? "archlinux",
-      projectsRoot: config.projectsRoot ??
-        process.env.DSH_PODMAN_PROJECTS_ROOT ??
-        "/projects",
-      controlToken: config.controlToken ?? process.env.DSH_PODMAN_ORCHESTRATOR_TOKEN ?? "",
-    },
+      defaultImage: config.defaultImage.get() || "archlinux",
+      projectsRoot: process.env.DSH_PODMAN_PROJECTS_ROOT ?? "/projects",
+      controlToken: process.env.DSH_PODMAN_ORCHESTRATOR_TOKEN ?? "",
+      containerEnv: config.containerEnv.get(),
+    }),
     ctx.workspaceRegistry,
   );
   ctx.provide("workspaceResolver", resolver);
@@ -137,8 +123,15 @@ export function apply(ctx: any, config: PluginConfig = {}): void {
     );
   });
   registerTools(ctx, resolver);
-  installContainerPreferences(ctx, resolver);
-  registerCardRoute(ctx, resolver, ctx.workspaceRegistry);
+  // The plugin ships its own configuration card, so the host must not
+  // auto-generate a settings page for the preferences namespace.
+  ctx.inject(["settings"], (child: any) => {
+    child.effect(
+      () => child.settings.configure({ auto: false }, ctx.fiber),
+      "podman: settings presentation",
+    );
+  });
+  registerCardRoute(ctx, resolver, ctx.workspaceRegistry, readLocale);
 }
 
 function registerTools(ctx: any, resolver: WorkspaceResolver): void {
@@ -190,14 +183,11 @@ export {
   projectMountMirror,
 } from "./mount-input.js";
 export {
-  ensurePodmanOpsPreset,
   HARNESS_SOURCE_SECTION,
-  homePresetsRoot,
-  PODMAN_OPS_AGENT_CORDIS_YML,
-  PODMAN_OPS_PRESET_YML,
   podmanRuntimeSection,
   withoutHarnessSourceSection,
 } from "./prompts.js";
+export { Config } from "./settings-schema.js";
 export { publicContainer, publicDaemon, publicImage, publicMount } from "./public.js";
 export {
   createSubprocessProvider,

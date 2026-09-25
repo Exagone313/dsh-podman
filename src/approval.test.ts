@@ -4,22 +4,22 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { readFileSync } from "node:fs";
 import { presetExec, sessionExec, testReadSession } from "./test-support.js";
 import {
   approvalDecision,
-  ensurePodmanOpsPreset,
   isSandboxEscalation,
-  PODMAN_OPS_AGENT_CORDIS_YML,
-  PODMAN_OPS_PRESET_YML,
   preExecutePolicy,
   READ_ONLY_TOOLS,
   SANDBOX_ESCALATION_REASON_PREFIX,
   summarizeArgs,
   TOOLS,
 } from "./index.js";
+
+// The bundle patch that declares the Podman operator preset.
+function podmanOpsPatch(): string {
+  return readFileSync(new URL("../cordis.patch.yml", import.meta.url), "utf8");
+}
 
 test("isSandboxEscalation claims only the harness's sandbox escalation", () => {
   assert.equal(SANDBOX_ESCALATION_REASON_PREFIX, "escalate sandbox to ");
@@ -652,6 +652,7 @@ test("summarizeArgs names the process identity and groups", () => {
 });
 
 test("Podman-ops preset content covers the recent tools", () => {
+  const patch = podmanOpsPatch();
   for (
     const tool of [
       "image_rebuild_all",
@@ -663,31 +664,36 @@ test("Podman-ops preset content covers the recent tools", () => {
     ]
   ) {
     assert.ok(
-      PODMAN_OPS_AGENT_CORDIS_YML.includes(tool),
+      patch.includes(tool),
       `podman-ops composition must mention ${tool}`,
     );
   }
-  assert.ok(PODMAN_OPS_PRESET_YML.includes("secrets"), "podman-ops metadata must mention secrets");
+  assert.match(patch, /id: podman-ops/, "the preset row must carry the policy's preset id");
+  assert.ok(patch.includes("secrets"), "podman-ops metadata must mention secrets");
   // The persona plugin takes its prose as `prefix` (a required field); `text`
   // is not part of its schema and would make the preset fail to load.
-  assert.match(PODMAN_OPS_AGENT_CORDIS_YML, /prefix:/);
-  assert.doesNotMatch(PODMAN_OPS_AGENT_CORDIS_YML, /\btext:/);
+  assert.match(patch, /prefix:/);
+  assert.doesNotMatch(patch, /\btext:/);
 });
 
-test("Podman-ops preset writer overwrites existing content", () => {
-  const dir = mkdtempSync(join(tmpdir(), "dsh-podman-"));
-  ensurePodmanOpsPreset(undefined, dir);
-  const composition = join(dir, "agent.cordis.yml");
-  const metadata = join(dir, "preset.yml");
-  assert.equal(readFileSync(composition, "utf8"), PODMAN_OPS_AGENT_CORDIS_YML);
-  assert.equal(readFileSync(metadata, "utf8"), PODMAN_OPS_PRESET_YML);
-
-  writeFileSync(composition, "# stale user copy\n");
-  ensurePodmanOpsPreset(undefined, dir);
-  assert.equal(
-    readFileSync(composition, "utf8"),
-    PODMAN_OPS_AGENT_CORDIS_YML,
-    "a second load must overwrite the stale copy",
+test("Podman-ops preset declares its composition as plugin rows", () => {
+  const patch = podmanOpsPatch();
+  for (
+    const plugin of [
+      "@deepseek-ai/dsh-persona",
+      "@deepseek-ai/dsh-tool-ask-user",
+      "@deepseek-ai/dsh-tool-todo",
+      "@deepseek-ai/dsh-tool-web",
+    ]
+  ) {
+    assert.ok(
+      patch.includes(plugin),
+      `podman-ops composition must declare ${plugin}`,
+    );
+  }
+  assert.ok(
+    patch.includes("@deepseek-ai/dsh-agent-preset"),
+    "the preset must be declared through the agent-preset row",
   );
 });
 

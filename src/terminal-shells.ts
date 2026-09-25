@@ -11,20 +11,22 @@ import { fsError, runExec } from "./guest-rpc.js";
 import { type TerminalShellView } from "./client/terminal-protocol.js";
 import { type WorkspaceBinding } from "./workspace-binding.js";
 
-// Names looked up on the container's PATH, matching the harness's candidates
-// plus the shells a minimal image may carry.
+// Names looked up on the container's PATH, ordered most capable first so the
+// picker offers — and preselects — the best shell the container has. The first
+// five mirror the harness's own candidate order; the minimal POSIX shells come
+// last, with `sh` final because /bin/sh is usually a symlink to one of them.
 export const SHELL_CANDIDATES = [
-  "sh",
-  "bash",
   "zsh",
+  "bash",
   "fish",
   "pwsh",
   "powershell",
+  "nu",
   "ksh",
   "mksh",
   "dash",
   "ash",
-  "nu",
+  "sh",
 ] as const;
 
 // POSIX `command -v`, not bash's `type -P`: the probe must not require a shell
@@ -47,11 +49,15 @@ const PROBE_SCRIPT = [
 
 const PROBE_TIMEOUT_MS = 10_000;
 const PROBE_MAX_BYTES = 64 * 1024;
-const PREFERRED = ["sh", "bash"];
+
+// One ordered list drives both the probe and the result order, so the two can
+// never disagree.
+const SHELL_RANK = new Map<string, number>(
+  SHELL_CANDIDATES.map((name, index) => [name, index]),
+);
 
 function rank(name: string): number {
-  const index = PREFERRED.indexOf(name);
-  return index === -1 ? PREFERRED.length : index;
+  return SHELL_RANK.get(name) ?? SHELL_CANDIDATES.length;
 }
 
 /**
@@ -59,7 +65,7 @@ function rank(name: string): number {
  * @param binding - guest connection for the target container.
  * @param cwd - an absolute path already mounted in that container.
  * @param signal - cancellation of the probe.
- * @returns each shell's requested name and resolved absolute path, `sh`/`bash` first.
+ * @returns each shell's requested name and resolved absolute path, most capable first.
  */
 export async function discoverShells(
   binding: WorkspaceBinding,

@@ -75,15 +75,21 @@ function routeHarness(sessions: TerminalSessions, resolver: any) {
   return routes;
 }
 
-test("shell discovery parses the probe, dedups and orders sh/bash first", async () => {
+test("shell discovery parses the probe, dedups and prefers the most capable shell", async () => {
   const { binding } = fakeGuest({
     stdout:
-      "sh\t/usr/bin/sh\nbash\t/usr/bin/bash\nzsh\t/opt/tools/bin/zsh\nnot a path\nbash\t/bin/bash\nfish\t/usr/bin/fish\n",
+      "sh\t/usr/bin/sh\nbash\t/usr/bin/bash\nzsh\t/opt/tools/bin/zsh\nnot a path\nbash\t/bin/bash\ndash\t/usr/bin/dash\nfish\t/usr/bin/fish\n",
   });
   const shells = await discoverShells(binding as any, ROOT);
   assert.deepEqual(
     shells.map((shell) => `${shell.name}=${shell.path}`),
-    ["sh=/usr/bin/sh", "bash=/usr/bin/bash", "fish=/usr/bin/fish", "zsh=/opt/tools/bin/zsh"],
+    [
+      "zsh=/opt/tools/bin/zsh",
+      "bash=/usr/bin/bash",
+      "fish=/usr/bin/fish",
+      "dash=/usr/bin/dash",
+      "sh=/usr/bin/sh",
+    ],
   );
 });
 

@@ -215,4 +215,6 @@ so a reload keeps the shell and its scrollback. Shell discovery runs inside the
 target container: candidate names are resolved with POSIX `command -v` on the
 container's PATH (including the deployment's PATH additions) and merged with
 `/etc/shells` and `$SHELL`, so only shells the container really provides are
-offered; the selected path is re-verified before the shell starts.
+offered, most capable first — the order mirrors the harness's own candidate
+preference and ends with the minimal POSIX shells, and the first entry is the
+client's default. The selected path is re-verified before the shell starts.

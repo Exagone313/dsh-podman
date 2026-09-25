@@ -385,7 +385,9 @@ harness's own Terminal always uses the session workspace's default container.
 The shell list is discovered **inside the chosen container**: candidate names
 are looked up on that container's PATH (`command -v`) and merged with
 `/etc/shells` and `$SHELL`, so a shell installed through a PATH addition or a
-mounted volume appears while one the image lacks does not. The selected shell is
+mounted volume appears while one the image lacks does not. The list is ordered
+most capable first (`zsh`, `bash`, `fish`, … down to `dash`, `ash`, `sh`), so the
+picker preselects the best shell the container has. The selected shell is
 verified again before it starts.
 
 Terminals are retained on the host: switching tabs, closing the Sidebar or

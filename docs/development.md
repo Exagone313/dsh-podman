@@ -20,8 +20,8 @@ This page is for **contributors** building the plugin from this repository.
 
 ## Building
 
-Prerequisites: Go 1.27, Node ≥ 22, pnpm 12, and (for the browser half) the
-`@deepseek-ai/dsh-client-*` packages published on npm.
+Prerequisites: Go 1.27, Node ≥ 22, pnpm 12, Deno ≥ 2.9 (formatting), and (for
+the browser half) the `@deepseek-ai/dsh-client-*` packages published on npm.
 
 ```sh
 pnpm install
@@ -36,9 +36,11 @@ The `Makefile` wraps the common workflows:
 ```sh
 make build-go       # build both Go binaries into bin/<os>-<arch>/
 make build          # build-go + pnpm-build
-make vet            # go vet with the build tags
+make vet            # gofmt -s check + go vet with the build tags
 make test-go        # go test with the build tags
 make test           # test-go + pnpm test (JS tests, which run against dist/)
+make fmt            # gofmt -s + deno fmt (TypeScript and Markdown)
+make fmt-check      # verify the formatting without rewriting anything
 make download-licenses  # generate LICENSE.pkg from the project and third-party Go licenses
 make image          # build the orchestrator, guest-agent and dsh container images
 ```
@@ -136,10 +138,11 @@ push runs only `release.yml`, which repeats the build, vet and tests itself:
 
 - **actions-lint** — zizmor scans the workflows for insecure practices.
 - **reuse** — REUSE license compliance.
-- **go** — build, vet, tests, and govulncheck (Go vulnerabilities). Unfixed
-  findings don't fail the job; fixable ones do.
-- **js** — install, typecheck, build, tests, and `pnpm audit`.
-- **docs** — `deno fmt --check` on the Markdown.
+- **go** — build, `gofmt -s` check, vet, tests, and govulncheck (Go
+  vulnerabilities). Unfixed findings don't fail the job; fixable ones do.
+- **js** — TypeScript formatting check, install, typecheck, build, tests, and
+  `pnpm audit`.
+- **docs** — Markdown formatting check (`deno fmt` via `make fmt-check-md`).
 - **images** — builds the orchestrator and guest-agent images (runs only after
   the test jobs pass); **dsh image** builds `Containerfile.dsh`.
 - **trivy** — filesystem vulnerability scan (unfixed ignored) and container

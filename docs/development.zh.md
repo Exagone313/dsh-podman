@@ -19,8 +19,8 @@ SPDX-License-Identifier: MIT
 
 ## 构建
 
-前置要求：Go 1.27、Node ≥ 22、pnpm 12，以及（浏览器端所需的）发布在 npm 上的
-`@deepseek-ai/dsh-client-*` 包。
+前置要求：Go 1.27、Node ≥ 22、pnpm 12、Deno ≥ 2.9（用于格式化），以及（浏览器端所需的）发布在
+npm 上的 `@deepseek-ai/dsh-client-*` 包。
 
 ```sh
 pnpm install
@@ -35,9 +35,11 @@ Go 构建标签会跳过 btrfs 和 devicemapper 存储驱动，它们需要宿�
 ```sh
 make build-go       # build both Go binaries into bin/<os>-<arch>/
 make build          # build-go + pnpm-build
-make vet            # go vet with the build tags
+make vet            # gofmt -s check + go vet with the build tags
 make test-go        # go test with the build tags
 make test           # test-go + pnpm test (JS tests, which run against dist/)
+make fmt            # gofmt -s + deno fmt (TypeScript and Markdown)
+make fmt-check      # verify the formatting without rewriting anything
 make download-licenses  # generate LICENSE.pkg from the project and third-party Go licenses
 make image          # build the orchestrator, guest-agent and dsh container images
 ```
@@ -130,10 +132,10 @@ zizmor）、`ci-code.yml`（Go、JS、镜像、Trivy）、`ci-docs.yml`（Deno f
 
 - **actions-lint** — zizmor 扫描工作流是否存在不安全实践。
 - **reuse** — REUSE 许可证合规检查。
-- **go** — 构建、vet、测试和 govulncheck（Go 漏洞）。未修复的
+- **go** — 构建、`gofmt -s` 检查、vet、测试和 govulncheck（Go 漏洞）。未修复的
   发现不会导致任务失败；可修复的会导致失败。
-- **js** — 安装、类型检查、构建、测试和 `pnpm audit`。
-- **docs** — 对 Markdown 运行 `deno fmt --check`。
+- **js** — TypeScript 格式检查、安装、类型检查、构建、测试和 `pnpm audit`。
+- **docs** — Markdown 格式检查（通过 `make fmt-check-md` 运行 `deno fmt`）。
 - **images** — 构建 orchestrator 和 guest-agent
   镜像（仅在测试任务通过后运行）；**dsh image** 构建 `Containerfile.dsh`。
 - **trivy** — 文件系统漏洞扫描（未修复的被忽略）和容器 错误配置扫描（DS-0002

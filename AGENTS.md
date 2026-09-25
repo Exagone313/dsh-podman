@@ -12,7 +12,9 @@ on a missing `btrfs/version.h` because they don't apply the required build tags
 exclude_graphdriver_devicemapper`).
 
 - `make build` — Go binaries + pnpm build
-- `make vet` / `make test-go` — Go checks with the tags
+- `make vet` / `make test-go` — Go checks with the tags (`vet` runs the gofmt
+  check first)
+- `make fmt` / `make fmt-check` — format / verify Go, TypeScript and Markdown
 - `make test` — Go tests + pnpm tests
 
 `pnpm test` runs against `dist/`, so run `pnpm build` first (or `make test`).
@@ -30,9 +32,9 @@ exclude_graphdriver_devicemapper`).
 User-facing docs live in `docs/`; `README.md` only links to them. Users install
 the plugin from npm — the local build is for development only.
 
-Markdown must be formatted with `deno fmt` (`deno fmt "**/*.md"` — quote the
-glob so deno expands it, not the shell); a docs-only workflow enforces this on
-`.md` changes.
+Markdown and TypeScript share one formatter — `deno fmt`, configured by
+`deno.json` (line width, wrapped-prose policy, and the formatted file set); run
+`make fmt`, and `make fmt-check` or the CI jobs verify it.
 
 ## Conventions
 
@@ -42,6 +44,9 @@ glob so deno expands it, not the shell); a docs-only workflow enforces this on
   `REUSE_ENCODING_MODULE=chardet reuse lint` (the `REUSE_ENCODING_MODULE`
   variable works around a reuse bug that otherwise false-positives certain UTF-8
   files, e.g. the Chinese `.zh.md` docs).
+- Go files are formatted with `gofmt -s`: run `make fmt-go` before committing.
+  `make vet` and the `go` CI job fail on an unformatted file. `third_party/` is
+  an upstream replacement module (`replace` in `go.mod`) left as published.
 - Prefer implementing with subagents when possible.
 - Name proto fields in `lower_snake_case` and read them in TypeScript through
   proto-loader's camelCase projection (`secret_env` → `secretEnv`); never spell

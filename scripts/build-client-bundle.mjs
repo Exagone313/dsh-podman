@@ -40,6 +40,9 @@ await build({
   target: "es2020",
   jsx: "automatic",
   external: EXTERNALS,
+  // Imported stylesheets (xterm's) arrive as strings the client injects once,
+  // instead of esbuild emitting a separate CSS file the host cannot serve.
+  loader: { ".css": "text" },
   banner: {
     js: `window.__ModuleLoader__.load({ id: ${JSON.stringify(ID)}, factory: (require) => {\n` +
       "var module = { exports: {} }; var exports = module.exports;",

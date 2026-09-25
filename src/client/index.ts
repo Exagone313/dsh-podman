@@ -3,15 +3,26 @@
 // SPDX-License-Identifier: MIT
 
 import type { Context as ClientContext } from "@deepseek-ai/cordis";
+import type { ShortcutCommandId } from "@deepseek-ai/dsh-client-shortcuts/client";
 import type {} from "@deepseek-ai/dsh-client-ui-renderer/client";
 import type {} from "@deepseek-ai/dsh-client-ui-settings/client";
 import type {} from "@deepseek-ai/dsh-client-ui-conversation/client";
 import type {} from "@deepseek-ai/dsh-client-locale/client";
+import type {} from "@deepseek-ai/dsh-client-ui-sidebar-right/client";
 import type {} from "@deepseek-ai/dsh-api-remotes/client";
+import { PluginArtworkTerminal } from "@deepseek-ai/dsh-client-ui-primitives";
 import type {} from "./slot-contract.js";
 import { buildDirectoryPicker } from "./directory-picker.js";
 import { ContainerCard } from "./ContainerCard.js";
+import { PodmanTerminal } from "./podman-terminal.js";
+import { PodmanTerminalGuide } from "./podman-terminal-guide.js";
+import { PodmanTerminalTitle } from "./podman-terminal-title.js";
 import { BUILTIN_PROMPT_PREFIX, ReadOnlyApprovalPanel } from "./read-only-approval.js";
+import {
+  PODMAN_TERMINAL_KIND,
+  PODMAN_TERMINAL_TAB_ID,
+  type PodmanTerminalParams,
+} from "./terminal-tab.js";
 import { PodmanToolRow, TOOL_VIEW_KEYS } from "./tool-views.js";
 import { installTerminalStyles } from "./terminal-styles.js";
 import { installDirectoryStyles } from "./container-card-directory-styles.js";
@@ -31,7 +42,14 @@ export const name = "podman";
 // package.json's `name`.
 const PLUGIN_PACKAGE = "@exagone313/dsh-podman";
 
-export const inject = ["slots", "locale", "configForms"];
+export const inject = [
+  "slots",
+  "locale",
+  "configForms",
+  "sidebarRight",
+  "sidebarRightTabs",
+  "shortcuts",
+];
 
 export function apply(ctx: ClientContext): void {
   installTerminalStyles(ctx);
@@ -132,4 +150,118 @@ export function apply(ctx: ClientContext): void {
       },
       ReadOnlyApprovalPanel,
     ));
+
+  // The Podman terminal page: one tab type plus the body/title seats and the
+  // guide card that opens it with a verified shell. Closing a tab unmounts the
+  // body, whose cleanup aborts the stream while the host keeps the shell
+  // retained, so no close handler is registered.
+  const t = ctx.locale.bind(NS);
+  ctx.effect(
+    () =>
+      ctx.sidebarRightTabs.register({
+        id: PODMAN_TERMINAL_TAB_ID,
+        kind: PODMAN_TERMINAL_KIND,
+        multiple: true,
+        keepMounted: true,
+        title: () => t("terminalTabTitle"),
+        guide: [{
+          id: "new",
+          order: 20,
+          title: () => t("terminalGuideTitle"),
+          description: () => t("terminalGuideDescription"),
+          icon: PluginArtworkTerminal,
+        }],
+      }),
+    "podman: terminal type",
+  );
+
+  ctx.effect(
+    () =>
+      ctx.slots.inject("sidebar.right.pane.tab", () =>
+        ctx.slots.register(
+          {
+            name: "sidebar.right.pane.tab",
+            key: PODMAN_TERMINAL_TAB_ID,
+            locale: NS,
+            inject: (sessionId) => ({ ...controller.inject(), sessionId }),
+          },
+          PodmanTerminal,
+        )),
+    "podman: terminal body",
+  );
+
+  ctx.effect(
+    () =>
+      ctx.slots.inject("sidebar.right.pane.tab.title", () =>
+        ctx.slots.register(
+          { name: "sidebar.right.pane.tab.title", key: PODMAN_TERMINAL_TAB_ID },
+          PodmanTerminalTitle,
+        )),
+    "podman: terminal title",
+  );
+
+  ctx.effect(
+    () =>
+      ctx.slots.inject("sidebar.right.tab.guide.entry", () =>
+        ctx.slots.register(
+          {
+            name: "sidebar.right.tab.guide.entry",
+            key: PODMAN_TERMINAL_TAB_ID,
+            locale: NS,
+            inject: (sessionId) => ({
+              ...controller.inject(),
+              sessionId,
+              openTab: (params: PodmanTerminalParams) => {
+                ctx.sidebarRight.openTab(PODMAN_TERMINAL_KIND, { params });
+              },
+            }),
+          },
+          PodmanTerminalGuide,
+        )),
+    "podman: terminal guide",
+  );
+
+  // Ctrl+Shift+` opens a terminal on the session the focused pane belongs to.
+  ctx.effect(
+    () =>
+      ctx.shortcuts.register({
+        id: "podman.terminal.new" as ShortcutCommandId,
+        label: () => t("terminalShortcut"),
+        aliases: ["new podman terminal"],
+        defaults: {
+          "desktop:linux": {
+            code: "Backquote",
+            modifiers: ["control", "shift"],
+          },
+          "web:linux": { code: "Backquote", modifiers: ["control", "shift"] },
+          "desktop:macos": {
+            code: "Backquote",
+            modifiers: ["control", "shift"],
+          },
+          "web:macos": { code: "Backquote", modifiers: ["control", "shift"] },
+          "desktop:windows": {
+            code: "Backquote",
+            modifiers: ["control", "shift"],
+          },
+          "web:windows": { code: "Backquote", modifiers: ["control", "shift"] },
+        },
+        regions: ["page", "editable", "terminal"],
+        modals: [],
+        resolve: ({ target }) => {
+          const captured = ctx.sidebarRight.commandTarget(target);
+          return captured === undefined
+            ? { status: "blocked", reason: t("terminalShortcutNoSession") }
+            : {
+              status: "handled",
+              run: () => {
+                ctx.sidebarRight.openTabFromTarget(
+                  PODMAN_TERMINAL_KIND,
+                  captured,
+                );
+              },
+            };
+        },
+      }),
+    "podman: terminal shortcut",
+  );
 }

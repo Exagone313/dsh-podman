@@ -203,6 +203,12 @@ async function startControlServer(
       recreateRequests.push(call.request);
       callback(null, { workspaceSlug: call.request.workspaceSlug });
     },
+    addContainerMount: (_call: any, callback: any) => {
+      callback(null, {});
+    },
+    removeWorkspace: (_call: any, callback: any) => {
+      callback(null, {});
+    },
   });
   const socketsRoot = resolve(
     tmpdir(),
@@ -394,6 +400,86 @@ test("containerBinding exposes the session directory only when a project mount c
     assert.equal(binding.defaultCwd, undefined);
   } finally {
     unmounted.stop();
+  }
+});
+
+test("containerBinding re-resolves the mount set after a container mutation", async () => {
+  const rows: any[] = [
+    {
+      workspaceSlug: SLUG,
+      containerName: "db",
+      agentSocketPath: "/run/x.sock",
+      agentToken: "tok",
+      mounts: [{ kind: "MOUNT_KIND_PROJECT", projectName: "team" }],
+    },
+  ];
+  const control = await startControlServer(rows);
+  try {
+    const resolver = new WorkspaceResolver(
+      {
+        socketsRoot: control.socketsRoot,
+        defaultImage: "arch",
+        projectsRoot: "/projects",
+        controlToken: "",
+      },
+      { resolveByPath: () => ({ id: SLUG, path: "/projects/team" }) } as any,
+    );
+    const first = await resolver.containerBinding("/projects/team", "db");
+    assert.equal(first.defaultCwd, "/projects/team");
+    // The container no longer mounts the session directory, but the cached
+    // entry still describes the row it was built from.
+    rows[0].mounts = [
+      { kind: "MOUNT_KIND_VOLUME", volume: "data", destination: "/data" },
+    ];
+    const stale = await resolver.containerBinding("/projects/team", "db");
+    assert.equal(
+      stale.defaultCwd,
+      "/projects/team",
+      "the cache is served until it is invalidated",
+    );
+    await resolver.control("addContainerMount", {
+      workspaceSlug: SLUG,
+      container: "db",
+    });
+    const fresh = await resolver.containerBinding("/projects/team", "db");
+    assert.equal(
+      fresh.defaultCwd,
+      undefined,
+      "a mutation re-resolves the mount set",
+    );
+  } finally {
+    control.stop();
+  }
+});
+
+test("removing a workspace drops every cached container binding", async () => {
+  const rows: any[] = [
+    {
+      workspaceSlug: SLUG,
+      containerName: "db",
+      agentSocketPath: "/run/x.sock",
+      agentToken: "tok",
+      mounts: [{ kind: "MOUNT_KIND_PROJECT", projectName: "team" }],
+    },
+  ];
+  const control = await startControlServer(rows);
+  try {
+    const resolver = new WorkspaceResolver(
+      {
+        socketsRoot: control.socketsRoot,
+        defaultImage: "arch",
+        projectsRoot: "/projects",
+        controlToken: "",
+      },
+      { resolveByPath: () => ({ id: SLUG, path: "/projects/team" }) } as any,
+    );
+    await resolver.containerBinding("/projects/team", "db");
+    rows[0].mounts = [];
+    await resolver.control("removeWorkspace", { workspaceSlug: SLUG });
+    const fresh = await resolver.containerBinding("/projects/team", "db");
+    assert.equal(fresh.defaultCwd, undefined);
+  } finally {
+    control.stop();
   }
 });
 

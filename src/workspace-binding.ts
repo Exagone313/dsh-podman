@@ -33,6 +33,22 @@ export interface BindingConfig {
   readyTimeoutMs?: number;
 }
 
+// The control calls that change a container's mount set or recreate it. A
+// successful call invalidates the cached binding for that container (or for
+// every container of a removed workspace), because the cached mounts decide
+// whether the session directory is exposed as the container's default cwd.
+const CONTAINER_MUTATIONS: Record<string, "container" | "workspace"> = {
+  startContainer: "container",
+  recreateContainer: "container",
+  removeContainer: "container",
+  addContainerMount: "container",
+  removeContainerMount: "container",
+  updateContainerMount: "container",
+  addContainerSecret: "container",
+  removeContainerSecret: "container",
+  removeWorkspace: "workspace",
+};
+
 export class WorkspaceResolver {
   private readonly bindings = new Map<string, Promise<WorkspaceBinding>>();
   // Named containers get their own cache, keyed by "<slug>:<logical name>", so
@@ -58,6 +74,19 @@ export class WorkspaceResolver {
     this.bindings.clear();
     this.containerBindings.clear();
     closeClients();
+  }
+  // forgetContainer drops the cached binding for one named container, so the
+  // next call re-resolves its row and picks up a changed mount set.
+  forgetContainer(slug: string, container: string): void {
+    this.containerBindings.delete(`${slug}:${container}`);
+  }
+  // forgetWorkspace drops every cached container binding of one workspace, so
+  // a removed (or recreated) workspace cannot serve stale rows.
+  forgetWorkspace(slug: string): void {
+    const prefix = `${slug}:`;
+    for (const key of [...this.containerBindings.keys()]) {
+      if (key.startsWith(prefix)) this.containerBindings.delete(key);
+    }
   }
   async resolve(cwd: unknown, signal?: AbortSignal): Promise<WorkspaceBinding> {
     const workspace = await this.workspaceForCwd(cwd);
@@ -342,13 +371,36 @@ export class WorkspaceResolver {
     request: unknown,
     signal?: AbortSignal,
   ): Promise<T> {
-    return unary<T>(
+    const result = await unary<T>(
       controlClient(join(this.config.socketsRoot, "orchestrator.sock")),
       method,
       request,
       metadata(this.config.controlToken, VERSION),
       signal,
     );
+    this.invalidateAfter(method, request);
+    return result;
+  }
+  // invalidateAfter drops the cached bindings a successful mutation invalidated.
+  // Only reachable after the call resolved, so a failed mutation keeps the
+  // warm entry it did not change.
+  private invalidateAfter(method: string, request: unknown): void {
+    const scope = CONTAINER_MUTATIONS[method];
+    if (scope === undefined) return;
+    const fields = (typeof request === "object" && request !== null
+      ? request
+      : {}) as { workspaceSlug?: unknown; container?: unknown };
+    const slug =
+      typeof fields.workspaceSlug === "string" ? fields.workspaceSlug : "";
+    if (slug === "") return;
+    if (scope === "workspace") {
+      this.forgetWorkspace(slug);
+      return;
+    }
+    const container =
+      typeof fields.container === "string" ? fields.container : "";
+    if (container === "") return;
+    this.forgetContainer(slug, container);
   }
 }
 

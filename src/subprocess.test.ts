@@ -6,6 +6,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { FakeTerminalCall, fakeTerminalResolver, spawnGuest, spawnSpec } from "./test-support.js";
 import { createSubprocessProvider, globCwd, outputReader, remoteArgv } from "./index.js";
+import { SubprocessExecutableNotFoundError } from "@deepseek-ai/dsh-subprocess";
 
 test("globCwd runs a discovery listing from its absolute search root", () => {
   assert.equal(
@@ -172,13 +173,18 @@ test("outputReader honors in-window offsets", () => {
   assert.equal(pastEnd.lossy, false);
 });
 
-test("resolveExecutable returns absolute paths and rejects bare names", async () => {
+test("resolveExecutable returns absolute paths and reports bare names as not found", async () => {
   const provider = createSubprocessProvider({} as any);
   assert.equal(await provider.resolveExecutable("/usr/bin/ls"), "/usr/bin/ls");
   assert.equal(await provider.resolveExecutable("/bin/sh"), "/bin/sh");
-  await assert.rejects(() => provider.resolveExecutable(""));
-  await assert.rejects(() => provider.resolveExecutable("bin/tool"));
-  await assert.rejects(() => provider.resolveExecutable("ls"));
+  // The harness treats only this class as "not installed", so shell discovery
+  // skips a candidate the images do not carry instead of failing.
+  for (const command of ["", "bin/tool", "ls", "zsh"]) {
+    await assert.rejects(
+      () => provider.resolveExecutable(command),
+      SubprocessExecutableNotFoundError,
+    );
+  }
 });
 
 test("terminalEnvironment reports the container's shell family", async () => {

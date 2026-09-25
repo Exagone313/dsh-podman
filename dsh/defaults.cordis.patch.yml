@@ -8,3 +8,12 @@
     host: '0.0.0.0'
     port: !!js ctx.webStartup.port ?? 3080
     compression: gzip
+
+# override available shells
+- id: terminal-controller
+  config:
+    shell:
+      path: /bin/bash
+      name: bash
+      args: [-i]
+    shellCandidates: [/bin/bash, /bin/sh]

@@ -7,6 +7,7 @@ import { globCwd, remoteArgv, unaryGuest } from "./guest-rpc.js";
 import { metadata, type WorkspaceResolver } from "./workspace-binding.js";
 import { randomUUID } from "node:crypto";
 import { PassThrough } from "node:stream";
+import { SubprocessExecutableNotFoundError } from "@deepseek-ai/dsh-subprocess";
 
 export interface SubprocessProvider {
   resolveExecutable(command: string): Promise<string>;
@@ -31,12 +32,12 @@ export function createSubprocessProvider(resolver: WorkspaceResolver): Subproces
     // execution world is per-workspace (each workspace is its own container),
     // so a bare command name cannot be looked up here. An absolute path is
     // returned unchanged: the guest resolves and spawns it inside the target
-    // container, which is the only place it can be checked. Shell selection
-    // (see terminalEnvironment) depends on this for an environment-default
-    // shell.
+    // container, which is the only place it can be checked. A bare name is
+    // reported in the harness's "not found" form, so shell discovery skips a
+    // candidate the images do not carry instead of failing the whole list.
     resolveExecutable: async (command: string): Promise<string> => {
       if (typeof command === "string" && command.startsWith("/")) return command;
-      throw new Error(
+      throw new SubprocessExecutableNotFoundError(
         `cannot resolve executable ${JSON.stringify(command)}: no workspace context is available`,
       );
     },

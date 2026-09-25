@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: MIT
 
 import { closeClients, controlClient, grpc, guestClient, unary } from "./grpc/runtime-client.js";
+import { mergeDefaultEnv } from "./container-env.js";
 import { isAbsolute, join } from "node:path";
 import { VERSION } from "./generated/version.js";
 
@@ -25,6 +26,9 @@ export interface BindingConfig {
   controlToken: string;
   // Bound on the guest-agent readiness wait, in milliseconds. Defaults to 15s.
   readyTimeoutMs?: number;
+  // The environment seeded into a container when it is created, mirroring the
+  // settings namespace (see container-env.ts).
+  containerEnv?: Record<string, string>;
 }
 
 // The control calls that change a container's mount set or recreate it. A
@@ -338,6 +342,9 @@ export class WorkspaceResolver {
       );
     } catch (error: any) {
       if (error.code !== grpc.status.NOT_FOUND) throw error;
+      // A new workspace's default container is a creation: seed the default
+      // environment. An existing one keeps its stored env instead.
+      const env = mergeDefaultEnv(this.config.containerEnv, undefined);
       await unary<any>(
         control,
         "createWorkspace",
@@ -346,6 +353,7 @@ export class WorkspaceResolver {
           projectName,
           imageId: this.config.defaultImage,
           mounts: [{ projectName, mode: "MOUNT_MODE_READ_WRITE" }],
+          ...(Object.keys(env).length > 0 ? { env } : {}),
         },
         controlMetadata,
         signal,

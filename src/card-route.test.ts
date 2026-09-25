@@ -222,8 +222,22 @@ test("installContainerPreferences seeds the base and syncs the resolver config",
     setConfig: (patch: Record<string, unknown>) => configs.push(patch),
   };
   installContainerPreferences(ctx, resolver);
-  assert.deepEqual(base, { defaultImage: "archlinux", socketsRoot: "/run/dsh-podman" });
+  assert.deepEqual(base, {
+    defaultImage: "archlinux",
+    socketsRoot: "/run/dsh-podman",
+    containerEnv: {},
+  });
   assert.ok(watcher !== undefined);
-  watcher({ defaultImage: "ubuntu", socketsRoot: "/run/other" });
-  assert.deepEqual(configs, [{ defaultImage: "ubuntu", socketsRoot: "/run/other" }]);
+  watcher({
+    defaultImage: "ubuntu",
+    socketsRoot: "/run/other",
+    containerEnv: { A: "1" },
+  });
+  assert.deepEqual(configs, [
+    {
+      defaultImage: "ubuntu",
+      socketsRoot: "/run/other",
+      containerEnv: { A: "1" },
+    },
+  ]);
 });

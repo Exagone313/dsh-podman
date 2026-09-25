@@ -14,12 +14,16 @@ export const settingsSchema = z.object({
   defaultImage: z.string().default(""),
   socketsRoot: z.string().default(""),
   uiLocale: z.string().default(""),
+  // The environment seeded into a container when it is created; a recreate is
+  // authoritative, so a value can be removed again. See container-env.ts.
+  containerEnv: z.dict(z.string()).default({}),
 }) as unknown as z<ContainerSettings>;
 
 export interface ContainerSettings {
   defaultImage: string;
   socketsRoot: string;
   uiLocale: string;
+  containerEnv: Record<string, string>;
 }
 
 export interface ContainerSettingsScope {

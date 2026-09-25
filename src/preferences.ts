@@ -2,9 +2,10 @@
 //
 // SPDX-License-Identifier: MIT
 
-// The plugin's real preferences (default image, sockets root, and the browser
-// locale) live in the settings namespace; everything derived from the
-// orchestrator travels over the card route (see card-route.ts).
+// The plugin's real preferences (default image, sockets root, the default
+// container environment, and the browser locale) live in the settings
+// namespace; everything derived from the orchestrator travels over the card
+// route (see card-route.ts).
 
 import {
   CONTAINER_NS,
@@ -27,12 +28,14 @@ export function installContainerPreferences(
       base: {
         defaultImage: resolver.getConfig().defaultImage,
         socketsRoot: resolver.getConfig().socketsRoot,
+        containerEnv: {},
       },
     }) as ContainerSettingsScope;
     scope.watch((next: ContainerSettings) => {
       resolver.setConfig({
         defaultImage: next.defaultImage,
         socketsRoot: next.socketsRoot,
+        containerEnv: next.containerEnv,
       });
     });
   });

@@ -212,6 +212,7 @@ export type ContainerPluginKey =
   | "terminalContainer"
   | "terminalShell"
   | "terminalDefaultContainer"
+  | "terminalStart"
   | "terminalConnect"
   | "terminalReconnect"
   | "terminalStatusConnecting"
@@ -436,6 +437,7 @@ export const en: Record<ContainerPluginKey, string> = {
   terminalContainer: "Container",
   terminalShell: "Shell",
   terminalDefaultContainer: "Default container",
+  terminalStart: "Start",
   terminalConnect: "Connect",
   terminalReconnect: "Reconnect",
   terminalStatusConnecting: "Connecting…",
@@ -658,6 +660,7 @@ export const zh: Record<ContainerPluginKey, string> = {
   terminalContainer: "容器",
   terminalShell: "Shell",
   terminalDefaultContainer: "默认容器",
+  terminalStart: "启动",
   terminalConnect: "连接",
   terminalReconnect: "重新连接",
   terminalStatusConnecting: "正在连接…",

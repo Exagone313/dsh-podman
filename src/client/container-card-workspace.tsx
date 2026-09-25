@@ -28,10 +28,11 @@ export function WorkspaceSection(props: {
   defaultImage: string;
   projectsRoot: string;
   directoryPicker?: DirectoryPickerFace;
-  onRemove: (workspace: string) => void;
+  onRemove: (workspace: string, container: string) => void;
   onRemoveWorkspace: (workspace: string) => void;
   onRecreate: (
     workspace: string,
+    container: string,
     image: string,
     env?: Record<string, string>,
   ) => void;
@@ -61,8 +62,17 @@ export function WorkspaceSection(props: {
     container: string,
     paths: readonly string[],
   ) => void;
-  onAddContainerSecret: (workspace: string, envVar: string, secret: string) => void;
-  onRemoveContainerSecret: (workspace: string, envVar: string) => void;
+  onAddContainerSecret: (
+    workspace: string,
+    container: string,
+    envVar: string,
+    secret: string,
+  ) => void;
+  onRemoveContainerSecret: (
+    workspace: string,
+    container: string,
+    envVar: string,
+  ) => void;
   // Adds the default container environment to this workspace's containers.
   onSyncDefaults: (workspace: string) => void;
   // How many default variables exist; the sync action is pointless without any.

@@ -327,9 +327,9 @@ export const en: Record<ContainerPluginKey, string> = {
   busy: "Working…",
   confirmTitle: "Confirm action",
   confirm: "Confirm",
-  confirmRemoveContainer: "Remove the default container of workspace “{workspace}”?",
+  confirmRemoveContainer: "Remove container “{container}” from workspace “{workspace}”?",
   confirmRecreate:
-    "Recreate the default container of workspace “{workspace}”? Its ephemeral state is lost.",
+    "Recreate container “{container}” in workspace “{workspace}”? Its ephemeral state is lost.",
   confirmRemoveImage:
     "Remove image “{image}”? Containers using it must be recreated from another image.",
   confirmRebuildImage: "Rebuild image “{image}” in place?",
@@ -552,8 +552,8 @@ export const zh: Record<ContainerPluginKey, string> = {
   busy: "处理中…",
   confirmTitle: "确认操作",
   confirm: "确认",
-  confirmRemoveContainer: "移除工作区“{workspace}”的默认容器？",
-  confirmRecreate: "重建工作区“{workspace}”的默认容器？其临时状态将丢失。",
+  confirmRemoveContainer: "移除工作区“{workspace}”中的容器“{container}”？",
+  confirmRecreate: "重建工作区“{workspace}”中的容器“{container}”？其临时状态将丢失。",
   confirmRemoveImage: "移除镜像“{image}”？使用它的容器需要用其他镜像重建。",
   confirmRebuildImage: "就地重建镜像“{image}”？",
   confirmRebuildAllImages: "按依赖顺序重建全部镜像（先基础镜像）？",

@@ -4,6 +4,7 @@
 
 import { BaseImageRow, ImageBuildModal, ImageItem } from "./container-card-images.js";
 import { CachesSection } from "./container-card-caches.js";
+import { DefaultEnvironmentSection } from "./container-card-default-env.js";
 import { SecretsSection } from "./container-card-secrets.js";
 import { CardChevron, ConfigField, ConfirmButton } from "./container-card-shared.js";
 import {
@@ -184,6 +185,8 @@ export function ContainerCard(props: ContainerCardProps): ReactNode {
                   onSetContainerPaths={props.setContainerPaths}
                   onAddContainerSecret={props.addContainerSecret}
                   onRemoveContainerSecret={props.removeContainerSecret}
+                  onSyncDefaults={props.syncDefaultEnv}
+                  defaultEnvCount={Object.keys(state.containerEnv).length}
                 />
               ))
             )}
@@ -379,6 +382,14 @@ export function ContainerCard(props: ContainerCardProps): ReactNode {
               onChange={props.editSocketsRoot}
               onSave={props.saveSocketsRoot}
               onDiscard={props.discardSocketsRoot}
+            />
+            <DefaultEnvironmentSection
+              t={t}
+              env={state.containerEnv}
+              busy={state.busy}
+              writable={state.writable}
+              onSave={props.saveContainerEnv}
+              onSync={props.syncDefaultEnv}
             />
             <div
               style={{

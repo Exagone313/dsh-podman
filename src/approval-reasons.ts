@@ -499,6 +499,42 @@ export function renderCacheCleanNotice(locale: ReasonLocale, files: number): str
   );
 }
 
+// Render the settings notice shown after the default environment was applied
+// to existing containers: how many were recreated, and how many stopped
+// containers were left for their next start.
+export function renderDefaultEnvSyncNotice(
+  locale: ReasonLocale,
+  applied: number,
+  skipped: number,
+): string {
+  const containers = (count: number): string =>
+    pick(locale, `${count} container${count === 1 ? "" : "s"}`, `${count} 个容器`);
+  if (applied === 0 && skipped === 0) {
+    return pick(
+      locale,
+      "the default environment is already applied to every running container",
+      "默认环境已应用于所有运行中的容器",
+    );
+  }
+  if (applied === 0) {
+    return pick(
+      locale,
+      `no running container needed the default environment; ${containers(skipped)} stopped`,
+      `没有运行中的容器需要默认环境；已跳过 ${containers(skipped)}`,
+    );
+  }
+  const suffix = skipped === 0 ? "" : pick(
+    locale,
+    `; ${containers(skipped)} stopped, to pick up on their next start`,
+    `；已跳过 ${containers(skipped)}，将在下次启动时生效`,
+  );
+  return pick(
+    locale,
+    `applied the default environment to ${containers(applied)}${suffix}`,
+    `已将默认环境应用于 ${containers(applied)}${suffix}`,
+  );
+}
+
 // Render one policy denial.
 export function renderDenial(locale: ReasonLocale, fact: DenialFact): string {
   switch (fact.kind) {

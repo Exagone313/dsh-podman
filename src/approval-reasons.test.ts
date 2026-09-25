@@ -7,6 +7,7 @@ import assert from "node:assert/strict";
 import {
   reasonLocale,
   renderCacheCleanNotice,
+  renderDefaultEnvSyncNotice,
   renderDenial,
   renderReason,
   resolveReasonLocale,
@@ -177,6 +178,33 @@ test("renderDenial renders the declined remount", () => {
   assert.equal(
     renderDenial("zh", { kind: "read_only_remount_declined", tool: "bash" }),
     "已拒绝：只读模式阻止 “bash”，且挂载未被重新挂载。",
+  );
+});
+
+test("renderDefaultEnvSyncNotice renders both languages", () => {
+  assert.equal(
+    renderDefaultEnvSyncNotice("en", 2, 0),
+    "applied the default environment to 2 containers",
+  );
+  assert.equal(
+    renderDefaultEnvSyncNotice("en", 1, 2),
+    "applied the default environment to 1 container; 2 containers stopped, to pick up on their next start",
+  );
+  assert.equal(
+    renderDefaultEnvSyncNotice("en", 0, 1),
+    "no running container needed the default environment; 1 container stopped",
+  );
+  assert.equal(
+    renderDefaultEnvSyncNotice("en", 0, 0),
+    "the default environment is already applied to every running container",
+  );
+  assert.equal(
+    renderDefaultEnvSyncNotice("zh", 2, 0),
+    "已将默认环境应用于 2 个容器",
+  );
+  assert.equal(
+    renderDefaultEnvSyncNotice("zh", 0, 1),
+    "没有运行中的容器需要默认环境；已跳过 1 个容器",
   );
 });
 

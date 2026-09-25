@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "dsh-podman",
+    "description": "Podman-backed execution for DeepSeek Harness (dsh)."
+  }
+}

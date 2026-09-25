@@ -275,7 +275,7 @@ UI 使用短名称。`secret_create` 的值由服务端用 `crypto/rand`
 ## 容器管理 UI
 
 插件附带一个浏览器端，把卡片注册到
-**@exagone313/dsh-podman** 页面（侧边栏 **插件** 面板 → **已安装**）。该页面列出编排器创建的 guest
+**dsh-podman** 页面（侧边栏 **插件** 面板 → **已安装**）。该页面列出编排器创建的 guest
 容器和已构建的镜像。没有容器的工作区会得到一个 **Create container**
 按钮，打开一个配置模态框——镜像、环境、挂载（project、tmpfs、volume 和
 secret）、PATH 附加项以及机密环境变量——而已有容器的工作区通过同一个模态框提供

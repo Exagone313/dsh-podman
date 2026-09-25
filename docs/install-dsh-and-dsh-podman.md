@@ -141,7 +141,7 @@ which requires online access.
 ## Verification
 
 - Open the sidebar's **Plugins** panel → **Installed** →
-  **@exagone313/dsh-podman**: the page should list the base images and, for a
+  **dsh-podman**: the page should list the base images and, for a
   workspace, offer to create its default container.
 - In a dsh session, run a shell command. It should execute inside a Podman
   container for the current workspace (the plugin auto-creates the workspace's

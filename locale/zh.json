@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "dsh-podman",
+    "description": "为 DeepSeek Harness（dsh）提供基于 Podman 的容器执行环境。"
+  }
+}

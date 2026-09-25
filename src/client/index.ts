@@ -20,6 +20,7 @@ import { PodmanTerminalTitle } from "./podman-terminal-title.js";
 import { BUILTIN_PROMPT_PREFIX, ReadOnlyApprovalPanel } from "./read-only-approval.js";
 import {
   PODMAN_TERMINAL_KIND,
+  PODMAN_TERMINAL_SHORTCUT_DEFAULTS,
   PODMAN_TERMINAL_TAB_ID,
   type PodmanTerminalParams,
 } from "./terminal-tab.js";
@@ -228,23 +229,7 @@ export function apply(ctx: ClientContext): void {
         id: "podman.terminal.new" as ShortcutCommandId,
         label: () => t("terminalShortcut"),
         aliases: ["new podman terminal"],
-        defaults: {
-          "desktop:linux": {
-            code: "Backquote",
-            modifiers: ["control", "shift"],
-          },
-          "web:linux": { code: "Backquote", modifiers: ["control", "shift"] },
-          "desktop:macos": {
-            code: "Backquote",
-            modifiers: ["control", "shift"],
-          },
-          "web:macos": { code: "Backquote", modifiers: ["control", "shift"] },
-          "desktop:windows": {
-            code: "Backquote",
-            modifiers: ["control", "shift"],
-          },
-          "web:windows": { code: "Backquote", modifiers: ["control", "shift"] },
-        },
+        defaults: PODMAN_TERMINAL_SHORTCUT_DEFAULTS,
         regions: ["page", "editable", "terminal"],
         modals: [],
         resolve: ({ target }) => {

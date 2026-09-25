@@ -20,10 +20,6 @@ import { installContainerPreferences } from "./preferences.js";
 import { registerCardRoute } from "./card-route.js";
 import { WorkspaceResolver, normalizeToolError } from "./workspace-binding.js";
 
-function withTrailingSlash(value: string): string {
-  return value.endsWith("/") ? value : `${value}/`;
-}
-
 export const name = "podman";
 
 export const inject = ["tools", "workspaceRegistry"];
@@ -33,7 +29,6 @@ export interface PluginConfig {
   defaultImage?: string;
   projectsRoot?: string;
   controlToken?: string;
-  imagePrefix?: string;
 }
 
 export function apply(ctx: any, config: PluginConfig = {}): void {
@@ -110,9 +105,6 @@ export function apply(ctx: any, config: PluginConfig = {}): void {
     { prepend: true },
   );
   ensurePodmanOpsPreset(ctx);
-  const imagePrefix = withTrailingSlash(
-    config.imagePrefix ?? process.env.DSH_PODMAN_IMAGE_PREFIX ?? "localhost/dsh-podman/",
-  );
   const resolver = new WorkspaceResolver(
     {
       socketsRoot:

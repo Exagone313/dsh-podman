@@ -18,6 +18,7 @@ import {
   writeGuestFile,
 } from "./guest-rpc.js";
 import { inferMountKind, mountsFromInput, projectMountDestinationReason } from "./mount-input.js";
+import { mergeDefaultEnv } from "./container-env.js";
 import { publicContainer, publicDaemon, publicImage, publicMount } from "./public.js";
 import { grpc } from "./grpc/runtime-client.js";
 import { defaultMountMode, mountKindToProto, mountModeToProto } from "./mount-enums.js";
@@ -89,6 +90,34 @@ function managedEnv(
 ): Record<string, string> {
   const managed = ctx?.get?.("shellEnv")?.collect?.(exec) ?? {};
   return { ...ENV_OVERRIDES, ...(env as Record<string, string> | undefined), ...managed };
+}
+
+// startContainerEnv resolves the environment a `container_start` request
+// carries. The caller's map wins over the defaults; a container that does not
+// exist yet is a creation and gets the defaults alone; one that already exists
+// keeps the environment it has (the orchestrator preserves a stored env when
+// the request omits one, so nothing has to be sent).
+async function startContainerEnv(
+  resolver: WorkspaceResolver,
+  slug: string,
+  input: any,
+): Promise<Record<string, string> | undefined> {
+  const defaults = resolver.getConfig().containerEnv;
+  if (input.env !== undefined) {
+    return mergeDefaultEnv(defaults, input.env as Record<string, string>);
+  }
+  if (defaults === undefined || Object.keys(defaults).length === 0) return undefined;
+  const result = await resolver.control<{ containers?: any[] }>(
+    "listContainers",
+    {},
+  );
+  const name = input.container === "" ? "default" : input.container;
+  const exists = (result.containers ?? []).some(
+    (row: any) => row.workspaceSlug === slug && row.containerName === name,
+  );
+  if (exists) return undefined;
+  const env = mergeDefaultEnv(defaults, undefined);
+  return Object.keys(env).length === 0 ? undefined : env;
 }
 
 // containerTarget resolves a container-scoped file target through the plugin's
@@ -209,12 +238,14 @@ export const toolHandlers: Record<
   },
   container_start: async (resolver, input, exec) => {
     const mounts = mountsFromInput(input.mounts, resolver.getConfig().projectsRoot);
+    const slug = await sessionWorkspaceSlug(resolver, currentCwd(exec));
+    const env = await startContainerEnv(resolver, slug, input);
     const row = await resolver.control("startContainer", {
-      workspaceSlug: await sessionWorkspaceSlug(resolver, currentCwd(exec)),
+      workspaceSlug: slug,
       container: input.container,
       imageId: input.image,
       ...(mounts === undefined ? {} : { mounts }),
-      ...(input.env !== undefined ? { env: input.env } : {}),
+      ...(env === undefined ? {} : { env }),
       ...(input.secretEnv !== undefined ? { secretEnv: input.secretEnv } : {}),
       ...(input.paths !== undefined ? { paths: input.paths } : {}),
     });

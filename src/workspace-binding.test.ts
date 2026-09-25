@@ -354,6 +354,46 @@ test("resolve refreshes a binding whose token the agent rejects", async () => {
   }
 });
 
+test("the auto-created workspace seeds the default environment", async () => {
+  const { socketsRoot, createRequests, stop } = await startControlServer();
+  try {
+    const resolver = new WorkspaceResolver(
+      {
+        socketsRoot,
+        defaultImage: "arch",
+        projectsRoot: "/projects",
+        controlToken: "",
+        containerEnv: { GIT_AUTHOR_NAME: "Elouan" },
+      },
+      { resolveByPath: () => ({ id: SLUG, path: "/projects/team" }) } as any,
+    );
+    await resolver.resolve("/projects/team");
+    assert.equal(createRequests.length, 1);
+    assert.deepEqual(createRequests[0].env, { GIT_AUTHOR_NAME: "Elouan" });
+  } finally {
+    stop();
+  }
+});
+
+test("the auto-created workspace omits env without defaults", async () => {
+  const { socketsRoot, createRequests, stop } = await startControlServer();
+  try {
+    const resolver = new WorkspaceResolver(
+      {
+        socketsRoot,
+        defaultImage: "arch",
+        projectsRoot: "/projects",
+        controlToken: "",
+      },
+      { resolveByPath: () => ({ id: SLUG, path: "/projects/team" }) } as any,
+    );
+    await resolver.resolve("/projects/team");
+    assert.deepEqual(createRequests[0].env, {});
+  } finally {
+    stop();
+  }
+});
+
 test("containerBinding exposes the session directory only when a project mount covers it", async () => {
   const mounted = await startControlServer([{
     workspaceSlug: SLUG,

@@ -219,6 +219,108 @@ test("container start and recreate forward PATH additions", async () => {
   assert.deepEqual(recreated.paths, ["/opt/bin"]);
 });
 
+test("container_start seeds the default environment into a new container", async () => {
+  const calls: Array<[string, any]> = [];
+  const resolver = {
+    registry: { resolveByPath: async () => ({ id: WORKSPACE_ID }) },
+    getConfig: () => ({
+      projectsRoot: "/projects",
+      containerEnv: { GIT_AUTHOR_NAME: "Elouan" },
+    }),
+    control: async (method: string, request: unknown) => {
+      calls.push([method, request as any]);
+      if (method === "listContainers") return { containers: [] };
+      return { containerName: "web", status: "running" };
+    },
+  } as never;
+  const exec = { agent: { session: { header: { cwd: "/projects/team" } } } };
+  await toolHandlers.container_start(
+    resolver,
+    { container: "web", image: "img-1" },
+    exec,
+  );
+  assert.deepEqual(
+    calls.map(([method]) => method),
+    ["listContainers", "startContainer"],
+  );
+  const start = calls.find(([method]) => method === "startContainer")!;
+  assert.deepEqual(start[1].env, { GIT_AUTHOR_NAME: "Elouan" });
+});
+
+test("container_start keeps an existing container's environment", async () => {
+  const calls: Array<[string, any]> = [];
+  const resolver = {
+    registry: { resolveByPath: async () => ({ id: WORKSPACE_ID }) },
+    getConfig: () => ({
+      projectsRoot: "/projects",
+      containerEnv: { GIT_AUTHOR_NAME: "Elouan" },
+    }),
+    control: async (method: string, request: unknown) => {
+      calls.push([method, request as any]);
+      if (method === "listContainers") {
+        return {
+          containers: [
+            { workspaceSlug: WORKSPACE_ID, containerName: "web", env: { KEEP: "1" } },
+          ],
+        };
+      }
+      return { containerName: "web", status: "running" };
+    },
+  } as never;
+  const exec = { agent: { session: { header: { cwd: "/projects/team" } } } };
+  await toolHandlers.container_start(
+    resolver,
+    { container: "web", image: "img-1" },
+    exec,
+  );
+  const start = calls.find(([method]) => method === "startContainer")!;
+  assert.equal("env" in start[1], false, "a stored environment must survive a start");
+});
+
+test("container_start lets the caller's environment win over the defaults", async () => {
+  const calls: Array<[string, any]> = [];
+  const resolver = {
+    registry: { resolveByPath: async () => ({ id: WORKSPACE_ID }) },
+    getConfig: () => ({
+      projectsRoot: "/projects",
+      containerEnv: { GIT_AUTHOR_NAME: "Elouan", GIT_AUTHOR_EMAIL: "exa@elou.world" },
+    }),
+    control: async (method: string, request: unknown) => {
+      calls.push([method, request as any]);
+      return { containerName: "web", status: "running" };
+    },
+  } as never;
+  const exec = { agent: { session: { header: { cwd: "/projects/team" } } } };
+  await toolHandlers.container_start(
+    resolver,
+    { container: "web", image: "img-1", env: { GIT_AUTHOR_NAME: "Other" } },
+    exec,
+  );
+  assert.deepEqual(calls.map(([method]) => method), ["startContainer"]);
+  assert.deepEqual(calls[0][1].env, {
+    GIT_AUTHOR_NAME: "Other",
+    GIT_AUTHOR_EMAIL: "exa@elou.world",
+  });
+});
+
+test("container_recreate never injects the default environment", async () => {
+  const calls: Array<[string, any]> = [];
+  const resolver = {
+    registry: { resolveByPath: async () => ({ id: WORKSPACE_ID }) },
+    getConfig: () => ({
+      projectsRoot: "/projects",
+      containerEnv: { GIT_AUTHOR_NAME: "Elouan" },
+    }),
+    control: async (method: string, request: unknown) => {
+      calls.push([method, request as any]);
+      return { containerName: "default", status: "running" };
+    },
+  } as never;
+  const exec = { agent: { session: { header: { cwd: "/projects/team" } } } };
+  await toolHandlers.container_recreate(resolver, { container: "default" }, exec);
+  assert.equal("env" in calls[0][1], false, "a recreate stores what it is given");
+});
+
 test("resolveGuestPath resolves relative paths and refuses traversal", () => {
   assert.equal(resolveGuestPath("/abs/file", "/projects/team"), "/abs/file");
   assert.equal(resolveGuestPath("README.md", "/projects/team"), "/projects/team/README.md");

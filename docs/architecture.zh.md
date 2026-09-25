@@ -148,7 +148,6 @@ Podman 页面通过 harness API 路径（`/api/podman/card`）之下的一个已
   `image_rebuild` / `image_rebuild_all` / volume / secret / secret-env / mount
   操作），并返回要显示的提示。
 
-因此插件自身的配置中**只保留真正的偏好**：默认镜像、sockets
-根目录，以及 Podman 页面的当前语言（`uiLocale`，以便主机以会话语言呈现审批文本——参见[审批](usage.zh.md#审批)）。它们是
+因此插件自身的配置中**只保留真正的偏好**：默认镜像、默认环境变量，以及 Podman 页面的当前语言（`uiLocale`，以便主机以会话语言呈现审批文本——参见[审批](usage.zh.md#审批)）。它们是
 volatile 字段，修改后无需重新加载插件即可生效。orchestrator
 派生的任何内容都不会被持久化，也不会有命令经由配置文档往返。

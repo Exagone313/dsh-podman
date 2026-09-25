@@ -20,10 +20,7 @@ export type ContainerPluginKey =
   | "copyFailed"
   | "reload"
   | "notice"
-  | "configTitle"
   | "defaultImage"
-  | "socketsRoot"
-  | "projectsRoot"
   | "defaultImageHint"
   | "defaultEnvironment"
   | "defaultEnvironmentHint"
@@ -224,10 +221,7 @@ export const en: Record<ContainerPluginKey, string> = {
   copyFailed: "Copy failed",
   reload: "Reload this view",
   notice: "Notice",
-  configTitle: "Configuration",
   defaultImage: "Default image",
-  socketsRoot: "Sockets root",
-  projectsRoot: "Projects root",
   defaultImageHint: "Image used when a workspace has no image of its own.",
   defaultEnvironment: "Default environment",
   defaultEnvironmentHint:
@@ -434,10 +428,7 @@ export const zh: Record<ContainerPluginKey, string> = {
   copyFailed: "复制失败",
   reload: "刷新此视图",
   notice: "提示",
-  configTitle: "配置",
   defaultImage: "默认镜像",
-  socketsRoot: "套接字根目录",
-  projectsRoot: "项目根目录",
   defaultImageHint: "工作区没有自带镜像时使用的镜像。",
   defaultEnvironment: "默认环境变量",
   defaultEnvironmentHint:

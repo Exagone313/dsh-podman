@@ -11,7 +11,6 @@ test("every preference is a volatile field with an empty default", () => {
   const config = (Config as any)({});
   const expected: Array<[string, unknown]> = [
     ["defaultImage", ""],
-    ["socketsRoot", ""],
     ["uiLocale", ""],
     ["containerEnv", {}],
   ];
@@ -25,22 +24,22 @@ test("every preference is a volatile field with an empty default", () => {
 });
 
 test("the resolver reads its config through the live reader", () => {
-  let socketsRoot = "/run/one";
+  let defaultImage = "archlinux";
   const resolver = new WorkspaceResolver(
     () => ({
-      socketsRoot,
-      defaultImage: "archlinux",
+      socketsRoot: "/run/dsh-podman",
+      defaultImage,
       projectsRoot: "/projects",
       controlToken: "token",
       containerEnv: {},
     }),
     undefined,
   );
-  assert.equal(resolver.getConfig().socketsRoot, "/run/one");
-  socketsRoot = "/run/two";
+  assert.equal(resolver.getConfig().defaultImage, "archlinux");
+  defaultImage = "alpine";
   assert.equal(
-    resolver.getConfig().socketsRoot,
-    "/run/two",
+    resolver.getConfig().defaultImage,
+    "alpine",
     "a volatile change must be visible without rebuilding the resolver",
   );
 });

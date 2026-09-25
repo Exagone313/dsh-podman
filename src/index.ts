@@ -94,9 +94,9 @@ export function apply(ctx: any, config: Config): void {
     // A reader, not a snapshot: every preference is a volatile config field an
     // edit commits in place, so the resolver observes changes without a reload.
     () => ({
-      socketsRoot: config.socketsRoot.get() ||
-        process.env.DSH_PODMAN_SOCKETS_ROOT ||
-        "/run/dsh-podman",
+      // Both roots are env-only, so the plugin and the orchestrator always
+      // resolve the same paths.
+      socketsRoot: process.env.DSH_PODMAN_SOCKETS_ROOT ?? "/run/dsh-podman",
       defaultImage: config.defaultImage.get() || "archlinux",
       projectsRoot: process.env.DSH_PODMAN_PROJECTS_ROOT ?? "/projects",
       controlToken: process.env.DSH_PODMAN_ORCHESTRATOR_TOKEN ?? "",

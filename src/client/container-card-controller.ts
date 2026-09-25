@@ -24,7 +24,6 @@ export const CONTAINER_NS = "podman";
 // The preferences the card edits, mirroring the host's settings namespace.
 export interface ContainerSettings {
   defaultImage: string;
-  socketsRoot: string;
   uiLocale?: string;
   // The environment seeded into a container when it is created.
   containerEnv?: Record<string, string>;
@@ -67,8 +66,6 @@ export interface CardState {
   orchestratorVersion: string;
   versionState: "ok" | "minor-mismatch" | "major-mismatch";
   defaultImage: string;
-  socketsRoot: string;
-  socketsRootDraft: string;
   // The default container environment, seeded into new containers (see
   // container-env.ts).
   containerEnv: Record<string, string>;
@@ -120,9 +117,6 @@ export interface ContainerCardFace {
   setSecret: (name: string, value: string) => void;
   addContainerSecret: (workspace: string, envVar: string, secret: string) => void;
   removeContainerSecret: (workspace: string, envVar: string) => void;
-  editSocketsRoot: (text: string) => void;
-  saveSocketsRoot: () => void;
-  discardSocketsRoot: () => void;
   // Replace the default environment (the git popup and the generic editor both
   // go through this).
   saveContainerEnv: (env: Record<string, string>) => void;
@@ -146,7 +140,7 @@ const EMPTY_SNAPSHOT: CardSnapshot = {
   caches: [],
 };
 
-type DraftableField = "defaultImage" | "socketsRoot";
+type DraftableField = "defaultImage";
 
 // The card reads its live state from the host route and its preferences from
 // the settings namespace. A command is one request, so nothing is re-delivered
@@ -193,8 +187,6 @@ export class ContainerCardController {
       orchestratorVersion: this.snapshot.orchestratorVersion,
       versionState: this.snapshot.versionState,
       defaultImage: value?.defaultImage ?? "",
-      socketsRoot: value?.socketsRoot ?? "",
-      socketsRootDraft: this.draft("socketsRoot", value?.socketsRoot ?? ""),
       containerEnv: value?.containerEnv ?? {},
       projectsRoot: this.snapshot.projectsRoot,
       ...(this.directoryPicker === undefined ? {} : { directoryPicker: this.directoryPicker }),
@@ -400,9 +392,6 @@ export class ContainerCardController {
           container: "default",
           secretEnvName: envVar,
         }),
-      editSocketsRoot: (text) => this.edit("socketsRoot", text),
-      saveSocketsRoot: () => this.save("socketsRoot"),
-      discardSocketsRoot: () => this.discard("socketsRoot"),
       saveContainerEnv: (env) => {
         void this.scope.set("containerEnv", env);
       },

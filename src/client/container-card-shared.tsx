@@ -6,66 +6,10 @@ import { hint } from "./container-card-styles.js";
 import { type MountInput, type ProjectMountView } from "./container-card-controller.js";
 import { type ContainerPluginKey } from "./locales.js";
 import { Button, Input, Modal, type StateDotState } from "@deepseek-ai/dsh-client-ui-primitives";
-import { type ReactNode, useId, useState } from "react";
+import { type ReactNode, useState } from "react";
 
 export function containerStateDot(status: string): StateDotState {
   return status === "running" ? "done" : "error";
-}
-
-export function ConfigField(props: {
-  t: (key: ContainerPluginKey) => string;
-  label: string;
-  value: string;
-  current: string;
-  writable: boolean;
-  onChange: (text: string) => void;
-  onSave: () => void;
-  onDiscard: () => void;
-}): ReactNode {
-  const { t, label, value, current, writable, onChange, onSave, onDiscard } = props;
-  const id = useId();
-  const dirty = value !== current;
-  return (
-    <div
-      style={{
-        display: "flex",
-        flexWrap: "wrap",
-        alignItems: "center",
-        gap: "8px",
-        padding: "8px 0",
-      }}
-    >
-      <label
-        htmlFor={id}
-        style={{ fontSize: "13px", color: "var(--dsw-alias-label-secondary)", minWidth: "110px" }}
-      >
-        {label}
-      </label>
-      <Input
-        id={id}
-        value={value}
-        disabled={!writable}
-        onChange={(event) => onChange(event.target.value)}
-        style={{ width: "200px" }}
-      />
-      <Button
-        variant="outline"
-        size="sm"
-        disabled={!writable || !dirty}
-        onClick={onSave}
-      >
-        {t("save")}
-      </Button>
-      <Button
-        variant="ghost"
-        size="sm"
-        disabled={!dirty}
-        onClick={onDiscard}
-      >
-        {t("discard")}
-      </Button>
-    </div>
-  );
 }
 
 export function Field(props: {

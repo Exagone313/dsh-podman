@@ -21,20 +21,18 @@ SPDX-License-Identifier: MIT
 | `DSH_PODMAN_PROJECTS_ROOT`      | `/projects`       | 用于将会话工作目录解析为工作区的项目根目录                                |
 | `DSH_PODMAN_SOCKETS_ROOT`       | `/run/dsh-podman` | 插件据此推导 orchestrator 控制套接字（`orchestrator.sock`）的套接字根目录 |
 
-`projectsRoot` 仅来自环境变量，以确保与 orchestrator 一致；`controlToken`
+`projectsRoot` 与 `socketsRoot` 仅来自环境变量，以确保与 orchestrator 一致；`controlToken`
 来自插件 `config` 或 `DSH_PODMAN_ORCHESTRATOR_TOKEN`。
 
 ## 插件（dsh 客户端）— UI 设置
 
-可在侧边栏 **插件** 面板 → **已安装** 的 **dsh-podman** 页面内编辑（配置部分和镜像的 Set-default
-弹窗）：
+可在侧边栏 **插件** 面板 → **已安装** 的 **dsh-podman** 页面内编辑（镜像的 Set-default 弹窗和**默认环境变量**区块）：
 
-| 设置           | 默认值                    | 说明                                                                                                                 |
-| -------------- | ------------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| `defaultImage` | `archlinux`               | 用于新工作区的镜像**短名称**；可通过 Set-default 弹窗从基础镜像和自定义镜像中选择                                    |
-| `socketsRoot`  | `DSH_PODMAN_SOCKETS_ROOT` | 插件用于连接 orchestrator 的套接字根目录；回退到环境变量                                                             |
-| `uiLocale`     | `""`                      | 插件管理的当前语言，由浏览器客户端写入，以便主机以会话语言呈现审批文本（见[审批](usage.zh.md#审批)）；不可由用户编辑 |
-| `containerEnv` | `{}`                      | 容器创建时注入的默认环境变量；见[默认环境变量](#默认环境变量)                                                        |
+| 设置           | 默认值      | 说明                                                                                                                 |
+| -------------- | ----------- | -------------------------------------------------------------------------------------------------------------------- |
+| `defaultImage` | `archlinux` | 用于新工作区的镜像**短名称**；可通过 Set-default 弹窗从基础镜像和自定义镜像中选择                                    |
+| `uiLocale`     | `""`        | 插件管理的当前语言，由浏览器客户端写入，以便主机以会话语言呈现审批文本（见[审批](usage.zh.md#审批)）；不可由用户编辑 |
+| `containerEnv` | `{}`        | 容器创建时注入的默认环境变量；见[默认环境变量](#默认环境变量)                                                        |
 
 ### 默认环境变量
 

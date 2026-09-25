@@ -377,8 +377,9 @@ image build is in progress.
 ## Podman terminal
 
 The plugin owns a **Podman terminal** right-Sidebar tab, separate from dsh's own
-Terminal tab. Open it from the right Sidebar's new-tab guide, or press
-**Ctrl+Shift+`**. It always runs in the session's own workspace — each workspace
+Terminal tab. Open it from the right Sidebar's new-tab guide — the card is
+**New terminal** — or press **Ctrl+Shift+`**; the tab is named after the shell it
+runs (`bash`,`sh`, …). It always runs in the session's own workspace — each workspace
 has its own side panes and terminals — so the start form only asks for a
 container and then a shell, and a shell can run in the default container or in a
 named one. If the session's directory names no known workspace the form reports

@@ -194,7 +194,11 @@ export function apply(ctx: ClientContext): void {
     () =>
       ctx.slots.inject("sidebar.right.pane.tab.title", () =>
         ctx.slots.register(
-          { name: "sidebar.right.pane.tab.title", key: PODMAN_TERMINAL_TAB_ID },
+          {
+            name: "sidebar.right.pane.tab.title",
+            key: PODMAN_TERMINAL_TAB_ID,
+            inject: (sessionId) => ({ sessionId }),
+          },
           PodmanTerminalTitle,
         )),
     "podman: terminal title",

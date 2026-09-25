@@ -13,6 +13,8 @@ import { toolHandlers } from "./tool-handlers.js";
 import { defineTool, TOOL_DESCRIPTIONS, toolOutput, TOOLS } from "./tool-schemas.js";
 import { toolCallView, toolResultView } from "./tool-views.js";
 import { registerCardRoute } from "./card-route.js";
+import { registerTerminalRoutes } from "./terminal-route.js";
+import { TerminalSessions } from "./terminal-sessions.js";
 import { type Config } from "./settings-schema.js";
 import { normalizeToolError, WorkspaceResolver } from "./workspace-binding.js";
 
@@ -132,6 +134,11 @@ export function apply(ctx: any, config: Config): void {
     );
   });
   registerCardRoute(ctx, resolver, ctx.workspaceRegistry, readLocale);
+  // The Podman terminal tab talks to guest ptys through its own routes; the
+  // registry keeps shells alive while the browser is away.
+  const terminalSessions = new TerminalSessions({ resolver });
+  ctx.effect(() => () => terminalSessions.dispose(), "podman: terminal sessions cleanup");
+  registerTerminalRoutes(ctx, resolver, terminalSessions, ctx.workspaceRegistry);
 }
 
 function registerTools(ctx: any, resolver: WorkspaceResolver): void {

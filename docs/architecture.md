@@ -71,10 +71,10 @@ model reads the artifact back with the container file tools instead of a host
 path the container cannot reach.
 
 A workspace's pod is torn down when its last container is removed, or directly
-through `RemoveWorkspace` (the Podman page's **Remove pod** action), which
-stops the containers' daemons, removes the pod and its containers, cleans their
-socket directories, and drops the stored workspace. Volumes, secrets, and
-project data are left untouched.
+through `RemoveWorkspace` (the Podman page's **Remove pod** action), which stops
+the containers' daemons, removes the pod and its containers, cleans their socket
+directories, and drops the stored workspace. Volumes, secrets, and project data
+are left untouched.
 
 Beyond project mounts, a container can mount named volumes (prefixed
 `DSH_PODMAN_VOLUME_PREFIX`, default `dsh-podman-`, and auto-created by podman on
@@ -174,10 +174,10 @@ lists only the custom images, so it never names a base the call had to ensure.
 
 When a host cache is configured (`DSH_PODMAN_HOST_*_CACHE`, mounted into both
 the build container and the orchestrator), builds reuse downloaded packages. The
-Podman page reports each cache's size and can clean it — keep the newest
-version of every package, or empty the cache. The builder serializes a cleanup
-against builds with a read/write lock, so a cleanup never deletes a package out
-from under a running build.
+Podman page reports each cache's size and can clean it — keep the newest version
+of every package, or empty the cache. The builder serializes a cleanup against
+builds with a read/write lock, so a cleanup never deletes a package out from
+under a running build.
 
 ## Podman page transport
 
@@ -204,8 +204,8 @@ The Podman terminal tab talks to guest ptys through its own authenticated routes
 on the same connection service (`/api/podman/terminal`,
 `/api/podman/terminal/shells`, `/api/podman/terminal/retained`). The open route
 streams newline-delimited JSON frames (ready, snapshot, base64 output, title,
-exit, error, detached) and takes control requests (input, resize, rename,
-close) over a POST; the carrier applies the same Host/Origin fence and browser
+exit, error, detached) and takes control requests (input, resize, rename, close)
+over a POST; the carrier applies the same Host/Origin fence and browser
 authentication as the card route.
 
 Each terminal is keyed by `(sessionId, tabId)` and retained by the host: the
@@ -219,6 +219,6 @@ offered, most capable first — the order mirrors the harness's own candidate
 preference and ends with the minimal POSIX shells, and the first entry is the
 client's default. The tab's workspace is resolved by the host from the session's
 own working directory — never chosen, shown or defaulted in the browser: a
-session outside every workspace is reported, and the client only uses the project
-name and workspace slug it is given. The selected path is re-verified before the
-shell starts.
+session outside every workspace is reported, and the client only uses the
+project name and workspace slug it is given. The selected path is re-verified
+before the shell starts.

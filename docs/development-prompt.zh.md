@@ -8,13 +8,16 @@ SPDX-License-Identifier: MIT
 
 本页给出用于构建开发镜像、创建工具链卷并把工作区容器接好的提示词，参见[开发](development.zh.md#开发容器工具链)。其中没有任何东西是现成的。
 
-把下面的文本块粘贴到已接入该工作区的 dsh 会话中。它可以反复运行：先检查工作区现状，只创建、挂载或修改缺失或不同的部分。重建容器会终止其守护进程并清空
+把下面的文本块粘贴到已接入该工作区的 dsh
+会话中。它可以反复运行：先检查工作区现状，只创建、挂载或修改缺失或不同的部分。重建容器会终止其守护进程并清空
 tmpfs，因此在需要变更时请预期这一点。
 
 以下步骤仍需在宿主机上手动完成，提示词只会请求它们，而不会自行尝试：
 
-- 重建 dsh、orchestrator 和 guest-agent 镜像（`make image`），这需要宿主机上的仓库检出与 podman；
-- 安装或编辑 `~/.config/containers/systemd/` 下的 Quadlet 单元，随后执行 `systemctl --user daemon-reload`
+- 重建 dsh、orchestrator 和 guest-agent
+  镜像（`make image`），这需要宿主机上的仓库检出与 podman；
+- 安装或编辑 `~/.config/containers/systemd/` 下的 Quadlet 单元，随后执行
+  `systemctl --user daemon-reload`
   并重启（见[安装开发构建](development.zh.md#安装开发构建)）。
 
 下面的提示词与英文页保持一致，原样粘贴即可。

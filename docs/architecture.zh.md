@@ -38,8 +38,8 @@ pod 中创建或替换容器；空的 `container`
 指向默认容器，其他名称会被校验）、`RecreateContainer{workspace_slug, container, image_id, mounts, env, paths}`（停止、删除并重新创建容器，可选择使用新镜像、项目挂载、环境或
 PATH 附加项；空的 `image_id`
 保留工作区当前的镜像）、`RemoveContainer`、`AddContainerMount`、`UpdateContainerMount`、`RemoveContainerMount`、`SetContainerPaths`、`AddContainerSecret`
-和
-`RemoveContainerSecret`。该服务还公开支撑 Podman 页面的工作区、卷、机密、镜像（构建、重建、删除以及拉取基础镜像）和缓存（列出与清理）操作，以及
+和 `RemoveContainerSecret`。该服务还公开支撑 Podman
+页面的工作区、卷、机密、镜像（构建、重建、删除以及拉取基础镜像）和缓存（列出与清理）操作，以及
 `GetVersion`。
 
 ## 工作区与 pod
@@ -95,7 +95,8 @@ API，运行并监督后台**守护进程**，并读取和写入文件。每个 
 
 Guest API 不提供监视器，因此插件的 `ctx.fs` 提供者对 `watch` 返回
 `FS_IO_ERROR`（`Filesystem watching is not supported by this provider.`）。harness
-的工作区文件变更流因此返回 `workspace-file/watch-unsupported`，浏览器的文件树改为按需刷新，而非实时刷新——与
+的工作区文件变更流因此返回
+`workspace-file/watch-unsupported`，浏览器的文件树改为按需刷新，而非实时刷新——与
 harness 自带的 SSH 文件系统提供者对远程路径采取的做法一致。
 
 命令和守护进程继承 guest agent 的环境，减去保留的 `DSH_PODMAN` 命名空间：agent
@@ -139,7 +140,8 @@ API，因此构建不会向 orchestrator 的状态目录写入任何内容。
 只列出自定义镜像，因此不会包含本次调用所确保的基础镜像。
 
 配置了主机缓存时（`DSH_PODMAN_HOST_*_CACHE`，同时挂载到构建容器和 orchestrator
-中），构建会复用已下载的软件包。Podman 页面会报告每个缓存的大小并可清理它——保留每个软件包的最新版本，或清空缓存。构建器用读写锁将清理与构建串行化，因此清理绝不会在构建进行时删除其正在使用的软件包。
+中），构建会复用已下载的软件包。Podman
+页面会报告每个缓存的大小并可清理它——保留每个软件包的最新版本，或清空缓存。构建器用读写锁将清理与构建串行化，因此清理绝不会在构建进行时删除其正在使用的软件包。
 
 ## Podman 页面传输
 
@@ -153,12 +155,25 @@ Podman 页面通过 harness API 路径（`/api/podman/card`）之下的一个已
   `image_rebuild` / `image_rebuild_all` / volume / secret / secret-env / mount
   操作），并返回要显示的提示。
 
-因此插件自身的配置中**只保留真正的偏好**：默认镜像、默认环境变量，以及 Podman 页面的当前语言（`uiLocale`，以便主机以会话语言呈现审批文本——参见[审批](usage.zh.md#审批)）。它们是
+因此插件自身的配置中**只保留真正的偏好**：默认镜像、默认环境变量，以及 Podman
+页面的当前语言（`uiLocale`，以便主机以会话语言呈现审批文本——参见[审批](usage.zh.md#审批)）。它们是
 volatile 字段，修改后无需重新加载插件即可生效。orchestrator
 派生的任何内容都不会被持久化，也不会有命令经由配置文档往返。
 
 ## Podman 终端传输
 
-Podman 终端标签页通过自身在同一 connection 服务上的已认证路由（`/api/podman/terminal`、`/api/podman/terminal/shells`、`/api/podman/terminal/retained`）与 guest pty 通信。打开路由以换行分隔的 JSON 帧（ready、snapshot、base64 输出、title、exit、error、detached）进行流式传输，并通过 POST 接收控制请求（input、resize、rename、close）；承载层会像卡片路由一样应用 Host/Origin 校验和浏览器认证。
+Podman 终端标签页通过自身在同一 connection
+服务上的已认证路由（`/api/podman/terminal`、`/api/podman/terminal/shells`、`/api/podman/terminal/retained`）与
+guest pty 通信。打开路由以换行分隔的 JSON 帧（ready、snapshot、base64
+输出、title、exit、error、detached）进行流式传输，并通过 POST
+接收控制请求（input、resize、rename、close）；承载层会像卡片路由一样应用
+Host/Origin 校验和浏览器认证。
 
-每个终端以 `(sessionId, tabId)` 为键并由主机保留：没有浏览器接入时 guest pty 仍然存活，同时每个输出块都会写入一个无头终端模拟器，重新接入时回放其序列化屏幕，因此刷新页面不会丢失 shell 及其回滚缓冲。shell 探测在目标容器内进行：以 POSIX `command -v` 在该容器的 PATH（含部署的 PATH 追加项）中解析候选名称，并与 `/etc/shells` 和 `$SHELL` 合并，因此只提供容器确实拥有的 shell；顺序按能力从强到弱（与 harness 自身的候选顺序一致，最精简的 POSIX shell 排在最后），第一项即客户端的默认值。标签页的工作区由主机根据会话自身的工作目录解析，浏览器既不可选择、不会显示，也不会回退：会话不在任何工作区内时会直接提示，客户端只使用主机给出的项目名与工作区 slug。所选路径在启动前会再次校验。
+每个终端以 `(sessionId, tabId)` 为键并由主机保留：没有浏览器接入时 guest pty
+仍然存活，同时每个输出块都会写入一个无头终端模拟器，重新接入时回放其序列化屏幕，因此刷新页面不会丢失
+shell 及其回滚缓冲。shell 探测在目标容器内进行：以 POSIX `command -v` 在该容器的
+PATH（含部署的 PATH 追加项）中解析候选名称，并与 `/etc/shells` 和 `$SHELL`
+合并，因此只提供容器确实拥有的 shell；顺序按能力从强到弱（与 harness
+自身的候选顺序一致，最精简的 POSIX shell
+排在最后），第一项即客户端的默认值。标签页的工作区由主机根据会话自身的工作目录解析，浏览器既不可选择、不会显示，也不会回退：会话不在任何工作区内时会直接提示，客户端只使用主机给出的项目名与工作区
+slug。所选路径在启动前会再次校验。

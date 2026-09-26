@@ -1,7 +1,7 @@
 {
   "fmt": {
     "lineWidth": 80,
-    "proseWrap": "preserve",
+    "proseWrap": "always",
     "include": ["**/*.md", "src/**/*.ts", "src/**/*.tsx", "scripts/**/*.mjs"],
     "exclude": ["bin", "dist", "node_modules", "third_party"]
   }

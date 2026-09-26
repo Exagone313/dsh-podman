@@ -8,7 +8,8 @@ SPDX-License-Identifier: MIT
 
 环境变量使用 `DSH_PODMAN_`
 前缀，并按读取它们的组件分组列出（被多个组件读取的变量会出现在每个组件的对应章节中）。插件还在
-侧边栏 **插件** 面板 → **已安装** 中的 **dsh-podman** 页面中暴露了一些 **UI 设置**，与环境变量分开列出。
+侧边栏 **插件** 面板 → **已安装** 中的 **dsh-podman** 页面中暴露了一些 **UI
+设置**，与环境变量分开列出。
 
 插件按以下顺序读取其配置：先是 cordis 中的插件
 `config`，然后是下方列出的环境变量，最后是内置默认值。
@@ -21,12 +22,13 @@ SPDX-License-Identifier: MIT
 | `DSH_PODMAN_PROJECTS_ROOT`      | `/projects`       | 用于将会话工作目录解析为工作区的项目根目录                                |
 | `DSH_PODMAN_SOCKETS_ROOT`       | `/run/dsh-podman` | 插件据此推导 orchestrator 控制套接字（`orchestrator.sock`）的套接字根目录 |
 
-`projectsRoot` 与 `socketsRoot` 仅来自环境变量，以确保与 orchestrator 一致；`controlToken`
-来自插件 `config` 或 `DSH_PODMAN_ORCHESTRATOR_TOKEN`。
+`projectsRoot` 与 `socketsRoot` 仅来自环境变量，以确保与 orchestrator
+一致；`controlToken` 来自插件 `config` 或 `DSH_PODMAN_ORCHESTRATOR_TOKEN`。
 
 ## 插件（dsh 客户端）— UI 设置
 
-可在侧边栏 **插件** 面板 → **已安装** 的 **dsh-podman** 页面内编辑（镜像的 Set-default 弹窗和**默认环境变量**区块）：
+可在侧边栏 **插件** 面板 → **已安装** 的 **dsh-podman** 页面内编辑（镜像的
+Set-default 弹窗和**默认环境变量**区块）：
 
 | 设置           | 默认值      | 说明                                                                                                                 |
 | -------------- | ----------- | -------------------------------------------------------------------------------------------------------------------- |
@@ -36,13 +38,18 @@ SPDX-License-Identifier: MIT
 
 ### 默认环境变量
 
-`containerEnv` 是一个在容器创建时注入的环境变量映射：新工作区的默认容器与每个命名容器都会收到它。容器自身的
-`env` 按变量逐个优先，而重建容器时会完全采用传入的环境变量，因此在容器的环境变量里删除某一项并重建该容器，即可彻底移除它。
+`containerEnv`
+是一个在容器创建时注入的环境变量映射：新工作区的默认容器与每个命名容器都会收到它。容器自身的
+`env`
+按变量逐个优先，而重建容器时会完全采用传入的环境变量，因此在容器的环境变量里删除某一项并重建该容器，即可彻底移除它。
 
-Podman 页面中的**默认环境变量**区块使用与容器相同的键/值行进行编辑：增删变量后点击**保存**（或**放弃**）。**Git
-身份**用一份姓名与邮箱填入 `GIT_AUTHOR_NAME`、`GIT_AUTHOR_EMAIL`、`GIT_COMMITTER_NAME` 与
+Podman
+页面中的**默认环境变量**区块使用与容器相同的键/值行进行编辑：增删变量后点击**保存**（或**放弃**）。**Git
+身份**用一份姓名与邮箱填入
+`GIT_AUTHOR_NAME`、`GIT_AUTHOR_EMAIL`、`GIT_COMMITTER_NAME` 与
 `GIT_COMMITTER_EMAIL`；**应用默认环境变量**会把缺少的变量补给尚未具备它们的运行中容器，只重建这些容器，且绝不覆盖已有值；已停止的容器留待下次启动。每个工作区行也提供同样的操作，只作用于该工作区。保留的
-`DSH_PODMAN*` 键会被忽略，且这些值并非机密——机密请使用 `secretEnv`（见[机密](usage.zh.md#机密)）。
+`DSH_PODMAN*` 键会被忽略，且这些值并非机密——机密请使用
+`secretEnv`（见[机密](usage.zh.md#机密)）。
 
 ## Orchestrator（`dsh-podman-orchestrator`）
 

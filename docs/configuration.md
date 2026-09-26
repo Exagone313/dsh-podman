@@ -9,8 +9,8 @@ SPDX-License-Identifier: MIT
 Environment variables use the `DSH_PODMAN_` prefix and are listed under the
 component that reads them (a variable read by several components appears in each
 of their sections). The plugin also exposes a few **UI settings** on its
-**dsh-podman** page (sidebar **Plugins** panel → **Installed**),
-listed separately from env vars.
+**dsh-podman** page (sidebar **Plugins** panel → **Installed**), listed
+separately from env vars.
 
 The plugin reads its configuration from, in order: the plugin `config` in
 cordis, then the environment variables below, then built-in defaults.
@@ -29,9 +29,8 @@ cordis, then the environment variables below, then built-in defaults.
 
 ## Plugin (dsh client) — UI settings
 
-Editable on the **dsh-podman** page (sidebar **Plugins** panel →
-**Installed**; the images' Set-default popup and the **Default environment**
-section):
+Editable on the **dsh-podman** page (sidebar **Plugins** panel → **Installed**;
+the images' Set-default popup and the **Default environment** section):
 
 | Setting        | Default     | Description                                                                                                                                                                     |
 | -------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -48,9 +47,8 @@ environment it is given, so removing a value from a container's environment and
 recreating it removes that value for good.
 
 The Podman page's **Default environment** section edits it with the same
-key/value rows
-a container uses: add or remove variables, then **Save** (or **Discard**).
-**Git identity** fills `GIT_AUTHOR_NAME`, `GIT_AUTHOR_EMAIL`,
+key/value rows a container uses: add or remove variables, then **Save** (or
+**Discard**). **Git identity** fills `GIT_AUTHOR_NAME`, `GIT_AUTHOR_EMAIL`,
 `GIT_COMMITTER_NAME` and `GIT_COMMITTER_EMAIL` from one name and one email, and
 **Apply default environment variables** adds the missing values to the running
 containers that lack them, recreating only those and never overwriting an

@@ -19,8 +19,9 @@ SPDX-License-Identifier: MIT
 
 ## 构建
 
-前置要求：Go 1.27、Node ≥ 22、pnpm 12、Deno ≥ 2.9（用于格式化），以及（浏览器端所需的）发布在
-npm 上的 `@deepseek-ai/dsh-client-*` 包。
+前置要求：Go 1.27、Node ≥ 22、pnpm 12、Deno ≥
+2.9（用于格式化），以及（浏览器端所需的）发布在 npm 上的
+`@deepseek-ai/dsh-client-*` 包。
 
 ```sh
 pnpm install
@@ -46,10 +47,11 @@ make image          # build the orchestrator, guest-agent and dsh container imag
 
 `make image` 依赖 `third-party-licenses.pkg`：`download-licenses` 目标会运行
 `scripts/download-licenses` 中的 Go 收集器，它调用 `go-licenses save` 并将项目的
-MIT 许可证以及所有第三方 Go 许可证和 Apache `NOTICE` 汇总到 `third-party-licenses.pkg`
-中。该文件被 gitignore （从不提交），并被烘焙进 orchestrator 和 guest-agent
-镜像，位于 `/usr/share/licenses/dsh-podman/LICENSE`；由于工作区容器会挂载
-guest-agent 镜像，因此它也会随之进入每个工作区容器。
+MIT 许可证以及所有第三方 Go 许可证和 Apache `NOTICE` 汇总到
+`third-party-licenses.pkg` 中。该文件被 gitignore （从不提交），并被烘焙进
+orchestrator 和 guest-agent 镜像，位于
+`/usr/share/licenses/dsh-podman/LICENSE`；由于工作区容器会挂载 guest-agent
+镜像，因此它也会随之进入每个工作区容器。
 
 `pnpm test` 运行 `node --test dist/*.test.js`，因此它要求先运行 `pnpm build`
 （`test` 目标会处理这一点）。
@@ -88,7 +90,8 @@ make image  # build images
 
 ### 运行本地镜像（Quadlet）
 
-随附的单元会拉取发布镜像。把它们指向 `make image` 构建的镜像，就能把本地构建当作正式服务来运行；把原来的行注释掉，切回时只需改一行。
+随附的单元会拉取发布镜像。把它们指向 `make image`
+构建的镜像，就能把本地构建当作正式服务来运行；把原来的行注释掉，切回时只需改一行。
 
 在 `~/.config/containers/systemd/dsh.container` 中：
 
@@ -98,7 +101,9 @@ Image=localhost/dsh-podman-dsh:latest
 Environment=DSH_PODMAN_PLUGIN_SOURCE=%h/project/dsh-podman
 ```
 
-该单元已经把 `%h/project` 以只读方式挂载，因此检出在 `~/project` 下的仓库无需额外的 `Volume=`。`npm pack` 会把入口脚本要安装的归档放在 `package.json` 旁边（见[安装本地插件构建](#安装本地插件构建)）。
+该单元已经把 `%h/project` 以只读方式挂载，因此检出在 `~/project`
+下的仓库无需额外的 `Volume=`。`npm pack` 会把入口脚本要安装的归档放在
+`package.json` 旁边（见[安装本地插件构建](#安装本地插件构建)）。
 
 在 `~/.config/containers/systemd/dsh-podman-orchestrator.container` 中：
 
@@ -111,7 +116,8 @@ Environment=DSH_PODMAN_GUEST_AGENT_IMAGE=localhost/dsh-podman-guest-agent:latest
 ```
 
 发布引用带有版本标签，因此每个发布版本都有各自不同的镜像引用。本地构建则复用同一个
-`:latest` 标签；orchestrator 因此无法察觉 guest agent 已被重建，详见[更新工作区容器](#更新工作区容器)。
+`:latest` 标签；orchestrator 因此无法察觉 guest agent
+已被重建，详见[更新工作区容器](#更新工作区容器)。
 
 编辑单元后重新加载 systemd：
 
@@ -128,33 +134,41 @@ npm pack        # the plugin archive the dsh entrypoint installs
 systemctl --user restart dsh dsh-podman-orchestrator
 ```
 
-dsh 镜像会在容器启动时安装插件，因此重启 dsh 才会重新安装刚打包的归档；重启 orchestrator
-则会采用新的 orchestrator 与 guest-agent 镜像。
+dsh 镜像会在容器启动时安装插件，因此重启 dsh 才会重新安装刚打包的归档；重启
+orchestrator 则会采用新的 orchestrator 与 guest-agent 镜像。
 
 ### 更新工作区容器
 
-guest-agent 镜像会在容器创建时挂载进去，因此正在运行的容器仍使用它启动时的那份 agent。只有当容器的
-guest-agent 镜像引用与当前配置不一致时，orchestrator 才会自行重建该容器——带版本标签的发布引用会如此，本地
-`:latest` 标签则不会。重建 guest agent 之后，请自行重建容器：
+guest-agent 镜像会在容器创建时挂载进去，因此正在运行的容器仍使用它启动时的那份
+agent。只有当容器的 guest-agent 镜像引用与当前配置不一致时，orchestrator
+才会自行重建该容器——带版本标签的发布引用会如此，本地 `:latest` 标签则不会。重建
+guest agent 之后，请自行重建容器：
 
-- 在 Podman 页面（侧边栏 **插件** 面板 → **已安装** → **dsh-podman**）中按容器操作：**Recreate**（沿用当前镜像）或 **Recreate with image**；
+- 在 Podman 页面（侧边栏 **插件** 面板 → **已安装** →
+  **dsh-podman**）中按容器操作：**Recreate**（沿用当前镜像）或 **Recreate with
+  image**；
 - 或使用 `container_recreate`，作用于命名容器或默认容器。
 
 若要重建整个工作区，可在其行上使用 **Remove pod**（或 `RemoveWorkspace`）：pod
-及其所有容器都会被移除，下次接入时会重新创建 pod 与默认容器。重启这两个服务绝不会触及工作区容器，上述两种操作也都不会删除卷、机密或项目数据。
+及其所有容器都会被移除，下次接入时会重新创建 pod
+与默认容器。重启这两个服务绝不会触及工作区容器，上述两种操作也都不会删除卷、机密或项目数据。
 
 仍在运行旧镜像中 guest agent 的容器会让 dsh 为其 guest 套接字记录
-`rejected by server because of excess pings`。该消息无害（grpc-js 会退避并重连），重建该容器后即消失；若同样的消息出现在
-`orchestrator.sock` 上，则说明 orchestrator 服务仍在运行上一个镜像。
+`rejected by server because of excess pings`。该消息无害（grpc-js
+会退避并重连），重建该容器后即消失；若同样的消息出现在 `orchestrator.sock`
+上，则说明 orchestrator 服务仍在运行上一个镜像。
 
 ### 开发容器工具链
 
 工作区容器的根文件系统是只读且一次性的，因此贡献者构建所用的工具链需要工作区的一个卷。项目并不分发开发镜像：请自行构建一个自定义镜像——[设置提示词](development-prompt.zh.md)
-会以 `archlinux` 为父镜像构建 `dsh-podman-tooling`，包含 `go`、`nodejs-lts-jod`、`npm`、`deno`、`reuse` 和
-`python-chardet`——并为镜像无法保存的状态创建工作区卷：Go 与 npm 缓存、含 `go install` 工具的 `gopath`，
-以及 `package.json` 固定版本、Arch 仓库没有的 pnpm。
+会以 `archlinux` 为父镜像构建 `dsh-podman-tooling`，包含
+`go`、`nodejs-lts-jod`、`npm`、`deno`、`reuse` 和
+`python-chardet`——并为镜像无法保存的状态创建工作区卷：Go 与 npm 缓存、含
+`go install` 工具的 `gopath`， 以及 `package.json` 固定版本、Arch 仓库没有的
+pnpm。
 
-提示词会把该卷以 `dsh-podman-toolchain` 挂载到 `/opt/toolchain`（读写），并让容器的缓存都指向它，因此无需 source
+提示词会把该卷以 `dsh-podman-toolchain` 挂载到
+`/opt/toolchain`（读写），并让容器的缓存都指向它，因此无需 source
 任何脚本即可使用：
 
 | 容器设置    | 值                                                                                                                                                                                                                                                                                                                         |
@@ -162,17 +176,21 @@ guest-agent 镜像引用与当前配置不一致时，orchestrator 才会自行�
 | PATH 追加项 | `/opt/toolchain/gopath/bin`、`/opt/toolchain/npm-global/bin`、`/opt/toolchain/pnpm-home`                                                                                                                                                                                                                                   |
 | 环境变量    | `GOCACHE=/opt/toolchain/gocache`、`GOMODCACHE=/opt/toolchain/gomodcache`、`GOPATH=/opt/toolchain/gopath`、`npm_config_cache=/opt/toolchain/npm-cache`、`npm_config_prefix=/opt/toolchain/npm-global`、`PNPM_HOME=/opt/toolchain/pnpm-home`、`DENO_DIR=/opt/toolchain/deno-dir`、`GOENV=/opt/toolchain/home/.config/go/env` |
 
-在 Podman 页面（侧边栏 **插件** 面板 → **已安装** → **dsh-podman**）的[默认环境变量](configuration.zh.md#默认环境变量) → **Git 身份** 中设置一次提交身份，容器便无需
-`~/.gitconfig` 即可获得 `GIT_AUTHOR_*`/`GIT_COMMITTER_*`。
+在 Podman 页面（侧边栏 **插件** 面板 → **已安装** →
+**dsh-podman**）的[默认环境变量](configuration.zh.md#默认环境变量) → **Git
+身份** 中设置一次提交身份，容器便无需 `~/.gitconfig` 即可获得
+`GIT_AUTHOR_*`/`GIT_COMMITTER_*`。
 
-提示词会在 dsh 内完成上述全部配置，并且可以反复粘贴以修复工作区。Podman 存储受管卷时会加上 `DSH_PODMAN_VOLUME_PREFIX`
-前缀，因此该卷显示为 `dsh-podman-dsh-podman-toolchain`。
+提示词会在 dsh 内完成上述全部配置，并且可以反复粘贴以修复工作区。Podman
+存储受管卷时会加上 `DSH_PODMAN_VOLUME_PREFIX` 前缀，因此该卷显示为
+`dsh-podman-dsh-podman-toolchain`。
 
 ### 安装本地插件构建
 
 dsh 镜像会在容器启动时自行安装插件，因此本地开发构建通过将安装源指向 bind mount
 的包来使用。上面的 Quadlet 配置就是下面第一种形式，仓库目录本身
-（`%h/project/dsh-podman`）已经通过单元的只读 `%h/project` 挂载可见。先构建并打包插件：
+（`%h/project/dsh-podman`）已经通过单元的只读 `%h/project`
+挂载可见。先构建并打包插件：
 
 ```bash
 pnpm build

@@ -21,9 +21,9 @@ attempting them:
 
 - rebuilding the dsh, orchestrator and guest-agent images (`make image`), which
   needs the repository checkout and podman on the host;
-- installing or editing the Quadlet units under
-  `~/.config/containers/systemd/`, then `systemctl --user daemon-reload` and a
-  restart (see [Install development builds](development.md#install-development-builds)).
+- installing or editing the Quadlet units under `~/.config/containers/systemd/`,
+  then `systemctl --user daemon-reload` and a restart (see
+  [Install development builds](development.md#install-development-builds)).
 
 ```text
 Set up a development environment for this dsh-podman workspace. It must be safe

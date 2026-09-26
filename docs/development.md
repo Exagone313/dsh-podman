@@ -45,13 +45,13 @@ make download-licenses  # generate third-party-licenses.pkg from the project and
 make image          # build the orchestrator, guest-agent and dsh container images
 ```
 
-`make image` depends on `third-party-licenses.pkg`: the `download-licenses` target runs the
-Go collector in `scripts/download-licenses`, which shells out to
+`make image` depends on `third-party-licenses.pkg`: the `download-licenses`
+target runs the Go collector in `scripts/download-licenses`, which shells out to
 `go-licenses save` and gathers the project's MIT license plus every third-party
-Go license and Apache `NOTICE` into `third-party-licenses.pkg`. That file is gitignored
-(never committed) and is baked into the orchestrator and guest-agent images at
-`/usr/share/licenses/dsh-podman/LICENSE`; because workspace containers mount the
-guest-agent image, it also rides along into every workspace container.
+Go license and Apache `NOTICE` into `third-party-licenses.pkg`. That file is
+gitignored (never committed) and is baked into the orchestrator and guest-agent
+images at `/usr/share/licenses/dsh-podman/LICENSE`; because workspace containers
+mount the guest-agent image, it also rides along into every workspace container.
 
 `pnpm test` runs `node --test dist/*.test.js`, so it requires `pnpm build` to
 have run first (the `test` target handles this).
@@ -153,8 +153,8 @@ not with the local `:latest` tag. After rebuilding the guest agent, recreate the
 containers yourself:
 
 - from the Podman page (sidebar **Plugins** panel → **Installed** →
-  **dsh-podman**), per container: **Recreate** (same image) or
-  **Recreate with image**;
+  **dsh-podman**), per container: **Recreate** (same image) or **Recreate with
+  image**;
 - with `container_recreate`, for a named container or the default one.
 
 To rebuild a whole workspace instead, use **Remove pod** on its row (or

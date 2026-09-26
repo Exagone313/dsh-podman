@@ -114,9 +114,9 @@ New containers are also seeded with the plugin's **default environment** (the
 `containerEnv` setting), so a git identity can be configured once instead of per
 project — see [Default environment](configuration.md#default-environment). The
 Podman page's **Git identity** popup fills the four
-`GIT_AUTHOR_*`/`GIT_COMMITTER_*`
-variables from one name and one email, and **Apply default environment
-variables** adds them to the running containers that lack them.
+`GIT_AUTHOR_*`/`GIT_COMMITTER_*` variables from one name and one email, and
+**Apply default environment variables** adds them to the running containers that
+lack them.
 
 `container_bash` and `container_exec` run with the same command-visible
 environment as the built-in `bash`: the harness's managed `DSH_*` facts
@@ -218,14 +218,13 @@ Project mounts do not take a `destination`: a project directory is always
 mounted at its mirrored path under the projects root. `destination` applies only
 to `tmpfs`, `volume` and `secret` mounts.
 
-On the Podman page, the project path field of the add-mount and
-create-container dialogs has a **Browse…** button. It opens a directory picker
-that reads the projects root through dsh's own host-side directory listing — the
-same service behind dsh's workspace directory selection — not through the
-orchestrator or a container. Its layout follows dsh's own directory browser: two
-columns, chevron breadcrumbs, folder icons, and a hidden-entry toggle. The
-dialog is confined to the projects root, and the path it produces is stored
-relative to that root.
+On the Podman page, the project path field of the add-mount and create-container
+dialogs has a **Browse…** button. It opens a directory picker that reads the
+projects root through dsh's own host-side directory listing — the same service
+behind dsh's workspace directory selection — not through the orchestrator or a
+container. Its layout follows dsh's own directory browser: two columns, chevron
+breadcrumbs, folder icons, and a hidden-entry toggle. The dialog is confined to
+the projects root, and the path it produces is stored relative to that root.
 
 Removing a mount names it by `kind` plus that mount's own handle: `project` for
 a project mount, `volume` for a named volume, `secret` for a secret, and
@@ -336,35 +335,34 @@ started with.
 
 ## Container management UI
 
-The plugin ships a browser half that registers its card on the
-**dsh-podman** page (sidebar **Plugins** panel → **Installed**). The
-page lists the orchestrator-created guest containers and
-the built images. A workspace with no container gets a **Create container** button
-that opens a configuration modal — image, environment, mounts (project, tmpfs,
-volume, and secret), PATH additions, and secret environment variables — and
-workspaces that already have containers offer an **Add container** button for
-additional, named containers through the same modal, which is titled after the
-button that opened it. In that modal each mount's mode is a dropdown
-(read-only/read-write), so the workspace project mount can be created read-only
-in one step; tmpfs and secret mounts are fixed (read-write and read-only
-respectively) and show a disabled dropdown. Container rows show their
-environment and secret-environment variables and their mounts, let you edit
-environment variables and add/remove mounts (each removal is confirmed), and
-attach/detach named secrets to a container's environment variables; each row
-also offers **Remove**, **Recreate** (same image), and **Recreate with image**.
-Every workspace row also offers **Remove pod**, which removes the workspace's
-pod, all of its containers, and the orchestrator's record for it (volumes,
-secrets, and project data are kept); removing a workspace's last container
-removes its pod as well, so an empty pod is never left behind. The page re-reads
-the live state whenever the Plugins panel opens it, and its footer has a
-**Reload this view** button. The images section can rebuild a single image or
-**rebuild all** in dependency order; **Build image** opens a popup with an
-image-id/base-image form and a chip input for the package list (type a name and
-press space/comma, or paste a list, to add removable chips). Volumes and secrets
-are listed as individual expandable rows, each with its own actions, and
-**Create volume** / **Create secret** open popup forms (the secret form takes an
-optional length; a secret's value can be overwritten, never read). Card actions
-are direct control calls and are not approval-gated.
+The plugin ships a browser half that registers its card on the **dsh-podman**
+page (sidebar **Plugins** panel → **Installed**). The page lists the
+orchestrator-created guest containers and the built images. A workspace with no
+container gets a **Create container** button that opens a configuration modal —
+image, environment, mounts (project, tmpfs, volume, and secret), PATH additions,
+and secret environment variables — and workspaces that already have containers
+offer an **Add container** button for additional, named containers through the
+same modal, which is titled after the button that opened it. In that modal each
+mount's mode is a dropdown (read-only/read-write), so the workspace project
+mount can be created read-only in one step; tmpfs and secret mounts are fixed
+(read-write and read-only respectively) and show a disabled dropdown. Container
+rows show their environment and secret-environment variables and their mounts,
+let you edit environment variables and add/remove mounts (each removal is
+confirmed), and attach/detach named secrets to a container's environment
+variables; each row also offers **Remove**, **Recreate** (same image), and
+**Recreate with image**. Every workspace row also offers **Remove pod**, which
+removes the workspace's pod, all of its containers, and the orchestrator's
+record for it (volumes, secrets, and project data are kept); removing a
+workspace's last container removes its pod as well, so an empty pod is never
+left behind. The page re-reads the live state whenever the Plugins panel opens
+it, and its footer has a **Reload this view** button. The images section can
+rebuild a single image or **rebuild all** in dependency order; **Build image**
+opens a popup with an image-id/base-image form and a chip input for the package
+list (type a name and press space/comma, or paste a list, to add removable
+chips). Volumes and secrets are listed as individual expandable rows, each with
+its own actions, and **Create volume** / **Create secret** open popup forms (the
+secret form takes an optional length; a secret's value can be overwritten, never
+read). Card actions are direct control calls and are not approval-gated.
 
 A **Package caches** section reports the size of every configured build cache
 (`DSH_PODMAN_HOST_PACMAN_CACHE`, `DSH_PODMAN_HOST_APT_CACHE`,
@@ -377,26 +375,29 @@ image build is in progress.
 ## Podman terminal
 
 The plugin owns a **Podman terminal** right-Sidebar tab, separate from dsh's own
-Terminal tab. Open it from the right Sidebar's new-tab guide — the card is
-**New terminal** — or press **Ctrl+`**; the tab is named after the shell it runs
+Terminal tab. Open it from the right Sidebar's new-tab guide — the card is **New
+terminal** — or press
+**Ctrl+`**; the tab is named after the shell it runs
 (`bash`,`sh`, …). The built-in Terminal UI is disabled by the plugin's bundle
 patch, which frees that shortcut (if it is enabled again, the plugin falls back
-to **Ctrl+Shift+`**); the agent's `terminal` tool is unaffected. It always runs in the session's own workspace — each workspace
-has its own side panes and terminals — so the start form only asks for a
-container and then a shell, and a shell can run in the default container or in a
-named one. If the session's directory names no known workspace the form reports
-that instead of guessing; the harness's own Terminal always uses that workspace's
-default container. The container and shell you last started are remembered in
-the browser's local storage and preselected while they are still available — a
-container that disappeared falls back to the default, and a shell the image no
-longer ships falls back to the first one the container offers.
+to **Ctrl+Shift+`**);
+the agent's `terminal` tool is unaffected. It always runs in the session's own
+workspace — each workspace has its own side panes and terminals — so the start
+form only asks for a container and then a shell, and a shell can run in the
+default container or in a named one. If the session's directory names no known
+workspace the form reports that instead of guessing; the harness's own Terminal
+always uses that workspace's default container. The container and shell you last
+started are remembered in the browser's local storage and preselected while they
+are still available — a container that disappeared falls back to the default,
+and a shell the image no longer ships falls back to the first one the container
+offers.
 
 The shell list is discovered **inside the chosen container**: candidate names
 are looked up on that container's PATH (`command -v`) and merged with
 `/etc/shells` and `$SHELL`, so a shell installed through a PATH addition or a
 mounted volume appears while one the image lacks does not. The list is ordered
-most capable first (`zsh`, `bash`, `fish`, … down to `dash`, `ash`, `sh`), so the
-picker preselects the best shell the container has. The selected shell is
+most capable first (`zsh`, `bash`, `fish`, … down to `dash`, `ash`, `sh`), so
+the picker preselects the best shell the container has. The selected shell is
 verified again before it starts.
 
 Terminals are retained on the host: switching tabs, closing the Sidebar or

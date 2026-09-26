@@ -14,7 +14,8 @@ import { readFileSync } from "node:fs";
 const raw = process.argv.slice(2);
 // npm eats a bare `--dry-run` and forwards only the rest, but sets
 // npm_config_dry_run=true for the script; detect both.
-const dryRun = raw.includes("--dry-run") || process.env.npm_config_dry_run === "true";
+const dryRun = raw.includes("--dry-run") ||
+  process.env.npm_config_dry_run === "true";
 const args = raw.filter((arg) => arg !== "--");
 const version = args.find((arg) => !arg.startsWith("-"));
 const extra = args.filter((arg) => !arg.startsWith("-") && arg !== version);

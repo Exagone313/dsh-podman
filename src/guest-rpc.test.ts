@@ -18,7 +18,11 @@ import { grpc } from "./grpc/runtime-client.js";
 // settles from its callback.
 function pingOnce(guest: any, _token: string): Promise<any> {
   return new Promise((resolve, reject) => {
-    guest.ping({}, undefined, (error: any, value: any) => error ? reject(error) : resolve(value));
+    guest.ping(
+      {},
+      undefined,
+      (error: any, value: any) => error ? reject(error) : resolve(value),
+    );
   });
 }
 
@@ -40,7 +44,8 @@ test("withGuestAuth retries once with a refreshed binding", async () => {
   const seen: string[] = [];
   const fresh = {
     guest: {
-      ping: (_request: any, _metadata: any, callback: any) => callback(null, { version: "v" }),
+      ping: (_request: any, _metadata: any, callback: any) =>
+        callback(null, { version: "v" }),
     },
     token: "new",
   };
@@ -56,7 +61,10 @@ test("withGuestAuth retries once with a refreshed binding", async () => {
 test("withGuestAuth surfaces a second rejection", async () => {
   const rejecting = rejectingGuest();
   const binding: any = { ...rejecting, refresh: async () => rejecting };
-  await assert.rejects(() => withGuestAuth(binding, pingOnce), /invalid agent token/);
+  await assert.rejects(
+    () => withGuestAuth(binding, pingOnce),
+    /invalid agent token/,
+  );
 });
 
 test("withGuestAuth does not refresh on a non-auth error", async () => {
@@ -80,7 +88,10 @@ test("withGuestAuth does not refresh on a non-auth error", async () => {
 
 test("withGuestAuth surfaces the error when the binding cannot refresh", async () => {
   const binding: any = rejectingGuest();
-  await assert.rejects(() => withGuestAuth(binding, pingOnce), /invalid agent token/);
+  await assert.rejects(
+    () => withGuestAuth(binding, pingOnce),
+    /invalid agent token/,
+  );
 });
 
 // FakeExecStream is the guest Exec bidi stream a real channel would give us.
@@ -113,7 +124,8 @@ function execGuest(stream: FakeExecStream) {
         signals.push(request.signal);
         callback(null, {});
       },
-      delete: (_request: any, _metadata: any, callback: any) => callback(null, {}),
+      delete: (_request: any, _metadata: any, callback: any) =>
+        callback(null, {}),
     },
   };
 }
@@ -136,7 +148,10 @@ test("runExec resolves on exit and asks the guest for a spill copy", async () =>
   assert.equal(result.exitCode, 0);
   assert.equal(result.stdout, "hi\n");
   const start = harness.stream.written[0].start;
-  assert.match(start.spillStdout.path, /^\/tmp\/dsh-podman\/[0-9a-f-]+\.stdout$/);
+  assert.match(
+    start.spillStdout.path,
+    /^\/tmp\/dsh-podman\/[0-9a-f-]+\.stdout$/,
+  );
   assert.equal(start.spillStderr.path.endsWith(".stderr"), true);
   // The output fit in memory, so the spill file is deleted again.
   assert.equal(result.stdoutSpillPath, undefined);
@@ -154,10 +169,18 @@ test("runExec aborts with the turn signal, then escalates to SIGKILL", async () 
   const harness = execGuest(new FakeExecStream());
   const binding: any = { guest: harness.guest, token: "t" };
   const controller = new AbortController();
-  const promise = runExec(binding, ["sleep", "99"], undefined, undefined, undefined, undefined, {
-    signal: controller.signal,
-    killGraceMs: 60,
-  });
+  const promise = runExec(
+    binding,
+    ["sleep", "99"],
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    {
+      signal: controller.signal,
+      killGraceMs: 60,
+    },
+  );
   harness.stream.emit("data", { processId: "7" });
   controller.abort();
   await assert.rejects(promise, /aborted/);
@@ -175,10 +198,18 @@ test("runExec leaves a command that exits within the grace period alone", async 
   const harness = execGuest(new FakeExecStream());
   const binding: any = { guest: harness.guest, token: "t" };
   const controller = new AbortController();
-  const promise = runExec(binding, ["sleep", "99"], undefined, undefined, undefined, undefined, {
-    signal: controller.signal,
-    killGraceMs: 30,
-  });
+  const promise = runExec(
+    binding,
+    ["sleep", "99"],
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    {
+      signal: controller.signal,
+      killGraceMs: 30,
+    },
+  );
   harness.stream.emit("data", { processId: "7" });
   controller.abort();
   await assert.rejects(promise, /aborted/);
@@ -192,9 +223,17 @@ test("runExec cancels an abort that arrives before the process id", async () => 
   const harness = execGuest(new FakeExecStream());
   const binding: any = { guest: harness.guest, token: "t" };
   const controller = new AbortController();
-  const promise = runExec(binding, ["sleep", "99"], undefined, undefined, undefined, undefined, {
-    signal: controller.signal,
-  });
+  const promise = runExec(
+    binding,
+    ["sleep", "99"],
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    {
+      signal: controller.signal,
+    },
+  );
   controller.abort();
   await assert.rejects(promise, /aborted/);
   assert.equal(harness.stream.cancelled, true);
@@ -219,15 +258,26 @@ test("runExec rejects a pre-aborted call without starting it", async () => {
 test("runExec keeps a bounded tail and points at the spill on truncation", async () => {
   const harness = execGuest(new FakeExecStream());
   const binding: any = { guest: harness.guest, token: "t" };
-  const promise = runExec(binding, ["big"], undefined, undefined, undefined, undefined, {
-    maxBytes: 4,
-    spillBytes: 1024,
-  });
+  const promise = runExec(
+    binding,
+    ["big"],
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    {
+      maxBytes: 4,
+      spillBytes: 1024,
+    },
+  );
   harness.stream.emit("data", { stdoutChunk: Buffer.from("0123456789") });
   harness.stream.emit("data", { exit: EXIT_OK });
   const result = await promise;
   assert.equal(result.stdout, "6789", "only the bounded tail is retained");
-  assert.match(result.stdoutSpillPath ?? "", /^\/tmp\/dsh-podman\/[0-9a-f-]+\.stdout$/);
+  assert.match(
+    result.stdoutSpillPath ?? "",
+    /^\/tmp\/dsh-podman\/[0-9a-f-]+\.stdout$/,
+  );
 });
 
 test("sessionWorkspaceSlug fails instead of fabricating a default workspace", async () => {

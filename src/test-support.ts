@@ -27,7 +27,10 @@ export class FakeTerminalCall extends EventEmitter {
       return;
     }
     if (message.resize) {
-      this.resizes.push({ rows: message.resize.rows, cols: message.resize.cols });
+      this.resizes.push({
+        rows: message.resize.rows,
+        cols: message.resize.cols,
+      });
       return;
     }
     if (message.stdinChunk) {
@@ -38,7 +41,12 @@ export class FakeTerminalCall extends EventEmitter {
       const requestId = message.inspectRequestId;
       queueMicrotask(() =>
         this.emit("data", {
-          foreground: { requestId, found: true, processGroupId: 7, inputWaiting: true },
+          foreground: {
+            requestId,
+            found: true,
+            processGroupId: 7,
+            inputWaiting: true,
+          },
         })
       );
       return;
@@ -129,7 +137,8 @@ export interface TestSessionFacts {
   preset?: string;
 }
 
-export const testReadSession = (session: any): TestSessionFacts => session?.facts ?? {};
+export const testReadSession = (session: any): TestSessionFacts =>
+  session?.facts ?? {};
 
 export const sessionExec = (
   name: string,
@@ -147,7 +156,9 @@ export const presetExec = (
 ): any => ({
   name,
   arguments: args,
-  agent: { session: { header: { agentPreset: preset }, facts: { ...facts, preset } } },
+  agent: {
+    session: { header: { agentPreset: preset }, facts: { ...facts, preset } },
+  },
 });
 
 export const MOUNT_TOOLS = [
@@ -202,7 +213,11 @@ export const SECRET_BEARING_CONTAINER = {
   agentSocketPath: `/run/dsh-podman/${WORKSPACE_ID}-default/guest.sock`,
   agentToken: "super-secret-token",
   mounts: [
-    { projectName: "team", mode: "MOUNT_MODE_READ_WRITE", kind: "MOUNT_KIND_PROJECT" },
+    {
+      projectName: "team",
+      mode: "MOUNT_MODE_READ_WRITE",
+      kind: "MOUNT_KIND_PROJECT",
+    },
   ],
   env: { PATH: "/bin", DB_PASSWORD: "hunter2" },
   secretEnv: { DB_PASS: "db-pass" },
@@ -264,7 +279,9 @@ export function guestFileRecorder(content = "hello", exists = true) {
       return {
         write(message: any) {
           if (message.start !== undefined) path = message.start.path;
-          if (message.dataChunk !== undefined) body += String(message.dataChunk);
+          if (message.dataChunk !== undefined) {
+            body += String(message.dataChunk);
+          }
         },
         end() {
           writes.push({ path, content: body });
@@ -327,14 +344,22 @@ export function guestExecRecorder(defaultCwd?: string, stdout?: string) {
             argv: message.start.argv,
             cwd: message.start.cwd,
             env: message.start.env,
-            ...(message.start.uid !== undefined ? { uid: message.start.uid.value } : {}),
-            ...(message.start.gid !== undefined ? { gid: message.start.gid.value } : {}),
-            ...(message.start.groups !== undefined ? { groups: message.start.groups } : {}),
+            ...(message.start.uid !== undefined
+              ? { uid: message.start.uid.value }
+              : {}),
+            ...(message.start.gid !== undefined
+              ? { gid: message.start.gid.value }
+              : {}),
+            ...(message.start.groups !== undefined
+              ? { groups: message.start.groups }
+              : {}),
           });
         },
         end() {
           for (const handler of handlers.data ?? []) {
-            if (stdout !== undefined) handler({ stdoutChunk: Buffer.from(stdout) });
+            if (stdout !== undefined) {
+              handler({ stdoutChunk: Buffer.from(stdout) });
+            }
             handler({ exit: { exitCode: 0, signaled: false } });
           }
         },
@@ -425,7 +450,10 @@ export function providerFor(guest: unknown) {
 
 // A fake guest for the text/byte provider methods: a stat result, a one-chunk
 // readFile, and a no-op writeFile.
-export function editGuest(stat: Record<string, unknown>, content = Buffer.alloc(0)) {
+export function editGuest(
+  stat: Record<string, unknown>,
+  content = Buffer.alloc(0),
+) {
   const writes: Buffer[] = [];
   return {
     writes,
@@ -445,7 +473,11 @@ export function editGuest(stat: Record<string, unknown>, content = Buffer.alloc(
           yield { data: content };
         },
       }),
-      writeFile: (_metadata: unknown, _options: unknown, callback: Function) => {
+      writeFile: (
+        _metadata: unknown,
+        _options: unknown,
+        callback: Function,
+      ) => {
         const call = {
           write(message: { dataChunk?: Uint8Array }) {
             if (message?.dataChunk) writes.push(Buffer.from(message.dataChunk));
@@ -540,7 +572,11 @@ export function spawnGuest(
       signals.push(request);
       callback(null, {});
     },
-    delete: (request: Record<string, unknown>, _metadata: unknown, callback: Function) => {
+    delete: (
+      request: Record<string, unknown>,
+      _metadata: unknown,
+      callback: Function,
+    ) => {
       deletes.push(request);
       callback(null, {});
     },
@@ -558,7 +594,11 @@ export function spawnGuest(
 export const spawnSpec = (overrides: Record<string, unknown> = {}) => ({
   argv: ["sleep", "1"],
   cwd: "/projects/team",
-  stdio: { stdin: "ignore", stdout: { maxBytes: 10 }, stderr: { maxBytes: 10 } },
+  stdio: {
+    stdin: "ignore",
+    stdout: { maxBytes: 10 },
+    stderr: { maxBytes: 10 },
+  },
   graceMs: 50,
   ...overrides,
 });

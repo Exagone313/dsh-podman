@@ -76,7 +76,9 @@ export function PathsList(props: {
     setDraft("");
   };
   const update = (index: number, path: string): void => {
-    onChange(entries.map((entry, at) => (at === index ? { ...entry, path } : entry)));
+    onChange(
+      entries.map((entry, at) => (at === index ? { ...entry, path } : entry)),
+    );
   };
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
@@ -99,66 +101,69 @@ export function PathsList(props: {
           </Button>
         </div>
       </Field>
-      {entries.length === 0 ? <p style={{ ...hint, margin: 0 }}>{t("noPaths")}</p> : (
-        entries.map((entry, index) => (
-          <div key={entry.id} style={pathRow}>
-            <button
-              type="button"
-              title={t("dragToReorder")}
-              aria-label={t("dragToReorder")}
-              draggable={!busy}
-              onDragStart={() => setDragIndex(index)}
-              onDragOver={(event) => event.preventDefault()}
-              onDrop={() => {
-                if (dragIndex !== null) move(dragIndex, index);
-                setDragIndex(null);
-              }}
-              style={dragHandle}
-            >
-              ≡
-            </button>
-            <Input
-              value={entry.path}
-              disabled={busy}
-              onChange={(event) => update(index, event.target.value)}
-              style={pathInput}
-            />
-            <Button
-              variant="outline"
-              size="sm"
-              title={t("moveUp")}
-              aria-label={t("moveUp")}
-              disabled={busy || index === 0}
-              onClick={() => move(index, index - 1)}
-              style={rowButton}
-            >
-              ↑
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              title={t("moveDown")}
-              aria-label={t("moveDown")}
-              disabled={busy || index === entries.length - 1}
-              onClick={() => move(index, index + 1)}
-              style={rowButton}
-            >
-              ↓
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              title={t("remove")}
-              aria-label={t("remove")}
-              disabled={busy}
-              onClick={() => onChange(entries.filter((_, at) => at !== index))}
-              style={rowButton}
-            >
-              ×
-            </Button>
-          </div>
-        ))
-      )}
+      {entries.length === 0
+        ? <p style={{ ...hint, margin: 0 }}>{t("noPaths")}</p>
+        : (
+          entries.map((entry, index) => (
+            <div key={entry.id} style={pathRow}>
+              <button
+                type="button"
+                title={t("dragToReorder")}
+                aria-label={t("dragToReorder")}
+                draggable={!busy}
+                onDragStart={() => setDragIndex(index)}
+                onDragOver={(event) => event.preventDefault()}
+                onDrop={() => {
+                  if (dragIndex !== null) move(dragIndex, index);
+                  setDragIndex(null);
+                }}
+                style={dragHandle}
+              >
+                ≡
+              </button>
+              <Input
+                value={entry.path}
+                disabled={busy}
+                onChange={(event) => update(index, event.target.value)}
+                style={pathInput}
+              />
+              <Button
+                variant="outline"
+                size="sm"
+                title={t("moveUp")}
+                aria-label={t("moveUp")}
+                disabled={busy || index === 0}
+                onClick={() => move(index, index - 1)}
+                style={rowButton}
+              >
+                ↑
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                title={t("moveDown")}
+                aria-label={t("moveDown")}
+                disabled={busy || index === entries.length - 1}
+                onClick={() => move(index, index + 1)}
+                style={rowButton}
+              >
+                ↓
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                title={t("remove")}
+                aria-label={t("remove")}
+                disabled={busy}
+                onClick={() =>
+                  onChange(entries.filter((_, at) => at !== index))}
+                style={rowButton}
+              >
+                ×
+              </Button>
+            </div>
+          ))
+        )}
     </div>
   );
 }
@@ -188,20 +193,22 @@ export function PathsEditor(props: {
   };
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-      {paths.length === 0 ? <p style={{ ...hint, margin: 0 }}>{t("noPaths")}</p> : (
-        shown.map((entry) => (
-          <code
-            key={entry.id}
-            style={{
-              ...greyId,
-              fontSize: "13px",
-              color: "var(--dsw-alias-label-primary)",
-            }}
-          >
-            {entry.path}
-          </code>
-        ))
-      )}
+      {paths.length === 0
+        ? <p style={{ ...hint, margin: 0 }}>{t("noPaths")}</p>
+        : (
+          shown.map((entry) => (
+            <code
+              key={entry.id}
+              style={{
+                ...greyId,
+                fontSize: "13px",
+                color: "var(--dsw-alias-label-primary)",
+              }}
+            >
+              {entry.path}
+            </code>
+          ))
+        )}
       <div>
         <Button
           variant="outline"

@@ -28,7 +28,12 @@ test("refresh on install publishes containers, images and workspaces", async () 
         return { images: [{ imageId: "img1" }] };
       }
       if (method === "listWorkspaces") {
-        return { workspaces: [{ workspaceSlug: "w1", mounts: [{ projectName: "team/app" }] }] };
+        return {
+          workspaces: [{
+            workspaceSlug: "w1",
+            mounts: [{ projectName: "team/app" }],
+          }],
+        };
       }
       if (method === "listVolumes") {
         return { volumes: [{ name: "data" }, { name: "cache" }] };
@@ -60,7 +65,9 @@ test("refresh on install publishes containers, images and workspaces", async () 
   assert.equal(workspaces[0].workspaceSlug, "w1");
   assert.equal(workspaces[0].projectName, "team/app");
   assert.deepEqual(scope.value.volumes, [{ name: "data" }, { name: "cache" }]);
-  assert.deepEqual(scope.value.secrets, [{ name: "db-pass" }, { name: "api-key" }]);
+  assert.deepEqual(scope.value.secrets, [{ name: "db-pass" }, {
+    name: "api-key",
+  }]);
 });
 
 test("create command drives createWorkspace with env", async () => {
@@ -209,7 +216,10 @@ test("dsh workspace layers orchestrator container info", async () => {
             containerName: `dsh-podman-${WORKSPACE_ID}-default`,
             imageId: "arch",
             status: "running",
-            mounts: [{ projectName: "team/app", mode: "MOUNT_MODE_READ_WRITE" }],
+            mounts: [{
+              projectName: "team/app",
+              mode: "MOUNT_MODE_READ_WRITE",
+            }],
           }],
         };
       }
@@ -221,7 +231,10 @@ test("dsh workspace layers orchestrator container info", async () => {
   const workspaces = scope.value.workspaces as any[];
   assert.equal(workspaces.length, 1);
   assert.equal(workspaces[0].projectName, "team/app");
-  assert.equal(workspaces[0].containerName, `dsh-podman-${WORKSPACE_ID}-default`);
+  assert.equal(
+    workspaces[0].containerName,
+    `dsh-podman-${WORKSPACE_ID}-default`,
+  );
   assert.equal(workspaces[0].status, "running");
   assert.equal(workspaces[0].imageId, "arch");
 });

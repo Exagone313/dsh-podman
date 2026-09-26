@@ -4,7 +4,13 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
-import { editGuest, editProvider, fakeGuest, providerFor, stubResolver } from "./test-support.js";
+import {
+  editGuest,
+  editProvider,
+  fakeGuest,
+  providerFor,
+  stubResolver,
+} from "./test-support.js";
 import { createFilesystemProvider } from "./index.js";
 
 test("filesystem provider resolves absolute safe paths", async () => {
@@ -44,7 +50,9 @@ test("filesystem provider rejects unsafe paths", async () => {
   const provider = createFilesystemProvider(stubResolver);
   await assert.rejects(() => provider.resolve("/a/../b"));
   await assert.rejects(() => provider.resolve("/a/b/../../etc"));
-  await assert.rejects(() => provider.resolve("../escape", { cwd: "/projects/team/app" }));
+  await assert.rejects(() =>
+    provider.resolve("../escape", { cwd: "/projects/team/app" })
+  );
 });
 
 test("filesystem provider maps targets", () => {
@@ -63,7 +71,11 @@ test("filesystem provider lstat maps entry types without following links", async
   const provider = createFilesystemProvider({
     resolveForPath: async () => ({
       guest: {
-        stat: (request: Record<string, unknown>, _metadata: unknown, callback: Function) => {
+        stat: (
+          request: Record<string, unknown>,
+          _metadata: unknown,
+          callback: Function,
+        ) => {
           requests.push(request);
           callback(null, {
             exists: true,
@@ -78,7 +90,9 @@ test("filesystem provider lstat maps entry types without following links", async
       token: "t",
     }),
   } as any);
-  const info = await provider.lstat("/projects/team/link", { cwd: "/projects/team" });
+  const info = await provider.lstat("/projects/team/link", {
+    cwd: "/projects/team",
+  });
   assert.equal(info.type, "symlink");
   assert.equal(info.size, 3);
   assert.deepEqual(requests, [{ path: "/projects/team/link", noFollow: true }]);
@@ -94,7 +108,10 @@ test("filesystem provider lstat reports an absent entry as undefined", async () 
       token: "t",
     }),
   } as any);
-  assert.equal(await provider.lstat("/projects/team/missing", { cwd: "/x" }), undefined);
+  assert.equal(
+    await provider.lstat("/projects/team/missing", { cwd: "/x" }),
+    undefined,
+  );
 });
 
 test("filesystem provider streamText decodes UTF-8 and rejects binary", async () => {
@@ -113,7 +130,8 @@ test("filesystem provider streamText decodes UTF-8 and rejects binary", async ()
       }
     },
     (error: unknown) =>
-      error instanceof Error && (error as { code?: string }).code === "FS_NOT_TEXT",
+      error instanceof Error &&
+      (error as { code?: string }).code === "FS_NOT_TEXT",
   );
 });
 
@@ -129,7 +147,8 @@ test("filesystem provider readBytes returns content and caps at maxBytes", async
   await assert.rejects(
     () => provider.readBytes(target, undefined, 3),
     (error: unknown) =>
-      error instanceof Error && (error as { code?: string }).code === "FS_TOO_LARGE",
+      error instanceof Error &&
+      (error as { code?: string }).code === "FS_TOO_LARGE",
   );
 });
 
@@ -169,7 +188,8 @@ test("filesystem provider editText reports the harness error codes", async () =>
         newString: "x",
         replaceAll: false,
       }),
-    (error: unknown) => (error as { code?: string }).code === "FS_EDIT_NOT_FOUND",
+    (error: unknown) =>
+      (error as { code?: string }).code === "FS_EDIT_NOT_FOUND",
   );
 
   const ambiguous = editProvider(editGuest({}, Buffer.from("aa")));
@@ -181,7 +201,8 @@ test("filesystem provider editText reports the harness error codes", async () =>
         newString: "b",
         replaceAll: false,
       }),
-    (error: unknown) => (error as { code?: string }).code === "FS_AMBIGUOUS_EDIT",
+    (error: unknown) =>
+      (error as { code?: string }).code === "FS_AMBIGUOUS_EDIT",
   );
 
   const stale = editProvider(editGuest({}, Buffer.from("hello")));
@@ -193,7 +214,8 @@ test("filesystem provider editText reports the harness error codes", async () =>
         { oldString: "h", newString: "H", replaceAll: false },
         { version: "other" },
       ),
-    (error: unknown) => (error as { code?: string }).code === "FS_STALE_VERSION",
+    (error: unknown) =>
+      (error as { code?: string }).code === "FS_STALE_VERSION",
   );
 });
 
@@ -206,15 +228,21 @@ test("filesystem provider writeText reports the harness error codes", async () =
     (error: unknown) => (error as { code?: string }).code === "FS_NOT_OBSERVED",
   );
   await assert.rejects(
-    () => existing.writeText(target, "x", { kind: "replaceIfVersion", version: "other" }),
-    (error: unknown) => (error as { code?: string }).code === "FS_STALE_VERSION",
+    () =>
+      existing.writeText(target, "x", {
+        kind: "replaceIfVersion",
+        version: "other",
+      }),
+    (error: unknown) =>
+      (error as { code?: string }).code === "FS_STALE_VERSION",
   );
 
   const dir = editProvider(editGuest({ isDir: true }));
   const dirTarget = await dir.resolve("/a", { cwd: "/x" });
   await assert.rejects(
     () => dir.writeText(dirTarget, "x"),
-    (error: unknown) => (error as { code?: string }).code === "FS_NOT_REGULAR_FILE",
+    (error: unknown) =>
+      (error as { code?: string }).code === "FS_NOT_REGULAR_FILE",
   );
 });
 
@@ -290,7 +318,9 @@ test("filesystem provider listDir returns resolved child targets", async () => {
       token: "t",
     }),
   } as any);
-  const target = await provider.resolve("/projects/team", { cwd: "/projects/team" });
+  const target = await provider.resolve("/projects/team", {
+    cwd: "/projects/team",
+  });
   const entries = await provider.listDir(target);
   assert.deepEqual(requests, [{ path: "/projects/team" }]);
   assert.deepEqual(
@@ -301,9 +331,24 @@ test("filesystem provider listDir returns resolved child targets", async () => {
       binding: entry.target.binding.token,
     })),
     [
-      { name: "src", type: "directory", path: "/projects/team/src", binding: "t" },
-      { name: "a.txt", type: "file", path: "/projects/team/a.txt", binding: "t" },
-      { name: "link", type: "other", path: "/projects/team/link", binding: "t" },
+      {
+        name: "src",
+        type: "directory",
+        path: "/projects/team/src",
+        binding: "t",
+      },
+      {
+        name: "a.txt",
+        type: "file",
+        path: "/projects/team/a.txt",
+        binding: "t",
+      },
+      {
+        name: "link",
+        type: "other",
+        path: "/projects/team/link",
+        binding: "t",
+      },
     ],
   );
   assert.equal(entries[1].size, 3);
@@ -327,7 +372,10 @@ test("filesystem provider listDir falls back to the directory bit", async () => 
   } as any);
   const target = await provider.resolve("/w", { cwd: "/w" });
   const entries = await provider.listDir(target);
-  assert.deepEqual(entries.map((entry: any) => entry.type), ["directory", "file"]);
+  assert.deepEqual(entries.map((entry: any) => entry.type), [
+    "directory",
+    "file",
+  ]);
 });
 
 test("filesystem provider writeText normalizes the diff basis", async () => {
@@ -351,9 +399,14 @@ test("filesystem provider reports watching as unsupported", async () => {
       }, new AbortController().signal),
     (error: any) =>
       error.code === "FS_IO_ERROR" &&
-      error.message === "Filesystem watching is not supported by this provider.",
+      error.message ===
+        "Filesystem watching is not supported by this provider.",
   );
-  assert.equal(notified, false, "changed must not fire when watching is unsupported");
+  assert.equal(
+    notified,
+    false,
+    "changed must not fire when watching is unsupported",
+  );
 
   const aborted = new AbortController();
   aborted.abort();

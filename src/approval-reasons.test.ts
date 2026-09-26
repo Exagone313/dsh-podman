@@ -99,10 +99,21 @@ test("renderDenial renders both languages", () => {
 });
 
 test("renderReason covers the remaining reason kinds in both languages", () => {
-  assert.equal(renderReason("en", { kind: "image_rebuild_all" }), "Rebuild all images.");
-  assert.equal(renderReason("zh", { kind: "image_rebuild_all" }), "重建全部镜像。");
   assert.equal(
-    renderReason("zh", { kind: "daemon_start", container: "c", argv: ["x"], uid: 1 }),
+    renderReason("en", { kind: "image_rebuild_all" }),
+    "Rebuild all images.",
+  );
+  assert.equal(
+    renderReason("zh", { kind: "image_rebuild_all" }),
+    "重建全部镜像。",
+  );
+  assert.equal(
+    renderReason("zh", {
+      kind: "daemon_start",
+      container: "c",
+      argv: ["x"],
+      uid: 1,
+    }),
     "在容器 “c” 中启动守护进程：x（uid 1）",
   );
   assert.equal(
@@ -116,14 +127,24 @@ test("renderReason covers the remaining reason kinds in both languages", () => {
     "在容器 “c” 中运行 shell 命令：id（uid 1、groups 3、4）",
   );
   assert.equal(
-    renderReason("zh", { kind: "container_secret_add", container: "c", secret: "s", env: "E" }),
+    renderReason("zh", {
+      kind: "container_secret_add",
+      container: "c",
+      secret: "s",
+      env: "E",
+    }),
     "将机密 “s” 作为 “E” 注入容器 “c”。",
   );
   assert.equal(
     renderReason("zh", {
       kind: "container_mount_update",
       container: "valkey-ctr",
-      mount: { kind: "volume", source: "valkey-data", destination: "/data", readOnly: false },
+      mount: {
+        kind: "volume",
+        source: "valkey-data",
+        destination: "/data",
+        readOnly: false,
+      },
     }),
     "更新容器 “valkey-ctr” 中的挂载：将卷 “valkey-data”（挂载到 “/data”）重新挂载为读写。",
   );
@@ -150,7 +171,12 @@ test("renderReason renders the read-only remount plan", () => {
       tool: "bash",
       remount: [
         { kind: "project", source: "team", readOnly: false },
-        { kind: "volume", source: "data", destination: "/data", readOnly: false },
+        {
+          kind: "volume",
+          source: "data",
+          destination: "/data",
+          readOnly: false,
+        },
       ],
       keep: [{ kind: "tmpfs", source: "", destination: "/scratch" }],
     }),
@@ -207,14 +233,20 @@ test("renderDefaultEnvSyncNotice renders both languages", () => {
 
 test("preExecutePolicy renders a localized deny reason", async () => {
   const denied = (await preExecutePolicy(
-    { name: "container_start", agent: { session: { facts: { mode: "read-only" } } } },
+    {
+      name: "container_start",
+      agent: { session: { facts: { mode: "read-only" } } },
+    },
     () => Promise.resolve({ kind: "allow" }),
     undefined,
     () => "zh",
     testReadSession,
   )) as { kind: string; reason: string };
   assert.equal(denied.kind, "deny");
-  assert.equal(denied.reason, "已拒绝：当前会话为只读，而 “container_start” 需要写入权限。");
+  assert.equal(
+    denied.reason,
+    "已拒绝：当前会话为只读，而 “container_start” 需要写入权限。",
+  );
 });
 
 test("preExecutePolicy renders a localized deny reason for a built-in tool", async () => {
@@ -226,5 +258,8 @@ test("preExecutePolicy renders a localized deny reason for a built-in tool", asy
     testReadSession,
   )) as { kind: string; reason: string };
   assert.equal(denied.kind, "deny");
-  assert.equal(denied.reason, "已拒绝：当前会话为只读，而 “bash” 可能修改文件。");
+  assert.equal(
+    denied.reason,
+    "已拒绝：当前会话为只读，而 “bash” 可能修改文件。",
+  );
 });

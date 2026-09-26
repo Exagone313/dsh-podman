@@ -4,7 +4,11 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createReadOnlyShellGate, READ_ONLY_GATED_TOOLS, REMOUNT_TOOL_NAME } from "./index.js";
+import {
+  createReadOnlyShellGate,
+  READ_ONLY_GATED_TOOLS,
+  REMOUNT_TOOL_NAME,
+} from "./index.js";
 import { WORKSPACE_ID } from "./test-support.js";
 
 const EXEC = {
@@ -54,7 +58,10 @@ function gateFixture(
 test("the gate ignores tools outside its set", async () => {
   const { gate, controlCalls } = gateFixture([]);
   assert.equal(await gate({ ...EXEC, name: "image_list" }, "en"), undefined);
-  assert.equal(await gate({ ...EXEC, name: "container_read" }, "en"), undefined);
+  assert.equal(
+    await gate({ ...EXEC, name: "container_read" }, "en"),
+    undefined,
+  );
   assert.deepEqual(controlCalls, []);
 });
 
@@ -75,9 +82,21 @@ test("the gate covers the shell, file, and daemon tools", () => {
 
 test("all mounts read-only allows the tool without a prompt", async () => {
   const { gate, controlCalls, approvals } = gateFixture([
-    { projectName: "team", kind: "MOUNT_KIND_PROJECT", mode: "MOUNT_MODE_READ_ONLY" },
-    { kind: "MOUNT_KIND_TMPFS", destination: "/scratch", mode: "MOUNT_MODE_READ_WRITE" },
-    { kind: "MOUNT_KIND_SECRET", secret: "tls", destination: "/run/secrets/tls" },
+    {
+      projectName: "team",
+      kind: "MOUNT_KIND_PROJECT",
+      mode: "MOUNT_MODE_READ_ONLY",
+    },
+    {
+      kind: "MOUNT_KIND_TMPFS",
+      destination: "/scratch",
+      mode: "MOUNT_MODE_READ_WRITE",
+    },
+    {
+      kind: "MOUNT_KIND_SECRET",
+      secret: "tls",
+      destination: "/run/secrets/tls",
+    },
   ]);
   assert.deepEqual(await gate(EXEC, "en"), { kind: "allow" });
   assert.deepEqual(approvals, []);
@@ -89,15 +108,27 @@ test("all mounts read-only allows the tool without a prompt", async () => {
 
 test("a read-write mount prompts and then remounts read-only", async () => {
   const { gate, controlCalls, approvals } = gateFixture([
-    { projectName: "team", kind: "MOUNT_KIND_PROJECT", mode: "MOUNT_MODE_READ_WRITE" },
+    {
+      projectName: "team",
+      kind: "MOUNT_KIND_PROJECT",
+      mode: "MOUNT_MODE_READ_WRITE",
+    },
     {
       kind: "MOUNT_KIND_VOLUME",
       volume: "data",
       destination: "/data",
       mode: "MOUNT_MODE_READ_WRITE",
     },
-    { kind: "MOUNT_KIND_TMPFS", destination: "/scratch", mode: "MOUNT_MODE_READ_WRITE" },
-    { kind: "MOUNT_KIND_SECRET", secret: "tls", destination: "/run/secrets/tls" },
+    {
+      kind: "MOUNT_KIND_TMPFS",
+      destination: "/scratch",
+      mode: "MOUNT_MODE_READ_WRITE",
+    },
+    {
+      kind: "MOUNT_KIND_SECRET",
+      secret: "tls",
+      destination: "/run/secrets/tls",
+    },
   ]);
   assert.deepEqual(await gate(EXEC, "en"), { kind: "allow" });
   assert.equal(approvals.length, 1);
@@ -105,13 +136,19 @@ test("a read-write mount prompts and then remounts read-only", async () => {
   assert.match(approvals[0], /- project "team" \(read-write\)/);
   assert.match(approvals[0], /- volume "data" at "\/data" \(read-write\)/);
   assert.match(approvals[0], /Kept as-is: tmpfs at "\/scratch"/);
-  const recreate = controlCalls.filter(([method]) => method === "recreateContainer");
+  const recreate = controlCalls.filter(([method]) =>
+    method === "recreateContainer"
+  );
   assert.equal(recreate.length, 1);
   assert.deepEqual(recreate[0][1], {
     workspaceSlug: WORKSPACE_ID,
     container: "default",
     mounts: [
-      { projectName: "team", kind: "MOUNT_KIND_PROJECT", mode: "MOUNT_MODE_READ_ONLY" },
+      {
+        projectName: "team",
+        kind: "MOUNT_KIND_PROJECT",
+        mode: "MOUNT_MODE_READ_ONLY",
+      },
       {
         projectName: "",
         kind: "MOUNT_KIND_VOLUME",
@@ -137,7 +174,11 @@ test("a read-write mount prompts and then remounts read-only", async () => {
 
 test("a declined prompt denies without remounting", async () => {
   const { gate, controlCalls, approvals } = gateFixture(
-    [{ projectName: "team", kind: "MOUNT_KIND_PROJECT", mode: "MOUNT_MODE_READ_WRITE" }],
+    [{
+      projectName: "team",
+      kind: "MOUNT_KIND_PROJECT",
+      mode: "MOUNT_MODE_READ_WRITE",
+    }],
     { approve: false },
   );
   const decision = (await gate(EXEC, "en")) as { kind: string; reason: string };
@@ -158,7 +199,11 @@ test("an unreadable container falls through to the plain denial", async () => {
 
 test("a plugin tool targets its own container", async () => {
   const { gate, controlCalls } = gateFixture(
-    [{ projectName: "team", kind: "MOUNT_KIND_PROJECT", mode: "MOUNT_MODE_READ_ONLY" }],
+    [{
+      projectName: "team",
+      kind: "MOUNT_KIND_PROJECT",
+      mode: "MOUNT_MODE_READ_ONLY",
+    }],
     { containerName: "web" },
   );
   const exec = {

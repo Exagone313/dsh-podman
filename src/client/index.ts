@@ -3,7 +3,10 @@
 // SPDX-License-Identifier: MIT
 
 import type { Context as ClientContext } from "@deepseek-ai/cordis";
-import type { ShortcutCommand, ShortcutCommandId } from "@deepseek-ai/dsh-client-shortcuts/client";
+import type {
+  ShortcutCommand,
+  ShortcutCommandId,
+} from "@deepseek-ai/dsh-client-shortcuts/client";
 import type {} from "@deepseek-ai/dsh-client-ui-renderer/client";
 import type {} from "@deepseek-ai/dsh-client-ui-settings/client";
 import type {} from "@deepseek-ai/dsh-client-ui-conversation/client";
@@ -17,7 +20,10 @@ import { ContainerCard } from "./ContainerCard.js";
 import { PodmanTerminal } from "./podman-terminal.js";
 import { PodmanTerminalGuide } from "./podman-terminal-guide.js";
 import { PodmanTerminalTitle } from "./podman-terminal-title.js";
-import { BUILTIN_PROMPT_PREFIX, ReadOnlyApprovalPanel } from "./read-only-approval.js";
+import {
+  BUILTIN_PROMPT_PREFIX,
+  ReadOnlyApprovalPanel,
+} from "./read-only-approval.js";
 import {
   PODMAN_TERMINAL_KIND,
   PODMAN_TERMINAL_SHORTCUT_DEFAULTS,
@@ -207,19 +213,22 @@ export function apply(ctx: ClientContext): void {
 
   ctx.effect(
     () =>
-      ctx.slots.inject("sidebar.right.tab.guide.entry", () =>
-        ctx.slots.register(
-          {
-            name: "sidebar.right.tab.guide.entry",
-            key: PODMAN_TERMINAL_TAB_ID,
-            locale: NS,
-            inject: (sessionId) => ({
-              ...controller.inject(),
-              sessionId,
-            }),
-          },
-          PodmanTerminalGuide,
-        )),
+      ctx.slots.inject(
+        "sidebar.right.tab.guide.entry",
+        () =>
+          ctx.slots.register(
+            {
+              name: "sidebar.right.tab.guide.entry",
+              key: PODMAN_TERMINAL_TAB_ID,
+              locale: NS,
+              inject: (sessionId) => ({
+                ...controller.inject(),
+                sessionId,
+              }),
+            },
+            PodmanTerminalGuide,
+          ),
+      ),
     "podman: terminal guide",
   );
 

@@ -24,7 +24,9 @@ const SLUG = "2c573001-4171-4900-904b-12a5cc02737a";
 const SLUG_SUB = "3d684112-5282-4a11-a15c-23b6dd13848b";
 
 test("normalizeToolError strips the prefix only for a gRPC status", () => {
-  const statusError: any = Object.assign(new Error("5 NOT_FOUND: missing"), { code: 5 });
+  const statusError: any = Object.assign(new Error("5 NOT_FOUND: missing"), {
+    code: 5,
+  });
   const normalized = normalizeToolError(statusError);
   assert.equal(normalized.message, "missing");
   assert.equal((normalized as { code?: string }).code, "NOT_FOUND");
@@ -77,11 +79,17 @@ test("metadata carries the plugin version only when one is given", () => {
   const withVersion = metadata("token-1", "1.2.3");
   assert.equal(withVersion.get("x-dsh-podman-plugin-version")[0], "1.2.3");
   // Guest calls pass no version, and the guest agent does not check it.
-  assert.equal(metadata("token-1").get("x-dsh-podman-plugin-version").length, 0);
+  assert.equal(
+    metadata("token-1").get("x-dsh-podman-plugin-version").length,
+    0,
+  );
 });
 
 test("normalizeToolError strips the grpc prefix and names the code", () => {
-  const prefixed = Object.assign(new Error("5 NOT_FOUND: container not found"), { code: 5 });
+  const prefixed = Object.assign(
+    new Error("5 NOT_FOUND: container not found"),
+    { code: 5 },
+  );
   const normalized = normalizeToolError(prefixed);
   assert.equal(normalized.message, "container not found");
   assert.equal((normalized as { code?: string }).code, "NOT_FOUND");
@@ -90,8 +98,13 @@ test("normalizeToolError strips the grpc prefix and names the code", () => {
   assert.equal(plain.message, "boom");
   assert.equal((plain as { code?: string }).code, undefined);
 
-  const named = Object.assign(new Error("bad input"), { code: "INVALID_ARGUMENT" });
-  assert.equal((normalizeToolError(named) as { code?: string }).code, "INVALID_ARGUMENT");
+  const named = Object.assign(new Error("bad input"), {
+    code: "INVALID_ARGUMENT",
+  });
+  assert.equal(
+    (normalizeToolError(named) as { code?: string }).code,
+    "INVALID_ARGUMENT",
+  );
 });
 
 test("containerNotFound reports one stable shape", () => {
@@ -99,7 +112,10 @@ test("containerNotFound reports one stable shape", () => {
     containerNotFound("db", "w1").message,
     'container "db" not found in workspace "w1"',
   );
-  assert.equal((containerNotFound("db") as { code?: string }).code, "NOT_FOUND");
+  assert.equal(
+    (containerNotFound("db") as { code?: string }).code,
+    "NOT_FOUND",
+  );
   assert.equal(containerNotFound("db").message, 'container "db" not found');
 });
 
@@ -147,7 +163,10 @@ async function startControlServer(
     ping: (call: any, callback: any) => {
       const bearer = String(call.metadata.get("authorization")[0] ?? "");
       if (bearer === "bearer stale") {
-        callback({ code: grpc.status.UNAUTHENTICATED, details: "invalid agent token" });
+        callback({
+          code: grpc.status.UNAUTHENTICATED,
+          details: "invalid agent token",
+        });
         return;
       }
       callback(null, { version: "test", commit: "test" });
@@ -167,7 +186,9 @@ async function startControlServer(
       callback({ code: grpc.status.NOT_FOUND, details: "workspace not found" });
     },
     ensureContainer: (call: any, callback: any) => {
-      const agentToken = options.staleToken === true && ensureCalls++ === 0 ? "stale" : "tok";
+      const agentToken = options.staleToken === true && ensureCalls++ === 0
+        ? "stale"
+        : "tok";
       const row = containers.find(
         (candidate: any) =>
           candidate.workspaceSlug === call.request.workspaceSlug &&
@@ -263,7 +284,11 @@ test("control calls carry the bearer token", async () => {
     );
     await resolver.control("listWorkspaces", {});
     assert.equal(received[0], "bearer tok-1");
-    assert.equal(versions[0], VERSION, "control calls report the plugin version");
+    assert.equal(
+      versions[0],
+      VERSION,
+      "control calls report the plugin version",
+    );
   } finally {
     stop();
   }
@@ -336,7 +361,9 @@ test("resolve exposes the session directory as the default cwd", async () => {
 test("resolve refreshes a binding whose token the agent rejects", async () => {
   // The first row carries a credential the guest agent rejects; resolving must
   // re-run the orchestrator's ensure and end with the usable token.
-  const { socketsRoot, stop } = await startControlServer([], { staleToken: true });
+  const { socketsRoot, stop } = await startControlServer([], {
+    staleToken: true,
+  });
   try {
     const resolver = new WorkspaceResolver(
       {
@@ -423,7 +450,11 @@ test("containerBinding exposes the session directory only when a project mount c
     containerName: "db",
     agentSocketPath: "/run/x.sock",
     agentToken: "tok",
-    mounts: [{ kind: "MOUNT_KIND_VOLUME", volume: "data", destination: "/data" }],
+    mounts: [{
+      kind: "MOUNT_KIND_VOLUME",
+      volume: "data",
+      destination: "/data",
+    }],
   }]);
   try {
     const resolver = new WorkspaceResolver(
@@ -544,7 +575,9 @@ test("containerBinding recreates a container whose agent never answers", async (
       },
       { resolveByPath: () => ({ id: SLUG, path: "/projects/team" }) } as any,
     );
-    await assert.rejects(() => resolver.containerBinding("/projects/team", "db"));
+    await assert.rejects(() =>
+      resolver.containerBinding("/projects/team", "db")
+    );
     assert.equal(control.recreateRequests.length, 1);
     assert.equal(control.recreateRequests[0].container, "db");
   } finally {
@@ -607,7 +640,8 @@ test("resolveForPath rejects paths it cannot map to a workspace", async () => {
   await assert.rejects(
     () => resolver.resolveForPath("/elsewhere/file", undefined),
     (error: unknown) =>
-      error instanceof Error && (error as { code?: string }).code === "FS_NOT_FOUND",
+      error instanceof Error &&
+      (error as { code?: string }).code === "FS_NOT_FOUND",
   );
 });
 

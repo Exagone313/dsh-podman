@@ -3,9 +3,17 @@
 // SPDX-License-Identifier: MIT
 
 import { hint } from "./container-card-styles.js";
-import { type MountInput, type ProjectMountView } from "./container-card-controller.js";
+import {
+  type MountInput,
+  type ProjectMountView,
+} from "./container-card-controller.js";
 import { type ContainerPluginKey, type Translate } from "./locales.js";
-import { Button, Input, Modal, type StateDotState } from "@deepseek-ai/dsh-client-ui-primitives";
+import {
+  Button,
+  Input,
+  Modal,
+  type StateDotState,
+} from "@deepseek-ai/dsh-client-ui-primitives";
 import { type ReactNode, useState } from "react";
 
 export function containerStateDot(status: string): StateDotState {
@@ -34,9 +42,11 @@ export const namePattern = /^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,63}$/;
 
 export const imageIdPattern = /^[a-zA-Z0-9_][a-zA-Z0-9_.\-/:]{0,127}$/;
 
-export const sanitizeName = (raw: string): string => raw.replace(/[^a-zA-Z0-9_.-]/g, "");
+export const sanitizeName = (raw: string): string =>
+  raw.replace(/[^a-zA-Z0-9_.-]/g, "");
 
-export const sanitizeImageId = (raw: string): string => raw.replace(/[^a-zA-Z0-9_.\-/:]/g, "");
+export const sanitizeImageId = (raw: string): string =>
+  raw.replace(/[^a-zA-Z0-9_.\-/:]/g, "");
 
 export const mountKindShort = (kind: string): string => {
   if (kind === "MOUNT_KIND_TMPFS") return "tmpfs";
@@ -68,15 +78,27 @@ export const mountLabel = (
     }`;
   }
   if (mount.kind === "volume") {
-    return `volume ${mount.volume}${mount.destination !== "" ? ` → ${mount.destination}` : ""}`;
+    return `volume ${mount.volume}${
+      mount.destination !== "" ? ` → ${mount.destination}` : ""
+    }`;
   }
   if (mount.kind === "secret") {
-    return `secret ${mount.secret}${mount.destination !== "" ? ` → ${mount.destination}` : ""}`;
+    return `secret ${mount.secret}${
+      mount.destination !== "" ? ` → ${mount.destination}` : ""
+    }`;
   }
   const mode = withMode
-    ? ` ${t(mount.mode === "read_only" ? "mountReadOnlySuffix" : "mountReadWriteSuffix")}`
+    ? ` ${
+      t(
+        mount.mode === "read_only"
+          ? "mountReadOnlySuffix"
+          : "mountReadWriteSuffix",
+      )
+    }`
     : "";
-  return `${mount.project}${mount.destination !== "" ? ` → ${mount.destination}` : ""}${mode}`;
+  return `${mount.project}${
+    mount.destination !== "" ? ` → ${mount.destination}` : ""
+  }${mode}`;
 };
 
 // Adding a mount defaults to read-only, so granting write access is always a
@@ -99,7 +121,8 @@ export function ConfirmButton(props: {
   ariaLabel?: string;
   onConfirm: () => void;
 }): ReactNode {
-  const { t, label, title, description, disabled, ariaLabel, onConfirm } = props;
+  const { t, label, title, description, disabled, ariaLabel, onConfirm } =
+    props;
   const [open, setOpen] = useState(false);
   const confirm = (): void => {
     setOpen(false);

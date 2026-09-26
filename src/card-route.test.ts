@@ -19,7 +19,9 @@ function fakeResolver(): { resolver: any; calls: Array<[string, unknown]> } {
     async control(method: string, request: unknown) {
       calls.push([method, request]);
       if (method === "getVersion") return { version: "9.9.9", commit: "abc" };
-      if (method === "listContainers") return { containers: [{ containerName: "c1" }] };
+      if (method === "listContainers") {
+        return { containers: [{ containerName: "c1" }] };
+      }
       if (method === "listImages") return { images: [{ imageId: "img1" }] };
       if (method === "listWorkspaces") return { workspaces: [] };
       if (method === "listVolumes") return { volumes: [{ name: "data" }] };
@@ -48,7 +50,9 @@ function fakeRouteContext(): { ctx: any; routes: any[] } {
               // under the API channel, or the registration is refused.
               if (!route.path.startsWith("/api/")) {
                 throw new Error(
-                  `connection: invalid exact Fetch route ${JSON.stringify(route.path)}`,
+                  `connection: invalid exact Fetch route ${
+                    JSON.stringify(route.path)
+                  }`,
                 );
               }
               routes.push(route);
@@ -67,7 +71,10 @@ function cardRequest(init?: RequestInit): Request {
 }
 
 test("registerCardRoute registers the card's exact fetch route", () => {
-  assert.ok(CARD_PATH.startsWith("/api/"), "the route must live under the API channel");
+  assert.ok(
+    CARD_PATH.startsWith("/api/"),
+    "the route must live under the API channel",
+  );
   const { resolver } = fakeResolver();
   const { ctx, routes } = fakeRouteContext();
   registerCardRoute(ctx, resolver);
@@ -171,11 +178,14 @@ test("the card route runs one command per POST and returns its notice", async ()
     }),
   }));
   assert.equal(recreate.status, 200);
-  assert.deepEqual(calls.find(([method]) => method === "recreateContainer")?.[1], {
-    workspaceSlug: "w1",
-    container: "foo",
-    imageId: "img1",
-  });
+  assert.deepEqual(
+    calls.find(([method]) => method === "recreateContainer")?.[1],
+    {
+      workspaceSlug: "w1",
+      container: "foo",
+      imageId: "img1",
+    },
+  );
 
   const detach = await routes[0].fetch(cardRequest({
     method: "POST",
@@ -207,14 +217,18 @@ test("the card route rejects a missing or unknown command", async () => {
   const { ctx, routes } = fakeRouteContext();
   registerCardRoute(ctx, resolver);
 
-  const missing = await routes[0].fetch(cardRequest({ method: "POST", body: "{}" }));
+  const missing = await routes[0].fetch(
+    cardRequest({ method: "POST", body: "{}" }),
+  );
   assert.equal(missing.status, 400);
   const unknown = await routes[0].fetch(cardRequest({
     method: "POST",
     body: JSON.stringify({ command: { op: "nope" } }),
   }));
   assert.equal(unknown.status, 400);
-  const malformed = await routes[0].fetch(cardRequest({ method: "POST", body: "not json" }));
+  const malformed = await routes[0].fetch(
+    cardRequest({ method: "POST", body: "not json" }),
+  );
   assert.equal(malformed.status, 400);
   const wrongMethod = await routes[0].fetch(cardRequest({ method: "DELETE" }));
   assert.equal(wrongMethod.status, 405);
@@ -235,5 +249,7 @@ test("the card route reports a failed command as an error", async () => {
     body: JSON.stringify({ command: { op: "remove", workspace: "w1" } }),
   }));
   assert.equal(response.status, 500);
-  assert.deepEqual(await response.json(), { error: "control plane unavailable" });
+  assert.deepEqual(await response.json(), {
+    error: "control plane unavailable",
+  });
 });

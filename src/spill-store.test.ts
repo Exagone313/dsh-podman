@@ -12,7 +12,8 @@ const SEGMENT = sessionSegment(SESSION_ID);
 
 function fakeCtx(sessions: Record<string, any>): any {
   return {
-    get: (name: string) => name === "sessions" ? { get: (id: string) => sessions[id] } : undefined,
+    get: (name: string) =>
+      name === "sessions" ? { get: (id: string) => sessions[id] } : undefined,
   };
 }
 
@@ -26,7 +27,12 @@ test("saveText writes a tool-result spill inside the session container", async (
   const content = "x".repeat(60000);
   const ref = await store.saveText({
     owner: { sessionId: SESSION_ID },
-    source: { kind: "tool", toolName: "web_fetch", callId: "c1", label: "result" },
+    source: {
+      kind: "tool",
+      toolName: "web_fetch",
+      callId: "c1",
+      label: "result",
+    },
     suggestedName: "web_fetch.txt",
     content,
   });
@@ -34,11 +40,17 @@ test("saveText writes a tool-result spill inside the session container", async (
   assert.equal(writes.length, 1);
   assert.match(
     writes[0].path,
-    new RegExp(`^/tmp/dsh-podman/spill/${SEGMENT}/[0-9a-f]{32}-web_fetch\\.txt$`),
+    new RegExp(
+      `^/tmp/dsh-podman/spill/${SEGMENT}/[0-9a-f]{32}-web_fetch\\.txt$`,
+    ),
   );
   assert.equal(ref.locator, writes[0].path);
   assert.equal(ref.bytes, content.length);
-  assert.equal(writes[0].content, content, "the full text is persisted verbatim");
+  assert.equal(
+    writes[0].content,
+    content,
+    "the full text is persisted verbatim",
+  );
   assert.match(ref.retrievalHint, /container_read/);
 });
 
@@ -59,7 +71,9 @@ test("saveText never lets the suggested name escape the spill directory", async 
 test("sessionSegment neutralizes path-shaped session ids", () => {
   // A session id is not necessarily a UUID, so it must never survive as a path
   // segment that can traverse or collide.
-  for (const id of ["..", ".", "../../etc", "a/b", "session-1", "sess..ion", ""]) {
+  for (
+    const id of ["..", ".", "../../etc", "a/b", "session-1", "sess..ion", ""]
+  ) {
     const segment = sessionSegment(id);
     assert.notEqual(segment, "");
     assert.notEqual(segment, ".");

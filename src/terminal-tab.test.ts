@@ -18,7 +18,13 @@ test("the Podman terminal shortcut prefers the built-in terminal's binding", () 
   const defaults: Record<string, unknown> = PODMAN_TERMINAL_SHORTCUT_DEFAULTS;
   assert.deepEqual(
     Object.keys(defaults).sort(),
-    ["desktop:linux", "desktop:macos", "desktop:windows", "web:macos", "web:windows"],
+    [
+      "desktop:linux",
+      "desktop:macos",
+      "desktop:windows",
+      "web:macos",
+      "web:windows",
+    ],
   );
   for (const value of Object.values(PODMAN_TERMINAL_SHORTCUT_DEFAULTS)) {
     assert.deepEqual(value, { code: "Backquote", modifiers: ["control"] });
@@ -28,10 +34,17 @@ test("the Podman terminal shortcut prefers the built-in terminal's binding", () 
 });
 
 test("the fallback binding is distinct and equally admitted", () => {
-  const fallback: Record<string, unknown> = PODMAN_TERMINAL_SHORTCUT_FALLBACK_DEFAULTS;
+  const fallback: Record<string, unknown> =
+    PODMAN_TERMINAL_SHORTCUT_FALLBACK_DEFAULTS;
   assert.deepEqual(
     Object.keys(fallback).sort(),
-    ["desktop:linux", "desktop:macos", "desktop:windows", "web:macos", "web:windows"],
+    [
+      "desktop:linux",
+      "desktop:macos",
+      "desktop:windows",
+      "web:macos",
+      "web:windows",
+    ],
   );
   // macOS Web admits Ctrl+` and Meta+Shift+`, never Ctrl+Shift+`.
   assert.deepEqual(PODMAN_TERMINAL_SHORTCUT_FALLBACK_DEFAULTS["web:macos"], {
@@ -39,7 +52,12 @@ test("the fallback binding is distinct and equally admitted", () => {
     modifiers: ["meta", "shift"],
   });
   for (
-    const profile of ["desktop:macos", "desktop:windows", "desktop:linux", "web:windows"] as const
+    const profile of [
+      "desktop:macos",
+      "desktop:windows",
+      "desktop:linux",
+      "web:windows",
+    ] as const
   ) {
     assert.deepEqual(PODMAN_TERMINAL_SHORTCUT_FALLBACK_DEFAULTS[profile], {
       code: "Backquote",

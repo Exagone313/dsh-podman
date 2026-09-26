@@ -11,16 +11,33 @@ import { FitAddon } from "@xterm/addon-fit";
 import { type ITheme, Terminal } from "@xterm/xterm";
 import xtermCss from "@xterm/xterm/css/xterm.css";
 import { Button } from "@deepseek-ai/dsh-client-ui-primitives";
-import type { InjectFace, PropsLocale, PropsRuntime } from "@deepseek-ai/dsh-client-ui-slots";
-import { type ReactNode, useEffect, useLayoutEffect, useRef, useState } from "react";
+import type {
+  InjectFace,
+  PropsLocale,
+  PropsRuntime,
+} from "@deepseek-ai/dsh-client-ui-slots";
+import {
+  type ReactNode,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import type { ContainerView } from "./card-protocol.js";
 import type { ContainerCardFace } from "./container-card-controller.js";
 import { fieldLabel, imageSelect } from "./container-card-styles.js";
 import { NS } from "./locales.js";
 import type { PodmanTerminalParams } from "./terminal-tab.js";
-import type { TerminalFrame, TerminalShellView, TerminalTargetView } from "./terminal-protocol.js";
+import type {
+  TerminalFrame,
+  TerminalShellView,
+  TerminalTargetView,
+} from "./terminal-protocol.js";
 import { containerOptions } from "./terminal-targets.js";
-import { forgetTerminalTitle, publishTerminalTitle } from "./terminal-titles.js";
+import {
+  forgetTerminalTitle,
+  publishTerminalTitle,
+} from "./terminal-titles.js";
 import {
   base64ToBytes,
   bytesToBase64,
@@ -155,8 +172,12 @@ export function PodmanTerminal(props: PodmanTerminalProps): ReactNode {
   // itself: the browser neither chooses nor guesses one. `failed` means the
   // host cannot place this session in a workspace.
   const [target, setTarget] = useState<TargetState>({ phase: "loading" });
-  const workspace = target.phase === "ready" ? target.target.workspace : undefined;
-  const workspaceSlug = target.phase === "ready" ? target.target.workspaceSlug : undefined;
+  const workspace = target.phase === "ready"
+    ? target.target.workspace
+    : undefined;
+  const workspaceSlug = target.phase === "ready"
+    ? target.target.workspaceSlug
+    : undefined;
   const unknownWorkspace = target.phase === "failed";
   const [container, setContainer] = useState<string | undefined>(
     params?.container,
@@ -186,7 +207,9 @@ export function PodmanTerminal(props: PodmanTerminalProps): ReactNode {
     setTarget({ phase: "loading" });
     void fetchTerminalTarget(sessionId, controller.signal).then(
       (resolved) => {
-        if (!controller.signal.aborted) setTarget({ phase: "ready", target: resolved });
+        if (!controller.signal.aborted) {
+          setTarget({ phase: "ready", target: resolved });
+        }
       },
       (error: unknown) => {
         if (controller.signal.aborted) return;
@@ -211,7 +234,9 @@ export function PodmanTerminal(props: PodmanTerminalProps): ReactNode {
 
   // The shells a container really offers; refetched whenever the target moves.
   useEffect(() => {
-    if (workspace === undefined || workspace === "" || container === undefined) {
+    if (
+      workspace === undefined || workspace === "" || container === undefined
+    ) {
       return;
     }
     const controller = new AbortController();
@@ -422,7 +447,9 @@ export function PodmanTerminal(props: PodmanTerminalProps): ReactNode {
       break;
     case "exited":
       statusLabel = t("terminalStatusExited", {
-        code: status.code === null ? t("terminalNoExitCode") : String(status.code),
+        code: status.code === null
+          ? t("terminalNoExitCode")
+          : String(status.code),
       });
       break;
     case "detached":
@@ -499,7 +526,9 @@ export function PodmanTerminal(props: PodmanTerminalProps): ReactNode {
           {state.busy ? t("terminalLoading") : t("unavailable")}
         </p>
       )}
-      {target.phase === "failed" && <p style={ERROR_STYLE} role="alert">{target.message}</p>}
+      {target.phase === "failed" && (
+        <p style={ERROR_STYLE} role="alert">{target.message}</p>
+      )}
       {shells.phase === "failed" && (
         <p style={ERROR_STYLE} role="alert">
           {t("terminalShellsFailed", { message: shells.message })}

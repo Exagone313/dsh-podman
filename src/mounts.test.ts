@@ -12,32 +12,60 @@ import {
   testReadSession,
   WORKSPACE_ID,
 } from "./test-support.js";
-import { approvalDecision, preExecutePolicy, summarizeArgs, toolHandlers, TOOLS } from "./index.js";
+import {
+  approvalDecision,
+  preExecutePolicy,
+  summarizeArgs,
+  toolHandlers,
+  TOOLS,
+} from "./index.js";
 import { forcedMountMode } from "./mount-enums.js";
-import { mountInputToProto, mountsFromInput, validateMountInput } from "./mount-input.js";
+import {
+  mountInputToProto,
+  mountsFromInput,
+  validateMountInput,
+} from "./mount-input.js";
 
 test("mount validation is shared between the tools and the card", () => {
   // A secret mount is read-only on every entry point.
   assert.throws(
-    () => validateMountInput({ kind: "secret", secret: "s", mode: "read_write" }, "/projects"),
+    () =>
+      validateMountInput(
+        { kind: "secret", secret: "s", mode: "read_write" },
+        "/projects",
+      ),
     /read-only/,
   );
   assert.throws(
-    () => mountInputToProto({ kind: "secret", secret: "s", mode: "read_write" }, "/projects"),
+    () =>
+      mountInputToProto(
+        { kind: "secret", secret: "s", mode: "read_write" },
+        "/projects",
+      ),
     /read-only/,
   );
   // A project mount never takes a destination.
   assert.throws(
-    () => mountInputToProto({ kind: "project", project: "p", destination: "/x" }, "/projects"),
+    () =>
+      mountInputToProto(
+        { kind: "project", project: "p", destination: "/x" },
+        "/projects",
+      ),
     /destination/,
   );
-  assert.deepEqual(mountInputToProto({ kind: "project", project: "team" }, "/projects"), {
-    projectName: "team",
-    kind: "MOUNT_KIND_PROJECT",
-    mode: "MOUNT_MODE_READ_ONLY",
-  });
   assert.deepEqual(
-    mountInputToProto({ kind: "secret", secret: "s", destination: "/run/s" }, "/projects"),
+    mountInputToProto({ kind: "project", project: "team" }, "/projects"),
+    {
+      projectName: "team",
+      kind: "MOUNT_KIND_PROJECT",
+      mode: "MOUNT_MODE_READ_ONLY",
+    },
+  );
+  assert.deepEqual(
+    mountInputToProto(
+      { kind: "secret", secret: "s", destination: "/run/s" },
+      "/projects",
+    ),
     {
       projectName: "",
       kind: "MOUNT_KIND_SECRET",
@@ -46,21 +74,27 @@ test("mount validation is shared between the tools and the card", () => {
       secret: "s",
     },
   );
-  assert.deepEqual(mountsFromInput([{ kind: "tmpfs", destination: "/data" }], "/projects"), [
-    {
-      projectName: "",
-      kind: "MOUNT_KIND_TMPFS",
-      mode: "MOUNT_MODE_READ_WRITE",
-      destination: "/data",
-    },
-  ]);
+  assert.deepEqual(
+    mountsFromInput([{ kind: "tmpfs", destination: "/data" }], "/projects"),
+    [
+      {
+        projectName: "",
+        kind: "MOUNT_KIND_TMPFS",
+        mode: "MOUNT_MODE_READ_WRITE",
+        destination: "/data",
+      },
+    ],
+  );
 });
 
 test("container_start approval depends on mounts being passed", () => {
   const tool = TOOLS.find((entry) => entry.name === "container_start");
   assert.ok(tool, "container_start registered");
   assert.notEqual(tool!.approval, true, "container_start must not always ask");
-  assert.ok(typeof tool!.approvalWhen === "function", "container_start approvalWhen");
+  assert.ok(
+    typeof tool!.approvalWhen === "function",
+    "container_start approvalWhen",
+  );
 
   assert.equal(
     approvalDecision("container_start", { container: "web" }),
@@ -109,7 +143,11 @@ test("preExecutePolicy denies project mounts that carry a destination", async ()
   const deny = (await preExecutePolicy(
     {
       name: "container_mount_add",
-      arguments: { kind: "project", project: "team/src", destination: "/custom" },
+      arguments: {
+        kind: "project",
+        project: "team/src",
+        destination: "/custom",
+      },
     },
     () => Promise.resolve({ kind: "allow" }),
     () => "/projects",
@@ -134,7 +172,11 @@ test("preExecutePolicy denies project mounts that carry a destination", async ()
     () => Promise.resolve({ kind: "allow" }),
     () => "/projects",
   )) as { kind: string };
-  assert.equal(startDeny.kind, "deny", "a mounts array with a project destination must deny");
+  assert.equal(
+    startDeny.kind,
+    "deny",
+    "a mounts array with a project destination must deny",
+  );
 
   const volumeAllowed = (await preExecutePolicy(
     {
@@ -143,7 +185,11 @@ test("preExecutePolicy denies project mounts that carry a destination", async ()
     },
     () => Promise.resolve({ kind: "ask", reason: "x" }),
   )) as { kind: string };
-  assert.equal(volumeAllowed.kind, "ask", "non-project mounts with a destination must still ask");
+  assert.equal(
+    volumeAllowed.kind,
+    "ask",
+    "non-project mounts with a destination must still ask",
+  );
 
   const underNever = (await preExecutePolicy(
     {
@@ -156,18 +202,30 @@ test("preExecutePolicy denies project mounts that carry a destination", async ()
     undefined,
     testReadSession,
   )) as { kind: string };
-  assert.equal(underNever.kind, "deny", "full access must not accept an invalid project mount");
+  assert.equal(
+    underNever.kind,
+    "deny",
+    "full access must not accept an invalid project mount",
+  );
 });
 
 test("mount tools are registered with the expected schemas", () => {
   const listTool = TOOLS.find((entry) => entry.name === "container_mount_list");
   assert.ok(listTool, "container_mount_list registered");
-  assert.notEqual(listTool!.approval, true, "container_mount_list must not require approval");
+  assert.notEqual(
+    listTool!.approval,
+    true,
+    "container_mount_list must not require approval",
+  );
   assert.deepEqual(listTool!.parameters.required, ["container"]);
 
   const addTool = TOOLS.find((entry) => entry.name === "container_mount_add");
   assert.ok(addTool, "container_mount_add registered");
-  assert.equal(addTool!.approval, true, "container_mount_add must require approval");
+  assert.equal(
+    addTool!.approval,
+    true,
+    "container_mount_add must require approval",
+  );
   assert.deepEqual(addTool!.parameters.required, ["container"]);
   assert.deepEqual(addTool!.parameters.properties.mode.enum, [
     "read_only",
@@ -190,9 +248,15 @@ test("mount tools are registered with the expected schemas", () => {
     "container_mount_add accepts a secret",
   );
 
-  const removeTool = TOOLS.find((entry) => entry.name === "container_mount_remove");
+  const removeTool = TOOLS.find((entry) =>
+    entry.name === "container_mount_remove"
+  );
   assert.ok(removeTool, "container_mount_remove registered");
-  assert.equal(removeTool!.approval, true, "container_mount_remove must require approval");
+  assert.equal(
+    removeTool!.approval,
+    true,
+    "container_mount_remove must require approval",
+  );
   assert.deepEqual(removeTool!.parameters.required, ["container"]);
   assert.deepEqual(removeTool!.parameters.properties.kind.enum, [
     "project",
@@ -216,9 +280,15 @@ test("mount tools are registered with the expected schemas", () => {
     "container_mount_remove accepts a destination",
   );
 
-  const updateTool = TOOLS.find((entry) => entry.name === "container_mount_update");
+  const updateTool = TOOLS.find((entry) =>
+    entry.name === "container_mount_update"
+  );
   assert.ok(updateTool, "container_mount_update registered");
-  assert.equal(updateTool!.approval, true, "container_mount_update must require approval");
+  assert.equal(
+    updateTool!.approval,
+    true,
+    "container_mount_update must require approval",
+  );
   assert.deepEqual(updateTool!.parameters.required, ["container", "mode"]);
   assert.deepEqual(updateTool!.parameters.properties.kind.enum, [
     "project",
@@ -273,12 +343,22 @@ test("container_mount_update maps the selector and mode", async () => {
   const { requests, resolver } = mountRequestRecorder();
   await toolHandlers.container_mount_update(
     resolver as never,
-    { container: "valkey-ctr", kind: "project", project: "team/src", mode: "read_only" },
+    {
+      container: "valkey-ctr",
+      kind: "project",
+      project: "team/src",
+      mode: "read_only",
+    },
     MOUNT_EXEC,
   );
   await toolHandlers.container_mount_update(
     resolver as never,
-    { container: "valkey-ctr", volume: "valkey-data", destination: "/data", mode: "read_write" },
+    {
+      container: "valkey-ctr",
+      volume: "valkey-data",
+      destination: "/data",
+      mode: "read_write",
+    },
     MOUNT_EXEC,
   );
   assert.deepEqual(requests[0], [
@@ -310,7 +390,12 @@ test("container_mount_update rejects kinds without a mode", async () => {
     () =>
       toolHandlers.container_mount_update(
         resolver as never,
-        { container: "web", kind: "tmpfs", destination: "/mnt", mode: "read_only" },
+        {
+          container: "web",
+          kind: "tmpfs",
+          destination: "/mnt",
+          mode: "read_only",
+        },
         MOUNT_EXEC,
       ),
     /only project and volume mounts carry a mode; tmpfs mounts cannot be remounted/,
@@ -324,7 +409,11 @@ test("container_mount_update rejects kinds without a mode", async () => {
       ),
     /unknown mount mode: rw/,
   );
-  assert.deepEqual(requests, [], "a rejected update must not reach the orchestrator");
+  assert.deepEqual(
+    requests,
+    [],
+    "a rejected update must not reach the orchestrator",
+  );
 });
 
 test("summarizeArgs renders the remount reason", () => {
@@ -368,7 +457,11 @@ test("container_mount_add rejects unknown mount kinds and modes", async () => {
       ),
     /unknown mount mode: rw/,
   );
-  assert.deepEqual(requests, [], "a rejected mount must not reach the orchestrator");
+  assert.deepEqual(
+    requests,
+    [],
+    "a rejected mount must not reach the orchestrator",
+  );
 });
 
 test("container_mount_add rejects a destination on a project mount", async () => {
@@ -377,7 +470,12 @@ test("container_mount_add rejects a destination on a project mount", async () =>
     () =>
       toolHandlers.container_mount_add(
         resolver as never,
-        { container: "web", kind: "project", project: "team/src", destination: "/custom" },
+        {
+          container: "web",
+          kind: "project",
+          project: "team/src",
+          destination: "/custom",
+        },
         MOUNT_EXEC,
       ),
     /Project mounts cannot set a destination; "team\/src" always mounts at "\/projects\/team\/src"/,
@@ -391,14 +489,22 @@ test("container_mount_add rejects a destination on a project mount", async () =>
       ),
     /Project mounts cannot set a destination/,
   );
-  assert.deepEqual(requests, [], "a rejected mount must not reach the orchestrator");
+  assert.deepEqual(
+    requests,
+    [],
+    "a rejected mount must not reach the orchestrator",
+  );
 
   await toolHandlers.container_mount_add(
     resolver as never,
     { container: "web", kind: "volume", volume: "data", destination: "/data" },
     MOUNT_EXEC,
   );
-  assert.equal(requests.length, 1, "a volume mount with a destination is still accepted");
+  assert.equal(
+    requests.length,
+    1,
+    "a volume mount with a destination is still accepted",
+  );
 });
 
 test("container_start rejects a destination on a project mount", async () => {
@@ -416,7 +522,11 @@ test("container_start rejects a destination on a project mount", async () => {
       ),
     /Project mounts cannot set a destination/,
   );
-  assert.deepEqual(requests, [], "a rejected mount must not reach the orchestrator");
+  assert.deepEqual(
+    requests,
+    [],
+    "a rejected mount must not reach the orchestrator",
+  );
 });
 
 test("container_mount_remove rejects unknown mount kinds", async () => {
@@ -430,7 +540,11 @@ test("container_mount_remove rejects unknown mount kinds", async () => {
       ),
     /unknown mount kind: bind/,
   );
-  assert.deepEqual(requests, [], "a rejected mount must not reach the orchestrator");
+  assert.deepEqual(
+    requests,
+    [],
+    "a rejected mount must not reach the orchestrator",
+  );
 });
 
 test("adding a tmpfs mount without a mode stays read_write", async () => {
@@ -521,7 +635,11 @@ test("container start and recreate reject unknown mount kinds and modes", async 
       ),
     /unknown mount mode: rw/,
   );
-  assert.deepEqual(requests, [], "a rejected mount must not reach the orchestrator");
+  assert.deepEqual(
+    requests,
+    [],
+    "a rejected mount must not reach the orchestrator",
+  );
 });
 
 test("container start maps valid mounts and defaults the mode to read_only", async () => {
@@ -535,7 +653,11 @@ test("container start maps valid mounts and defaults the mode to read_only", asy
         { project: "team/src", mode: "read_only" },
         { project: "team", mode: "read_write" },
         { kind: "volume", volume: "valkey-data", destination: "/data" },
-        { kind: "secret", secret: "valkey-tls", destination: "/run/secrets/tls" },
+        {
+          kind: "secret",
+          secret: "valkey-tls",
+          destination: "/run/secrets/tls",
+        },
         { kind: "tmpfs", destination: "/scratch" },
       ],
     },
@@ -626,7 +748,11 @@ test("container_mount_list returns mount objects", async () => {
           workspaceSlug: WORKSPACE_ID,
           containerName: "default",
           mounts: [
-            { projectName: "team", mode: "MOUNT_MODE_READ_WRITE", kind: "MOUNT_KIND_PROJECT" },
+            {
+              projectName: "team",
+              mode: "MOUNT_MODE_READ_WRITE",
+              kind: "MOUNT_KIND_PROJECT",
+            },
             {
               volume: "myvol",
               destination: "/data",
@@ -646,7 +772,12 @@ test("container_mount_list returns mount objects", async () => {
   );
   assert.deepEqual(out, [
     { projectName: "team", mode: "read_write", kind: "project" },
-    { volume: "myvol", destination: "/data", mode: "read_only", kind: "volume" },
+    {
+      volume: "myvol",
+      destination: "/data",
+      mode: "read_only",
+      kind: "volume",
+    },
   ]);
 });
 

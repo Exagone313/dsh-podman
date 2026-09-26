@@ -21,7 +21,12 @@ import {
 } from "./container-card-styles.js";
 import { type ImageView } from "./container-card-controller.js";
 import type { Translate } from "./locales.js";
-import { Button, DisclosureRow, Input, Modal } from "@deepseek-ai/dsh-client-ui-primitives";
+import {
+  Button,
+  DisclosureRow,
+  Input,
+  Modal,
+} from "@deepseek-ai/dsh-client-ui-primitives";
 import { type ReactNode, useId, useState } from "react";
 
 export function ImageItem(props: {
@@ -33,7 +38,8 @@ export function ImageItem(props: {
   onRebuild: (imageId: string) => void;
   onSetDefault: (imageId: string) => void;
 }): ReactNode {
-  const { t, image, busy, defaultImage, onRemove, onRebuild, onSetDefault } = props;
+  const { t, image, busy, defaultImage, onRemove, onRebuild, onSetDefault } =
+    props;
   const [open, setOpen] = useState(false);
   return (
     <DisclosureRow
@@ -66,8 +72,12 @@ export function ImageItem(props: {
                     t("none")
                   )
                   : (
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
-                      {image.packages.map((pkg) => <Chip key={pkg} t={t} label={pkg} />)}
+                    <div
+                      style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}
+                    >
+                      {image.packages.map((pkg) => (
+                        <Chip key={pkg} t={t} label={pkg} />
+                      ))}
                     </div>
                   )}
               </td>
@@ -114,9 +124,11 @@ export function BaseImageRow(props: {
   onPull: (name: string) => void;
   onSetDefault: (imageId: string) => void;
 }): ReactNode {
-  const { t, image, busy, defaultImage, onRebuild, onPull, onSetDefault } = props;
+  const { t, image, busy, defaultImage, onRebuild, onPull, onSetDefault } =
+    props;
   const [open, setOpen] = useState(false);
-  const pull = image.basePublic && (image.status === "missing" || image.status === "pulled");
+  const pull = image.basePublic &&
+    (image.status === "missing" || image.status === "pulled");
   const build = !image.basePublic && image.status === "missing";
   const rebuild = !image.basePublic && image.status === "built";
   return (
@@ -144,7 +156,9 @@ export function BaseImageRow(props: {
             </tr>
             <tr>
               <th style={thStyle} scope="row">{t("builtAt")}</th>
-              <td style={tdStyle}>{image.builtAt === "" ? t("none") : image.builtAt}</td>
+              <td style={tdStyle}>
+                {image.builtAt === "" ? t("none") : image.builtAt}
+              </td>
             </tr>
             <tr>
               <th style={thStyle} scope="row">{t("packages")}</th>
@@ -154,8 +168,12 @@ export function BaseImageRow(props: {
                     t("none")
                   )
                   : (
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
-                      {image.packages.map((pkg) => <Chip key={pkg} t={t} label={pkg} />)}
+                    <div
+                      style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}
+                    >
+                      {image.packages.map((pkg) => (
+                        <Chip key={pkg} t={t} label={pkg} />
+                      ))}
                     </div>
                   )}
               </td>

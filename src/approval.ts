@@ -3,7 +3,10 @@
 // SPDX-License-Identifier: MIT
 
 import { approvalPath, currentCwd } from "./guest-rpc.js";
-import { inferMountKind, projectMountDestinationReason } from "./mount-input.js";
+import {
+  inferMountKind,
+  projectMountDestinationReason,
+} from "./mount-input.js";
 import { defaultMountMode } from "./mount-enums.js";
 import { type ReadOnlyShellDecision } from "./read-only-shell.js";
 import { TOOLS } from "./tool-schemas.js";
@@ -24,10 +27,13 @@ function mountFact(
 ): MountFact | undefined {
   const inferred = inferMountKind(mount);
   const kind: MountFact["kind"] =
-    inferred === "volume" || inferred === "secret" || inferred === "tmpfs" ? inferred : "project";
-  const destination = typeof mount.destination === "string" && mount.destination !== ""
-    ? mount.destination
-    : undefined;
+    inferred === "volume" || inferred === "secret" || inferred === "tmpfs"
+      ? inferred
+      : "project";
+  const destination =
+    typeof mount.destination === "string" && mount.destination !== ""
+      ? mount.destination
+      : undefined;
   const source = kind === "tmpfs"
     ? ""
     : kind === "volume"
@@ -54,10 +60,14 @@ export function reasonFact(
   sessionCwd?: unknown,
 ): ReasonFact | undefined {
   const str = (key: string): string | undefined =>
-    typeof args[key] === "string" && args[key] !== "" ? (args[key] as string) : undefined;
+    typeof args[key] === "string" && args[key] !== ""
+      ? (args[key] as string)
+      : undefined;
   const listOf = (key: string): string[] | undefined => {
     const value = args[key];
-    return Array.isArray(value) && value.length > 0 ? value.map((item) => String(item)) : undefined;
+    return Array.isArray(value) && value.length > 0
+      ? value.map((item) => String(item))
+      : undefined;
   };
   const mountItems = (): MountFact[] | undefined => {
     const value = args.mounts;
@@ -85,11 +95,17 @@ export function reasonFact(
   const envKeys = (): string[] | undefined => mapKeys("env");
   const numberListOf = (key: string): number[] | undefined => {
     const value = args[key];
-    return Array.isArray(value) && value.length > 0 ? value.map((item) => Number(item)) : undefined;
+    return Array.isArray(value) && value.length > 0
+      ? value.map((item) => Number(item))
+      : undefined;
   };
   // The optional process identity a tool may carry, shared by the tools that
   // can run a process as another user.
-  const identityFact = (): { uid?: number; gid?: number; groups?: number[] } => {
+  const identityFact = (): {
+    uid?: number;
+    gid?: number;
+    groups?: number[];
+  } => {
     const uid = typeof args.uid === "number" ? args.uid : undefined;
     const gid = typeof args.gid === "number" ? args.gid : undefined;
     const groups = numberListOf("groups");
@@ -144,21 +160,29 @@ export function reasonFact(
     }
     case "container_remove": {
       const container = str("container");
-      return container === undefined ? undefined : { kind: "container_remove", container };
+      return container === undefined
+        ? undefined
+        : { kind: "container_remove", container };
     }
     case "volume_remove": {
       const volume = str("name");
-      return volume === undefined ? undefined : { kind: "volume_remove", name: volume };
+      return volume === undefined
+        ? undefined
+        : { kind: "volume_remove", name: volume };
     }
     case "secret_remove": {
       const secret = str("name");
-      return secret === undefined ? undefined : { kind: "secret_remove", name: secret };
+      return secret === undefined
+        ? undefined
+        : { kind: "secret_remove", name: secret };
     }
     case "container_secret_add": {
       const container = str("container");
       const env = str("env");
       const secret = str("secret");
-      if (container === undefined || env === undefined || secret === undefined) {
+      if (
+        container === undefined || env === undefined || secret === undefined
+      ) {
         return undefined;
       }
       return { kind: "container_secret_add", container, secret, env };
@@ -188,7 +212,9 @@ export function reasonFact(
     case "container_path_set": {
       const container = str("container");
       if (container === undefined) return undefined;
-      const paths = Array.isArray(args.paths) ? args.paths.map((path) => String(path)) : [];
+      const paths = Array.isArray(args.paths)
+        ? args.paths.map((path) => String(path))
+        : [];
       return { kind: "container_path_set", container, paths };
     }
     case "container_path_add":
@@ -407,14 +433,24 @@ export async function preExecutePolicy(
     ? (args as Record<string, unknown>)
     : undefined;
   const projectsRoot = getProjectsRoot?.();
-  const denyReason = mountDestinationsReason(name, parsed, projectsRoot, locale);
+  const denyReason = mountDestinationsReason(
+    name,
+    parsed,
+    projectsRoot,
+    locale,
+  );
   if (denyReason !== undefined) {
     return { kind: "deny", reason: denyReason };
   }
   if (facts.policy === "never") return next();
   const sessionCwd = currentCwd(exec);
-  if (facts.preset === PODMAN_OPS_PRESET && PODMAN_OPS_APPROVAL_TOOLS.has(name)) {
-    return { kind: "ask", ...askReason(name, parsed ?? {}, sessionCwd, locale) };
+  if (
+    facts.preset === PODMAN_OPS_PRESET && PODMAN_OPS_APPROVAL_TOOLS.has(name)
+  ) {
+    return {
+      kind: "ask",
+      ...askReason(name, parsed ?? {}, sessionCwd, locale),
+    };
   }
   return approvalDecision(name, parsed, sessionCwd, locale) ?? next();
 }

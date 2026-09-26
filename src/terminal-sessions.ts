@@ -22,7 +22,9 @@ import { type SerializeAddon as Serializer } from "@xterm/addon-serialize";
 // Both xterm packages are CommonJS: a default ESM import of their named exports
 // fails under Node's interop rules, so they are required with their own types.
 const require = createRequire(import.meta.url);
-const { Terminal } = require("@xterm/headless") as typeof import("@xterm/headless");
+const { Terminal } = require(
+  "@xterm/headless",
+) as typeof import("@xterm/headless");
 const { SerializeAddon } = require(
   "@xterm/addon-serialize",
 ) as typeof import("@xterm/addon-serialize");
@@ -116,13 +118,22 @@ export class TerminalSessions {
       };
     }
     const binding = options.container === "" || options.container === "default"
-      ? await this.options.resolver.resolveForPath(options.cwd, options.cwd, options.signal)
+      ? await this.options.resolver.resolveForPath(
+        options.cwd,
+        options.cwd,
+        options.signal,
+      )
       : await this.options.resolver.containerBinding(
         options.cwd,
         options.container,
         options.signal,
       );
-    const shell = await requireShell(binding, options.cwd, options.shell, options.signal);
+    const shell = await requireShell(
+      binding,
+      options.cwd,
+      options.shell,
+      options.signal,
+    );
     const terminal = openGuestTerminal(binding, {
       argv: [shell.path, "-i"],
       cwd: options.cwd,
@@ -155,12 +166,19 @@ export class TerminalSessions {
     };
     terminal.onOutput((chunk) => {
       entry.screen.write(chunk);
-      entry.listener?.({ type: "data", data: Buffer.from(chunk).toString("base64") });
+      entry.listener?.({
+        type: "data",
+        data: Buffer.from(chunk).toString("base64"),
+      });
     });
     void terminal.done.then(
       (outcome) => {
         entry.exit = outcome;
-        entry.listener?.({ type: "exit", exitCode: outcome.exitCode, signal: outcome.signal });
+        entry.listener?.({
+          type: "exit",
+          exitCode: outcome.exitCode,
+          signal: outcome.signal,
+        });
       },
       (error) => {
         entry.failure = error instanceof Error ? error.message : String(error);
@@ -217,7 +235,11 @@ export class TerminalSessions {
     });
     if (snapshot !== undefined) write({ type: "snapshot", screen: snapshot });
     if (entry.exit !== undefined) {
-      write({ type: "exit", exitCode: entry.exit.exitCode, signal: entry.exit.signal });
+      write({
+        type: "exit",
+        exitCode: entry.exit.exitCode,
+        signal: entry.exit.signal,
+      });
     } else if (entry.failure !== undefined) {
       write({ type: "error", message: entry.failure });
     }

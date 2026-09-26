@@ -9,7 +9,8 @@ import { existsSync, readFileSync } from "node:fs";
 // Every harness dependency must be an exact version: the set moves together
 // with the supported dsh release, and a caret quietly allowed the manifest to
 // drift a release behind the image.
-const EXACT_VERSION = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/;
+const EXACT_VERSION =
+  /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/;
 
 const SECTIONS = ["devDependencies", "peerDependencies"] as const;
 

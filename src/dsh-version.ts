@@ -24,7 +24,8 @@ export function dshVersion(): string {
 function resolveDshVersion(): string | undefined {
   let searchPaths: Array<string | null>;
   try {
-    searchPaths = createRequire(import.meta.url).resolve.paths("@deepseek-ai/dsh") ?? [];
+    searchPaths =
+      createRequire(import.meta.url).resolve.paths("@deepseek-ai/dsh") ?? [];
   } catch {
     return undefined;
   }

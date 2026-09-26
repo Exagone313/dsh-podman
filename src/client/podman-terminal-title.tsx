@@ -6,7 +6,10 @@
 // glyph plus the running shell's name. The name is the host's (published by the
 // tab body when it connects), the shell the page opened with before that, or the
 // registry title while neither is known.
-import type { InjectFace, PropsRuntime } from "@deepseek-ai/dsh-client-ui-slots";
+import type {
+  InjectFace,
+  PropsRuntime,
+} from "@deepseek-ai/dsh-client-ui-slots";
 import { type ReactNode, useSyncExternalStore } from "react";
 import type { PodmanTerminalParams } from "./terminal-tab.js";
 import { shellName } from "./terminal-targets.js";
@@ -45,7 +48,13 @@ export function PodmanTerminalTitle(
 // instead of the plugin artwork's fixed brand palette.
 function TerminalGlyph(): ReactNode {
   return (
-    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 16 16"
+      fill="none"
+      aria-hidden="true"
+    >
       <path d="M3 4L7 8L3 12" stroke="currentColor" />
       <path d="M9 12H13" stroke="currentColor" />
     </svg>

@@ -35,7 +35,9 @@ export function containerOptions(
   const names = new Set<string>();
   for (const container of containers) {
     if (container.workspaceSlug !== workspaceSlug) continue;
-    if (container.containerName === "" || container.containerName === "default") {
+    if (
+      container.containerName === "" || container.containerName === "default"
+    ) {
       continue;
     }
     // A podman name is an internal identifier the API rejects; never offer one.
@@ -71,7 +73,9 @@ export function validShell(
   shells: readonly TerminalShellView[],
 ): string | undefined {
   if (remembered === undefined || remembered === "") return undefined;
-  return shells.some((shell) => shell.path === remembered) ? remembered : undefined;
+  return shells.some((shell) => shell.path === remembered)
+    ? remembered
+    : undefined;
 }
 
 /**

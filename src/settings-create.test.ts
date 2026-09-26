@@ -127,7 +127,14 @@ test("secret_create command drives createSecret with the name", async () => {
   };
   await installCardCommandDriver(fakeContext(scope), resolver);
   await scope.update({
-    command: { op: "secret_create", workspace: "db-pass", image: "", at: 6, mounts: [], value: "" },
+    command: {
+      op: "secret_create",
+      workspace: "db-pass",
+      image: "",
+      at: 6,
+      mounts: [],
+      value: "",
+    },
   });
   await new Promise((resolve) => setImmediate(resolve));
   const createCall = calls.find(([method]) => method === "createSecret");
@@ -153,7 +160,13 @@ test("secret_create command drives createSecret with length when provided", asyn
   };
   await installCardCommandDriver(fakeContext(scope), resolver);
   await scope.update({
-    command: { op: "secret_create", workspace: "s", image: "", at: 11, length: 48 },
+    command: {
+      op: "secret_create",
+      workspace: "s",
+      image: "",
+      at: 11,
+      length: 48,
+    },
   });
   await new Promise((resolve) => setImmediate(resolve));
   const createCall = calls.find(([method]) => method === "createSecret");
@@ -205,11 +218,20 @@ test("secret_create command drives createSecret with charset when provided", asy
   };
   await installCardCommandDriver(fakeContext(scope), resolver);
   await scope.update({
-    command: { op: "secret_create", workspace: "tok", length: 48, charset: "hex" },
+    command: {
+      op: "secret_create",
+      workspace: "tok",
+      length: 48,
+      charset: "hex",
+    },
   });
   await new Promise((resolve) => setImmediate(resolve));
   const createCall = calls.find(([method]) => method === "createSecret");
-  assert.deepEqual(createCall?.[1], { name: "tok", length: 48, charset: "hex" });
+  assert.deepEqual(createCall?.[1], {
+    name: "tok",
+    length: 48,
+    charset: "hex",
+  });
   assert.equal(scope.value.command, null);
 });
 

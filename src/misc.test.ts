@@ -4,7 +4,11 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
-import { fakeToolContext, guestExecRecorder, guestFileRecorder } from "./test-support.js";
+import {
+  fakeToolContext,
+  guestExecRecorder,
+  guestFileRecorder,
+} from "./test-support.js";
 import {
   HARNESS_SOURCE_SECTION,
   toolCallView,
@@ -52,7 +56,11 @@ test("file tools resolve relative paths against the session cwd", async () => {
     exec,
     fakeToolContext(absolute.resolver),
   );
-  assert.deepEqual(absolute.reads, ["/etc/hosts"], "absolute paths pass through");
+  assert.deepEqual(
+    absolute.reads,
+    ["/etc/hosts"],
+    "absolute paths pass through",
+  );
 
   const write = guestFileRecorder();
   await toolHandlers.container_write(
@@ -61,17 +69,26 @@ test("file tools resolve relative paths against the session cwd", async () => {
     exec,
     fakeToolContext(write.resolver),
   );
-  assert.deepEqual(write.writes.map((entry) => entry.path), ["/projects/team/out.txt"]);
+  assert.deepEqual(write.writes.map((entry) => entry.path), [
+    "/projects/team/out.txt",
+  ]);
 
   const edit = guestFileRecorder("hello");
   await toolHandlers.container_edit(
     edit.resolver as never,
-    { container: "default", file_path: "a.txt", old_string: "hello", new_string: "bye" },
+    {
+      container: "default",
+      file_path: "a.txt",
+      old_string: "hello",
+      new_string: "bye",
+    },
     exec,
     fakeToolContext(edit.resolver),
   );
   assert.deepEqual(edit.reads, ["/projects/team/a.txt"]);
-  assert.deepEqual(edit.writes.map((entry) => entry.path), ["/projects/team/a.txt"]);
+  assert.deepEqual(edit.writes.map((entry) => entry.path), [
+    "/projects/team/a.txt",
+  ]);
 });
 
 test("file tools refuse traversal before reaching the guest", async () => {
@@ -112,11 +129,17 @@ test("tool presenters label every tool and render terminal commands", () => {
     );
   }
   assert.deepEqual(
-    toolCallView("container_bash", { command: "ls", description: "List files" }),
+    toolCallView("container_bash", {
+      command: "ls",
+      description: "List files",
+    }),
     { card: "terminal", title: "ls", description: "List files" },
   );
   assert.deepEqual(
-    toolCallView("container_exec", { argv: ["ls", "-la"], description: "List all" }),
+    toolCallView("container_exec", {
+      argv: ["ls", "-la"],
+      description: "List all",
+    }),
     { card: "terminal", title: "ls -la", description: "List all" },
   );
   assert.deepEqual(
@@ -193,7 +216,11 @@ test("command tools resolve a relative working directory", async () => {
     { container: "default", argv: ["ls"], workdir: "/abs" },
     exec,
   );
-  assert.equal(run.starts[0].cwd, "/abs", "absolute working directories pass through");
+  assert.equal(
+    run.starts[0].cwd,
+    "/abs",
+    "absolute working directories pass through",
+  );
 
   // An unset working directory defaults to the session's (when mounted).
   const bare = guestExecRecorder("/projects/team");
@@ -225,12 +252,22 @@ test("command tools pass an optional uid, gid, and groups", async () => {
   );
   // The managed environment is asserted separately; this pins the identity.
   const { env: _bashEnv, ...bashStart } = bash.starts[0];
-  assert.deepEqual(bashStart, { argv: ["bash", "-c", "id"], cwd: "/projects/team", uid: 1000 });
+  assert.deepEqual(bashStart, {
+    argv: ["bash", "-c", "id"],
+    cwd: "/projects/team",
+    uid: 1000,
+  });
 
   const run = guestExecRecorder("/projects/team");
   await toolHandlers.container_exec(
     run.resolver as never,
-    { container: "default", argv: ["id"], uid: 1000, gid: 2000, groups: [3000, 4000] },
+    {
+      container: "default",
+      argv: ["id"],
+      uid: 1000,
+      gid: 2000,
+      groups: [3000, 4000],
+    },
     exec,
   );
   const { env: _runEnv, ...runStart } = run.starts[0];

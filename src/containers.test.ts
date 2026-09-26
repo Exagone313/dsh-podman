@@ -21,7 +21,9 @@ import {
 } from "./index.js";
 
 test("container start/recreate/bash accept an env map schema", () => {
-  for (const name of ["container_start", "container_recreate", "container_bash"]) {
+  for (
+    const name of ["container_start", "container_recreate", "container_bash"]
+  ) {
     const tool = TOOLS.find((entry) => entry.name === name);
     assert.ok(tool, `${name} registered`);
     const env = tool!.parameters.properties.env;
@@ -145,12 +147,18 @@ test("container tools never expose internal fields in their results", async () =
       env: "DB_PASS",
       secret: "db-pass",
     }],
-    [toolHandlers.container_secret_remove, { container: "default", env: "DB_PASS" }],
+    [toolHandlers.container_secret_remove, {
+      container: "default",
+      env: "DB_PASS",
+    }],
   ];
   for (const [handler, input] of cases) {
     const out = await handler(secretBearingResolver(), input, exec);
     const json = JSON.stringify(out);
-    assert.ok(!json.includes("agentSocketPath"), "must not expose agentSocketPath");
+    assert.ok(
+      !json.includes("agentSocketPath"),
+      "must not expose agentSocketPath",
+    );
     assert.ok(!json.includes("agentToken"), "must not expose agentToken");
     assert.ok(!json.includes("podmanName"), "must not expose podmanName");
     assert.ok(!json.includes("workspaceSlug"), "must not expose workspaceSlug");
@@ -199,7 +207,11 @@ test("container start and recreate forward PATH additions", async () => {
     getConfig: () => ({ projectsRoot: "/projects" }),
     control: async (method: string, request: unknown) => {
       calls.push([method, request]);
-      return { containerName: "default", status: "running", paths: ["/opt/bin"] };
+      return {
+        containerName: "default",
+        status: "running",
+        paths: ["/opt/bin"],
+      };
     },
   } as never;
   const exec = { agent: { session: { header: { cwd: "/projects/team" } } } };
@@ -260,7 +272,11 @@ test("container_start keeps an existing container's environment", async () => {
       if (method === "listContainers") {
         return {
           containers: [
-            { workspaceSlug: WORKSPACE_ID, containerName: "web", env: { KEEP: "1" } },
+            {
+              workspaceSlug: WORKSPACE_ID,
+              containerName: "web",
+              env: { KEEP: "1" },
+            },
           ],
         };
       }
@@ -274,7 +290,11 @@ test("container_start keeps an existing container's environment", async () => {
     exec,
   );
   const start = calls.find(([method]) => method === "startContainer")!;
-  assert.equal("env" in start[1], false, "a stored environment must survive a start");
+  assert.equal(
+    "env" in start[1],
+    false,
+    "a stored environment must survive a start",
+  );
 });
 
 test("container_start lets the caller's environment win over the defaults", async () => {
@@ -283,7 +303,10 @@ test("container_start lets the caller's environment win over the defaults", asyn
     registry: { resolveByPath: async () => ({ id: WORKSPACE_ID }) },
     getConfig: () => ({
       projectsRoot: "/projects",
-      containerEnv: { GIT_AUTHOR_NAME: "John Doe", GIT_AUTHOR_EMAIL: "john.doe@git.example" },
+      containerEnv: {
+        GIT_AUTHOR_NAME: "John Doe",
+        GIT_AUTHOR_EMAIL: "john.doe@git.example",
+      },
     }),
     control: async (method: string, request: unknown) => {
       calls.push([method, request as any]);
@@ -317,21 +340,47 @@ test("container_recreate never injects the default environment", async () => {
     },
   } as never;
   const exec = { agent: { session: { header: { cwd: "/projects/team" } } } };
-  await toolHandlers.container_recreate(resolver, { container: "default" }, exec);
-  assert.equal("env" in calls[0][1], false, "a recreate stores what it is given");
+  await toolHandlers.container_recreate(
+    resolver,
+    { container: "default" },
+    exec,
+  );
+  assert.equal(
+    "env" in calls[0][1],
+    false,
+    "a recreate stores what it is given",
+  );
 });
 
 test("resolveGuestPath resolves relative paths and refuses traversal", () => {
   assert.equal(resolveGuestPath("/abs/file", "/projects/team"), "/abs/file");
-  assert.equal(resolveGuestPath("README.md", "/projects/team"), "/projects/team/README.md");
-  assert.equal(resolveGuestPath("src/main.go", "/projects/team"), "/projects/team/src/main.go");
+  assert.equal(
+    resolveGuestPath("README.md", "/projects/team"),
+    "/projects/team/README.md",
+  );
+  assert.equal(
+    resolveGuestPath("src/main.go", "/projects/team"),
+    "/projects/team/src/main.go",
+  );
   assert.equal(resolveGuestPath("./a", "/projects/team"), "/projects/team/a");
   // ".." is refused before resolution, where it would be normalised away.
-  assert.throws(() => resolveGuestPath("../escape", "/projects/team"), /must not escape/);
-  assert.throws(() => resolveGuestPath("a/../b", "/projects/team"), /must not escape/);
-  assert.throws(() => resolveGuestPath("/a/../b", "/projects/team"), /must not escape/);
+  assert.throws(
+    () => resolveGuestPath("../escape", "/projects/team"),
+    /must not escape/,
+  );
+  assert.throws(
+    () => resolveGuestPath("a/../b", "/projects/team"),
+    /must not escape/,
+  );
+  assert.throws(
+    () => resolveGuestPath("/a/../b", "/projects/team"),
+    /must not escape/,
+  );
   // A relative path is meaningless without a session working directory.
-  assert.throws(() => resolveGuestPath("rel", undefined), /session working directory/);
+  assert.throws(
+    () => resolveGuestPath("rel", undefined),
+    /session working directory/,
+  );
   assert.throws(() => resolveGuestPath("rel", ""), /session working directory/);
   assert.equal(resolveGuestPath("/abs", undefined), "/abs");
 });
@@ -342,7 +391,10 @@ test("resolveGuestCwd resolves working directories but keeps traversal", () => {
   assert.equal(resolveGuestCwd("/abs", "/projects/team"), "/abs");
   assert.equal(resolveGuestCwd("sub", "/projects/team"), "/projects/team/sub");
   // Commands are not confined to the projects root, so ".." is allowed here.
-  assert.equal(resolveGuestCwd("../sibling", "/projects/team"), "/projects/sibling");
+  assert.equal(
+    resolveGuestCwd("../sibling", "/projects/team"),
+    "/projects/sibling",
+  );
 });
 
 test("container_read applies offset and limit like the built-in read tool", async () => {
@@ -382,7 +434,11 @@ test("container_read records the read so a later write needs no re-read", async 
     ),
     "hello\n",
   );
-  assert.equal(ctx.observed.length, 1, "a successful read reports one observation");
+  assert.equal(
+    ctx.observed.length,
+    1,
+    "a successful read reports one observation",
+  );
   assert.equal(ctx.observed[0].target.displayPath, "/projects/team/f");
   assert.equal(ctx.observed[0].observation.kind, "present");
   assert.match(ctx.observed[0].observation.version, /^agent:/);
@@ -400,7 +456,8 @@ test("container_read reports a missing file and records it as absent", async () 
         exec,
         ctx,
       ),
-    (error: any) => error.code === "FS_NOT_FOUND" && /not found/.test(error.message),
+    (error: any) =>
+      error.code === "FS_NOT_FOUND" && /not found/.test(error.message),
   );
   assert.deepEqual(ctx.observed[0].observation, { kind: "absent" });
 });
@@ -413,18 +470,33 @@ test("container_edit requires a unique match unless replace_all is set", async (
     () =>
       toolHandlers.container_edit(
         duplicate.resolver as never,
-        { container: "default", file_path: "f", old_string: "a", new_string: "b" },
+        {
+          container: "default",
+          file_path: "f",
+          old_string: "a",
+          new_string: "b",
+        },
         exec,
         fakeToolContext(duplicate.resolver),
       ),
     /matched 3 times/,
   );
-  assert.deepEqual(duplicate.writes, [], "a non-unique match must not be written");
+  assert.deepEqual(
+    duplicate.writes,
+    [],
+    "a non-unique match must not be written",
+  );
 
   const all = guestFileRecorder("a a a");
   await toolHandlers.container_edit(
     all.resolver as never,
-    { container: "default", file_path: "f", old_string: "a", new_string: "b", replace_all: true },
+    {
+      container: "default",
+      file_path: "f",
+      old_string: "a",
+      new_string: "b",
+      replace_all: true,
+    },
     exec,
     fakeToolContext(all.resolver),
   );
@@ -432,7 +504,8 @@ test("container_edit requires a unique match unless replace_all is set", async (
 });
 
 test("container command and file tools mirror the built-in arguments", () => {
-  const parameters = (name: string): any => TOOLS.find((entry) => entry.name === name)!.parameters;
+  const parameters = (name: string): any =>
+    TOOLS.find((entry) => entry.name === name)!.parameters;
 
   const bash = parameters("container_bash");
   assert.ok(bash.required.includes("command"));
@@ -475,7 +548,9 @@ test("container_bash enforces timeoutMs", async () => {
       return {
         on(event: string, handler: (value?: unknown) => void) {
           (handlers[event] ??= []).push(handler);
-          if (event === "data") queueMicrotask(() => handler({ processId: "42" }));
+          if (event === "data") {
+            queueMicrotask(() => handler({ processId: "42" }));
+          }
         },
         write() {},
         end() {},
@@ -502,7 +577,12 @@ test("container_bash enforces timeoutMs", async () => {
     () =>
       toolHandlers.container_bash(
         resolver as never,
-        { container: "default", command: "sleep", description: "x", timeoutMs: 10 },
+        {
+          container: "default",
+          command: "sleep",
+          description: "x",
+          timeoutMs: 10,
+        },
         exec,
       ),
     /timed out/,
@@ -573,7 +653,12 @@ test("container_grep resolves its search path like a shell would", async () => {
     { container: "default", pattern: "TODO", path: "src" },
     exec,
   );
-  assert.deepEqual(plain.starts[0].argv, ["/usr/bin/rg", "-n", "TODO", "/projects/team/src"]);
+  assert.deepEqual(plain.starts[0].argv, [
+    "/usr/bin/rg",
+    "-n",
+    "TODO",
+    "/projects/team/src",
+  ]);
 
   // An include filter maps to ripgrep's --glob.
   const filtered = guestExecRecorder("/projects/team");
@@ -600,7 +685,12 @@ test("container_grep resolves its search path like a shell would", async () => {
   );
   // No path searches the session workspace explicitly: ripgrep would otherwise
   // read its (non-TTY) stdin instead of the working directory.
-  assert.deepEqual(none.starts[0].argv, ["/usr/bin/rg", "-n", "TODO", "/projects/team"]);
+  assert.deepEqual(none.starts[0].argv, [
+    "/usr/bin/rg",
+    "-n",
+    "TODO",
+    "/projects/team",
+  ]);
   assert.equal(none.starts[0].cwd, "/projects/team");
 });
 
@@ -649,7 +739,8 @@ test("container_glob passes the pattern as a glob and scopes the search", async 
 test("container_glob caps its result at 100 files", async () => {
   const exec = { agent: { session: { header: { cwd: "/projects/team" } } } };
   const lines = (count: number) =>
-    Array.from({ length: count }, (_, index) => `file-${index}.ts`).join("\n") + "\n";
+    Array.from({ length: count }, (_, index) => `file-${index}.ts`).join("\n") +
+    "\n";
 
   const small = guestExecRecorder("/projects/team", lines(3));
   const few = (await toolHandlers.container_glob(
@@ -702,7 +793,9 @@ test("podmanRuntimeSection names only the tools the agent has", () => {
 
   // The Podman operator preset mounts none of them, so the wording must not
   // name a tool the agent cannot call.
-  const containerOnly = podmanRuntimeSection({ tools: { get: () => undefined } });
+  const containerOnly = podmanRuntimeSection({
+    tools: { get: () => undefined },
+  });
   const short = containerOnly.text({ scope: "agent" });
   for (const tool of ["bash", "read", "write", "edit", "glob", "grep"]) {
     assert.doesNotMatch(short, new RegExp("`" + tool + "`"));
@@ -751,7 +844,9 @@ test("container_grep fails loudly when ripgrep reports an error", async () => {
         write() {},
         end() {
           for (const handler of handlers.data ?? []) {
-            handler({ stderrChunk: Buffer.from("rg: error parsing glob '[bad'\n") });
+            handler({
+              stderrChunk: Buffer.from("rg: error parsing glob '[bad'\n"),
+            });
             handler({ exit: { exitCode: 2, signaled: false } });
           }
         },

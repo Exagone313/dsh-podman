@@ -22,7 +22,12 @@ export interface MountFact {
 // The locale-independent shape of one gated call's reason. summarizeArgs builds
 // it; renderReason turns it into the single-line headline.
 export type ReasonFact =
-  | { kind: "image_build"; image: string; parent?: string; packages?: readonly string[] }
+  | {
+    kind: "image_build";
+    image: string;
+    parent?: string;
+    packages?: readonly string[];
+  }
   | { kind: "image_rebuild"; image: string }
   | { kind: "image_rebuild_all" }
   | { kind: "image_remove"; image: string }
@@ -50,7 +55,12 @@ export type ReasonFact =
   }
   | { kind: "volume_remove"; name: string }
   | { kind: "secret_remove"; name: string }
-  | { kind: "container_secret_add"; container: string; secret: string; env: string }
+  | {
+    kind: "container_secret_add";
+    container: string;
+    secret: string;
+    env: string;
+  }
   | { kind: "container_secret_remove"; container: string; env: string }
   | {
     kind: "container_bash";
@@ -123,7 +133,9 @@ function joinList(locale: ReasonLocale, items: readonly string[]): string {
   const separator = pick(locale, ", ", "、");
   const shown = items.slice(0, LIST_CAP).join(separator);
   const extra = items.length - LIST_CAP;
-  return extra > 0 ? pick(locale, `${shown}, +${extra} more`, `${shown}，另有 ${extra} 项`) : shown;
+  return extra > 0
+    ? pick(locale, `${shown}, +${extra} more`, `${shown}，另有 ${extra} 项`)
+    : shown;
 }
 
 // Render a mount's source name: `volume "data"`, `project "team/src"`,
@@ -177,13 +189,17 @@ function mountModeName(
   ) {
     return undefined;
   }
-  return mount.readOnly ? pick(locale, "read-only", "只读") : pick(locale, "read-write", "读写");
+  return mount.readOnly
+    ? pick(locale, "read-only", "只读")
+    : pick(locale, "read-write", "读写");
 }
 
 // Render one mount as `volume "data" at "/data" (read-only)`.
 function mountText(locale: ReasonLocale, mount: MountFact): string {
   const mode = mountModeName(locale, mount);
-  const suffix = mode === undefined ? "" : pick(locale, ` (${mode})`, `（${mode}）`);
+  const suffix = mode === undefined
+    ? ""
+    : pick(locale, ` (${mode})`, `（${mode}）`);
   return `${mountSourceText(locale, mount)}${suffix}`;
 }
 
@@ -208,7 +224,9 @@ function identityText(
       `groups ${joinList(locale, fact.groups.map((group) => String(group)))}`,
     );
   }
-  return ids.length === 0 ? "" : pick(locale, ` (${ids.join(", ")})`, `（${ids.join("、")}）`);
+  return ids.length === 0
+    ? ""
+    : pick(locale, ` (${ids.join(", ")})`, `（${ids.join("、")}）`);
 }
 
 // Start/recreate share one shape; only the verb differs.
@@ -221,25 +239,37 @@ function containerRun(
     ` from image ${quoted(locale, fact.image)}`,
     `（镜像 ${quoted(locale, fact.image)}）`,
   );
-  const mounts = fact.mounts === undefined || fact.mounts.length === 0 ? "" : pick(
-    locale,
-    ` with mounts: ${joinList(locale, fact.mounts.map((mount) => mountText(locale, mount)))}`,
-    `，挂载：${joinList(locale, fact.mounts.map((mount) => mountText(locale, mount)))}`,
-  );
+  const mounts = fact.mounts === undefined || fact.mounts.length === 0
+    ? ""
+    : pick(
+      locale,
+      ` with mounts: ${
+        joinList(locale, fact.mounts.map((mount) => mountText(locale, mount)))
+      }`,
+      `，挂载：${
+        joinList(locale, fact.mounts.map((mount) => mountText(locale, mount)))
+      }`,
+    );
   const env = fact.env === undefined || fact.env.length === 0 ? "" : pick(
     locale,
     ` with env: ${joinList(locale, fact.env)}`,
     `，环境变量：${joinList(locale, fact.env)}`,
   );
-  const secretEnv = fact.secretEnv === undefined || fact.secretEnv.length === 0 ? "" : pick(
-    locale,
-    ` with secret env: ${joinList(locale, fact.secretEnv)}`,
-    `，机密环境变量：${joinList(locale, fact.secretEnv)}`,
-  );
+  const secretEnv = fact.secretEnv === undefined || fact.secretEnv.length === 0
+    ? ""
+    : pick(
+      locale,
+      ` with secret env: ${joinList(locale, fact.secretEnv)}`,
+      `，机密环境变量：${joinList(locale, fact.secretEnv)}`,
+    );
   const paths = fact.paths === undefined || fact.paths.length === 0 ? "" : pick(
     locale,
-    ` with PATH additions: ${joinList(locale, fact.paths.map((path) => quoted(locale, path)))}`,
-    `，PATH 附加项：${joinList(locale, fact.paths.map((path) => quoted(locale, path)))}`,
+    ` with PATH additions: ${
+      joinList(locale, fact.paths.map((path) => quoted(locale, path)))
+    }`,
+    `，PATH 附加项：${
+      joinList(locale, fact.paths.map((path) => quoted(locale, path)))
+    }`,
   );
   const verb = fact.kind === "container_start"
     ? pick(locale, "Start", "启动")
@@ -249,7 +279,9 @@ function containerRun(
     `${verb} container ${
       quoted(locale, fact.container)
     }${image}${mounts}${env}${secretEnv}${paths}.`,
-    `${verb}容器 ${quoted(locale, fact.container)}${image}${mounts}${env}${secretEnv}${paths}。`,
+    `${verb}容器 ${
+      quoted(locale, fact.container)
+    }${image}${mounts}${env}${secretEnv}${paths}。`,
   );
 }
 
@@ -304,7 +336,9 @@ export function renderReason(locale: ReasonLocale, fact: ReasonFact): string {
         `Add mount to container ${quoted(locale, fact.container)}: ${
           mountText(locale, fact.mount)
         }.`,
-        `在容器 ${quoted(locale, fact.container)} 中添加挂载：${mountText(locale, fact.mount)}。`,
+        `在容器 ${quoted(locale, fact.container)} 中添加挂载：${
+          mountText(locale, fact.mount)
+        }。`,
       );
     case "container_mount_remove":
       return pick(
@@ -312,7 +346,9 @@ export function renderReason(locale: ReasonLocale, fact: ReasonFact): string {
         `Remove mount from container ${quoted(locale, fact.container)}: ${
           mountText(locale, fact.mount)
         }.`,
-        `从容器 ${quoted(locale, fact.container)} 中移除挂载：${mountText(locale, fact.mount)}。`,
+        `从容器 ${quoted(locale, fact.container)} 中移除挂载：${
+          mountText(locale, fact.mount)
+        }。`,
       );
     case "container_mount_update": {
       const destination = mountDestinationText(locale, fact.mount);
@@ -327,7 +363,9 @@ export function renderReason(locale: ReasonLocale, fact: ReasonFact): string {
         `Update mount in container ${quoted(locale, fact.container)}: remount ${
           mountSourceText(locale, fact.mount)
         } to ${mode}.`,
-        `更新容器 ${quoted(locale, fact.container)} 中的挂载：将${target}重新挂载为${mode}。`,
+        `更新容器 ${
+          quoted(locale, fact.container)
+        } 中的挂载：将${target}重新挂载为${mode}。`,
       );
     }
     case "container_path_set": {
@@ -336,7 +374,9 @@ export function renderReason(locale: ReasonLocale, fact: ReasonFact): string {
         : joinList(locale, fact.paths.map((path) => quoted(locale, path)));
       return pick(
         locale,
-        `Set the PATH additions of container ${quoted(locale, fact.container)}: ${list}.`,
+        `Set the PATH additions of container ${
+          quoted(locale, fact.container)
+        }: ${list}.`,
         `设置容器 ${quoted(locale, fact.container)} 的 PATH 附加项：${list}。`,
       );
     }
@@ -346,7 +386,9 @@ export function renderReason(locale: ReasonLocale, fact: ReasonFact): string {
         `Add ${quoted(locale, fact.path)} to the PATH of container ${
           quoted(locale, fact.container)
         }.`,
-        `将 ${quoted(locale, fact.path)} 添加到容器 ${quoted(locale, fact.container)} 的 PATH 中。`,
+        `将 ${quoted(locale, fact.path)} 添加到容器 ${
+          quoted(locale, fact.container)
+        } 的 PATH 中。`,
       );
     case "container_path_remove":
       return pick(
@@ -354,7 +396,9 @@ export function renderReason(locale: ReasonLocale, fact: ReasonFact): string {
         `Remove ${quoted(locale, fact.path)} from the PATH of container ${
           quoted(locale, fact.container)
         }.`,
-        `从容器 ${quoted(locale, fact.container)} 的 PATH 中移除 ${quoted(locale, fact.path)}。`,
+        `从容器 ${quoted(locale, fact.container)} 的 PATH 中移除 ${
+          quoted(locale, fact.path)
+        }。`,
       );
     case "read_only_remount": {
       const remount = fact.remount
@@ -362,8 +406,12 @@ export function renderReason(locale: ReasonLocale, fact: ReasonFact): string {
         .join("\n");
       const keep = fact.keep.length === 0 ? "" : pick(
         locale,
-        `\n\nKept as-is: ${joinList(locale, fact.keep.map((mount) => mountText(locale, mount)))}.`,
-        `\n\n保持不变：${joinList(locale, fact.keep.map((mount) => mountText(locale, mount)))}。`,
+        `\n\nKept as-is: ${
+          joinList(locale, fact.keep.map((mount) => mountText(locale, mount)))
+        }.`,
+        `\n\n保持不变：${
+          joinList(locale, fact.keep.map((mount) => mountText(locale, mount)))
+        }。`,
       );
       return pick(
         locale,
@@ -393,9 +441,9 @@ export function renderReason(locale: ReasonLocale, fact: ReasonFact): string {
         `Attach secret ${quoted(locale, fact.secret)} to container ${
           quoted(locale, fact.container)
         } as ${quoted(locale, fact.env)}.`,
-        `将机密 ${quoted(locale, fact.secret)} 作为 ${quoted(locale, fact.env)} 注入容器 ${
-          quoted(locale, fact.container)
-        }。`,
+        `将机密 ${quoted(locale, fact.secret)} 作为 ${
+          quoted(locale, fact.env)
+        } 注入容器 ${quoted(locale, fact.container)}。`,
       );
     case "container_secret_remove":
       return pick(
@@ -403,7 +451,9 @@ export function renderReason(locale: ReasonLocale, fact: ReasonFact): string {
         `Detach secret env var ${quoted(locale, fact.env)} from container ${
           quoted(locale, fact.container)
         }.`,
-        `从容器 ${quoted(locale, fact.container)} 中移除机密环境变量 ${quoted(locale, fact.env)}。`,
+        `从容器 ${quoted(locale, fact.container)} 中移除机密环境变量 ${
+          quoted(locale, fact.env)
+        }。`,
       );
     case "container_bash": {
       const cwd = fact.cwd === undefined ? "" : pick(
@@ -442,17 +492,27 @@ export function renderReason(locale: ReasonLocale, fact: ReasonFact): string {
     case "container_write":
       return pick(
         locale,
-        `Write ${quoted(locale, fact.path)} in container ${quoted(locale, fact.container)}.`,
-        `在容器 ${quoted(locale, fact.container)} 中写入 ${quoted(locale, fact.path)}。`,
+        `Write ${quoted(locale, fact.path)} in container ${
+          quoted(locale, fact.container)
+        }.`,
+        `在容器 ${quoted(locale, fact.container)} 中写入 ${
+          quoted(locale, fact.path)
+        }。`,
       );
     case "container_edit":
       return pick(
         locale,
-        `Edit ${quoted(locale, fact.path)} in container ${quoted(locale, fact.container)}.`,
-        `在容器 ${quoted(locale, fact.container)} 中编辑 ${quoted(locale, fact.path)}。`,
+        `Edit ${quoted(locale, fact.path)} in container ${
+          quoted(locale, fact.container)
+        }.`,
+        `在容器 ${quoted(locale, fact.container)} 中编辑 ${
+          quoted(locale, fact.path)
+        }。`,
       );
     case "daemon_start": {
-      const named = fact.name === undefined ? "" : ` ${quoted(locale, fact.name)}`;
+      const named = fact.name === undefined
+        ? ""
+        : ` ${quoted(locale, fact.name)}`;
       const suffix = identityText(locale, fact);
       return pick(
         locale,
@@ -469,7 +529,10 @@ export function renderReason(locale: ReasonLocale, fact: ReasonFact): string {
 
 // Render the settings notice shown after a cache cleanup. The card already
 // shows the resulting sizes, so the notice only names how many files went.
-export function renderCacheCleanNotice(locale: ReasonLocale, files: number): string {
+export function renderCacheCleanNotice(
+  locale: ReasonLocale,
+  files: number,
+): string {
   return pick(
     locale,
     `removed ${files} cached ${files === 1 ? "file" : "files"}`,
@@ -486,7 +549,11 @@ export function renderDefaultEnvSyncNotice(
   skipped: number,
 ): string {
   const containers = (count: number): string =>
-    pick(locale, `${count} container${count === 1 ? "" : "s"}`, `${count} 个容器`);
+    pick(
+      locale,
+      `${count} container${count === 1 ? "" : "s"}`,
+      `${count} 个容器`,
+    );
   if (applied === 0 && skipped === 0) {
     return pick(
       locale,
@@ -497,7 +564,9 @@ export function renderDefaultEnvSyncNotice(
   if (applied === 0) {
     return pick(
       locale,
-      `no running container needed the default environment; ${containers(skipped)} stopped`,
+      `no running container needed the default environment; ${
+        containers(skipped)
+      } stopped`,
       `没有运行中的容器需要默认环境；已跳过 ${containers(skipped)}`,
     );
   }
@@ -519,14 +588,22 @@ export function renderDenial(locale: ReasonLocale, fact: DenialFact): string {
     case "read_only":
       return pick(
         locale,
-        `Denied: the session is read-only, but ${quoted(locale, fact.tool)} needs write access.`,
-        `已拒绝：当前会话为只读，而 ${quoted(locale, fact.tool)} 需要写入权限。`,
+        `Denied: the session is read-only, but ${
+          quoted(locale, fact.tool)
+        } needs write access.`,
+        `已拒绝：当前会话为只读，而 ${
+          quoted(locale, fact.tool)
+        } 需要写入权限。`,
       );
     case "read_only_builtin":
       return pick(
         locale,
-        `Denied: the session is read-only, but ${quoted(locale, fact.tool)} can modify files.`,
-        `已拒绝：当前会话为只读，而 ${quoted(locale, fact.tool)} 可能修改文件。`,
+        `Denied: the session is read-only, but ${
+          quoted(locale, fact.tool)
+        } can modify files.`,
+        `已拒绝：当前会话为只读，而 ${
+          quoted(locale, fact.tool)
+        } 可能修改文件。`,
       );
     case "read_only_remount_declined":
       return pick(
@@ -534,7 +611,9 @@ export function renderDenial(locale: ReasonLocale, fact: DenialFact): string {
         `Denied: read-only mode blocks ${
           quoted(locale, fact.tool)
         } and the mounts were not remounted.`,
-        `已拒绝：只读模式阻止 ${quoted(locale, fact.tool)}，且挂载未被重新挂载。`,
+        `已拒绝：只读模式阻止 ${
+          quoted(locale, fact.tool)
+        }，且挂载未被重新挂载。`,
       );
     case "project_destination": {
       if (fact.mirror === undefined || fact.mirror === "") {
@@ -552,7 +631,9 @@ export function renderDenial(locale: ReasonLocale, fact: DenialFact): string {
         `Project mounts cannot set a destination; ${source} always mounts at ${
           quoted(locale, fact.mirror)
         }.`,
-        `项目挂载不能指定目标路径；${source} 始终挂载到 ${quoted(locale, fact.mirror)}。`,
+        `项目挂载不能指定目标路径；${source} 始终挂载到 ${
+          quoted(locale, fact.mirror)
+        }。`,
       );
     }
   }

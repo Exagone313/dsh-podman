@@ -60,7 +60,8 @@ export function forcedMountMode(kind: string | undefined): string | undefined {
 }
 
 export function mountModeToProto(mode: string | undefined): string {
-  const proto = mode !== undefined && Object.prototype.hasOwnProperty.call(MOUNT_MODES, mode)
+  const proto = mode !== undefined &&
+      Object.prototype.hasOwnProperty.call(MOUNT_MODES, mode)
     ? MOUNT_MODES[mode]
     : undefined;
   if (proto === undefined) throw new Error(`unknown mount mode: ${mode}`);
@@ -68,7 +69,9 @@ export function mountModeToProto(mode: string | undefined): string {
 }
 
 /** The logical mount kind for a proto enum value, or undefined when unspecified. */
-export function mountKindFromProto(proto: string | undefined): string | undefined {
+export function mountKindFromProto(
+  proto: string | undefined,
+): string | undefined {
   if (proto === undefined) return undefined;
   return Object.prototype.hasOwnProperty.call(KIND_FROM_PROTO, proto)
     ? KIND_FROM_PROTO[proto]
@@ -76,7 +79,9 @@ export function mountKindFromProto(proto: string | undefined): string | undefine
 }
 
 /** The logical mount mode for a proto enum value, or undefined when unspecified. */
-export function mountModeFromProto(proto: string | undefined): string | undefined {
+export function mountModeFromProto(
+  proto: string | undefined,
+): string | undefined {
   if (proto === undefined) return undefined;
   return Object.prototype.hasOwnProperty.call(MODE_FROM_PROTO, proto)
     ? MODE_FROM_PROTO[proto]

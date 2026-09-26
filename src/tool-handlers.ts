@@ -17,11 +17,24 @@ import {
   unaryGuest,
   writeGuestFile,
 } from "./guest-rpc.js";
-import { inferMountKind, mountsFromInput, projectMountDestinationReason } from "./mount-input.js";
+import {
+  inferMountKind,
+  mountsFromInput,
+  projectMountDestinationReason,
+} from "./mount-input.js";
 import { mergeDefaultEnv } from "./container-env.js";
-import { publicContainer, publicDaemon, publicImage, publicMount } from "./public.js";
+import {
+  publicContainer,
+  publicDaemon,
+  publicImage,
+  publicMount,
+} from "./public.js";
 import { grpc } from "./grpc/runtime-client.js";
-import { defaultMountMode, mountKindToProto, mountModeToProto } from "./mount-enums.js";
+import {
+  defaultMountMode,
+  mountKindToProto,
+  mountModeToProto,
+} from "./mount-enums.js";
 import {
   containerNotFound,
   metadata,
@@ -46,13 +59,17 @@ function failOnSearchError(
 ): void {
   if (result.exitCode !== 2) return;
   const detail = result.stderr.trim();
-  throw new Error(detail === "" ? `${tool} search failed (ripgrep exit code 2)` : detail);
+  throw new Error(
+    detail === "" ? `${tool} search failed (ripgrep exit code 2)` : detail,
+  );
 }
 
 // withSpillNote points the caller at the guest spill file when a command's
 // output was truncated in memory, so the full stream stays reachable with
 // container_read instead of silently vanishing.
-function withSpillNote<T extends { stdoutSpillPath?: string; stderrSpillPath?: string }>(
+function withSpillNote<
+  T extends { stdoutSpillPath?: string; stderrSpillPath?: string },
+>(
   result: T,
 ): T & { note?: string } {
   const paths = [result.stdoutSpillPath, result.stderrSpillPath].filter(
@@ -89,7 +106,11 @@ function managedEnv(
   env: unknown,
 ): Record<string, string> {
   const managed = ctx?.get?.("shellEnv")?.collect?.(exec) ?? {};
-  return { ...ENV_OVERRIDES, ...(env as Record<string, string> | undefined), ...managed };
+  return {
+    ...ENV_OVERRIDES,
+    ...(env as Record<string, string> | undefined),
+    ...managed,
+  };
 }
 
 // startContainerEnv resolves the environment a `container_start` request
@@ -106,7 +127,9 @@ async function startContainerEnv(
   if (input.env !== undefined) {
     return mergeDefaultEnv(defaults, input.env as Record<string, string>);
   }
-  if (defaults === undefined || Object.keys(defaults).length === 0) return undefined;
+  if (defaults === undefined || Object.keys(defaults).length === 0) {
+    return undefined;
+  }
   const result = await resolver.control<{ containers?: any[] }>(
     "listContainers",
     {},
@@ -203,7 +226,9 @@ export const toolHandlers: Record<
       await resolver.control("rebuildImage", { imageId: input.imageId }),
     ),
   image_rebuild_all: async (resolver) => {
-    const result = await resolver.control<{ rebuilt?: string[]; skipped?: string[] }>(
+    const result = await resolver.control<
+      { rebuilt?: string[]; skipped?: string[] }
+    >(
       "rebuildAllImages",
       {},
     );
@@ -237,7 +262,10 @@ export const toolHandlers: Record<
     ];
   },
   container_start: async (resolver, input, exec) => {
-    const mounts = mountsFromInput(input.mounts, resolver.getConfig().projectsRoot);
+    const mounts = mountsFromInput(
+      input.mounts,
+      resolver.getConfig().projectsRoot,
+    );
     const slug = await sessionWorkspaceSlug(resolver, currentCwd(exec));
     const env = await startContainerEnv(resolver, slug, input);
     const row = await resolver.control("startContainer", {
@@ -252,7 +280,10 @@ export const toolHandlers: Record<
     return publicContainer(row);
   },
   container_recreate: async (resolver, input, exec) => {
-    const mounts = mountsFromInput(input.mounts, resolver.getConfig().projectsRoot);
+    const mounts = mountsFromInput(
+      input.mounts,
+      resolver.getConfig().projectsRoot,
+    );
     const row = await resolver.control("recreateContainer", {
       workspaceSlug: await sessionWorkspaceSlug(resolver, currentCwd(exec)),
       container: input.container,
@@ -273,7 +304,12 @@ export const toolHandlers: Record<
   },
   container_bash: async (resolver, input, exec, ctx) => {
     const sessionCwd = currentCwd(exec);
-    const binding = await resolveToolBinding(resolver, sessionCwd, input.container, exec?.signal);
+    const binding = await resolveToolBinding(
+      resolver,
+      sessionCwd,
+      input.container,
+      exec?.signal,
+    );
     return withSpillNote(
       await runExec(
         binding,
@@ -288,7 +324,12 @@ export const toolHandlers: Record<
   },
   container_exec: async (resolver, input, exec, ctx) => {
     const sessionCwd = currentCwd(exec);
-    const binding = await resolveToolBinding(resolver, sessionCwd, input.container, exec?.signal);
+    const binding = await resolveToolBinding(
+      resolver,
+      sessionCwd,
+      input.container,
+      exec?.signal,
+    );
     return withSpillNote(
       await runExec(
         binding,
@@ -302,7 +343,12 @@ export const toolHandlers: Record<
     );
   },
   container_read: async (resolver, input, exec, ctx) => {
-    const target = await containerTarget(ctx, input.file_path, input.container, exec);
+    const target = await containerTarget(
+      ctx,
+      input.file_path,
+      input.container,
+      exec,
+    );
     // Mirror the harness's read tool: stat first so a miss is FS_NOT_FOUND and
     // a directory is FS_NOT_REGULAR_FILE, then record the read. The observation
     // is what satisfies the read-before-write guard for a later
@@ -310,7 +356,10 @@ export const toolHandlers: Record<
     const info = await ctx.fs.stat(target, exec?.signal);
     if (info === undefined) {
       ctx.emit("fs/observed", target, { kind: "absent" }, exec);
-      throw fsError("FS_NOT_FOUND", `cannot read "${target.displayPath}": not found`);
+      throw fsError(
+        "FS_NOT_FOUND",
+        `cannot read "${target.displayPath}": not found`,
+      );
     }
     if (info.type !== "file") {
       throw fsError(
@@ -325,23 +374,56 @@ export const toolHandlers: Record<
       input.offset,
       input.limit,
     );
-    ctx.emit("fs/observed", target, { kind: "present", version: info.version }, exec);
+    ctx.emit(
+      "fs/observed",
+      target,
+      { kind: "present", version: info.version },
+      exec,
+    );
     return lines;
   },
   container_write: async (resolver, input, exec, ctx) => {
-    const target = await containerTarget(ctx, input.file_path, input.container, exec);
+    const target = await containerTarget(
+      ctx,
+      input.file_path,
+      input.container,
+      exec,
+    );
     // The harness's write tool computes the intent through this waterfall and
     // the provider enforces it, so the container tool shares the same
     // read-before-write guard and diagnostics.
-    const intent = await ctx.waterfall("fs/write-intent", target, exec, () => undefined);
+    const intent = await ctx.waterfall(
+      "fs/write-intent",
+      target,
+      exec,
+      () => undefined,
+    );
     const content = String(input.content ?? "");
-    const outcome = await ctx.fs.writeText(target, content, intent, exec?.signal);
-    ctx.emit("fs/observed", target, { kind: "present", version: outcome.version }, exec);
+    const outcome = await ctx.fs.writeText(
+      target,
+      content,
+      intent,
+      exec?.signal,
+    );
+    ctx.emit("fs/observed", target, {
+      kind: "present",
+      version: outcome.version,
+    }, exec);
     return { bytesWritten: Buffer.byteLength(content, "utf8") };
   },
   container_edit: async (resolver, input, exec, ctx) => {
-    const target = await containerTarget(ctx, input.file_path, input.container, exec);
-    const intent = await ctx.waterfall("fs/edit-intent", target, exec, () => undefined);
+    const target = await containerTarget(
+      ctx,
+      input.file_path,
+      input.container,
+      exec,
+    );
+    const intent = await ctx.waterfall(
+      "fs/edit-intent",
+      target,
+      exec,
+      () => undefined,
+    );
     const outcome = await ctx.fs.editText(
       target,
       {
@@ -352,12 +434,20 @@ export const toolHandlers: Record<
       intent,
       exec?.signal,
     );
-    ctx.emit("fs/observed", target, { kind: "present", version: outcome.version }, exec);
+    ctx.emit("fs/observed", target, {
+      kind: "present",
+      version: outcome.version,
+    }, exec);
     return { before: outcome.before, after: outcome.after };
   },
   container_glob: async (resolver, input, exec) => {
     const sessionCwd = currentCwd(exec);
-    const binding = await resolveToolBinding(resolver, sessionCwd, input.container, exec?.signal);
+    const binding = await resolveToolBinding(
+      resolver,
+      sessionCwd,
+      input.container,
+      exec?.signal,
+    );
     const argv = [
       "rg",
       "--files",
@@ -394,7 +484,12 @@ export const toolHandlers: Record<
   },
   container_grep: async (resolver, input, exec) => {
     const sessionCwd = currentCwd(exec);
-    const binding = await resolveToolBinding(resolver, sessionCwd, input.container, exec?.signal);
+    const binding = await resolveToolBinding(
+      resolver,
+      sessionCwd,
+      input.container,
+      exec?.signal,
+    );
     const cwd = guestCwd(undefined, sessionCwd, binding);
     // The search root: the requested path, else the container's default (the
     // session workspace when it is mounted). Ripgrep reads stdin instead of the
@@ -406,9 +501,17 @@ export const toolHandlers: Record<
     }
     argv.push(input.pattern);
     if (root !== undefined) argv.push(root);
-    const result = await runExec(binding, argv, cwd, undefined, undefined, undefined, {
-      signal: exec?.signal,
-    });
+    const result = await runExec(
+      binding,
+      argv,
+      cwd,
+      undefined,
+      undefined,
+      undefined,
+      {
+        signal: exec?.signal,
+      },
+    );
     failOnSearchError("grep", result);
     return {
       matches: outputLines(result.stdout),
@@ -434,7 +537,10 @@ export const toolHandlers: Record<
   container_mount_add: async (resolver, input, exec) => {
     const kind = inferMountKind(input);
     const projectsRoot = resolver.getConfig().projectsRoot;
-    const destinationReason = projectMountDestinationReason(projectsRoot, input);
+    const destinationReason = projectMountDestinationReason(
+      projectsRoot,
+      input,
+    );
     if (destinationReason !== undefined) throw new Error(destinationReason);
     if (kind === "secret" && input.mode === "read_write") {
       throw new Error(
@@ -494,7 +600,10 @@ export const toolHandlers: Record<
       );
     }
     const projectsRoot = resolver.getConfig().projectsRoot;
-    const destinationReason = projectMountDestinationReason(projectsRoot, input);
+    const destinationReason = projectMountDestinationReason(
+      projectsRoot,
+      input,
+    );
     if (destinationReason !== undefined) throw new Error(destinationReason);
     const request: Record<string, unknown> = {
       workspaceSlug: await sessionWorkspaceSlug(resolver, currentCwd(exec)),
@@ -516,16 +625,32 @@ export const toolHandlers: Record<
   container_path_set: async (resolver, input, exec) => {
     const sessionCwd = currentCwd(exec);
     const slug = await sessionWorkspaceSlug(resolver, sessionCwd);
-    const binding = await resolveToolBinding(resolver, sessionCwd, input.container, exec?.signal);
+    const binding = await resolveToolBinding(
+      resolver,
+      sessionCwd,
+      input.container,
+      exec?.signal,
+    );
     const paths = Array.isArray(input.paths) ? input.paths.map(String) : [];
     return {
-      paths: await applyContainerPaths(resolver, binding, slug, input.container, paths),
+      paths: await applyContainerPaths(
+        resolver,
+        binding,
+        slug,
+        input.container,
+        paths,
+      ),
     };
   },
   container_path_add: async (resolver, input, exec) => {
     const sessionCwd = currentCwd(exec);
     const slug = await sessionWorkspaceSlug(resolver, sessionCwd);
-    const binding = await resolveToolBinding(resolver, sessionCwd, input.container, exec?.signal);
+    const binding = await resolveToolBinding(
+      resolver,
+      sessionCwd,
+      input.container,
+      exec?.signal,
+    );
     const current = await containerPathState(binding);
     // Prepending gives the new path the highest priority; an existing entry is
     // moved to the front rather than duplicated.
@@ -534,13 +659,24 @@ export const toolHandlers: Record<
       ...current.paths.filter((path) => path !== input.path),
     ];
     return {
-      paths: await applyContainerPaths(resolver, binding, slug, input.container, paths),
+      paths: await applyContainerPaths(
+        resolver,
+        binding,
+        slug,
+        input.container,
+        paths,
+      ),
     };
   },
   container_path_remove: async (resolver, input, exec) => {
     const sessionCwd = currentCwd(exec);
     const slug = await sessionWorkspaceSlug(resolver, sessionCwd);
-    const binding = await resolveToolBinding(resolver, sessionCwd, input.container, exec?.signal);
+    const binding = await resolveToolBinding(
+      resolver,
+      sessionCwd,
+      input.container,
+      exec?.signal,
+    );
     const current = await containerPathState(binding);
     if (!current.paths.includes(input.path)) {
       if (current.defaultPaths.includes(input.path)) {
@@ -556,11 +692,20 @@ export const toolHandlers: Record<
     }
     const paths = current.paths.filter((path) => path !== input.path);
     return {
-      paths: await applyContainerPaths(resolver, binding, slug, input.container, paths),
+      paths: await applyContainerPaths(
+        resolver,
+        binding,
+        slug,
+        input.container,
+        paths,
+      ),
     };
   },
   volume_list: async (resolver) => {
-    const result = await resolver.control<{ volumes?: any[] }>("listVolumes", {});
+    const result = await resolver.control<{ volumes?: any[] }>(
+      "listVolumes",
+      {},
+    );
     return (result.volumes ?? []).map((volume: any) => ({ name: volume.name }));
   },
   volume_create: async (resolver, input) => {
@@ -572,7 +717,10 @@ export const toolHandlers: Record<
     return { removed: input.name };
   },
   secret_list: async (resolver) => {
-    const result = await resolver.control<{ secrets?: any[] }>("listSecrets", {});
+    const result = await resolver.control<{ secrets?: any[] }>(
+      "listSecrets",
+      {},
+    );
     return (result.secrets ?? []).map((secret: any) => ({ name: secret.name }));
   },
   secret_create: async (resolver, input) => {
@@ -606,7 +754,12 @@ export const toolHandlers: Record<
   },
   daemon_start: async (resolver, input, exec) => {
     const sessionCwd = currentCwd(exec);
-    const binding = await resolveToolBinding(resolver, sessionCwd, input.container, exec?.signal);
+    const binding = await resolveToolBinding(
+      resolver,
+      sessionCwd,
+      input.container,
+      exec?.signal,
+    );
     const request: Record<string, unknown> = {
       argv: input.argv,
       inheritEnv: { value: input.inheritEnv !== false },
@@ -670,11 +823,14 @@ export const toolHandlers: Record<
       input.container,
       exec?.signal,
     );
-    const result = (await daemonCall(input.name, () =>
-      unaryGuest({ binding }, "daemonLogs", {
-        name: input.name,
-        tailBytes: input.tailBytes,
-      }))) as { stdout?: unknown; stderr?: unknown };
+    const result = (await daemonCall(
+      input.name,
+      () =>
+        unaryGuest({ binding }, "daemonLogs", {
+          name: input.name,
+          tailBytes: input.tailBytes,
+        }),
+    )) as { stdout?: unknown; stderr?: unknown };
     return {
       stdout: bytesText(result.stdout),
       stderr: bytesText(result.stderr),
@@ -698,7 +854,9 @@ async function containerPathState(binding: {
   const paths = Array.isArray(result?.paths)
     ? result.paths.map((path: unknown) => String(path))
     : [];
-  const defaultPath = typeof result?.defaultPath === "string" ? result.defaultPath : "";
+  const defaultPath = typeof result?.defaultPath === "string"
+    ? result.defaultPath
+    : "";
   return {
     paths,
     defaultPaths: defaultPath === "" ? [] : defaultPath.split(":"),

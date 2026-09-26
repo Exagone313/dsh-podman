@@ -69,26 +69,50 @@ test("cache_clean command drives cleanCaches, maps the mode, and reports the res
       calls.push([method, request]);
       if (method === "listContainers") return { containers: [] };
       if (method === "listImages") return { images: [] };
-      if (method === "cleanCaches") return { removedFiles: 2, removedBytes: "2048" };
+      if (method === "cleanCaches") {
+        return { removedFiles: 2, removedBytes: "2048" };
+      }
       if (method === "listCaches") {
-        return { caches: [{ manager: "pacman", path: "/cache", files: 1, bytes: "1024" }] };
+        return {
+          caches: [{
+            manager: "pacman",
+            path: "/cache",
+            files: 1,
+            bytes: "1024",
+          }],
+        };
       }
       return {};
     },
   };
   await installCardCommandDriver(fakeContext(scope), resolver);
   await scope.update({
-    command: { op: "cache_clean", workspace: "", image: "", at: 3, cacheMode: "all" },
+    command: {
+      op: "cache_clean",
+      workspace: "",
+      image: "",
+      at: 3,
+      cacheMode: "all",
+    },
   });
   await new Promise((resolve) => setImmediate(resolve));
   await scope.update({
-    command: { op: "cache_clean", workspace: "", image: "", at: 4, cacheMode: "keep-latest" },
+    command: {
+      op: "cache_clean",
+      workspace: "",
+      image: "",
+      at: 4,
+      cacheMode: "keep-latest",
+    },
   });
   await new Promise((resolve) => setImmediate(resolve));
   const modes = calls
     .filter(([method]) => method === "cleanCaches")
     .map(([, request]) => (request as { mode: string }).mode);
-  assert.deepEqual(modes, ["CACHE_CLEAN_MODE_ALL", "CACHE_CLEAN_MODE_KEEP_LATEST"]);
+  assert.deepEqual(modes, [
+    "CACHE_CLEAN_MODE_ALL",
+    "CACHE_CLEAN_MODE_KEEP_LATEST",
+  ]);
   assert.equal(scope.value.command, null);
   assert.equal(scope.value.notice, "removed 2 cached files");
   const caches = scope.value.caches as any[];
@@ -166,7 +190,14 @@ test("secret_remove command drives removeSecret with the name", async () => {
   };
   await installCardCommandDriver(fakeContext(scope), resolver);
   await scope.update({
-    command: { op: "secret_remove", workspace: "db-pass", image: "", at: 7, mounts: [], value: "" },
+    command: {
+      op: "secret_remove",
+      workspace: "db-pass",
+      image: "",
+      at: 7,
+      mounts: [],
+      value: "",
+    },
   });
   await new Promise((resolve) => setImmediate(resolve));
   const removeCall = calls.find(([method]) => method === "removeSecret");
@@ -277,7 +308,12 @@ test("image_base_rebuild command drives rebuildBaseImage with the name", async (
   };
   await installCardCommandDriver(fakeContext(scope), resolver);
   await scope.update({
-    command: { op: "image_base_rebuild", workspace: "archlinux", image: "", at: 21 },
+    command: {
+      op: "image_base_rebuild",
+      workspace: "archlinux",
+      image: "",
+      at: 21,
+    },
   });
   await new Promise((resolve) => setImmediate(resolve));
   const rebuildCall = calls.find(([method]) => method === "rebuildBaseImage");
@@ -303,7 +339,12 @@ test("image_base_pull command drives pullBaseImage with the name", async () => {
   };
   await installCardCommandDriver(fakeContext(scope), resolver);
   await scope.update({
-    command: { op: "image_base_pull", workspace: "archlinux", image: "", at: 22 },
+    command: {
+      op: "image_base_pull",
+      workspace: "archlinux",
+      image: "",
+      at: 22,
+    },
   });
   await new Promise((resolve) => setImmediate(resolve));
   const pullCall = calls.find(([method]) => method === "pullBaseImage");
@@ -453,7 +494,9 @@ test("container_secret_remove command drives removeContainerSecret with the defa
     },
   });
   await new Promise((resolve) => setImmediate(resolve));
-  const removeCall = calls.find(([method]) => method === "removeContainerSecret");
+  const removeCall = calls.find(([method]) =>
+    method === "removeContainerSecret"
+  );
   assert.deepEqual(removeCall?.[1], {
     workspaceSlug: "w",
     container: "default",

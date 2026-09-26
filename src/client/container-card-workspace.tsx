@@ -14,7 +14,11 @@ import {
 } from "./container-card-controller.js";
 import { type DirectoryPickerFace } from "./directory-picker.js";
 import type { Translate } from "./locales.js";
-import { Button, DisclosureRow, StateDot } from "@deepseek-ai/dsh-client-ui-primitives";
+import {
+  Button,
+  DisclosureRow,
+  StateDot,
+} from "@deepseek-ai/dsh-client-ui-primitives";
 import { type ReactNode, useState } from "react";
 
 export function WorkspaceSection(props: {
@@ -104,7 +108,9 @@ export function WorkspaceSection(props: {
     defaultEnvCount,
   } = props;
   const [open, setOpen] = useState(false);
-  const [createOpen, setCreateOpen] = useState<"default" | "named" | null>(null);
+  const [createOpen, setCreateOpen] = useState<"default" | "named" | null>(
+    null,
+  );
   const hasContainer = containers.length > 0;
   return (
     <DisclosureRow
@@ -120,7 +126,9 @@ export function WorkspaceSection(props: {
         <code style={greyId}>{workspace.workspaceSlug}</code>
         {!hasContainer
           ? (
-            <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+            <div
+              style={{ display: "flex", flexDirection: "column", gap: "8px" }}
+            >
               <p style={{ ...hint, margin: 0 }}>{t("noContainers")}</p>
               <div>
                 <Button
@@ -183,7 +191,9 @@ export function WorkspaceSection(props: {
             t={t}
             label={t("removePod")}
             title={t("confirmTitle")}
-            description={t("confirmRemovePod", { workspace: workspace.projectName })}
+            description={t("confirmRemovePod", {
+              workspace: workspace.projectName,
+            })}
             disabled={busy}
             onConfirm={() => onRemoveWorkspace(workspace.workspaceSlug)}
           />

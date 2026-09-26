@@ -4,13 +4,26 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
-import { FakeTerminalCall, fakeTerminalResolver, spawnGuest, spawnSpec } from "./test-support.js";
-import { createSubprocessProvider, globCwd, outputReader, remoteArgv } from "./index.js";
+import {
+  FakeTerminalCall,
+  fakeTerminalResolver,
+  spawnGuest,
+  spawnSpec,
+} from "./test-support.js";
+import {
+  createSubprocessProvider,
+  globCwd,
+  outputReader,
+  remoteArgv,
+} from "./index.js";
 import { SubprocessExecutableNotFoundError } from "@deepseek-ai/dsh-subprocess";
 
 test("globCwd runs a discovery listing from its absolute search root", () => {
   assert.equal(
-    globCwd(["rg", "--files", "--glob=sub/b.txt", "--", "/tmp/globtest"], "/projects/team"),
+    globCwd(
+      ["rg", "--files", "--glob=sub/b.txt", "--", "/tmp/globtest"],
+      "/projects/team",
+    ),
     "/tmp/globtest",
   );
   assert.equal(
@@ -211,7 +224,9 @@ test("spawnTerminal drives the guest terminal stream", async () => {
 
   const chunks: Buffer[] = [];
   handle.output.on("data", (chunk: Buffer) => chunks.push(Buffer.from(chunk)));
-  const outputEnded = new Promise<void>((resolve) => handle.output.on("end", resolve));
+  const outputEnded = new Promise<void>((resolve) =>
+    handle.output.on("end", resolve)
+  );
 
   fake.emitStdout(Buffer.from("hello"));
   await handle.write("ls\n");
@@ -224,7 +239,10 @@ test("spawnTerminal drives the guest terminal stream", async () => {
   assert.deepEqual(fake.resizes, [{ rows: 40, cols: 100 }]);
   const activity = await handle.inspectActivity();
   assert.equal(activity.state, "unknown");
-  assert.ok(activity.revision > 0, "observed activity must advance the revision");
+  assert.ok(
+    activity.revision > 0,
+    "observed activity must advance the revision",
+  );
 
   assert.deepEqual(await handle.inspectForeground(), {
     processGroupId: 7,
@@ -241,9 +259,17 @@ test("spawnTerminal drives the guest terminal stream", async () => {
 });
 
 test("spawnTerminal rejects an empty argv", async () => {
-  const provider = createSubprocessProvider(fakeTerminalResolver(new FakeTerminalCall()));
+  const provider = createSubprocessProvider(
+    fakeTerminalResolver(new FakeTerminalCall()),
+  );
   await assert.rejects(
-    () => provider.spawnTerminal({ argv: [], cwd: "/projects/team", rows: 24, cols: 80 }),
+    () =>
+      provider.spawnTerminal({
+        argv: [],
+        cwd: "/projects/team",
+        rows: 24,
+        cols: 80,
+      }),
     /argv must contain a program/,
   );
 });
@@ -359,7 +385,9 @@ test("subprocess provider tears down a failed exec stream", async () => {
   const failed = assert.rejects(handle.done, /guest vanished/);
   // A paused PassThrough only emits "end" once a consumer reads it to EOF.
   handle.stdout.resume();
-  const outputEnded = new Promise<void>((resolve) => handle.stdout.on("end", () => resolve()));
+  const outputEnded = new Promise<void>((resolve) =>
+    handle.stdout.on("end", () => resolve())
+  );
   fake.streams[0].emit("error", new Error("guest vanished"));
   await outputEnded;
   await failed;

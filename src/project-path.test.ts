@@ -29,7 +29,10 @@ test("projectNameFromHostPath maps a host directory to a project path", () => {
 test("projectNameFromHostPath refuses anything outside the projects root", () => {
   assert.equal(projectNameFromHostPath("/projects", "/projects"), undefined);
   assert.equal(projectNameFromHostPath("/projects", "/projects/"), undefined);
-  assert.equal(projectNameFromHostPath("/projects", "/projects2/web"), undefined);
+  assert.equal(
+    projectNameFromHostPath("/projects", "/projects2/web"),
+    undefined,
+  );
   assert.equal(projectNameFromHostPath("/projects", "/etc/hosts"), undefined);
   assert.equal(projectNameFromHostPath("/projects", "web"), undefined);
   assert.equal(projectNameFromHostPath("/projects", ""), undefined);
@@ -65,7 +68,10 @@ test("project paths resolve their dots and never escape the root", () => {
   // A ".." that would climb above the root clamps to the root, on both the
   // path-building and the path-clamping helper.
   assert.equal(confineToRoot("/projects", "/projects/../etc"), "/projects");
-  assert.equal(confineToRoot("/projects", "/projects/a/../../etc"), "/projects");
+  assert.equal(
+    confineToRoot("/projects", "/projects/a/../../etc"),
+    "/projects",
+  );
   assert.equal(hostPathForProjectName("/projects", "../etc"), "/projects");
   assert.equal(hostPathForProjectName("/projects", "a/../../etc"), "/projects");
   assert.equal(hostPathForProjectName("/projects", "/../etc"), "/projects");
@@ -74,7 +80,10 @@ test("project paths resolve their dots and never escape the root", () => {
 });
 
 test("parentDirectory never climbs above the projects root", () => {
-  assert.equal(parentDirectory("/projects", "/projects/web/sub"), "/projects/web");
+  assert.equal(
+    parentDirectory("/projects", "/projects/web/sub"),
+    "/projects/web",
+  );
   assert.equal(parentDirectory("/projects", "/projects/web"), "/projects");
   assert.equal(parentDirectory("/projects", "/projects"), "/projects");
   assert.equal(parentDirectory("/projects", "/elsewhere"), "/projects");

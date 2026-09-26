@@ -4,7 +4,11 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
-import { FakeExecStream, FakeTerminalCall, WORKSPACE_ID } from "./test-support.js";
+import {
+  FakeExecStream,
+  FakeTerminalCall,
+  WORKSPACE_ID,
+} from "./test-support.js";
 import {
   TERMINAL_PATH,
   TERMINAL_RETAINED_PATH,
@@ -28,7 +32,8 @@ function fakeGuest(options: { stdout?: string } = {}) {
     starts,
     binding: {
       guest: {
-        exec: () => new FakeExecStream(starts, { stdout: options.stdout ?? "" }),
+        exec: () =>
+          new FakeExecStream(starts, { stdout: options.stdout ?? "" }),
         terminal: () => terminal,
       },
       token: "t",
@@ -112,7 +117,8 @@ test("the host resolves a session's workspace from its own directory", async () 
   const sessions = new TerminalSessions({ resolver, retentionMs: 60_000 });
   try {
     const routes = routeHarness(sessions, resolver, {
-      get: (id: string) => id === "s1" ? { header: { cwd: `${ROOT}/src` } } : undefined,
+      get: (id: string) =>
+        id === "s1" ? { header: { cwd: `${ROOT}/src` } } : undefined,
     });
     const target = routes.get(TERMINAL_TARGET_PATH);
     assert.ok(target);
@@ -132,7 +138,9 @@ test("the host resolves a session's workspace from its own directory", async () 
       new Request(`http://dsh.internal${TERMINAL_TARGET_PATH}`),
     );
     assert.equal(missingId.status, 400);
-    assert.deepEqual(await missingId.json(), { error: "sessionId is required" });
+    assert.deepEqual(await missingId.json(), {
+      error: "sessionId is required",
+    });
     for (
       const store of [
         { get: () => undefined },
@@ -140,7 +148,9 @@ test("the host resolves a session's workspace from its own directory", async () 
         { get: () => ({ header: { cwd: "/elsewhere" } }) },
       ]
     ) {
-      const other = routeHarness(sessions, resolver, store).get(TERMINAL_TARGET_PATH);
+      const other = routeHarness(sessions, resolver, store).get(
+        TERMINAL_TARGET_PATH,
+      );
       const refused = await other.fetch(
         new Request(`http://dsh.internal${TERMINAL_TARGET_PATH}?sessionId=s1`),
       );
@@ -213,7 +223,11 @@ test("terminal sessions stream frames, retain the shell and control it", async (
     );
     assert.deepEqual(terminal.resizes, [{ cols: 100, rows: 30 }]);
     assert.equal(
-      sessions.control({ terminalId: prepared.terminalId, kind: "rename", title: "dev" }),
+      sessions.control({
+        terminalId: prepared.terminalId,
+        kind: "rename",
+        title: "dev",
+      }),
       true,
     );
     assert.deepEqual(frames.at(-1), { type: "title", title: "dev" });
@@ -260,7 +274,10 @@ test("terminal sessions stream frames, retain the shell and control it", async (
     });
     assert.deepEqual(resolver.calls, ["default", "dev"]);
     assert.equal(sessions.retained("s1").length, 2);
-    assert.equal(sessions.control({ terminalId: other.terminalId, kind: "close" }), true);
+    assert.equal(
+      sessions.control({ terminalId: other.terminalId, kind: "close" }),
+      true,
+    );
     assert.equal(sessions.retained("s1").length, 1);
     detach();
   } finally {
@@ -300,12 +317,19 @@ test("terminal routes open, control, list and validate", async () => {
     const reader = response.body!.getReader();
     const first = new TextDecoder().decode((await reader.read()).value);
     assert.match(first, /"type":"ready"/);
-    const ready = JSON.parse(first.trim().split("\n")[0]) as { terminalId: string };
+    const ready = JSON.parse(first.trim().split("\n")[0]) as {
+      terminalId: string;
+    };
 
     const control = await open.fetch(
       new Request(`http://dsh.internal${TERMINAL_PATH}`, {
         method: "POST",
-        body: JSON.stringify({ terminalId: ready.terminalId, kind: "resize", cols: 90, rows: 30 }),
+        body: JSON.stringify({
+          terminalId: ready.terminalId,
+          kind: "resize",
+          cols: 90,
+          rows: 30,
+        }),
       }),
     );
     assert.equal(control.status, 200);
@@ -319,10 +343,16 @@ test("terminal routes open, control, list and validate", async () => {
     assert.equal(unknownTerminal.status, 404);
 
     const shellsResponse = await routes.get(TERMINAL_SHELLS_PATH).fetch(
-      new Request(`http://dsh.internal${TERMINAL_SHELLS_PATH}?workspace=team&sessionId=s1`),
+      new Request(
+        `http://dsh.internal${TERMINAL_SHELLS_PATH}?workspace=team&sessionId=s1`,
+      ),
     );
-    const shellsBody = (await shellsResponse.json()) as { shells: TerminalShellView[] };
-    assert.deepEqual(shellsBody.shells.map((shell) => shell.path), ["/usr/bin/bash"]);
+    const shellsBody = (await shellsResponse.json()) as {
+      shells: TerminalShellView[];
+    };
+    assert.deepEqual(shellsBody.shells.map((shell) => shell.path), [
+      "/usr/bin/bash",
+    ]);
 
     const retainedResponse = await routes.get(TERMINAL_RETAINED_PATH).fetch(
       new Request(`http://dsh.internal${TERMINAL_RETAINED_PATH}?sessionId=s1`),

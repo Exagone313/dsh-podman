@@ -51,6 +51,8 @@ export function toolResultView(
   return {
     card: "terminal",
     output,
-    ...(data.signal ? { signal: String(data.signal) } : { exitCode: Number(data.exitCode ?? 0) }),
+    ...(data.signal
+      ? { signal: String(data.signal) }
+      : { exitCode: Number(data.exitCode ?? 0) }),
   };
 }

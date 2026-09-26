@@ -36,26 +36,31 @@ export function CachesSection(props: {
     <>
       <div style={sectionTitle}>{t("cachesTitle")}</div>
       <div style={wsBody}>
-        {caches.length === 0 ? <p style={{ ...hint, margin: 0 }}>{t("noCaches")}</p> : (
-          caches.map((cache) => (
-            <div
-              key={cache.manager}
-              style={{
-                display: "flex",
-                flexWrap: "wrap",
-                alignItems: "center",
-                gap: "8px",
-              }}
-            >
-              <strong style={{ color: "var(--dsw-alias-label-primary)" }}>
-                {cache.manager}
-              </strong>
-              <span style={hint}>
-                {t("cacheUsage", { size: formatBytes(cache.bytes), n: cache.files })}
-              </span>
-            </div>
-          ))
-        )}
+        {caches.length === 0
+          ? <p style={{ ...hint, margin: 0 }}>{t("noCaches")}</p>
+          : (
+            caches.map((cache) => (
+              <div
+                key={cache.manager}
+                style={{
+                  display: "flex",
+                  flexWrap: "wrap",
+                  alignItems: "center",
+                  gap: "8px",
+                }}
+              >
+                <strong style={{ color: "var(--dsw-alias-label-primary)" }}>
+                  {cache.manager}
+                </strong>
+                <span style={hint}>
+                  {t("cacheUsage", {
+                    size: formatBytes(cache.bytes),
+                    n: cache.files,
+                  })}
+                </span>
+              </div>
+            ))
+          )}
         <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
           <ConfirmButton
             t={t}

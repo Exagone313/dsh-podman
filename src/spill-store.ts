@@ -37,7 +37,9 @@ function spillName(suggestedName: unknown): string {
     .replace(/\.{2,}/g, "_")
     .replace(/^[.-]+/, "")
     .slice(0, 64);
-  return `${randomUUID().replace(/-/g, "")}-${safe === "" ? "spill.txt" : safe}`;
+  return `${randomUUID().replace(/-/g, "")}-${
+    safe === "" ? "spill.txt" : safe
+  }`;
 }
 
 // sessionSegment is the per-session directory name. Session ids are not

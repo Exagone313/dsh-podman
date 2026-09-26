@@ -55,7 +55,11 @@ test("create command drives createWorkspace with mounts and image", async () => 
     workspaceSlug: "w1",
     projectName: "team",
     imageId: "img1",
-    mounts: [{ projectName: "team", kind: "MOUNT_KIND_PROJECT", mode: "MOUNT_MODE_READ_WRITE" }],
+    mounts: [{
+      projectName: "team",
+      kind: "MOUNT_KIND_PROJECT",
+      mode: "MOUNT_MODE_READ_WRITE",
+    }],
   });
   assert.equal(scope.value.command, null);
 });
@@ -269,7 +273,9 @@ test("container_mount_remove command drives removeContainerMount for each kind",
     },
   });
   await new Promise((resolve) => setImmediate(resolve));
-  const removeCalls = calls.filter(([method]) => method === "removeContainerMount");
+  const removeCalls = calls.filter(([method]) =>
+    method === "removeContainerMount"
+  );
   assert.deepEqual(removeCalls.map(([, request]) => request), [
     {
       workspaceSlug: "w1",
@@ -319,7 +325,9 @@ test("container_mount_update command drives updateContainerMount", async () => {
     }),
   });
   await new Promise((resolve) => setImmediate(resolve));
-  const updateCalls = calls.filter(([method]) => method === "updateContainerMount");
+  const updateCalls = calls.filter(([method]) =>
+    method === "updateContainerMount"
+  );
   assert.deepEqual(updateCalls.map(([, request]) => request), [
     {
       workspaceSlug: "w1",

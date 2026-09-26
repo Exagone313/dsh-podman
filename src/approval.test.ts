@@ -177,9 +177,15 @@ test("summarizeArgs renders the approval reason for each gated tool", () => {
     }),
     'Build image "dev" from "archlinux" with packages: git, curl, tmux, vim, zsh, openssh, jq, ripgrep, +3 more.',
   );
-  assert.equal(summarizeArgs("image_rebuild", { imageId: "valkey" }), 'Rebuild image "valkey".');
+  assert.equal(
+    summarizeArgs("image_rebuild", { imageId: "valkey" }),
+    'Rebuild image "valkey".',
+  );
   assert.equal(summarizeArgs("image_rebuild_all", {}), "Rebuild all images.");
-  assert.equal(summarizeArgs("image_remove", { imageId: "valkey" }), 'Remove image "valkey".');
+  assert.equal(
+    summarizeArgs("image_remove", { imageId: "valkey" }),
+    'Remove image "valkey".',
+  );
   assert.equal(
     summarizeArgs("container_recreate", { container: "valkey-ctr" }),
     'Recreate container "valkey-ctr".',
@@ -312,7 +318,10 @@ test("summarizeArgs tolerates missing or malformed arguments", () => {
   assert.equal(summarizeArgs("image_build", {}), "");
   assert.equal(summarizeArgs("container_mount_add", { container: "c" }), "");
   assert.equal(summarizeArgs("image_list", { imageId: "x" }), "");
-  assert.equal(summarizeArgs("container_recreate", { container: "c" }), 'Recreate container "c".');
+  assert.equal(
+    summarizeArgs("container_recreate", { container: "c" }),
+    'Recreate container "c".',
+  );
   assert.equal(
     summarizeArgs("container_recreate", {
       container: "c",
@@ -357,7 +366,14 @@ test("read-only permission allows get/list tools and denies the rest", async () 
     assert.equal(result.kind, "allow");
   }
 
-  for (const name of ["image_build", "container_start", "container_remove", "volume_remove"]) {
+  for (
+    const name of [
+      "image_build",
+      "container_start",
+      "container_remove",
+      "volume_remove",
+    ]
+  ) {
     const result = (await preExecutePolicy(
       sessionExec(name),
       () => Promise.resolve({ kind: "allow" }),
@@ -404,7 +420,11 @@ test("read-only denies the built-in file and shell tools", async () => {
 });
 
 test("workspace-write and full access delegate the built-in file and shell tools", async () => {
-  for (const facts of [{ mode: "workspace-write", policy: "ask" }, { policy: "never" }]) {
+  for (
+    const facts of [{ mode: "workspace-write", policy: "ask" }, {
+      policy: "never",
+    }]
+  ) {
     for (const name of ["write", "edit", "bash", "pwsh"]) {
       let delegated = false;
       const result = (await preExecutePolicy(
@@ -475,7 +495,10 @@ test("workspace-write keeps the ask-based approval", async () => {
     testReadSession,
   )) as { kind: string; reason: string };
   assert.equal(asked.kind, "ask");
-  assert.equal(asked.reason, 'Build image "valkey" from "archlinux" with packages: valkey.');
+  assert.equal(
+    asked.reason,
+    'Build image "valkey" from "archlinux" with packages: valkey.',
+  );
 });
 
 test("read-only wins over a never approval policy", async () => {
@@ -486,7 +509,11 @@ test("read-only wins over a never approval policy", async () => {
     undefined,
     testReadSession,
   )) as { kind: string };
-  assert.equal(result.kind, "deny", "read-only must deny mutating tools even under full access");
+  assert.equal(
+    result.kind,
+    "deny",
+    "read-only must deny mutating tools even under full access",
+  );
 });
 
 test("podman-ops preset asks for its approval-gated tools only", async () => {
@@ -502,7 +529,10 @@ test("podman-ops preset asks for its approval-gated tools only", async () => {
     testReadSession,
   )) as { kind: string; reason: string };
   assert.equal(asked.kind, "ask");
-  assert.equal(asked.reason, 'Run a shell command in container "valkey-ctr": valkey-cli ping');
+  assert.equal(
+    asked.reason,
+    'Run a shell command in container "valkey-ctr": valkey-cli ping',
+  );
 
   const daemon = (await preExecutePolicy(
     presetExec("daemon_start", "podman-ops", {
@@ -564,7 +594,10 @@ test("podman-ops keeps open tools ungated and respects permissions", async () =>
   assert.equal(open.kind, "allow");
 
   const denied = (await preExecutePolicy(
-    presetExec("container_bash", "podman-ops", { container: "c", command: "ls" }, {
+    presetExec("container_bash", "podman-ops", {
+      container: "c",
+      command: "ls",
+    }, {
       mode: "read-only",
     }),
     () => Promise.resolve({ kind: "allow" }),
@@ -576,7 +609,9 @@ test("podman-ops keeps open tools ungated and respects permissions", async () =>
 
   let fullDelegated = false;
   const full = (await preExecutePolicy(
-    presetExec("daemon_start", "podman-ops", { container: "c", argv: ["x"] }, { policy: "never" }),
+    presetExec("daemon_start", "podman-ops", { container: "c", argv: ["x"] }, {
+      policy: "never",
+    }),
     () => {
       fullDelegated = true;
       return Promise.resolve({ kind: "allow" });
@@ -593,28 +628,58 @@ test("summarizeArgs renders reasons for the podman-ops gated tools", () => {
   assert.equal(
     summarizeArgs("container_exec", {
       container: "c",
-      argv: ["python", "run.py", "--x", "1", "--y", "2", "--z", "3", "--w", "4", "--v", "5"],
+      argv: [
+        "python",
+        "run.py",
+        "--x",
+        "1",
+        "--y",
+        "2",
+        "--z",
+        "3",
+        "--w",
+        "4",
+        "--v",
+        "5",
+      ],
     }),
     'Run a command in container "c": python run.py --x 1 --y 2 --z 3 …',
   );
   assert.equal(
-    summarizeArgs("container_write", { container: "c", file_path: "/etc/valkey/valkey.conf" }),
+    summarizeArgs("container_write", {
+      container: "c",
+      file_path: "/etc/valkey/valkey.conf",
+    }),
     'Write "/etc/valkey/valkey.conf" in container "c".',
   );
   assert.equal(
-    summarizeArgs("container_edit", { container: "c", file_path: "/etc/valkey/valkey.conf" }),
+    summarizeArgs("container_edit", {
+      container: "c",
+      file_path: "/etc/valkey/valkey.conf",
+    }),
     'Edit "/etc/valkey/valkey.conf" in container "c".',
   );
   assert.equal(
-    summarizeArgs("container_bash", { container: "c", command: "ping -c 1 8.8.8.8" }),
+    summarizeArgs("container_bash", {
+      container: "c",
+      command: "ping -c 1 8.8.8.8",
+    }),
     'Run a shell command in container "c": ping -c 1 8.8.8.8',
   );
   assert.equal(
-    summarizeArgs("container_bash", { container: "c", command: "ls", workdir: "/srv" }),
+    summarizeArgs("container_bash", {
+      container: "c",
+      command: "ls",
+      workdir: "/srv",
+    }),
     'Run a shell command in container "c" (cwd "/srv"): ls',
   );
   assert.equal(
-    summarizeArgs("container_exec", { container: "c", argv: ["ls"], workdir: "/srv" }),
+    summarizeArgs("container_exec", {
+      container: "c",
+      argv: ["ls"],
+      workdir: "/srv",
+    }),
     'Run a command in container "c" (cwd "/srv"): ls',
   );
 });
@@ -631,7 +696,11 @@ test("summarizeArgs names the process identity and groups", () => {
     'Run a shell command in container "c": id (uid 1000, gid 1000, groups 3000, 4000)',
   );
   assert.equal(
-    summarizeArgs("container_exec", { container: "c", argv: ["id"], gid: 2000 }),
+    summarizeArgs("container_exec", {
+      container: "c",
+      argv: ["id"],
+      gid: 2000,
+    }),
     'Run a command in container "c": id (gid 2000)',
   );
   assert.equal(
@@ -646,7 +715,11 @@ test("summarizeArgs names the process identity and groups", () => {
   );
   // An empty groups list is not worth naming.
   assert.equal(
-    summarizeArgs("container_exec", { container: "c", argv: ["id"], groups: [] }),
+    summarizeArgs("container_exec", {
+      container: "c",
+      argv: ["id"],
+      groups: [],
+    }),
     'Run a command in container "c": id',
   );
 });
@@ -668,8 +741,15 @@ test("Podman-ops preset content covers the recent tools", () => {
       `podman-ops composition must mention ${tool}`,
     );
   }
-  assert.match(patch, /id: podman-ops/, "the preset row must carry the policy's preset id");
-  assert.ok(patch.includes("secrets"), "podman-ops metadata must mention secrets");
+  assert.match(
+    patch,
+    /id: podman-ops/,
+    "the preset row must carry the policy's preset id",
+  );
+  assert.ok(
+    patch.includes("secrets"),
+    "podman-ops metadata must mention secrets",
+  );
   // The persona plugin takes its prose as `prefix` (a required field); `text`
   // is not part of its schema and would make the preset fail to load.
   assert.match(patch, /prefix:/);
@@ -718,9 +798,12 @@ test("summarizeArgs includes PATH additions for container start/recreate", () =>
 });
 
 test("an approval ask omits the reason when no summary can be derived", () => {
-  assert.deepEqual(approvalDecision("container_mount_remove", { container: "c" }), {
-    kind: "ask",
-  });
+  assert.deepEqual(
+    approvalDecision("container_mount_remove", { container: "c" }),
+    {
+      kind: "ask",
+    },
+  );
 });
 
 test("summarizeArgs includes env keys for container start/recreate", () => {
@@ -743,7 +826,18 @@ test("summarizeArgs includes env keys for container start/recreate", () => {
   assert.equal(
     summarizeArgs("container_start", {
       container: "web",
-      env: { A: "1", B: "2", C: "3", D: "4", E: "5", F: "6", G: "7", H: "8", I: "9", J: "10" },
+      env: {
+        A: "1",
+        B: "2",
+        C: "3",
+        D: "4",
+        E: "5",
+        F: "6",
+        G: "7",
+        H: "8",
+        I: "9",
+        J: "10",
+      },
     }),
     'Start container "web" with env: A, B, C, D, E, F, G, H, +2 more.',
   );
@@ -763,11 +857,19 @@ test("summarizeArgs includes env keys for container start/recreate", () => {
 
 test("approval prompts name the resolved path", () => {
   assert.equal(
-    summarizeArgs("container_write", { container: "c", file_path: "notes.md" }, "/projects/team"),
+    summarizeArgs(
+      "container_write",
+      { container: "c", file_path: "notes.md" },
+      "/projects/team",
+    ),
     'Write "/projects/team/notes.md" in container "c".',
   );
   assert.equal(
-    summarizeArgs("container_edit", { container: "c", file_path: "notes.md" }, "/projects/team"),
+    summarizeArgs(
+      "container_edit",
+      { container: "c", file_path: "notes.md" },
+      "/projects/team",
+    ),
     'Edit "/projects/team/notes.md" in container "c".',
   );
   // Without a session cwd, or for a path that cannot resolve, the prompt still
@@ -777,7 +879,11 @@ test("approval prompts name the resolved path", () => {
     'Write "notes.md" in container "c".',
   );
   assert.equal(
-    summarizeArgs("container_write", { container: "c", file_path: "../x" }, "/projects/team"),
+    summarizeArgs(
+      "container_write",
+      { container: "c", file_path: "../x" },
+      "/projects/team",
+    ),
     'Write "../x" in container "c".',
   );
 });
@@ -813,7 +919,10 @@ test("container_start asks for approval when it attaches secrets", () => {
     undefined,
   );
   assert.equal(
-    approvalDecision("container_start", { container: "web", paths: ["/opt/bin"] }),
+    approvalDecision("container_start", {
+      container: "web",
+      paths: ["/opt/bin"],
+    }),
     undefined,
   );
   assert.equal(
@@ -843,5 +952,8 @@ test("container_start asks for approval when it attaches secrets", () => {
 test("the bundle patch disables the built-in terminal UI", () => {
   // The Podman terminal replaces the built-in one; its client row must stay off
   // so the guide offers a single terminal card and Ctrl+` is free.
-  assert.match(podmanOpsPatch(), /- id: ui-sidebar-terminal\n\s+disabled: true/);
+  assert.match(
+    podmanOpsPatch(),
+    /- id: ui-sidebar-terminal\n\s+disabled: true/,
+  );
 });

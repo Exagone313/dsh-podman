@@ -33,7 +33,10 @@ test("the terminal card remembers the target it started", () => {
   });
   // The default container is a real choice and must survive the round trip.
   writeTerminalTarget({ container: "", shell: "/bin/sh" }, storage);
-  assert.deepEqual(readTerminalTarget(storage), { container: "", shell: "/bin/sh" });
+  assert.deepEqual(readTerminalTarget(storage), {
+    container: "",
+    shell: "/bin/sh",
+  });
 });
 
 test("unusable stored values leave the card without a preference", () => {
@@ -69,5 +72,7 @@ test("a storage that refuses to answer never breaks the card", () => {
     },
   };
   assert.equal(readTerminalTarget(failing), undefined);
-  assert.doesNotThrow(() => writeTerminalTarget({ container: "", shell: "/bin/sh" }, failing));
+  assert.doesNotThrow(() =>
+    writeTerminalTarget({ container: "", shell: "/bin/sh" }, failing)
+  );
 });

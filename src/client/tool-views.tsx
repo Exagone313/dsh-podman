@@ -23,7 +23,10 @@ import {
   TerminalBlock,
   type TerminalBlockLabels,
 } from "@deepseek-ai/dsh-client-ui-primitives";
-import type { PropsLocale, TranslateNS } from "@deepseek-ai/dsh-client-ui-slots";
+import type {
+  PropsLocale,
+  TranslateNS,
+} from "@deepseek-ai/dsh-client-ui-slots";
 import type { ToolCallViewProps } from "@deepseek-ai/dsh-client-ui-tool/client";
 import { type ContainerPluginKey, NS } from "./locales.js";
 import { TERMINAL_CLASS } from "./terminal-styles.js";
@@ -292,7 +295,9 @@ function capLines(text: string, max: number): string {
 function parseArgs(argsRaw: string): Record<string, unknown> {
   try {
     const parsed: unknown = JSON.parse(argsRaw);
-    return typeof parsed === "object" && parsed !== null ? (parsed as Record<string, unknown>) : {};
+    return typeof parsed === "object" && parsed !== null
+      ? (parsed as Record<string, unknown>)
+      : {};
   } catch {
     return {};
   }
@@ -317,7 +322,9 @@ function resultText(block: ToolCallViewProps["block"]): string | null {
   if (!("kind" in block)) return null;
   const parts: string[] = [];
   for (const item of block.content) {
-    parts.push(item.type === "text" ? item.text : JSON.stringify(item, null, 2));
+    parts.push(
+      item.type === "text" ? item.text : JSON.stringify(item, null, 2),
+    );
   }
   if (parts.length === 0 && block.error !== undefined) {
     parts.push(`${block.error.name}: ${block.error.code}`);
@@ -335,7 +342,9 @@ function prettyOutput(text: string | null): string | null {
       const record = data as Record<string, unknown>;
       if ("stdout" in record || "stderr" in record) {
         return [record.stdout, record.stderr]
-          .filter((value): value is string => typeof value === "string" && value !== "")
+          .filter((value): value is string =>
+            typeof value === "string" && value !== ""
+          )
           .join("");
       }
     }
@@ -367,7 +376,9 @@ function terminalCard(
   block: ToolCallViewProps["block"],
   cwd: string | undefined,
 ): TerminalCard | null {
-  if (toolName !== "container_bash" && toolName !== "container_exec") return null;
+  if (toolName !== "container_bash" && toolName !== "container_exec") {
+    return null;
+  }
   const command = toolName === "container_bash"
     ? typeof args.command === "string" ? args.command : ""
     : Array.isArray(args.argv)
@@ -391,7 +402,9 @@ function terminalCard(
     if (typeof data !== "object" || data === null) return null;
     const record = data as Record<string, unknown>;
     const output = [record.stdout, record.stderr]
-      .filter((value): value is string => typeof value === "string" && value !== "")
+      .filter((value): value is string =>
+        typeof value === "string" && value !== ""
+      )
       .join("");
     const signal = typeof record.signal === "string" && record.signal !== ""
       ? record.signal
@@ -399,9 +412,9 @@ function terminalCard(
     return {
       ...base,
       output,
-      ...(signal !== undefined
-        ? { signal }
-        : { exitCode: typeof record.exitCode === "number" ? record.exitCode : 0 }),
+      ...(signal !== undefined ? { signal } : {
+        exitCode: typeof record.exitCode === "number" ? record.exitCode : 0,
+      }),
     };
   } catch {
     return null;
@@ -438,7 +451,9 @@ export function PodmanToolRow({
   t,
 }: PodmanToolRowProps) {
   const presentation = TOOL_PRESENTATION[toolName];
-  const title = presentation === undefined ? toolName : t(presentation.titleKey);
+  const title = presentation === undefined
+    ? toolName
+    : t(presentation.titleKey);
   const settled = "kind" in block;
   const argsRaw = (settled ? block.call?.argsRaw : block.argsRaw) ?? "";
   const args = parseArgs(argsRaw);
@@ -455,7 +470,11 @@ export function PodmanToolRow({
     ? firstLine(output)
     : null;
   const summary = failureLine ??
-    argSummary(args, presentation?.summaryKeys ?? [], firstLine(argsRaw) || block.callId);
+    argSummary(
+      args,
+      presentation?.summaryKeys ?? [],
+      firstLine(argsRaw) || block.callId,
+    );
   const [expanded, setExpanded] = useState(false);
   const expandable = terminal !== null || (output !== null && output !== "");
   const leading = state === "error"

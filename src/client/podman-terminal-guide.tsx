@@ -6,18 +6,38 @@
 // container really offers, then open a new terminal tab bound to that target in
 // the Session's own workspace. It reads the same settings-card snapshot as the
 // tab body and never asks for a workspace, because each Session has exactly one.
-import { Button, PluginArtworkTerminal } from "@deepseek-ai/dsh-client-ui-primitives";
-import type { InjectFace, PropsLocale, PropsRuntime } from "@deepseek-ai/dsh-client-ui-slots";
+import {
+  Button,
+  PluginArtworkTerminal,
+} from "@deepseek-ai/dsh-client-ui-primitives";
+import type {
+  InjectFace,
+  PropsLocale,
+  PropsRuntime,
+} from "@deepseek-ai/dsh-client-ui-slots";
 import { type ReactNode, useEffect, useState } from "react";
 import type { ContainerCardFace } from "./container-card-controller.js";
 import { fieldLabel, fieldSelect, hint } from "./container-card-styles.js";
 import { NS } from "./locales.js";
 import { ContainerField } from "./podman-terminal.js";
 import { PODMAN_TERMINAL_KIND } from "./terminal-tab.js";
-import { readTerminalTarget, writeTerminalTarget } from "./terminal-preference.js";
-import { containerOptions, validContainer, validShell } from "./terminal-targets.js";
-import type { TerminalShellView, TerminalTargetView } from "./terminal-protocol.js";
-import { fetchTerminalShells, fetchTerminalTarget } from "./terminal-transport.js";
+import {
+  readTerminalTarget,
+  writeTerminalTarget,
+} from "./terminal-preference.js";
+import {
+  containerOptions,
+  validContainer,
+  validShell,
+} from "./terminal-targets.js";
+import type {
+  TerminalShellView,
+  TerminalTargetView,
+} from "./terminal-protocol.js";
+import {
+  fetchTerminalShells,
+  fetchTerminalTarget,
+} from "./terminal-transport.js";
 import type {} from "@deepseek-ai/dsh-client-ui-sidebar-right/client";
 
 /** The card snapshot the guide reads; the tab's own actions open the terminal. */
@@ -49,8 +69,12 @@ export function PodmanTerminalGuide(
   const state = props.useContainerCard((snapshot) => snapshot);
   // The host resolves the Session's workspace and reports it when it cannot.
   const [target, setTarget] = useState<TargetState>({ phase: "loading" });
-  const workspace = target.phase === "ready" ? target.target.workspace : undefined;
-  const workspaceSlug = target.phase === "ready" ? target.target.workspaceSlug : undefined;
+  const workspace = target.phase === "ready"
+    ? target.target.workspace
+    : undefined;
+  const workspaceSlug = target.phase === "ready"
+    ? target.target.workspaceSlug
+    : undefined;
   const unknownWorkspace = target.phase === "failed";
   const [container, setContainer] = useState<string | undefined>(undefined);
   const [shells, setShells] = useState<ShellsState>({ phase: "loading" });
@@ -68,7 +92,9 @@ export function PodmanTerminalGuide(
     setTarget({ phase: "loading" });
     void fetchTerminalTarget(sessionId, controller.signal).then(
       (resolved) => {
-        if (!controller.signal.aborted) setTarget({ phase: "ready", target: resolved });
+        if (!controller.signal.aborted) {
+          setTarget({ phase: "ready", target: resolved });
+        }
       },
       (error: unknown) => {
         if (controller.signal.aborted) return;
@@ -89,12 +115,17 @@ export function PodmanTerminalGuide(
   // the first snapshot, otherwise the empty default would pre-empt a remembered
   // named container before the options are known.
   useEffect(() => {
-    if (unknownWorkspace || workspace === undefined || container !== undefined) {
+    if (
+      unknownWorkspace || workspace === undefined || container !== undefined
+    ) {
       return;
     }
     if (state.busy) return;
     setContainer(
-      validContainer(stored?.container, containerOptions(state.containers, workspaceSlug)),
+      validContainer(
+        stored?.container,
+        containerOptions(state.containers, workspaceSlug),
+      ),
     );
   }, [
     unknownWorkspace,
@@ -107,7 +138,9 @@ export function PodmanTerminalGuide(
   ]);
 
   useEffect(() => {
-    if (workspace === undefined || workspace === "" || container === undefined) {
+    if (
+      workspace === undefined || workspace === "" || container === undefined
+    ) {
       return;
     }
     const controller = new AbortController();
@@ -121,7 +154,9 @@ export function PodmanTerminalGuide(
       (list) => {
         if (controller.signal.aborted) return;
         setShells({ phase: "ready", shells: list });
-        setShell((previous) => previous ?? validShell(stored?.shell, list) ?? list[0]?.path);
+        setShell((previous) =>
+          previous ?? validShell(stored?.shell, list) ?? list[0]?.path
+        );
       },
       (error: unknown) => {
         if (controller.signal.aborted) return;
@@ -137,7 +172,8 @@ export function PodmanTerminalGuide(
   }, [workspace, container, sessionId]);
 
   const shellList = shells.phase === "ready" ? shells.shells : [];
-  const ready = !unknownWorkspace && container !== undefined && shell !== undefined &&
+  const ready = !unknownWorkspace && container !== undefined &&
+    shell !== undefined &&
     shellList.length > 0;
   return (
     <div style={CARD_STYLE} data-sidebar-right-guide-entry={props.kind}>
@@ -160,7 +196,9 @@ export function PodmanTerminalGuide(
         )
         : (
           <>
-            {target.phase === "failed" && <p style={hint} role="alert">{target.message}</p>}
+            {target.phase === "failed" && (
+              <p style={hint} role="alert">{target.message}</p>
+            )}
             <div style={FIELDS_STYLE}>
               <ContainerField
                 containers={state.containers}
@@ -199,7 +237,9 @@ export function PodmanTerminalGuide(
                     </option>
                   )
                   : shellList.map((entry) => (
-                    <option key={entry.path} value={entry.path}>{entry.name}</option>
+                    <option key={entry.path} value={entry.path}>
+                      {entry.name}
+                    </option>
                   ))}
               </select>
             </div>
@@ -211,7 +251,8 @@ export function PodmanTerminalGuide(
             {!unknownWorkspace && shells.phase === "loading" && (
               <p style={hint} role="status">{t("terminalLoading")}</p>
             )}
-            {!unknownWorkspace && shells.phase === "ready" && shellList.length === 0 && (
+            {!unknownWorkspace && shells.phase === "ready" &&
+              shellList.length === 0 && (
               <p style={hint} role="status">{t("terminalNoShells")}</p>
             )}
             <div style={ACTIONS_STYLE}>

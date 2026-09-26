@@ -65,7 +65,9 @@ export function confineToRoot(root: string, path: string): string {
   if (!normalizedPath.startsWith(`${normalizedRoot}/`)) {
     return normalizedRoot;
   }
-  const name = normalizeProjectPath(normalizedPath.slice(normalizedRoot.length + 1));
+  const name = normalizeProjectPath(
+    normalizedPath.slice(normalizedRoot.length + 1),
+  );
   if (name === undefined || name === "") return normalizedRoot;
   return `${normalizedRoot}/${name}`;
 }

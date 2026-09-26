@@ -2,7 +2,11 @@
 //
 // SPDX-License-Identifier: MIT
 
-import { defaultMountMode, mountKindToProto, mountModeToProto } from "./mount-enums.js";
+import {
+  defaultMountMode,
+  mountKindToProto,
+  mountModeToProto,
+} from "./mount-enums.js";
 import { type ReasonLocale, renderDenial } from "./approval-reasons.js";
 
 // The mount kind for a call: an explicit non-empty `kind` wins, otherwise it is
@@ -42,9 +46,13 @@ export function projectMountDestinationReason(
   locale: ReasonLocale = "en",
 ): string | undefined {
   if (inferMountKind(args) !== "project") return undefined;
-  if (args.destination === undefined || args.destination === "") return undefined;
+  if (args.destination === undefined || args.destination === "") {
+    return undefined;
+  }
   const project = typeof args.project === "string" ? args.project : "";
-  const mirror = projectsRoot === undefined ? "" : projectMountMirror(projectsRoot, project);
+  const mirror = projectsRoot === undefined
+    ? ""
+    : projectMountMirror(projectsRoot, project);
   return renderDenial(locale, {
     kind: "project_destination",
     ...(project === "" ? {} : { source: project }),

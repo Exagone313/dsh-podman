@@ -95,11 +95,21 @@ test("daemon tools require no approval and are valid object-rooted schemas", () 
 });
 
 test("publicDaemon omits the exit code while the daemon runs", () => {
-  const running = publicDaemon({ name: "web", argv: ["sleep", "600"], running: true, exitCode: 0 });
+  const running = publicDaemon({
+    name: "web",
+    argv: ["sleep", "600"],
+    running: true,
+    exitCode: 0,
+  });
   assert.equal(running.running, true);
   assert.equal("exitCode" in running, false);
 
-  const exited = publicDaemon({ name: "web", argv: ["sleep", "600"], running: false, exitCode: 3 });
+  const exited = publicDaemon({
+    name: "web",
+    argv: ["sleep", "600"],
+    running: false,
+    exitCode: 3,
+  });
   assert.equal(exited.running, false);
   assert.equal(exited.exitCode, 3);
 });
@@ -143,7 +153,11 @@ test("daemon_start returns a daemon info object", async () => {
   const exec = { agent: { session: { header: { cwd: "/proj" } } } };
   const out = await toolHandlers.daemon_start(
     resolver,
-    { container: "default", argv: ["python3", "-m", "http.server", "8000"], name: "web" },
+    {
+      container: "default",
+      argv: ["python3", "-m", "http.server", "8000"],
+      name: "web",
+    },
     exec,
   );
   assert.deepEqual(out, {

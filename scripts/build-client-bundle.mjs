@@ -44,7 +44,10 @@ await build({
   // instead of esbuild emitting a separate CSS file the host cannot serve.
   loader: { ".css": "text" },
   banner: {
-    js: `window.__ModuleLoader__.load({ id: ${JSON.stringify(ID)}, factory: (require) => {\n` +
+    js:
+      `window.__ModuleLoader__.load({ id: ${
+        JSON.stringify(ID)
+      }, factory: (require) => {\n` +
       "var module = { exports: {} }; var exports = module.exports;",
   },
   footer: {

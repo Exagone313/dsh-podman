@@ -59,7 +59,9 @@ test("container_path_set persists and applies the whole list", async () => {
 });
 
 test("container_path_add prepends and moves an existing entry to the front", async () => {
-  const { controlCalls, resolver } = pathRequestRecorder({ paths: ["/a", "/b"] });
+  const { controlCalls, resolver } = pathRequestRecorder({
+    paths: ["/a", "/b"],
+  });
   const added = await toolHandlers.container_path_add(
     resolver as never,
     { container: "default", path: "/c" },

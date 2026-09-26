@@ -2,8 +2,14 @@
 //
 // SPDX-License-Identifier: MIT
 
-import { createSnapshotStore, type SnapshotStore } from "@deepseek-ai/dsh-client-store";
-import type { ConfigForm, ConfigFormSnapshot } from "@deepseek-ai/dsh-client-ui-settings/client";
+import {
+  createSnapshotStore,
+  type SnapshotStore,
+} from "@deepseek-ai/dsh-client-store";
+import type {
+  ConfigForm,
+  ConfigFormSnapshot,
+} from "@deepseek-ai/dsh-client-ui-settings/client";
 import type {
   CacheView,
   CardSnapshot,
@@ -98,16 +104,35 @@ export interface ContainerCardFace {
     image: string,
     env?: Record<string, string>,
   ) => void;
-  createContainer: (workspace: WorkspaceView, config?: ContainerCreateConfig) => void;
+  createContainer: (
+    workspace: WorkspaceView,
+    config?: ContainerCreateConfig,
+  ) => void;
   startContainer: (
     workspace: WorkspaceView,
     container: string,
     config?: ContainerCreateConfig,
   ) => void;
-  addContainerMount: (workspace: string, container: string, mount: MountInput) => void;
-  removeContainerMount: (workspace: string, container: string, mount: MountInput) => void;
-  updateContainerMount: (workspace: string, container: string, mount: MountInput) => void;
-  setContainerPaths: (workspace: string, container: string, paths: readonly string[]) => void;
+  addContainerMount: (
+    workspace: string,
+    container: string,
+    mount: MountInput,
+  ) => void;
+  removeContainerMount: (
+    workspace: string,
+    container: string,
+    mount: MountInput,
+  ) => void;
+  updateContainerMount: (
+    workspace: string,
+    container: string,
+    mount: MountInput,
+  ) => void;
+  setContainerPaths: (
+    workspace: string,
+    container: string,
+    paths: readonly string[],
+  ) => void;
   createVolume: (name: string) => void;
   removeVolume: (name: string) => void;
   removeImage: (imageId: string) => void;
@@ -126,7 +151,11 @@ export interface ContainerCardFace {
     envVar: string,
     secret: string,
   ) => void;
-  removeContainerSecret: (workspace: string, container: string, envVar: string) => void;
+  removeContainerSecret: (
+    workspace: string,
+    container: string,
+    envVar: string,
+  ) => void;
   // Replace the default environment (the git popup and the generic editor both
   // go through this).
   saveContainerEnv: (env: Record<string, string>) => void;
@@ -199,7 +228,9 @@ export class ContainerCardController {
       defaultImage: value?.defaultImage ?? "",
       containerEnv: value?.containerEnv ?? {},
       projectsRoot: this.snapshot.projectsRoot,
-      ...(this.directoryPicker === undefined ? {} : { directoryPicker: this.directoryPicker }),
+      ...(this.directoryPicker === undefined
+        ? {}
+        : { directoryPicker: this.directoryPicker }),
       workspaces: this.snapshot.workspaces,
       containers: this.snapshot.containers,
       images: this.snapshot.images,
@@ -328,9 +359,12 @@ export class ContainerCardController {
       reload: () => {
         void this.reload();
       },
-      remove: (workspace, container) => this.command("remove", workspace, "", { container }),
-      cleanCaches: (mode) => this.command("cache_clean", "", "", { cacheMode: mode }),
-      removeWorkspace: (workspace) => this.command("workspace_remove", workspace, ""),
+      remove: (workspace, container) =>
+        this.command("remove", workspace, "", { container }),
+      cleanCaches: (mode) =>
+        this.command("cache_clean", "", "", { cacheMode: mode }),
+      removeWorkspace: (workspace) =>
+        this.command("workspace_remove", workspace, ""),
       recreate: (workspace, container, image, env) =>
         this.command("recreate", workspace, image, {
           container,
@@ -343,9 +377,15 @@ export class ContainerCardController {
           config?.image ?? (workspace.imageId || this.defaultImage() || ""),
           {
             projectName: workspace.projectName,
-            ...(config?.mounts && config.mounts.length > 0 ? { mounts: config.mounts } : {}),
-            ...(config?.env && Object.keys(config.env).length > 0 ? { env: config.env } : {}),
-            ...(config?.paths && config.paths.length > 0 ? { paths: config.paths } : {}),
+            ...(config?.mounts && config.mounts.length > 0
+              ? { mounts: config.mounts }
+              : {}),
+            ...(config?.env && Object.keys(config.env).length > 0
+              ? { env: config.env }
+              : {}),
+            ...(config?.paths && config.paths.length > 0
+              ? { paths: config.paths }
+              : {}),
             ...(config?.secretEnv && Object.keys(config.secretEnv).length > 0
               ? { secretEnv: config.secretEnv }
               : {}),
@@ -358,20 +398,35 @@ export class ContainerCardController {
           config?.image ?? (workspace.imageId || this.defaultImage() || ""),
           {
             container,
-            ...(config?.mounts && config.mounts.length > 0 ? { mounts: config.mounts } : {}),
-            ...(config?.env && Object.keys(config.env).length > 0 ? { env: config.env } : {}),
-            ...(config?.paths && config.paths.length > 0 ? { paths: config.paths } : {}),
+            ...(config?.mounts && config.mounts.length > 0
+              ? { mounts: config.mounts }
+              : {}),
+            ...(config?.env && Object.keys(config.env).length > 0
+              ? { env: config.env }
+              : {}),
+            ...(config?.paths && config.paths.length > 0
+              ? { paths: config.paths }
+              : {}),
             ...(config?.secretEnv && Object.keys(config.secretEnv).length > 0
               ? { secretEnv: config.secretEnv }
               : {}),
           },
         ),
       addContainerMount: (workspace, container, mount) =>
-        this.command("container_mount_add", workspace, "", { container, mount }),
+        this.command("container_mount_add", workspace, "", {
+          container,
+          mount,
+        }),
       removeContainerMount: (workspace, container, mount) =>
-        this.command("container_mount_remove", workspace, "", { container, mount }),
+        this.command("container_mount_remove", workspace, "", {
+          container,
+          mount,
+        }),
       updateContainerMount: (workspace, container, mount) =>
-        this.command("container_mount_update", workspace, "", { container, mount }),
+        this.command("container_mount_update", workspace, "", {
+          container,
+          mount,
+        }),
       setContainerPaths: (workspace, container, paths) =>
         this.command("container_path_set", workspace, "", { container, paths }),
       createVolume: (name) => this.command("volume_create", name, ""),
@@ -393,7 +448,8 @@ export class ContainerCardController {
           ...(charset ? { charset } : {}),
         }),
       removeSecret: (name) => this.command("secret_remove", name, ""),
-      setSecret: (name, value) => this.command("secret_set", name, "", { value }),
+      setSecret: (name, value) =>
+        this.command("secret_set", name, "", { value }),
       addContainerSecret: (workspace, container, envVar, secret) =>
         this.command("container_secret_add", workspace, "", {
           container,
@@ -408,7 +464,8 @@ export class ContainerCardController {
       saveContainerEnv: (env) => {
         void this.scope.set("containerEnv", env);
       },
-      syncDefaultEnv: (workspace) => this.command("default_env_sync", workspace, ""),
+      syncDefaultEnv: (workspace) =>
+        this.command("default_env_sync", workspace, ""),
     };
   }
 

@@ -195,7 +195,8 @@ export function DirectoryPickerModal(props: {
                     type="button"
                     className="dsh-podman-directory-crumb"
                     disabled={busy}
-                    onClick={() => navigate(crumb)}
+                    onClick={() =>
+                      navigate(crumb)}
                   >
                     {crumbLabel(crumb)}
                   </button>
@@ -236,11 +237,13 @@ export function DirectoryPickerModal(props: {
               </>
             )}
           </div>
-          {error === "" ? null : (
-            <p className="dsh-podman-directory-error" role="alert">
-              {error}
-            </p>
-          )}
+          {error === ""
+            ? null
+            : (
+              <p className="dsh-podman-directory-error" role="alert">
+                {error}
+              </p>
+            )}
           {error === "" && truncated
             ? (
               <p className="dsh-podman-directory-status" role="status">
@@ -315,7 +318,12 @@ function DirectoryRow(props: {
               className="dsh-podman-directory-rowicon-selected"
             />
           )
-          : <IconFolderCloseRegular size={16} className="dsh-podman-directory-rowicon" />}
+          : (
+            <IconFolderCloseRegular
+              size={16}
+              className="dsh-podman-directory-rowicon"
+            />
+          )}
         <span className="dsh-podman-directory-rowname">{entry.name}</span>
         <IconChevronRightOutlineRegular
           size={12}

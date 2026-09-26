@@ -2,17 +2,31 @@
 //
 // SPDX-License-Identifier: MIT
 
-import { BaseImageRow, ImageBuildModal, ImageItem } from "./container-card-images.js";
+import {
+  BaseImageRow,
+  ImageBuildModal,
+  ImageItem,
+} from "./container-card-images.js";
 import { CachesSection } from "./container-card-caches.js";
 import { DefaultEnvironmentSection } from "./container-card-default-env.js";
 import { SecretsSection } from "./container-card-secrets.js";
 import { ConfirmButton } from "./container-card-shared.js";
-import { banner, footerRow, hint, imageSelect, sectionTitle } from "./container-card-styles.js";
+import {
+  banner,
+  footerRow,
+  hint,
+  imageSelect,
+  sectionTitle,
+} from "./container-card-styles.js";
 import { VolumesSection } from "./container-card-volumes.js";
 import { WorkspaceSection } from "./container-card-workspace.js";
 import { type ContainerCardFace } from "./container-card-controller.js";
 import { NS } from "./locales.js";
-import { Button, Modal, writeClipboard } from "@deepseek-ai/dsh-client-ui-primitives";
+import {
+  Button,
+  Modal,
+  writeClipboard,
+} from "@deepseek-ai/dsh-client-ui-primitives";
 import {
   type InjectFace,
   type PropsLocale,
@@ -46,18 +60,28 @@ export function ContainerCard(props: ContainerCardProps): ReactNode {
   const copyVersions = async (): Promise<void> => {
     const lines = [
       `${t("dsh")} ${state.dshVersion || t("versionUnknown")}`,
-      `${t("cardTitle")} ${state.version}${state.commit ? ` · ${state.commit}` : ""}`,
-      `${t("orchestrator")} ${state.orchestratorVersion || t("versionUnknown")}`,
+      `${t("cardTitle")} ${state.version}${
+        state.commit ? ` · ${state.commit}` : ""
+      }`,
+      `${t("orchestrator")} ${
+        state.orchestratorVersion || t("versionUnknown")
+      }`,
     ];
-    setCopyState((await writeClipboard(lines.join("\n"))) ? "copied" : "failed");
-    if (copyResetTimer.current !== undefined) clearTimeout(copyResetTimer.current);
+    setCopyState(
+      (await writeClipboard(lines.join("\n"))) ? "copied" : "failed",
+    );
+    if (copyResetTimer.current !== undefined) {
+      clearTimeout(copyResetTimer.current);
+    }
     copyResetTimer.current = setTimeout(() => setCopyState("idle"), 1500);
   };
   // The reset timer is cancelled on unmount, so it cannot fire against an
   // unmounted component.
   useEffect(
     () => () => {
-      if (copyResetTimer.current !== undefined) clearTimeout(copyResetTimer.current);
+      if (copyResetTimer.current !== undefined) {
+        clearTimeout(copyResetTimer.current);
+      }
     },
     [],
   );
@@ -82,11 +106,13 @@ export function ContainerCard(props: ContainerCardProps): ReactNode {
     return (
       <div style={{ padding: "8px 0", fontSize: "13px", opacity: 0.8 }}>
         <p style={{ margin: 0 }}>{t("unavailable")}</p>
-        {state.notice === "" ? null : (
-          <p style={{ margin: "4px 0 0" }} role="status">
-            {t("notice")}: {state.notice}
-          </p>
-        )}
+        {state.notice === ""
+          ? null
+          : (
+            <p style={{ margin: "4px 0 0" }} role="status">
+              {t("notice")}: {state.notice}
+            </p>
+          )}
         <div style={{ marginTop: "8px" }}>
           <Button
             variant="outline"
@@ -129,7 +155,8 @@ export function ContainerCard(props: ContainerCardProps): ReactNode {
             t={t}
             workspace={workspace}
             containers={state.containers.filter(
-              (container) => container.workspaceSlug === workspace.workspaceSlug,
+              (container) =>
+                container.workspaceSlug === workspace.workspaceSlug,
             )}
             images={state.images}
             volumes={state.volumes}
@@ -278,7 +305,9 @@ export function ContainerCard(props: ContainerCardProps): ReactNode {
           value={defaultImage}
           onChange={(event) => setDefaultImage(event.target.value)}
         >
-          {defaultCandidates.length === 0 ? <option value="">{t("none")}</option> : null}
+          {defaultCandidates.length === 0
+            ? <option value="">{t("none")}</option>
+            : null}
           {defaultCandidates.map((name) => (
             <option key={name} value={name}>
               {name}

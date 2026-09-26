@@ -13,7 +13,10 @@ import { readFileSync } from "node:fs";
 
 function localeMeta(language: string): any {
   return JSON.parse(
-    readFileSync(new URL(`../locale/${language}.json`, import.meta.url), "utf8"),
+    readFileSync(
+      new URL(`../locale/${language}.json`, import.meta.url),
+      "utf8",
+    ),
   );
 }
 

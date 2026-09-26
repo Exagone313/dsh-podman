@@ -2,11 +2,18 @@
 //
 // SPDX-License-Identifier: MIT
 
-import { type ContainerView, type MountInput } from "./container-card-controller.js";
+import {
+  type ContainerView,
+  type MountInput,
+} from "./container-card-controller.js";
 import { EnvEditor, MountsEditor } from "./container-card-editors.js";
 import { type DirectoryPickerFace } from "./directory-picker.js";
 import { PathsEditor } from "./container-card-paths.js";
-import { ConfirmButton, mountKindShort, mountViewToInput } from "./container-card-shared.js";
+import {
+  ConfirmButton,
+  mountKindShort,
+  mountViewToInput,
+} from "./container-card-shared.js";
 import {
   actions,
   containerHeader,
@@ -19,7 +26,12 @@ import {
   wsBody,
 } from "./container-card-styles.js";
 import { type ContainerPluginKey, type Translate } from "./locales.js";
-import { Button, DisclosureRow, Input, Pill } from "@deepseek-ai/dsh-client-ui-primitives";
+import {
+  Button,
+  DisclosureRow,
+  Input,
+  Pill,
+} from "@deepseek-ai/dsh-client-ui-primitives";
 import { type ReactNode, useEffect, useState } from "react";
 
 // The order the summary table lists mount kinds in.
@@ -78,9 +90,21 @@ export function ContainerRow(props: {
     image: string,
     env?: Record<string, string>,
   ) => void;
-  onAddContainerMount: (workspace: string, container: string, mount: MountInput) => void;
-  onRemoveContainerMount: (workspace: string, container: string, mount: MountInput) => void;
-  onUpdateContainerMount: (workspace: string, container: string, mount: MountInput) => void;
+  onAddContainerMount: (
+    workspace: string,
+    container: string,
+    mount: MountInput,
+  ) => void;
+  onRemoveContainerMount: (
+    workspace: string,
+    container: string,
+    mount: MountInput,
+  ) => void;
+  onUpdateContainerMount: (
+    workspace: string,
+    container: string,
+    mount: MountInput,
+  ) => void;
   onSetContainerPaths: (
     workspace: string,
     container: string,
@@ -213,7 +237,8 @@ export function ContainerRow(props: {
             container: container.containerName,
           })}
           disabled={!enabled}
-          onConfirm={() => onRemove(container.workspaceSlug, container.containerName)}
+          onConfirm={() =>
+            onRemove(container.workspaceSlug, container.containerName)}
         />
         <ConfirmButton
           t={t}
@@ -224,7 +249,13 @@ export function ContainerRow(props: {
             container: container.containerName,
           })}
           disabled={!enabled}
-          onConfirm={() => onRecreate(container.workspaceSlug, container.containerName, "", env)}
+          onConfirm={() =>
+            onRecreate(
+              container.workspaceSlug,
+              container.containerName,
+              "",
+              env,
+            )}
         />
         <select
           style={imageSelect}
@@ -233,7 +264,9 @@ export function ContainerRow(props: {
           onChange={(event) => setSelected(event.target.value)}
           aria-label={t("recreateWithImage")}
         >
-          {container.imageId === "" ? <option value="">{t("none")}</option> : null}
+          {container.imageId === ""
+            ? <option value="">{t("none")}</option>
+            : null}
           {images.map((image) => (
             <option key={image.imageId} value={image.imageId}>
               {image.imageId}
@@ -250,7 +283,12 @@ export function ContainerRow(props: {
           })}
           disabled={!enabled || selected === ""}
           onConfirm={() =>
-            onRecreate(container.workspaceSlug, container.containerName, selected, env)}
+            onRecreate(
+              container.workspaceSlug,
+              container.containerName,
+              selected,
+              env,
+            )}
         />
       </div>
       <DisclosureRow
@@ -282,7 +320,9 @@ export function ContainerRow(props: {
             projectsRoot={projectsRoot}
             directoryPicker={directoryPicker}
             confirmRemove
-            primaryProject={container.containerName === "default" ? projectName : ""}
+            primaryProject={container.containerName === "default"
+              ? projectName
+              : ""}
             onUpdate={(mount) =>
               onUpdateContainerMount(
                 container.workspaceSlug,
@@ -358,7 +398,10 @@ export function ContainerRow(props: {
                 t={t}
                 label={t("detachSecret")}
                 title={t("confirmTitle")}
-                description={t("confirmDetachSecret", { env: envVar, secret: secretName })}
+                description={t("confirmDetachSecret", {
+                  env: envVar,
+                  secret: secretName,
+                })}
                 disabled={busy}
                 onConfirm={() =>
                   onRemoveContainerSecret(
@@ -385,7 +428,9 @@ export function ContainerRow(props: {
               onChange={(event) => setAttachSecret(event.target.value)}
               aria-label={t("attachSecret")}
             >
-              {secrets.length === 0 ? <option value="">{t("none")}</option> : null}
+              {secrets.length === 0
+                ? <option value="">{t("none")}</option>
+                : null}
               {secrets.map((secret) => (
                 <option key={secret.name} value={secret.name}>
                   {secret.name}
@@ -405,7 +450,8 @@ export function ContainerRow(props: {
             <Button
               variant="outline"
               size="sm"
-              disabled={!enabled || attachVar.trim() === "" || attachSecret === ""}
+              disabled={!enabled || attachVar.trim() === "" ||
+                attachSecret === ""}
               onClick={attach}
             >
               {t("attachSecret")}

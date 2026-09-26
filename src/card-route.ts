@@ -25,7 +25,11 @@ import {
   resolveReasonLocale,
 } from "./approval-reasons.js";
 import { mergeDefaultEnv, missingDefaultEnv } from "./container-env.js";
-import { defaultMountMode, mountKindToProto, mountModeToProto } from "./mount-enums.js";
+import {
+  defaultMountMode,
+  mountKindToProto,
+  mountModeToProto,
+} from "./mount-enums.js";
 import { mountInputToProto, validateMountInput } from "./mount-input.js";
 import { unaryGuest } from "./guest-rpc.js";
 import { type WorkspaceResolver, workspaceSlug } from "./workspace-binding.js";
@@ -35,7 +39,9 @@ import { dshVersion } from "./dsh-version.js";
 
 // readOrchestratorVersion asks the orchestrator for its version, or returns ""
 // when the call fails (an orchestrator predating the handshake).
-async function readOrchestratorVersion(resolver: WorkspaceResolver): Promise<string> {
+async function readOrchestratorVersion(
+  resolver: WorkspaceResolver,
+): Promise<string> {
   try {
     const response: any = await resolver.control("getVersion", {});
     return String(response?.version ?? "");
@@ -113,7 +119,10 @@ function orchestratorWorkspaceViews(raw: unknown): WorkspaceView[] {
   }));
 }
 
-function dshWorkspaceViews(registry: any, projectsRoot: string): WorkspaceView[] {
+function dshWorkspaceViews(
+  registry: any,
+  projectsRoot: string,
+): WorkspaceView[] {
   const list = registry?.list?.() ?? [];
   return list.map((workspace: any) => {
     const path = String(workspace.path ?? "");
@@ -122,12 +131,15 @@ function dshWorkspaceViews(registry: any, projectsRoot: string): WorkspaceView[]
       : path;
     return {
       workspaceSlug: workspaceSlug(workspace.id),
-      projectName: projectName || String(workspace.title ?? "") || String(workspace.id ?? ""),
+      projectName: projectName || String(workspace.title ?? "") ||
+        String(workspace.id ?? ""),
       containerName: "",
       imageId: "",
       status: "",
       createdAt: workspace.createdAt ?? "",
-      mounts: projectName !== "" ? [{ projectName, mode: "MOUNT_MODE_READ_WRITE" }] : [],
+      mounts: projectName !== ""
+        ? [{ projectName, mode: "MOUNT_MODE_READ_WRITE" }]
+        : [],
     };
   });
 }
@@ -136,7 +148,9 @@ function mergeWorkspaceViews(
   dsh: WorkspaceView[],
   orchestrator: WorkspaceView[],
 ): WorkspaceView[] {
-  const bySlug = new Map(orchestrator.map((workspace) => [workspace.workspaceSlug, workspace]));
+  const bySlug = new Map(
+    orchestrator.map((workspace) => [workspace.workspaceSlug, workspace]),
+  );
   const seen = new Set<string>();
   const merged: WorkspaceView[] = [];
   for (const workspace of dsh) {
@@ -183,7 +197,9 @@ export async function cardSnapshot(
   } catch (error: unknown) {
     // An incompatible plugin is refused before any handler runs, so the card
     // reports the mismatch instead of an unexplained empty snapshot.
-    if ((error as { code?: unknown })?.code !== "FailedPrecondition") throw error;
+    if ((error as { code?: unknown })?.code !== "FailedPrecondition") {
+      throw error;
+    }
     return {
       version: VERSION,
       commit: GIT_COMMIT,
@@ -262,12 +278,17 @@ export async function runCommand(
         imageId: command.image === "" ? undefined : command.image,
       };
       const projectsRoot = resolver.getConfig().projectsRoot;
-      const mounts = command.mounts.map((mount) => mountInputToProto(mount, projectsRoot));
+      const mounts = command.mounts.map((mount) =>
+        mountInputToProto(mount, projectsRoot)
+      );
       if (mounts.length > 0) payload.mounts = mounts;
       // The card's create is a creation path: seed the default environment
       // under whatever the modal collected. A later recreate is authoritative,
       // which is how a seeded value is removed again.
-      const env = mergeDefaultEnv(resolver.getConfig().containerEnv, command.env);
+      const env = mergeDefaultEnv(
+        resolver.getConfig().containerEnv,
+        command.env,
+      );
       if (Object.keys(env).length > 0) payload.env = env;
       if (Object.keys(command.secretEnv).length > 0) {
         payload.secretEnv = command.secretEnv;
@@ -291,7 +312,9 @@ export async function runCommand(
       if (m === null) break;
       validateMountInput(m, resolver.getConfig().projectsRoot);
       const kind = mountKindToProto(m.kind || undefined);
-      const mode = mountModeToProto(m.mode || defaultMountMode(m.kind || undefined));
+      const mode = mountModeToProto(
+        m.mode || defaultMountMode(m.kind || undefined),
+      );
       const request: Record<string, unknown> = {
         workspaceSlug: command.workspace,
         container: command.container || "default",
@@ -467,7 +490,9 @@ export async function runCommand(
       let applied = 0;
       let skipped = 0;
       for (const row of listings.containers ?? []) {
-        if (command.workspace !== "" && row.workspaceSlug !== command.workspace) {
+        if (
+          command.workspace !== "" && row.workspaceSlug !== command.workspace
+        ) {
           continue;
         }
         const current = (row.env ?? {}) as Record<string, string>;
@@ -521,7 +546,9 @@ function stringField(value: unknown, fallback = ""): string {
 }
 
 function stringMap(value: unknown): Record<string, string> {
-  if (typeof value !== "object" || value === null || Array.isArray(value)) return {};
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    return {};
+  }
   const result: Record<string, string> = {};
   for (const [key, item] of Object.entries(value as Record<string, unknown>)) {
     result[key] = String(item);
@@ -641,7 +668,13 @@ export function registerCardRoute(
       methods: ["GET", "POST"],
       requestBody: "buffered",
       fetch: (request: Request) =>
-        handleCardRequest(request, connectionCtx, resolver, workspaceRegistry, readLocale),
+        handleCardRequest(
+          request,
+          connectionCtx,
+          resolver,
+          workspaceRegistry,
+          readLocale,
+        ),
     });
   });
 }

@@ -2,7 +2,12 @@
 //
 // SPDX-License-Identifier: MIT
 
-import { discardUnneededSpill, outputReader, spillTargetFor, splitEnv } from "./output-reader.js";
+import {
+  discardUnneededSpill,
+  outputReader,
+  spillTargetFor,
+  splitEnv,
+} from "./output-reader.js";
 import { openGuestTerminal } from "./guest-terminal.js";
 import { globCwd, remoteArgv, unaryGuest } from "./guest-rpc.js";
 import { metadata, type WorkspaceResolver } from "./workspace-binding.js";
@@ -20,7 +25,9 @@ export interface SubprocessProvider {
   dispose(): void;
 }
 
-export function createSubprocessProvider(resolver: WorkspaceResolver): SubprocessProvider {
+export function createSubprocessProvider(
+  resolver: WorkspaceResolver,
+): SubprocessProvider {
   // Live termination handles, so service disposal can stop every process this
   // provider started (the harness's disposal contract).
   const live = new Set<() => void>();
@@ -36,9 +43,13 @@ export function createSubprocessProvider(resolver: WorkspaceResolver): Subproces
     // reported in the harness's "not found" form, so shell discovery skips a
     // candidate the images do not carry instead of failing the whole list.
     resolveExecutable: async (command: string): Promise<string> => {
-      if (typeof command === "string" && command.startsWith("/")) return command;
+      if (typeof command === "string" && command.startsWith("/")) {
+        return command;
+      }
       throw new SubprocessExecutableNotFoundError(
-        `cannot resolve executable ${JSON.stringify(command)}: no workspace context is available`,
+        `cannot resolve executable ${
+          JSON.stringify(command)
+        }: no workspace context is available`,
       );
     },
     // Shell selection happens before a workspace is chosen, so the provider
@@ -97,7 +108,9 @@ export function createSubprocessProvider(resolver: WorkspaceResolver): Subproces
         terminated = true;
         signalProcess("SIGTERM");
         if (killTimer === undefined) {
-          const grace = typeof spec.graceMs === "number" && spec.graceMs > 0 ? spec.graceMs : 5000;
+          const grace = typeof spec.graceMs === "number" && spec.graceMs > 0
+            ? spec.graceMs
+            : 5000;
           killTimer = setTimeout(() => {
             if (!exited) signalProcess("SIGKILL");
           }, grace);
@@ -177,7 +190,9 @@ export function createSubprocessProvider(resolver: WorkspaceResolver): Subproces
                 const data = Buffer.from(output.stdoutChunk);
                 stdoutReader?.append(data);
                 writeChunk(stream, state.stdout, data);
-                if (spec.stdio?.stdout === "inherit") process.stdout.write(data);
+                if (spec.stdio?.stdout === "inherit") {
+                  process.stdout.write(data);
+                }
               }
               if (output.processId) {
                 state.pid = Number(output.processId);
@@ -187,7 +202,9 @@ export function createSubprocessProvider(resolver: WorkspaceResolver): Subproces
                 const data = Buffer.from(output.stderrChunk);
                 stderrReader?.append(data);
                 writeChunk(stream, state.stderr, data);
-                if (spec.stdio?.stderr === "inherit") process.stderr.write(data);
+                if (spec.stdio?.stderr === "inherit") {
+                  process.stderr.write(data);
+                }
               }
               if (output.exit) {
                 stdoutReader?.setSpillValid(
@@ -227,14 +244,21 @@ export function createSubprocessProvider(resolver: WorkspaceResolver): Subproces
                 // /dev/null: a pipe would be a non-TTY stdin, and tools like
                 // ripgrep then read stdin instead of the working directory.
                 stdinPipe: spec.stdio?.stdin === "pipe",
-                ...(stdoutSpill.target !== undefined ? { spillStdout: stdoutSpill.target } : {}),
-                ...(stderrSpill.target !== undefined ? { spillStderr: stderrSpill.target } : {}),
+                ...(stdoutSpill.target !== undefined
+                  ? { spillStdout: stdoutSpill.target }
+                  : {}),
+                ...(stderrSpill.target !== undefined
+                  ? { spillStderr: stderrSpill.target }
+                  : {}),
               },
             });
             if (spec.stdio?.stdin !== "pipe") stream.end();
             else {
               state.stdin = new PassThrough();
-              state.stdin.on("data", (data: Buffer) => stream.write({ stdinChunk: data }));
+              state.stdin.on(
+                "data",
+                (data: Buffer) => stream.write({ stdinChunk: data }),
+              );
               state.stdin.on("end", () => stream.end());
             }
           }),
@@ -329,7 +353,8 @@ export function createSubprocessProvider(resolver: WorkspaceResolver): Subproces
           revision: terminal.activityRevision(),
         }),
         inspectForeground: async () => terminal.inspectForeground(),
-        signalForeground: async (signal: string) => terminal.signalForeground(signal),
+        signalForeground: async (signal: string) =>
+          terminal.signalForeground(signal),
         terminate: async () => {
           await terminal.terminate();
           endOutput();

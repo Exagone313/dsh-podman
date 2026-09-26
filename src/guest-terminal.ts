@@ -62,19 +62,23 @@ export function openGuestTerminal(
 
   let resolveStarted!: (pid: number) => void;
   let rejectStarted!: (error: unknown) => void;
-  const started = new Promise<number>((resolveStartedPromise, rejectStartedPromise) => {
-    resolveStarted = resolveStartedPromise;
-    rejectStarted = rejectStartedPromise;
-  });
+  const started = new Promise<number>(
+    (resolveStartedPromise, rejectStartedPromise) => {
+      resolveStarted = resolveStartedPromise;
+      rejectStarted = rejectStartedPromise;
+    },
+  );
   // A caller that never awaits startup must not crash on an unhandled rejection.
   started.catch(() => {});
 
   let resolveExit!: (outcome: GuestTerminalExit) => void;
   let rejectExit!: (error: unknown) => void;
-  const done = new Promise<GuestTerminalExit>((resolveExitPromise, rejectExitPromise) => {
-    resolveExit = resolveExitPromise;
-    rejectExit = rejectExitPromise;
-  });
+  const done = new Promise<GuestTerminalExit>(
+    (resolveExitPromise, rejectExitPromise) => {
+      resolveExit = resolveExitPromise;
+      rejectExit = rejectExitPromise;
+    },
+  );
   done.catch(() => {});
 
   const failPending = (error: unknown): void => {
@@ -85,7 +89,10 @@ export function openGuestTerminal(
   // Settle the stream exactly once, however it ends: an exit message, a stream
   // error, or a stream that ends without one. Every path also releases pending
   // foreground queries so a caller cannot hang on them.
-  const settle = (error: Error | undefined, outcome?: GuestTerminalExit): void => {
+  const settle = (
+    error: Error | undefined,
+    outcome?: GuestTerminalExit,
+  ): void => {
     if (exited) return;
     exited = true;
     if (error !== undefined) {
@@ -198,14 +205,21 @@ export function openGuestTerminal(
     },
     inspectForeground: async () => {
       if (exited) return undefined;
-      const response = await request((requestId) => ({ inspectRequestId: requestId }));
+      const response = await request((requestId) => ({
+        inspectRequestId: requestId,
+      }));
       return response.found
-        ? { processGroupId: response.processGroupId, inputWaiting: response.inputWaiting }
+        ? {
+          processGroupId: response.processGroupId,
+          inputWaiting: response.inputWaiting,
+        }
         : undefined;
     },
     signalForeground: async (signal) => {
       if (exited) throw new Error("terminal has exited");
-      const response = await request((requestId) => ({ signal: { signal, requestId } }));
+      const response = await request((requestId) => ({
+        signal: { signal, requestId },
+      }));
       if (!response.found) {
         throw new Error(`no foreground process group to signal ${signal}`);
       }

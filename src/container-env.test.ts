@@ -36,7 +36,9 @@ test("mergeDefaultEnv drops empty and reserved defaults", () => {
 });
 
 test("missingDefaultEnv reports only the absent keys", () => {
-  assert.deepEqual(missingDefaultEnv({ A: "1", B: "2" }, { B: "own" }), { A: "1" });
+  assert.deepEqual(missingDefaultEnv({ A: "1", B: "2" }, { B: "own" }), {
+    A: "1",
+  });
   assert.deepEqual(missingDefaultEnv({ A: "1" }, { A: "own" }), {});
   assert.deepEqual(missingDefaultEnv(undefined, {}), {});
 });
@@ -48,17 +50,23 @@ test("git identity fills the author and committer pairs", () => {
     GIT_COMMITTER_NAME: "John Doe",
     GIT_COMMITTER_EMAIL: "john.doe@git.example",
   });
-  assert.deepEqual(readGitIdentity(gitIdentityEnv("John Doe", "john.doe@git.example")), {
-    name: "John Doe",
-    email: "john.doe@git.example",
-  });
+  assert.deepEqual(
+    readGitIdentity(gitIdentityEnv("John Doe", "john.doe@git.example")),
+    {
+      name: "John Doe",
+      email: "john.doe@git.example",
+    },
+  );
   assert.deepEqual(readGitIdentity(undefined), { name: "", email: "" });
 });
 
 test("setGitIdentity adds, replaces and clears the four keys", () => {
   const base = { KEEP: "1", GIT_AUTHOR_NAME: "old" };
   const set = setGitIdentity(base, "new", "new@example.com");
-  assert.deepEqual(set, { KEEP: "1", ...gitIdentityEnv("new", "new@example.com") });
+  assert.deepEqual(set, {
+    KEEP: "1",
+    ...gitIdentityEnv("new", "new@example.com"),
+  });
   for (const key of GIT_IDENTITY_KEYS) assert.ok(key in set);
   // An empty field clears the whole identity, leaving other defaults alone.
   assert.deepEqual(setGitIdentity(set, "", "new@example.com"), { KEEP: "1" });

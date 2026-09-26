@@ -23,7 +23,11 @@ const DEFAULTS = {
 function driver(
   containerEnv: Record<string, string> | undefined,
   containers: any[] = [],
-): { scope: ReturnType<typeof fakeScope>; calls: Array<[string, any]>; resolver: any } {
+): {
+  scope: ReturnType<typeof fakeScope>;
+  calls: Array<[string, any]>;
+  resolver: any;
+} {
   const scope = fakeScope(baseValue());
   const calls: Array<[string, any]> = [];
   const resolver: any = {
@@ -40,7 +44,8 @@ function driver(
   return { scope, calls, resolver };
 }
 
-const settle = (): Promise<void> => new Promise((resolve) => setImmediate(resolve));
+const settle = (): Promise<void> =>
+  new Promise((resolve) => setImmediate(resolve));
 
 test("create seeds the default environment into a new workspace", async () => {
   const { scope, calls, resolver } = driver(DEFAULTS);
@@ -84,7 +89,12 @@ test("recreate is authoritative and does not re-seed the defaults", async () => 
   const { scope, calls, resolver } = driver(DEFAULTS);
   await installCardCommandDriver(fakeContext(scope), resolver);
   await scope.update({
-    command: { op: "recreate", workspace: "w1", image: "", env: { EXTRA: "1" } },
+    command: {
+      op: "recreate",
+      workspace: "w1",
+      image: "",
+      env: { EXTRA: "1" },
+    },
   });
   await settle();
   const recreate = calls.find(([method]) => method === "recreateContainer");
@@ -105,7 +115,12 @@ test("default_env_sync adds only missing keys to running containers", async () =
       status: "running",
       env: { ...DEFAULTS },
     },
-    { workspaceSlug: "w2", containerName: "default", status: "stopped", env: {} },
+    {
+      workspaceSlug: "w2",
+      containerName: "default",
+      status: "stopped",
+      env: {},
+    },
   ];
   const { scope, calls, resolver } = driver(DEFAULTS, containers);
   await installCardCommandDriver(fakeContext(scope), resolver);
@@ -131,8 +146,18 @@ test("default_env_sync adds only missing keys to running containers", async () =
 
 test("default_env_sync honors a workspace filter", async () => {
   const containers = [
-    { workspaceSlug: "w1", containerName: "default", status: "running", env: {} },
-    { workspaceSlug: "w2", containerName: "default", status: "running", env: {} },
+    {
+      workspaceSlug: "w1",
+      containerName: "default",
+      status: "running",
+      env: {},
+    },
+    {
+      workspaceSlug: "w2",
+      containerName: "default",
+      status: "running",
+      env: {},
+    },
   ];
   const { scope, calls, resolver } = driver(DEFAULTS, containers);
   await installCardCommandDriver(fakeContext(scope), resolver);
@@ -146,7 +171,12 @@ test("default_env_sync honors a workspace filter", async () => {
 
 test("default_env_sync reports nothing to do when the defaults are absent", async () => {
   const { scope, calls, resolver } = driver(undefined, [
-    { workspaceSlug: "w1", containerName: "default", status: "running", env: {} },
+    {
+      workspaceSlug: "w1",
+      containerName: "default",
+      status: "running",
+      env: {},
+    },
   ]);
   await installCardCommandDriver(fakeContext(scope), resolver);
   await calls.splice(0);

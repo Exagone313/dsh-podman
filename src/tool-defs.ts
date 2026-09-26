@@ -103,7 +103,11 @@ export const TOOLS: ToolDefinition[] = [
     parameters: containerRecreateParameters,
     approval: true,
   },
-  { name: "container_remove", parameters: containerRemoveParameters, approval: true },
+  {
+    name: "container_remove",
+    parameters: containerRemoveParameters,
+    approval: true,
+  },
   { name: "container_bash", parameters: containerBashParameters },
   { name: "container_exec", parameters: containerExecParameters },
   { name: "container_read", parameters: containerReadParameters },
@@ -238,8 +242,10 @@ export const TOOL_DESCRIPTIONS: Record<string, string> = {
   daemon_list:
     "List the daemons running inside a container of the current workspace. Daemons live in the container's guest agent and do not survive a container recreate.",
   daemon_stop: "Stop a daemon inside a container of the current workspace.",
-  daemon_restart: "Restart a daemon inside a container of the current workspace.",
-  daemon_logs: "Read the captured logs of a daemon inside a container of the current workspace.",
+  daemon_restart:
+    "Restart a daemon inside a container of the current workspace.",
+  daemon_logs:
+    "Read the captured logs of a daemon inside a container of the current workspace.",
 };
 
 // UI title and icon category per tool, used by the host presenters so a UI can

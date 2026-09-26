@@ -14,7 +14,11 @@ test("volume tools are registered with the expected schemas", () => {
     if (name === "volume_remove") {
       assert.equal(tool!.approval, true, "volume_remove must require approval");
     } else {
-      assert.notEqual(tool!.approval, true, `${name} must not require approval`);
+      assert.notEqual(
+        tool!.approval,
+        true,
+        `${name} must not require approval`,
+      );
     }
     assert.equal(tool!.parameters.type, "object", `${name} type`);
     assert.equal(typeof tool!.parameters.properties, "object");

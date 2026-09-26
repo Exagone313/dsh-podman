@@ -9,7 +9,11 @@ import {
   workspaceSlug,
 } from "./workspace-binding.js";
 import { grpc } from "./grpc/runtime-client.js";
-import { discardUnneededSpill, outputReader, SPILL_ROOT } from "./output-reader.js";
+import {
+  discardUnneededSpill,
+  outputReader,
+  SPILL_ROOT,
+} from "./output-reader.js";
 import { randomUUID } from "node:crypto";
 import { isAbsolute, resolve as resolvePath } from "node:path";
 
@@ -19,7 +23,9 @@ import { isAbsolute, resolve as resolvePath } from "node:path";
 // its mirrored path under DSH_PODMAN_PROJECTS_ROOT.
 function resolveAgainstSession(path: string, sessionCwd: unknown): string {
   if (isAbsolute(path)) return path;
-  const base = typeof sessionCwd === "string" && sessionCwd !== "" ? sessionCwd : undefined;
+  const base = typeof sessionCwd === "string" && sessionCwd !== ""
+    ? sessionCwd
+    : undefined;
   if (base === undefined) {
     throw new Error(
       "relative paths need a session working directory; pass an absolute path",
@@ -100,8 +106,13 @@ export function detectLineEndings(raw: string): "CRLF" | "LF" {
   return crlfCount > lfCount ? "CRLF" : "LF";
 }
 
-export function restoreLineEndings(content: string, endings: "CRLF" | "LF"): string {
-  return endings === "LF" ? content : normalizeLineEndings(content).split("\n").join("\r\n");
+export function restoreLineEndings(
+  content: string,
+  endings: "CRLF" | "LF",
+): string {
+  return endings === "LF"
+    ? content
+    : normalizeLineEndings(content).split("\n").join("\r\n");
 }
 
 export function fsError(code: string, message: string): Error {
@@ -112,7 +123,10 @@ export function fsError(code: string, message: string): Error {
 
 // The harness's FS_ABORTED: a caller that already cancelled must fail before
 // any I/O.
-export function throwIfAborted(signal: AbortSignal | undefined, verb: string): void {
+export function throwIfAborted(
+  signal: AbortSignal | undefined,
+  verb: string,
+): void {
   if (signal?.aborted) throw fsError("FS_ABORTED", `${verb} aborted`);
 }
 
@@ -283,7 +297,9 @@ export async function readDiffBasis(
 }
 
 export function guestVersion(result: any): string {
-  return `agent:${result.modifiedAt ?? ""}:${result.size ?? 0}:${result.mode ?? ""}`;
+  return `agent:${result.modifiedAt ?? ""}:${result.size ?? 0}:${
+    result.mode ?? ""
+  }`;
 }
 
 export async function writeGuestFile(
@@ -294,40 +310,53 @@ export async function writeGuestFile(
   signal?: AbortSignal,
 ): Promise<number> {
   throwIfAborted(signal, "write");
-  return withGuestAuth(binding, (guest, token) =>
-    new Promise((resolveDone, reject) => {
-      let detach: () => void = () => {};
-      const call = guest.writeFile(
-        metadata(token),
-        {},
-        (error: Error | null, result: any) => {
-          detach();
-          error
-            ? reject(signal?.aborted ? fsError("FS_ABORTED", "write aborted") : error)
-            : resolveDone(Number(result?.bytesWritten ?? 0));
-        },
-      );
-      detach = onAbortCancel(call, signal);
-      call.write({
-        start: { path, create: opts.create, truncate: opts.truncate },
-      });
-      call.write({ dataChunk: Buffer.from(content) });
-      call.end();
-    }));
+  return withGuestAuth(
+    binding,
+    (guest, token) =>
+      new Promise((resolveDone, reject) => {
+        let detach: () => void = () => {};
+        const call = guest.writeFile(
+          metadata(token),
+          {},
+          (error: Error | null, result: any) => {
+            detach();
+            error
+              ? reject(
+                signal?.aborted
+                  ? fsError("FS_ABORTED", "write aborted")
+                  : error,
+              )
+              : resolveDone(Number(result?.bytesWritten ?? 0));
+          },
+        );
+        detach = onAbortCancel(call, signal);
+        call.write({
+          start: { path, create: opts.create, truncate: opts.truncate },
+        });
+        call.write({ dataChunk: Buffer.from(content) });
+        call.end();
+      }),
+  );
 }
 
 export async function readGuestFile(
   binding: WorkspaceBinding,
   path: string,
 ): Promise<string> {
-  return withGuestAuth(binding, (guest, token) =>
-    new Promise<string>((resolveDone, reject) => {
-      const chunks: Buffer[] = [];
-      const call = guest.readFile({ path }, metadata(token));
-      call.on("data", (chunk: any) => chunks.push(Buffer.from(chunk.data)));
-      call.on("error", reject);
-      call.on("end", () => resolveDone(Buffer.concat(chunks).toString("utf8")));
-    }));
+  return withGuestAuth(
+    binding,
+    (guest, token) =>
+      new Promise<string>((resolveDone, reject) => {
+        const chunks: Buffer[] = [];
+        const call = guest.readFile({ path }, metadata(token));
+        call.on("data", (chunk: any) => chunks.push(Buffer.from(chunk.data)));
+        call.on("error", reject);
+        call.on(
+          "end",
+          () => resolveDone(Buffer.concat(chunks).toString("utf8")),
+        );
+      }),
+  );
 }
 
 const READ_LIMIT = 2000;
@@ -385,153 +414,182 @@ export async function runExec(
   const killGraceMs = Number.isFinite(configuredGrace) && configuredGrace > 0
     ? configuredGrace
     : EXEC_KILL_GRACE_MS;
-  const stdoutSpec = { path: `${SPILL_ROOT}/${randomUUID()}.stdout`, maxBytes: spillBytes };
-  const stderrSpec = { path: `${SPILL_ROOT}/${randomUUID()}.stderr`, maxBytes: spillBytes };
-  return withGuestAuth(binding, (guest, token) =>
-    new Promise((resolveDone, reject) => {
-      const stdoutReader = outputReader({ maxBytes }, stdoutSpec);
-      const stderrReader = outputReader({ maxBytes }, stderrSpec);
-      if (stdoutReader === undefined || stderrReader === undefined) {
-        reject(new Error("exec output reader is unavailable"));
-        return;
-      }
-      const stream = (guest as any).exec(metadata(token));
-      let processId: string | undefined;
-      let timer: ReturnType<typeof setTimeout> | undefined;
-      let killTimer: ReturnType<typeof setTimeout> | undefined;
-      let settled = false;
-      let detach: () => void = () => {};
-      // settle runs one final action exactly once and tears down the timeout
-      // and the abort listener, so a timeout, an abort, and an exit cannot
-      // race. The kill timer deliberately outlives settle: it is the
-      // escalation for a command that ignored the cancellation's SIGTERM.
-      const settle = (finish: () => void): void => {
-        if (settled) return;
-        settled = true;
-        if (timer !== undefined) {
-          clearTimeout(timer);
-          timer = undefined;
-        }
-        detach();
-        finish();
-      };
-      const clearKillTimer = (): void => {
-        if (killTimer !== undefined) {
-          clearTimeout(killTimer);
-          killTimer = undefined;
-        }
-      };
-      const stopProcess = (sig: string): void => {
-        if (processId === undefined) return;
-        // Best effort: ask the guest to terminate the running process tree.
-        unaryGuest({ binding: { guest, token } }, "signal", {
-          processId,
-          signal: sig,
-        }).catch(() => {});
-      };
-      const cancelStream = (): void => {
-        try {
-          stream.cancel?.();
-        } catch {
-          // The stream already ended; nothing to cancel.
-        }
-      };
-      // A cancellation asks the command to stop with SIGTERM, then kills its
-      // process group once the grace period elapses without an exit. The
-      // stream stays open for that grace so the guest still knows the process;
-      // the guest also escalates a cancelled stream to a group SIGKILL, so a
-      // lost connection stops the tree too.
-      const escalateStop = (): void => {
-        if (processId === undefined) {
-          // Nothing to signal yet: cancelling the stream is all that is left.
-          cancelStream();
+  const stdoutSpec = {
+    path: `${SPILL_ROOT}/${randomUUID()}.stdout`,
+    maxBytes: spillBytes,
+  };
+  const stderrSpec = {
+    path: `${SPILL_ROOT}/${randomUUID()}.stderr`,
+    maxBytes: spillBytes,
+  };
+  return withGuestAuth(
+    binding,
+    (guest, token) =>
+      new Promise((resolveDone, reject) => {
+        const stdoutReader = outputReader({ maxBytes }, stdoutSpec);
+        const stderrReader = outputReader({ maxBytes }, stderrSpec);
+        if (stdoutReader === undefined || stderrReader === undefined) {
+          reject(new Error("exec output reader is unavailable"));
           return;
         }
-        stopProcess("SIGTERM");
-        if (killTimer !== undefined) return;
-        killTimer = setTimeout(() => {
-          killTimer = undefined;
-          stopProcess("SIGKILL");
-          cancelStream();
-        }, killGraceMs);
-        killTimer.unref?.();
-      };
-      const abortWith = (error: Error): void => {
-        escalateStop();
-        settle(() => reject(error));
-      };
-      if (typeof timeoutMs === "number" && timeoutMs > 0) {
-        timer = setTimeout(() => {
-          timer = undefined;
-          abortWith(new Error(`command timed out after ${timeoutMs} ms`));
-        }, timeoutMs);
-      }
-      if (signal !== undefined) {
-        if (signal.aborted) {
-          abortWith(fsError("FS_ABORTED", "exec aborted"));
-          return;
+        const stream = (guest as any).exec(metadata(token));
+        let processId: string | undefined;
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        let killTimer: ReturnType<typeof setTimeout> | undefined;
+        let settled = false;
+        let detach: () => void = () => {};
+        // settle runs one final action exactly once and tears down the timeout
+        // and the abort listener, so a timeout, an abort, and an exit cannot
+        // race. The kill timer deliberately outlives settle: it is the
+        // escalation for a command that ignored the cancellation's SIGTERM.
+        const settle = (finish: () => void): void => {
+          if (settled) return;
+          settled = true;
+          if (timer !== undefined) {
+            clearTimeout(timer);
+            timer = undefined;
+          }
+          detach();
+          finish();
+        };
+        const clearKillTimer = (): void => {
+          if (killTimer !== undefined) {
+            clearTimeout(killTimer);
+            killTimer = undefined;
+          }
+        };
+        const stopProcess = (sig: string): void => {
+          if (processId === undefined) return;
+          // Best effort: ask the guest to terminate the running process tree.
+          unaryGuest({ binding: { guest, token } }, "signal", {
+            processId,
+            signal: sig,
+          }).catch(() => {});
+        };
+        const cancelStream = (): void => {
+          try {
+            stream.cancel?.();
+          } catch {
+            // The stream already ended; nothing to cancel.
+          }
+        };
+        // A cancellation asks the command to stop with SIGTERM, then kills its
+        // process group once the grace period elapses without an exit. The
+        // stream stays open for that grace so the guest still knows the process;
+        // the guest also escalates a cancelled stream to a group SIGKILL, so a
+        // lost connection stops the tree too.
+        const escalateStop = (): void => {
+          if (processId === undefined) {
+            // Nothing to signal yet: cancelling the stream is all that is left.
+            cancelStream();
+            return;
+          }
+          stopProcess("SIGTERM");
+          if (killTimer !== undefined) return;
+          killTimer = setTimeout(() => {
+            killTimer = undefined;
+            stopProcess("SIGKILL");
+            cancelStream();
+          }, killGraceMs);
+          killTimer.unref?.();
+        };
+        const abortWith = (error: Error): void => {
+          escalateStop();
+          settle(() => reject(error));
+        };
+        if (typeof timeoutMs === "number" && timeoutMs > 0) {
+          timer = setTimeout(() => {
+            timer = undefined;
+            abortWith(new Error(`command timed out after ${timeoutMs} ms`));
+          }, timeoutMs);
         }
-        const onAbort = (): void => abortWith(fsError("FS_ABORTED", "exec aborted"));
-        signal.addEventListener("abort", onAbort, { once: true });
-        detach = () => signal.removeEventListener("abort", onAbort);
-      }
-      stream.on("data", (output: any) => {
-        if (output.processId) processId = String(output.processId);
-        if (output.stdoutChunk) {
-          stdoutReader.append(Buffer.from(output.stdoutChunk));
+        if (signal !== undefined) {
+          if (signal.aborted) {
+            abortWith(fsError("FS_ABORTED", "exec aborted"));
+            return;
+          }
+          const onAbort = (): void =>
+            abortWith(fsError("FS_ABORTED", "exec aborted"));
+          signal.addEventListener("abort", onAbort, { once: true });
+          detach = () => signal.removeEventListener("abort", onAbort);
         }
-        if (output.stderrChunk) {
-          stderrReader.append(Buffer.from(output.stderrChunk));
-        }
-        if (output.exit) {
-          // The command stopped on its own within the grace period: nothing is
-          // left to escalate.
-          clearKillTimer();
-          stdoutReader.setSpillValid(Boolean(output.exit.stdoutSpillValid));
-          stderrReader.setSpillValid(Boolean(output.exit.stderrSpillValid));
-          const out = stdoutReader.readFrom(0);
-          const err = stderrReader.readFrom(0);
-          // A spill the in-memory tail already covered is deleted; a valid one
-          // holding dropped output stays for the caller to read.
-          discardUnneededSpill({ guest, token }, stdoutReader);
-          discardUnneededSpill({ guest, token }, stderrReader);
+        stream.on("data", (output: any) => {
+          if (output.processId) processId = String(output.processId);
+          if (output.stdoutChunk) {
+            stdoutReader.append(Buffer.from(output.stdoutChunk));
+          }
+          if (output.stderrChunk) {
+            stderrReader.append(Buffer.from(output.stderrChunk));
+          }
+          if (output.exit) {
+            // The command stopped on its own within the grace period: nothing is
+            // left to escalate.
+            clearKillTimer();
+            stdoutReader.setSpillValid(Boolean(output.exit.stdoutSpillValid));
+            stderrReader.setSpillValid(Boolean(output.exit.stderrSpillValid));
+            const out = stdoutReader.readFrom(0);
+            const err = stderrReader.readFrom(0);
+            // A spill the in-memory tail already covered is deleted; a valid one
+            // holding dropped output stays for the caller to read.
+            discardUnneededSpill({ guest, token }, stdoutReader);
+            discardUnneededSpill({ guest, token }, stderrReader);
+            settle(() =>
+              resolveDone({
+                exitCode: output.exit.exitCode,
+                signal: output.exit.signaled ? output.exit.signal : null,
+                stdout: out.text,
+                stderr: err.text,
+                ...(out.spillPath === undefined
+                  ? {}
+                  : { stdoutSpillPath: out.spillPath }),
+                ...(err.spillPath === undefined
+                  ? {}
+                  : { stderrSpillPath: err.spillPath }),
+              })
+            );
+          }
+        });
+        stream.on("error", (error: unknown) => settle(() => reject(error)));
+        stream.on("end", () =>
+          // A stream that ends without an exit message (guest restart, dropped
+          // socket) must not leave the caller pending forever.
           settle(() =>
-            resolveDone({
-              exitCode: output.exit.exitCode,
-              signal: output.exit.signaled ? output.exit.signal : null,
-              stdout: out.text,
-              stderr: err.text,
-              ...(out.spillPath === undefined ? {} : { stdoutSpillPath: out.spillPath }),
-              ...(err.spillPath === undefined ? {} : { stderrSpillPath: err.spillPath }),
-            })
-          );
-        }
-      });
-      stream.on("error", (error: unknown) => settle(() => reject(error)));
-      stream.on("end", () =>
-        // A stream that ends without an exit message (guest restart, dropped
-        // socket) must not leave the caller pending forever.
-        settle(() => reject(new Error("exec stream ended before the process exited"))));
-      stream.write({
-        start: {
-          argv: remoteArgv(argv),
-          cwd,
-          env: env ?? {},
-          ...(identity?.uid !== undefined ? { uid: { value: identity.uid } } : {}),
-          ...(identity?.gid !== undefined ? { gid: { value: identity.gid } } : {}),
-          ...(identity?.groups !== undefined ? { groups: identity.groups } : {}),
-          spillStdout: stdoutSpec,
-          spillStderr: stderrSpec,
-        },
-      });
-      stream.end();
-    }));
+            reject(new Error("exec stream ended before the process exited"))
+          ));
+        stream.write({
+          start: {
+            argv: remoteArgv(argv),
+            cwd,
+            env: env ?? {},
+            ...(identity?.uid !== undefined
+              ? { uid: { value: identity.uid } }
+              : {}),
+            ...(identity?.gid !== undefined
+              ? { gid: { value: identity.gid } }
+              : {}),
+            ...(identity?.groups !== undefined
+              ? { groups: identity.groups }
+              : {}),
+            spillStdout: stdoutSpec,
+            spillStderr: stderrSpec,
+          },
+        });
+        stream.end();
+      }),
+  );
 }
 
 // sliceLines returns the requested 1-based line range of a file's content,
 // defaulting to the first READ_LIMIT lines like the harness's read tool.
-export function sliceLines(content: string, offset: unknown, limit: unknown): string {
-  const start = typeof offset === "number" && Number.isInteger(offset) && offset > 0 ? offset : 1;
+export function sliceLines(
+  content: string,
+  offset: unknown,
+  limit: unknown,
+): string {
+  const start =
+    typeof offset === "number" && Number.isInteger(offset) && offset > 0
+      ? offset
+      : 1;
   const max = typeof limit === "number" && Number.isInteger(limit) && limit > 0
     ? limit
     : READ_LIMIT;
@@ -547,7 +605,10 @@ export async function streamLines(
   offset: unknown,
   limit: unknown,
 ): Promise<string> {
-  const start = typeof offset === "number" && Number.isInteger(offset) && offset > 0 ? offset : 1;
+  const start =
+    typeof offset === "number" && Number.isInteger(offset) && offset > 0
+      ? offset
+      : 1;
   const max = typeof limit === "number" && Number.isInteger(limit) && limit > 0
     ? limit
     : READ_LIMIT;
@@ -623,7 +684,10 @@ export async function resolveToolBinding(
   return resolver.containerBinding(cwd, container, signal);
 }
 
-export async function guestStat(target: any, signal?: AbortSignal): Promise<any> {
+export async function guestStat(
+  target: any,
+  signal?: AbortSignal,
+): Promise<any> {
   const result = await guestStatResponse(target, signal);
   if (!result.exists) return undefined;
   return {
@@ -633,23 +697,31 @@ export async function guestStat(target: any, signal?: AbortSignal): Promise<any>
   };
 }
 
-export function guestStatResponse(target: any, signal?: AbortSignal): Promise<any> {
+export function guestStatResponse(
+  target: any,
+  signal?: AbortSignal,
+): Promise<any> {
   throwIfAborted(signal, "stat");
-  return withGuestAuth(target.binding, (guest, token) =>
-    new Promise<any>((resolveDone, reject) => {
-      let detach: () => void = () => {};
-      const call = guest.stat(
-        { path: target.targetKey },
-        metadata(token),
-        (error: Error | null, value: any) => {
-          detach();
-          error
-            ? reject(signal?.aborted ? fsError("FS_ABORTED", "stat aborted") : error)
-            : resolveDone(value);
-        },
-      );
-      detach = onAbortCancel(call, signal);
-    }));
+  return withGuestAuth(
+    target.binding,
+    (guest, token) =>
+      new Promise<any>((resolveDone, reject) => {
+        let detach: () => void = () => {};
+        const call = guest.stat(
+          { path: target.targetKey },
+          metadata(token),
+          (error: Error | null, value: any) => {
+            detach();
+            error
+              ? reject(
+                signal?.aborted ? fsError("FS_ABORTED", "stat aborted") : error,
+              )
+              : resolveDone(value);
+          },
+        );
+        detach = onAbortCancel(call, signal);
+      }),
+  );
 }
 
 export async function unaryGuest(
@@ -659,23 +731,28 @@ export async function unaryGuest(
   signal?: AbortSignal,
 ): Promise<unknown> {
   throwIfAborted(signal, method);
-  return withGuestAuth(target.binding, (guest, token) =>
-    new Promise((resolveDone, reject) => {
-      let detach: () => void = () => {};
-      const call = (guest as any)[method](
-        request,
-        metadata(token),
-        (error: Error | null, result: unknown) => {
-          detach();
-          error
-            ? reject(
-              signal?.aborted ? fsError("FS_ABORTED", `${method} aborted`) : error,
-            )
-            : resolveDone(result);
-        },
-      );
-      detach = onAbortCancel(call, signal);
-    }));
+  return withGuestAuth(
+    target.binding,
+    (guest, token) =>
+      new Promise((resolveDone, reject) => {
+        let detach: () => void = () => {};
+        const call = (guest as any)[method](
+          request,
+          metadata(token),
+          (error: Error | null, result: unknown) => {
+            detach();
+            error
+              ? reject(
+                signal?.aborted
+                  ? fsError("FS_ABORTED", `${method} aborted`)
+                  : error,
+              )
+              : resolveDone(result);
+          },
+        );
+        detach = onAbortCancel(call, signal);
+      }),
+  );
 }
 
 // globCwd returns the working directory a ripgrep discovery listing must run
@@ -685,16 +762,23 @@ export async function unaryGuest(
 // could never match an absolute root. Running the listing from the root anchors
 // the pattern to `path` while keeping the printed paths absolute, which is what
 // the harness renders against the session working directory.
-export function globCwd(argv: readonly string[], cwd: unknown): string | undefined {
+export function globCwd(
+  argv: readonly string[],
+  cwd: unknown,
+): string | undefined {
   const runner = argv[0];
-  if (runner === undefined || !/(?:^|\/)rg(?:\.exe)?$/.test(runner)) return undefined;
+  if (runner === undefined || !/(?:^|\/)rg(?:\.exe)?$/.test(runner)) {
+    return undefined;
+  }
   if (!argv.includes("--files")) return undefined;
   const separator = argv.indexOf("--");
   if (separator < 0) return undefined;
   const roots = argv.slice(separator + 1);
   if (roots.length !== 1) return undefined;
   const root = roots[0];
-  if (typeof cwd !== "string" || cwd === "" || !isAbsolute(root)) return undefined;
+  if (typeof cwd !== "string" || cwd === "" || !isAbsolute(root)) {
+    return undefined;
+  }
   return root;
 }
 

@@ -65,7 +65,8 @@ export function createReadOnlyShellGate(deps: {
     // gate never widens access it could not verify.
     if (state === undefined) return undefined;
     const remount = state.mounts.filter(
-      (mount) => carriesMode(mount.kind) && mount.mode !== "MOUNT_MODE_READ_ONLY",
+      (mount) =>
+        carriesMode(mount.kind) && mount.mode !== "MOUNT_MODE_READ_ONLY",
     );
     if (remount.length === 0) return { kind: "allow" };
     const keep = state.mounts.filter((mount) => !remount.includes(mount));
@@ -93,7 +94,9 @@ export function createReadOnlyShellGate(deps: {
 // plugin's tools, the default container for the built-in ones.
 function containerOf(exec: any): string {
   const container = exec?.arguments?.container;
-  return typeof container === "string" && container !== "" ? container : "default";
+  return typeof container === "string" && container !== ""
+    ? container
+    : "default";
 }
 
 // Whether a mount kind carries a mode: project and volume mounts do; tmpfs is
@@ -179,10 +182,13 @@ function mountFactOf(mount: ContainerMount): MountFact {
     typeof mount.kind === "string" ? mount.kind : undefined,
   );
   const kind: MountFact["kind"] =
-    resolved === "volume" || resolved === "secret" || resolved === "tmpfs" ? resolved : "project";
-  const destination = typeof mount.destination === "string" && mount.destination !== ""
-    ? mount.destination
-    : undefined;
+    resolved === "volume" || resolved === "secret" || resolved === "tmpfs"
+      ? resolved
+      : "project";
+  const destination =
+    typeof mount.destination === "string" && mount.destination !== ""
+      ? mount.destination
+      : undefined;
   const source = kind === "volume"
     ? String(mount.volume ?? "")
     : kind === "secret"

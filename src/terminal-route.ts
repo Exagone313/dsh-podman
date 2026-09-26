@@ -37,7 +37,11 @@ function message(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-function integer(raw: string | null, min: number, max: number): number | undefined {
+function integer(
+  raw: string | null,
+  min: number,
+  max: number,
+): number | undefined {
   if (raw === null || raw === "") return undefined;
   const value = Number(raw);
   if (!Number.isInteger(value) || value < min || value > max) return undefined;
@@ -57,7 +61,9 @@ function workspaceCwd(
   if (projectName !== "") {
     for (const workspace of list) {
       const path = String(workspace.path ?? "");
-      const name = path.startsWith(`${projectsRoot}/`) ? path.slice(projectsRoot.length + 1) : path;
+      const name = path.startsWith(`${projectsRoot}/`)
+        ? path.slice(projectsRoot.length + 1)
+        : path;
       if (name === projectName) return path;
     }
     return undefined;
@@ -89,7 +95,9 @@ function sessionWorkspace(
       : path;
     best = { path, projectName, slug: workspaceSlug(workspace.id) };
   }
-  return best === undefined ? undefined : { workspace: best.projectName, workspaceSlug: best.slug };
+  return best === undefined
+    ? undefined
+    : { workspace: best.projectName, workspaceSlug: best.slug };
 }
 
 function handleTarget(
@@ -113,7 +121,9 @@ function handleTarget(
 }
 
 function controlOf(body: any): TerminalControl | undefined {
-  if (typeof body?.terminalId !== "string" || body.terminalId === "") return undefined;
+  if (typeof body?.terminalId !== "string" || body.terminalId === "") {
+    return undefined;
+  }
   const terminalId = body.terminalId;
   switch (body.kind) {
     case "input":
@@ -157,7 +167,11 @@ async function handleOpen(
   workspaceRegistry: any,
 ): Promise<Response> {
   const url = new URL(request.url);
-  let options: TerminalOpenQuery & { cwd: string; reopen: boolean; signal: AbortSignal };
+  let options: TerminalOpenQuery & {
+    cwd: string;
+    reopen: boolean;
+    signal: AbortSignal;
+  };
   try {
     const sessionId = url.searchParams.get("sessionId") ?? "";
     const tabId = url.searchParams.get("tabId") ?? "";
@@ -166,11 +180,15 @@ async function handleOpen(
     const shell = url.searchParams.get("shell") ?? "";
     const cols = integer(url.searchParams.get("cols"), MIN_COLS, MAX_COLS);
     const rows = integer(url.searchParams.get("rows"), MIN_ROWS, MAX_ROWS);
-    if (sessionId === "" || tabId === "" || shell === "" || !shell.startsWith("/")) {
+    if (
+      sessionId === "" || tabId === "" || shell === "" || !shell.startsWith("/")
+    ) {
       throw new Error("sessionId, tabId and an absolute shell are required");
     }
     if (cols === undefined || rows === undefined) {
-      throw new Error(`cols must be ${MIN_COLS}..${MAX_COLS} and rows ${MIN_ROWS}..${MAX_ROWS}`);
+      throw new Error(
+        `cols must be ${MIN_COLS}..${MAX_COLS} and rows ${MIN_ROWS}..${MAX_ROWS}`,
+      );
     }
     const cwd = workspaceCwd(
       ctx,
@@ -248,7 +266,9 @@ async function handleControl(
     return json(400, { error: "invalid terminal control" });
   }
   const control = controlOf(body);
-  if (control === undefined) return json(400, { error: "unknown terminal control" });
+  if (control === undefined) {
+    return json(400, { error: "unknown terminal control" });
+  }
   return sessions.control(control)
     ? json(200, { ok: true })
     : json(404, { error: "unknown terminal" });
@@ -272,17 +292,24 @@ async function handleShells(
     sessionId,
   );
   if (cwd === undefined) {
-    return json(400, { error: `unknown workspace ${JSON.stringify(workspace)}` });
+    return json(400, {
+      error: `unknown workspace ${JSON.stringify(workspace)}`,
+    });
   }
   try {
     const binding = await bindingFor(resolver, cwd, container, request.signal);
-    return json(200, { shells: await discoverShells(binding, cwd, request.signal) });
+    return json(200, {
+      shells: await discoverShells(binding, cwd, request.signal),
+    });
   } catch (error) {
     return json(502, { error: message(error) });
   }
 }
 
-function handleRetained(request: Request, sessions: TerminalSessions): Response {
+function handleRetained(
+  request: Request,
+  sessions: TerminalSessions,
+): Response {
   const sessionId = new URL(request.url).searchParams.get("sessionId") ?? "";
   if (sessionId === "") return json(400, { error: "sessionId is required" });
   return json(200, { terminals: sessions.retained(sessionId) });
@@ -315,13 +342,15 @@ export function registerTerminalRoutes(
       path: TERMINAL_SHELLS_PATH,
       methods: ["GET"],
       requestBody: "buffered",
-      fetch: (request: Request) => handleShells(request, ctx, resolver, workspaceRegistry),
+      fetch: (request: Request) =>
+        handleShells(request, ctx, resolver, workspaceRegistry),
     });
     connectionCtx.connection.fetch.register({
       path: TERMINAL_TARGET_PATH,
       methods: ["GET"],
       requestBody: "buffered",
-      fetch: (request: Request) => handleTarget(request, ctx, resolver, workspaceRegistry),
+      fetch: (request: Request) =>
+        handleTarget(request, ctx, resolver, workspaceRegistry),
     });
     connectionCtx.connection.fetch.register({
       path: TERMINAL_RETAINED_PATH,

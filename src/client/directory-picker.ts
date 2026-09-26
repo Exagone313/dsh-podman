@@ -29,9 +29,13 @@ export class DirectoryPickerError extends Error {
 // buildDirectoryPicker adapts the injected Remote namespace to the face, or
 // returns undefined when this deployment mounts no directory picker (the card
 // then hides the browse affordance and the path stays a plain input).
-export function buildDirectoryPicker(remote: any): DirectoryPickerFace | undefined {
+export function buildDirectoryPicker(
+  remote: any,
+): DirectoryPickerFace | undefined {
   const picker = remote?.directoryPicker;
-  if (picker === undefined || typeof picker.list !== "function") return undefined;
+  if (picker === undefined || typeof picker.list !== "function") {
+    return undefined;
+  }
   return {
     async list(path: string, signal?: AbortSignal): Promise<DirectoryListing> {
       const result = await picker.list(path, signal);

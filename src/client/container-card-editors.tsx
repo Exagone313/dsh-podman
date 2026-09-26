@@ -2,7 +2,12 @@
 //
 // SPDX-License-Identifier: MIT
 
-import { ConfirmButton, emptyMount, Field, mountLabel } from "./container-card-shared.js";
+import {
+  ConfirmButton,
+  emptyMount,
+  Field,
+  mountLabel,
+} from "./container-card-shared.js";
 import { greyId, imageSelect } from "./container-card-styles.js";
 import { type MountInput } from "./container-card-controller.js";
 import { DirectoryPickerModal } from "./container-card-directory.js";
@@ -17,7 +22,10 @@ import {
   renameEnvKey,
   setEnvValue,
 } from "../env-rows.js";
-import { hostPathForProjectName, projectNameFromHostPath } from "../project-path.js";
+import {
+  hostPathForProjectName,
+  projectNameFromHostPath,
+} from "../project-path.js";
 import type { Translate } from "./locales.js";
 import { Button, Input, Modal } from "@deepseek-ai/dsh-client-ui-primitives";
 import { type ReactNode, useId, useRef, useState } from "react";
@@ -236,7 +244,9 @@ export function MountsEditor(props: {
             disabled={busy}
             onChange={(event) => updateDraft({ volume: event.target.value })}
           >
-            {volumes.length === 0 ? <option value="">{t("none")}</option> : null}
+            {volumes.length === 0
+              ? <option value="">{t("none")}</option>
+              : null}
             {volumes.map((volume) => (
               <option key={volume.name} value={volume.name}>
                 {volume.name}
@@ -249,7 +259,8 @@ export function MountsEditor(props: {
             id={mountDestinationId}
             value={draft.destination}
             disabled={busy}
-            onChange={(event) => updateDraft({ destination: event.target.value })}
+            onChange={(event) =>
+              updateDraft({ destination: event.target.value })}
           />
         </Field>
         <Field label={t("mountMode")} htmlFor={mountModeId}>
@@ -277,7 +288,9 @@ export function MountsEditor(props: {
             disabled={busy}
             onChange={(event) => updateDraft({ secret: event.target.value })}
           >
-            {secrets.length === 0 ? <option value="">{t("none")}</option> : null}
+            {secrets.length === 0
+              ? <option value="">{t("none")}</option>
+              : null}
             {secrets.map((secret) => (
               <option key={secret.name} value={secret.name}>
                 {secret.name}
@@ -290,7 +303,8 @@ export function MountsEditor(props: {
             id={mountDestinationId}
             value={draft.destination}
             disabled={busy}
-            onChange={(event) => updateDraft({ destination: event.target.value })}
+            onChange={(event) =>
+              updateDraft({ destination: event.target.value })}
           />
         </Field>
       </>
@@ -322,11 +336,13 @@ export function MountsEditor(props: {
               : null}
           </div>
         </Field>
-        {browseError === "" ? null : (
-          <p style={{ margin: 0, fontSize: "13px" }} role="alert">
-            {browseError}
-          </p>
-        )}
+        {browseError === ""
+          ? null
+          : (
+            <p style={{ margin: 0, fontSize: "13px" }} role="alert">
+              {browseError}
+            </p>
+          )}
         <Field label={t("mountMode")} htmlFor={mountModeId}>
           <select
             id={mountModeId}
@@ -344,7 +360,9 @@ export function MountsEditor(props: {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
       {mounts.map((mount, index) => {
-        const nextMode = mount.mode === "read_write" ? "read_only" : "read_write";
+        const nextMode = mount.mode === "read_write"
+          ? "read_only"
+          : "read_write";
         const forced = forcedMountMode(mount.kind);
         const editable = mount.kind === "project" || mount.kind === "volume";
         const removable = mount.kind !== "project" ||
@@ -380,12 +398,15 @@ export function MountsEditor(props: {
                   value={forced ?? mount.mode}
                   disabled={!enabled || forced !== undefined}
                   aria-label={t("mountMode")}
-                  onChange={(event) => onUpdate?.({ ...mount, mode: event.target.value }, index)}
+                  onChange={(event) =>
+                    onUpdate?.({ ...mount, mode: event.target.value }, index)}
                 >
                   {forced !== undefined
                     ? (
                       <option value={forced}>
-                        {forced === "read_write" ? t("readWrite") : t("readOnly")}
+                        {forced === "read_write"
+                          ? t("readWrite")
+                          : t("readOnly")}
                       </option>
                     )
                     : (
@@ -397,18 +418,26 @@ export function MountsEditor(props: {
                 </select>
               )
               : null}
-            {modeControl === "remount" && editable && onUpdate !== undefined && (
-              <ConfirmButton
-                t={t}
-                label={nextMode === "read_only" ? t("remountReadOnly") : t("remountReadWrite")}
-                title={t("confirmTitle")}
-                description={nextMode === "read_only"
-                  ? t("confirmRemountReadOnly", { mount: mountLabel(t, mount, false) })
-                  : t("confirmRemountReadWrite", { mount: mountLabel(t, mount, false) })}
-                disabled={!enabled}
-                onConfirm={() => onUpdate({ ...mount, mode: nextMode }, index)}
-              />
-            )}
+            {modeControl === "remount" && editable && onUpdate !== undefined &&
+              (
+                <ConfirmButton
+                  t={t}
+                  label={nextMode === "read_only"
+                    ? t("remountReadOnly")
+                    : t("remountReadWrite")}
+                  title={t("confirmTitle")}
+                  description={nextMode === "read_only"
+                    ? t("confirmRemountReadOnly", {
+                      mount: mountLabel(t, mount, false),
+                    })
+                    : t("confirmRemountReadWrite", {
+                      mount: mountLabel(t, mount, false),
+                    })}
+                  disabled={!enabled}
+                  onConfirm={() =>
+                    onUpdate({ ...mount, mode: nextMode }, index)}
+                />
+              )}
             {removable &&
               (confirmRemove
                 ? (
@@ -416,7 +445,9 @@ export function MountsEditor(props: {
                     t={t}
                     label={t("remove")}
                     title={t("confirmTitle")}
-                    description={t("confirmRemoveMount", { mount: mountLabel(t, mount, false) })}
+                    description={t("confirmRemoveMount", {
+                      mount: mountLabel(t, mount, false),
+                    })}
                     disabled={!enabled}
                     onConfirm={() => onRemove(mount)}
                   />

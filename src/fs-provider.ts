@@ -69,14 +69,18 @@ export interface FilesystemProvider {
   ): Promise<() => Promise<void>>;
 }
 
-export function createFilesystemProvider(resolver: WorkspaceResolver): FilesystemProvider {
+export function createFilesystemProvider(
+  resolver: WorkspaceResolver,
+): FilesystemProvider {
   return {
     resolve: async (path: string, opts?: any) => {
       throwIfAborted(opts?.signal, "resolve");
       const resolved = resolveGuestPath(path, opts?.cwd);
       // An explicit container targets that container's guest; the harness's own
       // tools never pass one and keep the session workspace's default.
-      const container = typeof opts?.container === "string" ? opts.container : "";
+      const container = typeof opts?.container === "string"
+        ? opts.container
+        : "";
       const binding = container !== "" && container !== "default"
         ? await resolver.containerBinding(opts?.cwd, container, opts?.signal)
         : await resolver.resolveForPath(resolved, opts?.cwd, opts?.signal);
@@ -95,7 +99,8 @@ export function createFilesystemProvider(resolver: WorkspaceResolver): Filesyste
     contains: (parent: any, child: any) =>
       child.targetKey === parent.targetKey ||
       child.targetKey.startsWith(`${parent.targetKey}/`),
-    readText: (target: any, signal?: AbortSignal) => readGuestText(target, signal),
+    readText: (target: any, signal?: AbortSignal) =>
+      readGuestText(target, signal),
     streamText: (target: any, signal?: AbortSignal) =>
       Promise.resolve(guestTextChunks(target, signal)),
     readBytes: async (
@@ -140,7 +145,11 @@ export function createFilesystemProvider(resolver: WorkspaceResolver): Filesyste
     lstat: async (path: string, opts?: any, signal?: AbortSignal) => {
       throwIfAborted(signal, "lstat");
       const resolved = resolveGuestPath(path, opts?.cwd);
-      const binding = await resolver.resolveForPath(resolved, opts?.cwd, signal);
+      const binding = await resolver.resolveForPath(
+        resolved,
+        opts?.cwd,
+        signal,
+      );
       const result: any = await unaryGuest(
         { binding },
         "stat",
@@ -150,8 +159,14 @@ export function createFilesystemProvider(resolver: WorkspaceResolver): Filesyste
       if (!result?.exists) return undefined;
       return {
         version: guestVersion(result),
-        type: result.isSymlink ? "symlink" : result.isDir ? "directory" : "file",
-        ...(result.size !== undefined && result.size !== null ? { size: Number(result.size) } : {}),
+        type: result.isSymlink
+          ? "symlink"
+          : result.isDir
+          ? "directory"
+          : "file",
+        ...(result.size !== undefined && result.size !== null
+          ? { size: Number(result.size) }
+          : {}),
       };
     },
     writeText: async (
@@ -220,7 +235,9 @@ export function createFilesystemProvider(resolver: WorkspaceResolver): Filesyste
         { path: target.targetKey },
         signal,
       );
-      const entries: any[] = Array.isArray(response?.entries) ? response.entries : [];
+      const entries: any[] = Array.isArray(response?.entries)
+        ? response.entries
+        : [];
       return entries.map((entry: any) => {
         const childKey = join(target.targetKey, entry.name);
         // Prefer the guest-reported followed type; fall back to the directory

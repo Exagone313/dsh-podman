@@ -18,8 +18,15 @@ test("image_build requires imageId, parent and packages", () => {
   const tool = TOOLS.find((entry) => entry.name === "image_build");
   assert.ok(tool, "image_build registered");
   assert.equal(tool!.approval, true, "image_build must require approval");
-  assert.deepEqual(tool!.parameters.required, ["imageId", "parent", "packages"]);
-  assert.equal(tool!.parameters.properties.imageId.description, "Image short name.");
+  assert.deepEqual(tool!.parameters.required, [
+    "imageId",
+    "parent",
+    "packages",
+  ]);
+  assert.equal(
+    tool!.parameters.properties.imageId.description,
+    "Image short name.",
+  );
   assert.ok(
     tool!.parameters.properties.parent.description.includes(
       "Short name of the parent image",
@@ -86,7 +93,10 @@ test("image_list returns image objects", async () => {
 
 test("image_rebuild_all returns rebuilt and skipped arrays", async () => {
   const resolver = {
-    control: async () => ({ rebuilt: ["archlinux", "dev"], skipped: ["broken"] }),
+    control: async () => ({
+      rebuilt: ["archlinux", "dev"],
+      skipped: ["broken"],
+    }),
   } as never;
   const out = await toolHandlers.image_rebuild_all(resolver, {}, {});
   assert.deepEqual(out, { rebuilt: ["archlinux", "dev"], skipped: ["broken"] });

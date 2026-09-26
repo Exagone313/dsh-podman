@@ -21,7 +21,9 @@ import {
 } from "./terminal-protocol.js";
 
 // `reopen` forces a fresh shell instead of reattaching the retained one.
-export type TerminalStreamQuery = TerminalOpenQuery & { readonly reopen?: boolean };
+export type TerminalStreamQuery = TerminalOpenQuery & {
+  readonly reopen?: boolean;
+};
 
 async function failure(response: Response): Promise<Error> {
   try {
@@ -104,7 +106,9 @@ export async function openTerminalStream(
  * @param control - the control to apply.
  * @throws when the host refuses it: an unknown terminal, or a malformed body.
  */
-export async function sendTerminalControl(control: TerminalControl): Promise<void> {
+export async function sendTerminalControl(
+  control: TerminalControl,
+): Promise<void> {
   const response = await fetch(endpoint(TERMINAL_PATH), {
     method: "POST",
     headers: {
@@ -189,7 +193,9 @@ export async function fetchRetainedTerminals(
 ): Promise<TerminalRetainedView[]> {
   const url = endpoint(TERMINAL_RETAINED_PATH);
   url.searchParams.set("sessionId", sessionId);
-  const response = await fetch(url, { headers: { accept: "application/json" } });
+  const response = await fetch(url, {
+    headers: { accept: "application/json" },
+  });
   if (!response.ok) throw await failure(response);
   const body = (await response.json()) as { terminals?: unknown };
   if (!Array.isArray(body.terminals)) return [];

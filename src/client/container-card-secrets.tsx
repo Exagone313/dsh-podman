@@ -2,10 +2,26 @@
 //
 // SPDX-License-Identifier: MIT
 
-import { ConfirmButton, Field, namePattern, sanitizeName } from "./container-card-shared.js";
-import { greyId, hint, imageSelect, sectionTitle, wsBody } from "./container-card-styles.js";
+import {
+  ConfirmButton,
+  Field,
+  namePattern,
+  sanitizeName,
+} from "./container-card-shared.js";
+import {
+  greyId,
+  hint,
+  imageSelect,
+  sectionTitle,
+  wsBody,
+} from "./container-card-styles.js";
 import type { Translate } from "./locales.js";
-import { Button, DisclosureRow, Input, Modal } from "@deepseek-ai/dsh-client-ui-primitives";
+import {
+  Button,
+  DisclosureRow,
+  Input,
+  Modal,
+} from "@deepseek-ai/dsh-client-ui-primitives";
 import { type ReactNode, useId, useState } from "react";
 
 export function SecretRow(props: {
@@ -96,9 +112,10 @@ export function SecretsSection(props: {
   const submit = (): void => {
     if (!namePattern.test(name)) return;
     const parsedLength = parseInt(length, 10);
-    const normalized = length.trim() === "" || Number.isNaN(parsedLength) || parsedLength < 1
-      ? undefined
-      : parsedLength;
+    const normalized =
+      length.trim() === "" || Number.isNaN(parsedLength) || parsedLength < 1
+        ? undefined
+        : parsedLength;
     onCreate(name.trim(), normalized, charset);
     setName("");
     setLength("32");
@@ -133,7 +150,8 @@ export function SecretsSection(props: {
             title={secret.name}
             open={openSecret === secret.name}
             expandable
-            onToggle={() => setOpenSecret(openSecret === secret.name ? null : secret.name)}
+            onToggle={() =>
+              setOpenSecret(openSecret === secret.name ? null : secret.name)}
           >
             <div style={wsBody}>
               <SecretRow

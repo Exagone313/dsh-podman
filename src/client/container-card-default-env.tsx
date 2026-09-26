@@ -113,7 +113,11 @@ export function DefaultEnvironmentSection(props: {
             >
               {t("clear")}
             </Button>
-            <Button variant="outline" size="sm" onClick={() => setGitOpen(false)}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setGitOpen(false)}
+            >
               {t("cancel")}
             </Button>
             <Button

@@ -33,15 +33,22 @@ export function missingDefaultEnv(
   env: Record<string, string> | undefined,
 ): Record<string, string> {
   const missing: Record<string, string> = {};
-  for (const [key, value] of Object.entries(mergeDefaultEnv(defaults, undefined))) {
-    if (!Object.prototype.hasOwnProperty.call(env ?? {}, key)) missing[key] = value;
+  for (
+    const [key, value] of Object.entries(mergeDefaultEnv(defaults, undefined))
+  ) {
+    if (!Object.prototype.hasOwnProperty.call(env ?? {}, key)) {
+      missing[key] = value;
+    }
   }
   return missing;
 }
 
 // gitIdentityEnv turns one name and one email into the four variables git
 // needs: the author and the committer pair are the same identity.
-export function gitIdentityEnv(name: string, email: string): Record<string, string> {
+export function gitIdentityEnv(
+  name: string,
+  email: string,
+): Record<string, string> {
   return {
     GIT_AUTHOR_NAME: name,
     GIT_AUTHOR_EMAIL: email,

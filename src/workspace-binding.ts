@@ -2,7 +2,13 @@
 //
 // SPDX-License-Identifier: MIT
 
-import { closeClients, controlClient, grpc, guestClient, unary } from "./grpc/runtime-client.js";
+import {
+  closeClients,
+  controlClient,
+  grpc,
+  guestClient,
+  unary,
+} from "./grpc/runtime-client.js";
 import { mergeDefaultEnv } from "./container-env.js";
 import { isAbsolute, join } from "node:path";
 import { VERSION } from "./generated/version.js";
@@ -88,12 +94,17 @@ export class WorkspaceResolver {
   async resolve(cwd: unknown, signal?: AbortSignal): Promise<WorkspaceBinding> {
     const workspace = await this.workspaceForCwd(cwd);
     const key = workspaceSlug(workspace.id);
-    const projectName = projectNameForPath(this.getConfig().projectsRoot, workspace.path);
+    const projectName = projectNameForPath(
+      this.getConfig().projectsRoot,
+      workspace.path,
+    );
     const binding = await this.ready(key, projectName, signal);
     // The default container always keeps its project mount, so the session
     // directory is always mounted in it.
     const session = defaultCwdOf(cwd);
-    return session === undefined ? binding : { ...binding, defaultCwd: session };
+    return session === undefined
+      ? binding
+      : { ...binding, defaultCwd: session };
   }
   // Resolve the workspace binding for a filesystem path when the caller did not
   // supply a session working directory. The 0.1.5 `fs.resolve` contract allows
@@ -112,7 +123,9 @@ export class WorkspaceResolver {
       if (workspace !== undefined) {
         return this.resolve(String(workspace.path), signal);
       }
-      throw notFoundError(`no DH workspace contains path ${JSON.stringify(path)}`);
+      throw notFoundError(
+        `no DH workspace contains path ${JSON.stringify(path)}`,
+      );
     }
     throw new Error(
       `cannot resolve a DH workspace for path ${
@@ -143,7 +156,9 @@ export class WorkspaceResolver {
     }
     const workspace = await this.registry?.resolveByPath?.(cwd);
     if (workspace === undefined) {
-      throw new Error(`no DH workspace owns session cwd ${JSON.stringify(cwd)}`);
+      throw new Error(
+        `no DH workspace owns session cwd ${JSON.stringify(cwd)}`,
+      );
     }
     return workspace;
   }
@@ -158,7 +173,12 @@ export class WorkspaceResolver {
     const workspace = await this.workspaceForCwd(cwd);
     const slug = workspaceSlug(workspace.id);
     const key = `${slug}:${container}`;
-    let entry = await this.resolveContainerBinding(slug, container, key, signal);
+    let entry = await this.resolveContainerBinding(
+      slug,
+      container,
+      key,
+      signal,
+    );
     try {
       entry = {
         binding: await this.ensureAgentReady(entry.binding),
@@ -312,10 +332,12 @@ export class WorkspaceResolver {
   ): Promise<WorkspaceBinding> {
     let binding = this.bindings.get(key);
     if (binding === undefined) {
-      binding = this.create(key, projectName, signal).catch((error: unknown) => {
-        if (this.bindings.get(key) === binding) this.bindings.delete(key);
-        throw error;
-      });
+      binding = this.create(key, projectName, signal).catch(
+        (error: unknown) => {
+          if (this.bindings.get(key) === binding) this.bindings.delete(key);
+          throw error;
+        },
+      );
       this.bindings.set(key, binding);
     }
     return binding;
@@ -404,17 +426,22 @@ export class WorkspaceResolver {
   private invalidateAfter(method: string, request: unknown): void {
     const scope = CONTAINER_MUTATIONS[method];
     if (scope === undefined) return;
-    const fields = (typeof request === "object" && request !== null ? request : {}) as {
-      workspaceSlug?: unknown;
-      container?: unknown;
-    };
-    const slug = typeof fields.workspaceSlug === "string" ? fields.workspaceSlug : "";
+    const fields =
+      (typeof request === "object" && request !== null ? request : {}) as {
+        workspaceSlug?: unknown;
+        container?: unknown;
+      };
+    const slug = typeof fields.workspaceSlug === "string"
+      ? fields.workspaceSlug
+      : "";
     if (slug === "") return;
     if (scope === "workspace") {
       this.forgetWorkspace(slug);
       return;
     }
-    const container = typeof fields.container === "string" ? fields.container : "";
+    const container = typeof fields.container === "string"
+      ? fields.container
+      : "";
     if (container === "") return;
     this.forgetContainer(slug, container);
   }
@@ -436,7 +463,9 @@ export function containerNotFound(container: string, slug?: string): Error {
   const error = new Error(
     slug === undefined
       ? `container ${JSON.stringify(container)} not found`
-      : `container ${JSON.stringify(container)} not found in workspace ${JSON.stringify(slug)}`,
+      : `container ${JSON.stringify(container)} not found in workspace ${
+        JSON.stringify(slug)
+      }`,
   );
   (error as { code?: string }).code = "NOT_FOUND";
   return error;
@@ -451,7 +480,9 @@ export function normalizeToolError(error: unknown): Error {
   const numericCode = typeof code === "number" ? code : undefined;
   // Only a real gRPC status renders the "<code> <NAME>: " prefix; a plain
   // message that merely looks like one must stay intact.
-  const message = numericCode === undefined ? raw : raw.replace(/^\d+\s+[A-Z_]+:\s*/, "");
+  const message = numericCode === undefined
+    ? raw
+    : raw.replace(/^\d+\s+[A-Z_]+:\s*/, "");
   const name = numericCode !== undefined
     ? (grpc.status as unknown as Record<number, string>)[numericCode]
     : typeof code === "string"
@@ -464,7 +495,10 @@ export function normalizeToolError(error: unknown): Error {
 
 function waitForReady(agent: grpc.Client, timeoutMs = 15000): Promise<void> {
   return new Promise((resolve, reject) => {
-    agent.waitForReady(Date.now() + timeoutMs, (error) => error ? reject(error) : resolve());
+    agent.waitForReady(
+      Date.now() + timeoutMs,
+      (error) => error ? reject(error) : resolve(),
+    );
   });
 }
 
@@ -494,7 +528,8 @@ export function workspaceSlug(id: unknown): string {
   }
   return value.toLowerCase();
 }
-const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 // metadata builds the call metadata. The plugin version is sent on control
 // calls so the orchestrator can refuse an incompatible plugin; guest calls omit
 // it, since the guest agent does not check it.

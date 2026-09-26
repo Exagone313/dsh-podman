@@ -2,10 +2,20 @@
 //
 // SPDX-License-Identifier: MIT
 
-import { ConfirmButton, Field, namePattern, sanitizeName } from "./container-card-shared.js";
+import {
+  ConfirmButton,
+  Field,
+  namePattern,
+  sanitizeName,
+} from "./container-card-shared.js";
 import { hint, sectionTitle, wsBody } from "./container-card-styles.js";
 import type { Translate } from "./locales.js";
-import { Button, DisclosureRow, Input, Modal } from "@deepseek-ai/dsh-client-ui-primitives";
+import {
+  Button,
+  DisclosureRow,
+  Input,
+  Modal,
+} from "@deepseek-ai/dsh-client-ui-primitives";
 import { type ReactNode, useId, useState } from "react";
 
 export function VolumesSection(props: {
@@ -56,7 +66,8 @@ export function VolumesSection(props: {
             title={volume.name}
             open={openVolume === volume.name}
             expandable
-            onToggle={() => setOpenVolume(openVolume === volume.name ? null : volume.name)}
+            onToggle={() =>
+              setOpenVolume(openVolume === volume.name ? null : volume.name)}
           >
             <div style={wsBody}>
               <div
@@ -71,7 +82,9 @@ export function VolumesSection(props: {
                   t={t}
                   label={t("removeVolume")}
                   title={t("confirmTitle")}
-                  description={t("confirmRemoveVolume", { volume: volume.name })}
+                  description={t("confirmRemoveVolume", {
+                    volume: volume.name,
+                  })}
                   disabled={busy}
                   onConfirm={() => onRemove(volume.name)}
                 />

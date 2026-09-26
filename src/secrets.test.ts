@@ -4,20 +4,36 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
-import { MOUNT_EXEC, mountRequestRecorder, SECRET_TOOLS, WORKSPACE_ID } from "./test-support.js";
+import {
+  MOUNT_EXEC,
+  mountRequestRecorder,
+  SECRET_TOOLS,
+  WORKSPACE_ID,
+} from "./test-support.js";
 import { READ_ONLY_TOOLS, toolHandlers, TOOLS } from "./index.js";
 
 test("secret tools are registered with the expected schemas", () => {
-  assert.ok(READ_ONLY_TOOLS.has("secret_list"), "secret_list must be read-only");
+  assert.ok(
+    READ_ONLY_TOOLS.has("secret_list"),
+    "secret_list must be read-only",
+  );
 
   const listTool = TOOLS.find((entry) => entry.name === "secret_list");
   assert.ok(listTool, "secret_list registered");
-  assert.notEqual(listTool!.approval, true, "secret_list must not require approval");
+  assert.notEqual(
+    listTool!.approval,
+    true,
+    "secret_list must not require approval",
+  );
   assert.deepEqual(listTool!.parameters.required, []);
 
   const createTool = TOOLS.find((entry) => entry.name === "secret_create");
   assert.ok(createTool, "secret_create registered");
-  assert.notEqual(createTool!.approval, true, "secret_create must not require approval");
+  assert.notEqual(
+    createTool!.approval,
+    true,
+    "secret_create must not require approval",
+  );
   assert.deepEqual(createTool!.parameters.required, ["name"]);
   assert.equal(createTool!.parameters.properties.length.type, "integer");
   assert.equal(createTool!.parameters.properties.length.minimum, 1);
@@ -29,19 +45,37 @@ test("secret tools are registered with the expected schemas", () => {
 
   const removeTool = TOOLS.find((entry) => entry.name === "secret_remove");
   assert.ok(removeTool, "secret_remove registered");
-  assert.equal(removeTool!.approval, true, "secret_remove must require approval");
+  assert.equal(
+    removeTool!.approval,
+    true,
+    "secret_remove must require approval",
+  );
   assert.deepEqual(removeTool!.parameters.required, ["name"]);
 
   const addTool = TOOLS.find((entry) => entry.name === "container_secret_add");
   assert.ok(addTool, "container_secret_add registered");
-  assert.equal(addTool!.approval, true, "container_secret_add must require approval");
-  assert.deepEqual(addTool!.parameters.required, ["container", "env", "secret"]);
+  assert.equal(
+    addTool!.approval,
+    true,
+    "container_secret_add must require approval",
+  );
+  assert.deepEqual(addTool!.parameters.required, [
+    "container",
+    "env",
+    "secret",
+  ]);
   assert.equal(addTool!.parameters.properties.secret.type, "string");
   assert.equal(addTool!.parameters.properties.env.type, "string");
 
-  const removeEnvTool = TOOLS.find((entry) => entry.name === "container_secret_remove");
+  const removeEnvTool = TOOLS.find((entry) =>
+    entry.name === "container_secret_remove"
+  );
   assert.ok(removeEnvTool, "container_secret_remove registered");
-  assert.equal(removeEnvTool!.approval, true, "container_secret_remove must require approval");
+  assert.equal(
+    removeEnvTool!.approval,
+    true,
+    "container_secret_remove must require approval",
+  );
   assert.deepEqual(removeEnvTool!.parameters.required, ["container", "env"]);
 
   for (const name of SECRET_TOOLS) {
@@ -137,7 +171,11 @@ test("mount tools reject a read-write secret mount", async () => {
       ),
     /secret mounts are read-only/,
   );
-  assert.deepEqual(requests, [], "a rejected mount must not reach the orchestrator");
+  assert.deepEqual(
+    requests,
+    [],
+    "a rejected mount must not reach the orchestrator",
+  );
 });
 
 test("container_list returns secretEnv maps on container rows", async () => {

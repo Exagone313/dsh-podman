@@ -2,15 +2,30 @@
 //
 // SPDX-License-Identifier: MIT
 
-import { isSandboxEscalation, preExecutePolicy, type SessionFacts } from "./approval.js";
+import {
+  isSandboxEscalation,
+  preExecutePolicy,
+  type SessionFacts,
+} from "./approval.js";
 import { type ReasonLocale, resolveReasonLocale } from "./approval-reasons.js";
 import { createFilesystemProvider } from "./fs-provider.js";
 import { createSpillStore } from "./spill-store.js";
-import { podmanRuntimeSection, withoutHarnessSourceSection } from "./prompts.js";
+import {
+  podmanRuntimeSection,
+  withoutHarnessSourceSection,
+} from "./prompts.js";
 import { createSubprocessProvider } from "./subprocess.js";
-import { createReadOnlyShellGate, REMOUNT_TOOL_NAME } from "./read-only-shell.js";
+import {
+  createReadOnlyShellGate,
+  REMOUNT_TOOL_NAME,
+} from "./read-only-shell.js";
 import { toolHandlers } from "./tool-handlers.js";
-import { defineTool, TOOL_DESCRIPTIONS, toolOutput, TOOLS } from "./tool-schemas.js";
+import {
+  defineTool,
+  TOOL_DESCRIPTIONS,
+  toolOutput,
+  TOOLS,
+} from "./tool-schemas.js";
 import { toolCallView, toolResultView } from "./tool-views.js";
 import { registerCardRoute } from "./card-route.js";
 import { registerTerminalRoutes } from "./terminal-route.js";
@@ -26,7 +41,8 @@ export function apply(ctx: any, config: Config): void {
   // Approval text follows the session language: the browser client records its
   // active locale in the plugin's own volatile `uiLocale` preference, so the
   // value is always read live and an unset one renders in English.
-  const readLocale = (): ReasonLocale => resolveReasonLocale(config.uiLocale.get());
+  const readLocale = (): ReasonLocale =>
+    resolveReasonLocale(config.uiLocale.get());
   // The session's permission knobs live in the harness's own services: the
   // sandbox policy resolves the effective mode (approved override, last logged
   // mode, then the deployment default), the approval service reports the logged
@@ -120,7 +136,8 @@ export function apply(ctx: any, config: Config): void {
     promptCtx.systemPrompt.section(podmanRuntimeSection(promptCtx));
     promptCtx.on(
       "system-prompt/assemble",
-      async (_assembly: any, _context: any, next: any) => withoutHarnessSourceSection(await next()),
+      async (_assembly: any, _context: any, next: any) =>
+        withoutHarnessSourceSection(await next()),
       { global: true, prepend: true },
     );
   });
@@ -137,8 +154,16 @@ export function apply(ctx: any, config: Config): void {
   // The Podman terminal tab talks to guest ptys through its own routes; the
   // registry keeps shells alive while the browser is away.
   const terminalSessions = new TerminalSessions({ resolver });
-  ctx.effect(() => () => terminalSessions.dispose(), "podman: terminal sessions cleanup");
-  registerTerminalRoutes(ctx, resolver, terminalSessions, ctx.workspaceRegistry);
+  ctx.effect(
+    () => () => terminalSessions.dispose(),
+    "podman: terminal sessions cleanup",
+  );
+  registerTerminalRoutes(
+    ctx,
+    resolver,
+    terminalSessions,
+    ctx.workspaceRegistry,
+  );
 }
 
 function registerTools(ctx: any, resolver: WorkspaceResolver): void {
@@ -151,7 +176,8 @@ function registerTools(ctx: any, resolver: WorkspaceResolver): void {
         parameters: tool.parameters,
         ...(tool.approval ? { approval: true } : {}),
         presentCall: (args: any) => toolCallView(tool.name, args),
-        presentResult: (args: any, result: any) => toolResultView(tool.name, args, result),
+        presentResult: (args: any, result: any) =>
+          toolResultView(tool.name, args, result),
         output: toolOutput,
         execute: async (input: any, exec: any) => {
           try {
@@ -183,7 +209,12 @@ export {
   REMOUNT_TOOL_NAME,
 } from "./read-only-shell.js";
 export { createFilesystemProvider, FilesystemProvider } from "./fs-provider.js";
-export { globCwd, remoteArgv, resolveGuestCwd, resolveGuestPath } from "./guest-rpc.js";
+export {
+  globCwd,
+  remoteArgv,
+  resolveGuestCwd,
+  resolveGuestPath,
+} from "./guest-rpc.js";
 export {
   inferMountKind,
   projectMountDestinationReason,
@@ -195,7 +226,12 @@ export {
   withoutHarnessSourceSection,
 } from "./prompts.js";
 export { Config } from "./settings-schema.js";
-export { publicContainer, publicDaemon, publicImage, publicMount } from "./public.js";
+export {
+  publicContainer,
+  publicDaemon,
+  publicImage,
+  publicMount,
+} from "./public.js";
 export {
   createSubprocessProvider,
   OutputReader,

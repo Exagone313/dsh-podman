@@ -67,13 +67,21 @@ export type TerminalFrame =
   | { readonly type: "snapshot"; readonly screen: string }
   | { readonly type: "data"; readonly data: string }
   | { readonly type: "title"; readonly title: string }
-  | { readonly type: "exit"; readonly exitCode: number | null; readonly signal: string | null }
+  | {
+    readonly type: "exit";
+    readonly exitCode: number | null;
+    readonly signal: string | null;
+  }
   | { readonly type: "error"; readonly message: string }
   | { readonly type: "detached" };
 
 /** One control request against an open terminal. */
 export type TerminalControl =
-  | { readonly terminalId: string; readonly kind: "input"; readonly data: string }
+  | {
+    readonly terminalId: string;
+    readonly kind: "input";
+    readonly data: string;
+  }
   | {
     readonly terminalId: string;
     readonly kind: "resize";
@@ -81,4 +89,8 @@ export type TerminalControl =
     readonly rows: number;
   }
   | { readonly terminalId: string; readonly kind: "close" }
-  | { readonly terminalId: string; readonly kind: "rename"; readonly title: string };
+  | {
+    readonly terminalId: string;
+    readonly kind: "rename";
+    readonly title: string;
+  };

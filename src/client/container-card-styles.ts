@@ -114,4 +114,7 @@ export const imageSelect: React.CSSProperties = {
 
 // A select that fills its label's row where fields are stacked; the narrow
 // guide card uses it so the container and shell controls share one width.
-export const fieldSelect: React.CSSProperties = { ...imageSelect, width: "100%" };
+export const fieldSelect: React.CSSProperties = {
+  ...imageSelect,
+  width: "100%",
+};

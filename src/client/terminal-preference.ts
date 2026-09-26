@@ -49,11 +49,15 @@ export function readTerminalTarget(
     const raw = (storage ?? browserStorage())?.getItem(TERMINAL_TARGET_KEY);
     if (raw === undefined || raw === null || raw === "") return undefined;
     const parsed: unknown = JSON.parse(raw);
-    if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+    if (
+      typeof parsed !== "object" || parsed === null || Array.isArray(parsed)
+    ) {
       return undefined;
     }
     const record = parsed as Record<string, unknown>;
-    const container = typeof record.container === "string" ? record.container : undefined;
+    const container = typeof record.container === "string"
+      ? record.container
+      : undefined;
     const shell = typeof record.shell === "string" ? record.shell : undefined;
     if (container === undefined && shell === undefined) return undefined;
     return {

@@ -15,8 +15,16 @@ test("every preference is a volatile field with an empty default", () => {
     ["containerEnv", {}],
   ];
   for (const [field, value] of expected) {
-    assert.equal(typeof config[field].get, "function", `${field} must be volatile`);
-    assert.deepEqual(config[field].get(), value, `${field} must resolve its default`);
+    assert.equal(
+      typeof config[field].get,
+      "function",
+      `${field} must be volatile`,
+    );
+    assert.deepEqual(
+      config[field].get(),
+      value,
+      `${field} must resolve its default`,
+    );
   }
   // The host serves the schema to the client config form: volatility must be
   // declared on the schema, not only in the parsed value.

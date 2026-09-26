@@ -4,7 +4,8 @@
 
 const containerParam = {
   type: "string",
-  description: 'Logical container name; use "default" for the default workspace container.',
+  description:
+    'Logical container name; use "default" for the default workspace container.',
 };
 
 const imageIdParam = { type: "string", description: "Image short name." };
@@ -25,7 +26,8 @@ const mountModeParam = {
 const mountKindParam = {
   type: "string",
   enum: ["project", "tmpfs", "volume", "secret"],
-  description: "Kind of mount: a project bind, a tmpfs, a named volume, or a named secret.",
+  description:
+    "Kind of mount: a project bind, a tmpfs, a named volume, or a named secret.",
 };
 
 // A project mount names a path under the projects root, so it may include
@@ -54,7 +56,8 @@ const projectMountItemParam = {
 const mountsParam = {
   type: "array",
   items: projectMountItemParam,
-  description: "Optional mounts to apply: a project bind, a tmpfs, a named volume, or a secret.",
+  description:
+    "Optional mounts to apply: a project bind, a tmpfs, a named volume, or a secret.",
 };
 
 export const envParam = {
@@ -68,7 +71,8 @@ const pathsParam = {
   type: "array",
   items: {
     type: "string",
-    description: "Absolute directory to prepend to the container's PATH (no ':', NUL, or newline).",
+    description:
+      "Absolute directory to prepend to the container's PATH (no ':', NUL, or newline).",
   },
   description:
     "Complete ordered list of PATH additions, highest priority first. Replaces the current list; an empty list clears it.",
@@ -85,23 +89,27 @@ const uidParam = {
 const gidParam = {
   type: "integer",
   minimum: 0,
-  description: "Run the process as this gid. Defaults to the uid when uid is set.",
+  description:
+    "Run the process as this gid. Defaults to the uid when uid is set.",
 };
 
 const groupsParam = {
   type: "array",
   items: { type: "integer", minimum: 0 },
-  description: "Supplementary group ids; replaces the process's whole supplementary set.",
+  description:
+    "Supplementary group ids; replaces the process's whole supplementary set.",
 };
 
 const descriptionParam = {
   type: "string",
-  description: "Clear, concise description of what this command does in active voice, 5-10 words.",
+  description:
+    "Clear, concise description of what this command does in active voice, 5-10 words.",
 };
 
 const timeoutMsParam = {
   type: "number",
-  description: "Timeout in milliseconds; the command is killed when it expires.",
+  description:
+    "Timeout in milliseconds; the command is killed when it expires.",
 };
 
 export const imageListParameters = {
@@ -167,7 +175,8 @@ export const containerStartParameters = {
     secretEnv: {
       type: "object",
       additionalProperties: { type: "string" },
-      description: "Secret environment variables (env var name to secret short name).",
+      description:
+        "Secret environment variables (env var name to secret short name).",
     },
     paths: pathsParam,
   },
@@ -188,7 +197,8 @@ export const containerRecreateParameters = {
     secretEnv: {
       type: "object",
       additionalProperties: { type: "string" },
-      description: "Secret environment variables (env var name to secret short name).",
+      description:
+        "Secret environment variables (env var name to secret short name).",
     },
     paths: pathsParam,
   },
@@ -330,13 +340,17 @@ export const volumeListParameters = {
 
 export const volumeCreateParameters = {
   type: "object",
-  properties: { name: { type: "string", description: "Volume name to create." } },
+  properties: {
+    name: { type: "string", description: "Volume name to create." },
+  },
   required: ["name"],
 };
 
 export const volumeRemoveParameters = {
   type: "object",
-  properties: { name: { type: "string", description: "Volume name to remove." } },
+  properties: {
+    name: { type: "string", description: "Volume name to remove." },
+  },
   required: ["name"],
 };
 
@@ -366,7 +380,9 @@ export const secretCreateParameters = {
 
 export const secretRemoveParameters = {
   type: "object",
-  properties: { name: { type: "string", description: "Secret name to remove." } },
+  properties: {
+    name: { type: "string", description: "Secret name to remove." },
+  },
   required: ["name"],
 };
 
@@ -431,7 +447,8 @@ export const containerReadParameters = {
     container: containerParam,
     file_path: {
       type: "string",
-      description: "Path to read, resolved against the session working directory.",
+      description:
+        "Path to read, resolved against the session working directory.",
     },
     offset: {
       type: "integer",
@@ -453,7 +470,8 @@ export const containerWriteParameters = {
     container: containerParam,
     file_path: {
       type: "string",
-      description: "Path to write, resolved against the session working directory.",
+      description:
+        "Path to write, resolved against the session working directory.",
     },
     content: { type: "string", description: "Content to write." },
   },
@@ -466,7 +484,8 @@ export const containerEditParameters = {
     container: containerParam,
     file_path: {
       type: "string",
-      description: "Path to edit, resolved against the session working directory.",
+      description:
+        "Path to edit, resolved against the session working directory.",
     },
     old_string: { type: "string", description: "Literal text to replace." },
     new_string: { type: "string", description: "Replacement text." },
@@ -486,7 +505,8 @@ export const containerGlobParameters = {
     pattern: { type: "string", description: "File pattern." },
     path: {
       type: "string",
-      description: "Directory to search in. Defaults to the session working directory.",
+      description:
+        "Directory to search in. Defaults to the session working directory.",
     },
   },
   required: ["container", "pattern"],
@@ -499,7 +519,8 @@ export const containerGrepParameters = {
     pattern: { type: "string", description: "Regex to search for." },
     path: {
       type: "string",
-      description: "File or directory to search. Defaults to the session working directory.",
+      description:
+        "File or directory to search. Defaults to the session working directory.",
     },
     include: {
       type: "string",

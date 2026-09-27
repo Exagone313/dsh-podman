@@ -11,7 +11,7 @@ import { EnvEditor } from "./container-card-editors.js";
 import { ConfirmButton, Field } from "./container-card-shared.js";
 import { hint, sectionTitle, wsBody } from "./container-card-styles.js";
 import {
-  gitOnlyDrift,
+  commitIdentityAction,
   readGitIdentity,
   setGitIdentity,
 } from "../container-env.js";
@@ -46,10 +46,16 @@ export function DefaultEnvironmentSection(props: {
   // The identity popup applies into the draft; when the draft's only drift from
   // the saved environment is inside the identity keys, it commits straight, so
   // a name/email edit is not left unsaved behind an easy-to-miss Save click.
+  // When the popup restores the saved identity exactly, its pending change is
+  // discarded and the editor falls back to the persisted defaults, instead of
+  // keeping the stale identity (a no-op save would not resync the draft, since
+  // the server value did not change).
   const commitIdentity = (next: Record<string, string>): void => {
-    if (JSON.stringify(next) === serverEnv) return;
-    if (gitOnlyDrift(env, draft)) {
+    const action = commitIdentityAction(env, draft, next);
+    if (action === "save") {
       onSave(next);
+    } else if (action === "discard") {
+      setDraft(env);
     } else {
       setDraft(next);
     }

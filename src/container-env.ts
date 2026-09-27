@@ -105,3 +105,21 @@ export function gitOnlyDrift(
   }
   return true;
 }
+
+// commitIdentityAction decides how the identity popup's result `next` is
+// applied: "discard" when it restores the persisted environment exactly (the
+// popup brought the identity back, so its pending change is dropped), "save"
+// when the only drift from the server is inside the identity keys (committing
+// straight cannot lose any other edit), "draft" otherwise (other defaults are
+// being edited, so the result lands in the draft and the Save button stays in
+// charge). Since setGitIdentity copies every non-identity key, `next` can
+// equal the server only when nothing but the identity was pending, so
+// "discard" never loses another edit.
+export function commitIdentityAction(
+  server: Record<string, string>,
+  draft: Record<string, string>,
+  next: Record<string, string>,
+): "discard" | "save" | "draft" {
+  if (JSON.stringify(next) === JSON.stringify(server)) return "discard";
+  return gitOnlyDrift(server, draft) ? "save" : "draft";
+}

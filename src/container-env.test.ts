@@ -5,6 +5,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  commitIdentityAction,
   GIT_IDENTITY_KEYS,
   gitIdentityEnv,
   gitOnlyDrift,
@@ -92,4 +93,29 @@ test("gitOnlyDrift tells an identity-only change apart from other edits", () => 
   // Removing a non-identity key, or an identity key drifting in the server map
   // while another edit exists, both count as a real diff.
   assert.equal(gitOnlyDrift({ KEEP: "1", ...identity }, identity), false);
+});
+
+test("commitIdentityAction applies the popup result without losing edits", () => {
+  const saved = gitIdentityEnv("John Doe", "john.doe@git.example");
+  const changed = setGitIdentity(saved, "New", "new@example.com");
+  // The popup restores the saved identity while the draft still holds the
+  // changed one: the pending identity edit is discarded, not kept (regression:
+  // the old code returned early and left the changed identity in the draft).
+  assert.equal(commitIdentityAction(saved, changed, saved), "discard");
+  // No drift at all and an unchanged popup is a no-op discard too.
+  assert.equal(commitIdentityAction(saved, saved, saved), "discard");
+  // An identity-only change commits straight: nothing else can be lost.
+  assert.equal(commitIdentityAction(saved, changed, changed), "save");
+  assert.equal(commitIdentityAction(saved, saved, changed), "save");
+  // Clearing the identity alone is also git-only.
+  assert.equal(commitIdentityAction(saved, changed, {}), "save");
+  // Another pending default keeps the result in the draft, whatever the popup
+  // does to the identity: change, restore, or clear.
+  const withKeep = { ...saved, KEEP: "1" };
+  assert.equal(
+    commitIdentityAction(saved, withKeep, { ...withKeep, ...changed }),
+    "draft",
+  );
+  assert.equal(commitIdentityAction(saved, withKeep, withKeep), "draft");
+  assert.equal(commitIdentityAction(saved, withKeep, { KEEP: "1" }), "draft");
 });

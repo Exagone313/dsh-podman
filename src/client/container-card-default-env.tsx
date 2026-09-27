@@ -10,7 +10,11 @@
 import { EnvEditor } from "./container-card-editors.js";
 import { ConfirmButton, Field } from "./container-card-shared.js";
 import { hint, sectionTitle, wsBody } from "./container-card-styles.js";
-import { readGitIdentity, setGitIdentity } from "../container-env.js";
+import {
+  gitOnlyDrift,
+  readGitIdentity,
+  setGitIdentity,
+} from "../container-env.js";
 import type { Translate } from "./locales.js";
 import { Button, Input, Modal } from "@deepseek-ai/dsh-client-ui-primitives";
 import { type ReactNode, useEffect, useId, useState } from "react";
@@ -39,6 +43,17 @@ export function DefaultEnvironmentSection(props: {
   }, [serverEnv]);
   const dirty = JSON.stringify(draft) !== serverEnv;
   const disabled = busy || !writable;
+  // The identity popup applies into the draft; when the draft's only drift from
+  // the saved environment is inside the identity keys, it commits straight, so
+  // a name/email edit is not left unsaved behind an easy-to-miss Save click.
+  const commitIdentity = (next: Record<string, string>): void => {
+    if (JSON.stringify(next) === serverEnv) return;
+    if (gitOnlyDrift(env, draft)) {
+      onSave(next);
+    } else {
+      setDraft(next);
+    }
+  };
   const openGit = (): void => {
     const identity = readGitIdentity(draft);
     setGitName(identity.name);
@@ -107,7 +122,7 @@ export function DefaultEnvironmentSection(props: {
               size="sm"
               disabled={busy || readGitIdentity(draft).name === ""}
               onClick={() => {
-                setDraft(setGitIdentity(draft, "", ""));
+                commitIdentity(setGitIdentity(draft, "", ""));
                 setGitOpen(false);
               }}
             >
@@ -125,7 +140,7 @@ export function DefaultEnvironmentSection(props: {
               size="sm"
               disabled={busy || gitName === "" || gitEmail === ""}
               onClick={() => {
-                setDraft(setGitIdentity(draft, gitName, gitEmail));
+                commitIdentity(setGitIdentity(draft, gitName, gitEmail));
                 setGitOpen(false);
               }}
             >

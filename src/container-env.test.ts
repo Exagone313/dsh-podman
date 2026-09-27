@@ -7,6 +7,7 @@ import assert from "node:assert/strict";
 import {
   GIT_IDENTITY_KEYS,
   gitIdentityEnv,
+  gitOnlyDrift,
   mergeDefaultEnv,
   missingDefaultEnv,
   readGitIdentity,
@@ -73,4 +74,22 @@ test("setGitIdentity adds, replaces and clears the four keys", () => {
   assert.deepEqual(setGitIdentity(set, "new", ""), { KEEP: "1" });
   // The input map is not mutated.
   assert.deepEqual(base, { KEEP: "1", GIT_AUTHOR_NAME: "old" });
+});
+
+test("gitOnlyDrift tells an identity-only change apart from other edits", () => {
+  const identity = gitIdentityEnv("John Doe", "john.doe@git.example");
+  // No drift at all qualifies (there is nothing else to lose by committing).
+  assert.equal(gitOnlyDrift(identity, identity), true);
+  // Changing or removing the identity alone is git-only.
+  assert.equal(
+    gitOnlyDrift(identity, setGitIdentity(identity, "New", "new@example.com")),
+    true,
+  );
+  assert.equal(gitOnlyDrift(identity, setGitIdentity(identity, "", "")), true);
+  // Any other default drift means the Save button must stay in charge.
+  assert.equal(gitOnlyDrift(identity, { ...identity, KEEP: "1" }), false);
+  assert.equal(gitOnlyDrift({ KEEP: "1" }, { KEEP: "2" }), false);
+  // Removing a non-identity key, or an identity key drifting in the server map
+  // while another edit exists, both count as a real diff.
+  assert.equal(gitOnlyDrift({ KEEP: "1", ...identity }, identity), false);
 });

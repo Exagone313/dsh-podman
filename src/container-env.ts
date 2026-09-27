@@ -89,3 +89,19 @@ export function setGitIdentity(
   if (name === "" || email === "") return next;
   return { ...next, ...gitIdentityEnv(name, email) };
 }
+
+// gitOnlyDrift answers whether `before` differs from the persisted `server`
+// only inside the git identity keys. When that holds, the identity popup can
+// commit its change directly, because no other default is being edited.
+export function gitOnlyDrift(
+  server: Record<string, string>,
+  before: Record<string, string>,
+): boolean {
+  const identity = new Set<string>(GIT_IDENTITY_KEYS);
+  const keys = new Set([...Object.keys(server), ...Object.keys(before)]);
+  for (const key of keys) {
+    if (identity.has(key)) continue;
+    if (server[key] !== before[key]) return false;
+  }
+  return true;
+}

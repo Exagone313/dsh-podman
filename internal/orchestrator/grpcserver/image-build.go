@@ -35,10 +35,13 @@ func rebuildGraph(images []state.Image) (byID map[string]state.Image, dependents
 // images. It returns the ordered list of images to rebuild, with every parent
 // preceding its dependents, and the list of image ids to skip.
 //
-// A parent that names a base image is always usable: bases are ensured before
-// custom images are rebuilt. A parent that cannot be resolved to a stored
-// custom image is skipped, as are any images left over by a dependency cycle.
-func rebuildPlan(images []state.Image) (ordered []state.Image, skipped []string) {
+// A parent that names a base image is usable unless the base's rebuild failed
+// in this run (failedBases): a failed base skips its dependents, since they
+// would otherwise rebuild against the stale old base. A base that is merely
+// missing is still provisioned on demand when its dependent is rebuilt. A
+// parent that cannot be resolved to a stored custom image is skipped, as are
+// any images left over by a dependency cycle.
+func rebuildPlan(images []state.Image, failedBases map[string]bool) (ordered []state.Image, skipped []string) {
 	byID, dependents := rebuildGraph(images)
 
 	settled := make(map[string]bool, len(images))
@@ -84,6 +87,12 @@ func rebuildPlan(images []state.Image) (ordered []state.Image, skipped []string)
 				continue
 			}
 			if _, isBase := imagebuild.BaseImageByID(image.Parent); isBase {
+				if failedBases[image.Parent] {
+					markSkipped(id)
+					delete(remaining, id)
+					progress = true
+					continue
+				}
 				settled[id] = true
 				rebuilt[id] = true
 				ordered = append(ordered, image)

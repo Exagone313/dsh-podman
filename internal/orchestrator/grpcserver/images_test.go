@@ -520,7 +520,8 @@ func TestRebuildAllImagesFailingBuilderSkipsAll(t *testing.T) {
 		t.Fatalf("expected no rebuilt images, got %#v", response.Rebuilt)
 	}
 	// The base images whose availability could not be checked come first, then
-	// the custom images and their dependents.
+	// the custom images and their dependents (skipped because their base
+	// failed, not by a runtime build failure).
 	want := make([]string, 0, len(imagebuild.BaseImages)+2)
 	for _, base := range imagebuild.BaseImages {
 		want = append(want, base.ID)
@@ -661,7 +662,7 @@ func TestRebuildPlanOrder(t *testing.T) {
 	images := append(rebuildAllImagesFixtures(),
 		state.Image{ImageID: "unresolvable", Parent: "does-not-exist", ImageTag: "unresolvable:latest"},
 	)
-	ordered, skipped := rebuildPlan(images)
+	ordered, skipped := rebuildPlan(images, nil)
 	wantOrder := []string{"mid", "top"}
 	if !sameImageIDs(ordered, wantOrder) {
 		t.Fatalf("expected order %#v, got %#v", wantOrder, ordered)
@@ -671,12 +672,56 @@ func TestRebuildPlanOrder(t *testing.T) {
 	}
 }
 
+func TestRebuildPlanFailedBaseSkipsDependents(t *testing.T) {
+	images := rebuildAllImagesFixtures() // mid -> archlinux, top -> mid
+	ordered, skipped := rebuildPlan(images, map[string]bool{"archlinux": true})
+	if len(ordered) != 0 {
+		t.Fatalf("expected no rebuild candidates under a failed base, got %#v", ordered)
+	}
+	if !sameStrings(skipped, []string{"mid", "top"}) {
+		t.Fatalf("expected the failed base's dependents skipped, got %#v", skipped)
+	}
+	// A base that merely does not exist is not failed: it is provisioned on
+	// demand, so its dependents are still ordered.
+	ordered, skipped = rebuildPlan(images, map[string]bool{})
+	if !sameImageIDs(ordered, []string{"mid", "top"}) {
+		t.Fatalf("expected dependents ordered under a missing base, got %#v", ordered)
+	}
+	if len(skipped) != 0 {
+		t.Fatalf("expected nothing skipped under a missing base, got %#v", skipped)
+	}
+}
+
+func TestRebuildAllFailedBaseSkipsDescendants(t *testing.T) {
+	store := newTestStore(t)
+	if err := store.SaveImages(rebuildAllImagesFixtures()); err != nil {
+		t.Fatal(err)
+	}
+	podman := newFakePodman()
+	server := &Server{Store: store, Podman: podman, ImageBuilder: &imagebuild.Builder{}, Logger: silentLogger()}
+	// archlinux exists locally, so the base pass rebuilds it; the unusable
+	// builder fails that rebuild, and both dependents must be skipped with it.
+	podman.images = map[string]bool{
+		server.baseTag("archlinux"): true,
+	}
+	response, err := server.RebuildAllImages(context.Background(), &ctl.RebuildAllImagesRequest{})
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if len(response.Rebuilt) != 0 {
+		t.Fatalf("expected no rebuilt images, got %#v", response.Rebuilt)
+	}
+	if !sameStrings(response.Skipped, []string{"archlinux", "mid", "top"}) {
+		t.Fatalf("expected the failed base and its dependents skipped, got %#v", response.Skipped)
+	}
+}
+
 func TestRebuildPlanCycleSkipped(t *testing.T) {
 	images := []state.Image{
 		{ImageID: "cyc-a", Parent: "cyc-b"},
 		{ImageID: "cyc-b", Parent: "cyc-a"},
 	}
-	ordered, skipped := rebuildPlan(images)
+	ordered, skipped := rebuildPlan(images, nil)
 	if len(ordered) != 0 {
 		t.Fatalf("expected no rebuild candidates for a cycle, got %#v", ordered)
 	}

@@ -120,14 +120,16 @@ func (s *Server) RebuildAllImages(_ context.Context, _ *ctl.RebuildAllImagesRequ
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 	baseFailures := make([]string, 0)
+	failedBases := make(map[string]bool)
 	for _, base := range imagebuild.BaseImages {
 		exists, err := s.Podman.ImageExists(s.baseTag(base.ID))
 		if err != nil {
 			s.log().Error("control request failed", "method", "RebuildAllImages", "base_image", base.ID, "error", err)
 			// A base whose availability could not be checked is reported in
 			// skipped like any other image left unavailable, instead of being
-			// only logged.
+			// only logged, and its dependents are skipped with it.
 			baseFailures = append(baseFailures, base.ID)
+			failedBases[base.ID] = true
 			continue
 		}
 		if !exists {
@@ -141,10 +143,11 @@ func (s *Server) RebuildAllImages(_ context.Context, _ *ctl.RebuildAllImagesRequ
 		if err := s.rebuildBaseImage(&base); err != nil {
 			s.log().Error("control request failed", "method", "RebuildAllImages", "base_image", base.ID, "error", err)
 			baseFailures = append(baseFailures, base.ID)
+			failedBases[base.ID] = true
 		}
 	}
 	_, dependents := rebuildGraph(images)
-	ordered, skipped := rebuildPlan(images)
+	ordered, skipped := rebuildPlan(images, failedBases)
 	skipped = append(baseFailures, skipped...)
 	settled := make(map[string]bool, len(images))
 	for _, id := range skipped {

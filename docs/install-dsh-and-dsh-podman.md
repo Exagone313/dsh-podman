@@ -10,10 +10,13 @@ SPDX-License-Identifier: MIT
 
 The goal of this guide is to install:
 
-- [DeepSeek Harness](https://deepseek.com/harness), referred to later as _dsh_
+- [DeepSeek Harness](https://deepseek.com/harness), referred to later as _dsh_,
+  in its own Podman container
 - the dsh-podman plugin in dsh, which replaces host filesystem and shell access
 - the dsh-podman orchestrator, a separate Podman container that integrates with
   Podman
+
+Note that if there is existing installation data at `~/.dsh`, it will be reused.
 
 Having the dsh plugin and the orchestrator running as separate containers is an
 important part of the security design of dsh-podman: dsh itself doesn't have
@@ -109,6 +112,9 @@ which requires online access.
 2. Copy the files [dsh.container](../quadlet/dsh.container) and
    [dsh-podman-orchestrator.container](../quadlet/dsh-podman-orchestrator.container)
    to `~/.config/containers/systemd/`.
+   ```bash
+   cp quadlet/* ~/.config/containers/systemd/
+   ```
    - Adapt the files to your desired project directory if you wish to change it.
 3. Reload systemd session configuration:
    ```bash
@@ -147,10 +153,16 @@ which requires online access.
   container for the current workspace (the plugin auto-creates the workspace's
   default container on first use).
 
-## Enable daily auto-updates (optional)
+## Set Git identity (recommended)
 
-This requires enabling lingering for your user.
+- Open settings from the sidebar's **Plugins** panel → **Installed** →
+  **dsh-podman**
+- Scroll down to **Default environment**
+- Click on **Git identity**
+- Enter the name and email to use for Git and click on **Apply**
+- Click on **Apply default environment variables** and then **Confirm**
 
-```bash
-systemctl --user enable --now podman-auto-update.timer
-```
+## Updating dsh & dsh-podman
+
+Read the [update documentation](./update.md) to know how to manually update or
+set up auto-updates.

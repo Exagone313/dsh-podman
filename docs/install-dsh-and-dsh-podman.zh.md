@@ -10,9 +10,12 @@ SPDX-License-Identifier: MIT
 
 本指南的目标是安装：
 
-- [DeepSeek Harness](https://deepseek.com/harness)，下文简称 _dsh_
+- [DeepSeek Harness](https://deepseek.com/harness)，下文简称 _dsh_，在它自己的
+  Podman 容器中运行
 - dsh 中的 dsh-podman 插件，它取代了宿主的文件系统和 shell 访问
 - dsh-podman 编排器，一个与 Podman 集成的独立 Podman 容器
+
+请注意，如果 `~/.dsh` 中已有安装数据，它将被复用。
 
 将 dsh 插件和编排器作为独立的容器运行，是 dsh-podman 安全设计的重要一环： dsh
 本身不能直接访问 Podman，只有编排器可以，并且受到限制。dsh
@@ -90,6 +93,9 @@ SPDX-License-Identifier: MIT
 2. 将文件 [dsh.container](../quadlet/dsh.container) 和
    [dsh-podman-orchestrator.container](../quadlet/dsh-podman-orchestrator.container)
    复制到 `~/.config/containers/systemd/`。
+   ```bash
+   cp quadlet/* ~/.config/containers/systemd/
+   ```
    - 如果你希望更改项目目录，可相应调整这些文件。
 3. 重新加载 systemd 会话配置：
    ```bash
@@ -125,10 +131,14 @@ SPDX-License-Identifier: MIT
 - 在 dsh 会话中运行一条 shell 命令。它应在当前工作区的 Podman
   容器内执行（插件会在首次使用时自动创建工作区的默认容器）。
 
-## 启用每日自动更新（可选）
+## 配置 Git 身份（推荐）
 
-这需要为你的用户启用 lingering。
+- 打开侧边栏的 **插件** 面板 → **已安装** → **dsh-podman**
+- 向下滚动到 **默认环境**
+- 点击 **Git 身份**
+- 输入用于 Git 的名称和邮箱，然后点击 **应用**
+- 点击 **应用默认环境变量**，然后点击 **确认**
 
-```bash
-systemctl --user enable --now podman-auto-update.timer
-```
+## 更新 dsh 与 dsh-podman
+
+请阅读[更新文档](./update.zh.md)，了解如何手动更新或设置自动更新。

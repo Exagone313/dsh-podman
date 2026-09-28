@@ -24,6 +24,7 @@ per-project Podman containers.
 ## Documentation
 
 - **[Install DeepSeek Harness & dsh-podman with rootless Podman](docs/install-dsh-and-dsh-podman.md)**
+- [Update](docs/update.md)
 - [Architecture](docs/architecture.md)
 - [Configuration](docs/configuration.md)
 - [Usage](docs/usage.md)

@@ -121,11 +121,25 @@ func (s *Server) RebuildAllImages(_ context.Context, _ *ctl.RebuildAllImagesRequ
 	}
 	baseFailures := make([]string, 0)
 	for _, base := range imagebuild.BaseImages {
-		if _, _, err := s.ensureBase(base.ID); err != nil {
+		exists, err := s.Podman.ImageExists(s.baseTag(base.ID))
+		if err != nil {
 			s.log().Error("control request failed", "method", "RebuildAllImages", "base_image", base.ID, "error", err)
-			// A base that could not be built or pulled is reported in skipped
-			// like any other image left unavailable, instead of being only
-			// logged.
+			// A base whose availability could not be checked is reported in
+			// skipped like any other image left unavailable, instead of being
+			// only logged.
+			baseFailures = append(baseFailures, base.ID)
+			continue
+		}
+		if !exists {
+			// Rebuilding only refreshes images that already exist: a base that
+			// was never built is left alone. A base that a stored custom image
+			// needs is still provisioned on demand when that custom image is
+			// rebuilt (resolveParent -> ensureBase).
+			s.log().Info("control request skipped", "method", "RebuildAllImages", "base_image", base.ID, "reason", "missing")
+			continue
+		}
+		if err := s.rebuildBaseImage(&base); err != nil {
+			s.log().Error("control request failed", "method", "RebuildAllImages", "base_image", base.ID, "error", err)
 			baseFailures = append(baseFailures, base.ID)
 		}
 	}
@@ -174,14 +188,38 @@ func (s *Server) RebuildBaseImage(_ context.Context, request *ctl.RebuildBaseIma
 	if s.ImageBuilder == nil {
 		return nil, status.Error(codes.FailedPrecondition, "image builder is not configured")
 	}
-	spec := imagebuild.BuildSpec{ImageID: base.ID, From: base.Primitive, PackageManager: base.PackageManager, Packages: base.Packages, IsBase: true, PostInstall: base.PostInstall}
-	tag, err := s.ImageBuilder.Build(spec)
-	if err != nil {
+	if err := s.rebuildBaseImage(base); err != nil {
 		s.log().Error("control request failed", "method", "RebuildBaseImage", "name", request.GetName(), "error", err)
-		return nil, status.Error(codes.Internal, err.Error())
+		return nil, err
 	}
+	tag := s.baseTag(base.ID)
 	s.log().Info("control request completed", "method", "RebuildBaseImage", "name", request.GetName(), "image_tag", tag)
 	return imageProto(resolvedImage{ImageID: base.ID, IsBase: true, PackageManager: base.PackageManager, ImageTag: tag, Primitive: base.Primitive, Packages: append([]string(nil), base.Packages...), Status: "built", BuiltAt: s.Podman.ImageCreated(tag), BasePublic: false}), nil
+}
+
+// rebuildBaseImage refreshes a base image. In local mode the base's primitive
+// is pulled first, so the rebuild reflects current upstream rather than a stale
+// local copy, then the base is built from it. In public mode the base tag is
+// pulled again. The caller is responsible for the podman/builder availability
+// checks.
+func (s *Server) rebuildBaseImage(base *imagebuild.BaseImage) error {
+	if s.baseImagesPublic() {
+		return s.Podman.ImagePull(s.baseTag(base.ID))
+	}
+	if s.Podman == nil {
+		return status.Error(codes.FailedPrecondition, "podman is not configured")
+	}
+	if s.ImageBuilder == nil {
+		return status.Error(codes.FailedPrecondition, "image builder is not configured")
+	}
+	if err := s.Podman.ImagePull(base.Primitive); err != nil {
+		return status.Error(codes.Internal, err.Error())
+	}
+	spec := imagebuild.BuildSpec{ImageID: base.ID, From: base.Primitive, PackageManager: base.PackageManager, Packages: base.Packages, IsBase: true, PostInstall: base.PostInstall}
+	if _, err := s.ImageBuilder.Build(spec); err != nil {
+		return status.Error(codes.Internal, err.Error())
+	}
+	return nil
 }
 
 func (s *Server) PullBaseImage(_ context.Context, request *ctl.PullBaseImageRequest) (*ctl.Image, error) {

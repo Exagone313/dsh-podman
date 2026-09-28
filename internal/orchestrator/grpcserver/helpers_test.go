@@ -72,6 +72,12 @@ type fakePodman struct {
 	recreated         []string
 	createErr         error
 	recreateFails     int
+	// images is the image-presence map ImageExists consults; an unrecorded
+	// name counts as present, keeping callers that do not care about image
+	// availability on the double's old unconditional answer.
+	images map[string]bool
+	// pulled records every image name ImagePull was asked to pull.
+	pulled []string
 }
 
 func newFakePodman() *fakePodman {

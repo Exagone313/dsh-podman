@@ -129,13 +129,30 @@ func TestListImages(t *testing.T) {
 	}
 }
 
-func (f *fakePodman) ImageExists(string) (bool, error) { return true, nil }
+func (f *fakePodman) ImageExists(name string) (bool, error) {
+	if f.images == nil {
+		return true, nil
+	}
+	return f.images[name], nil
+}
 
 func (f *fakePodman) ImageCreated(string) string { return "" }
 
-func (f *fakePodman) ImagePull(string) error { return nil }
+func (f *fakePodman) ImagePull(name string) error {
+	f.pulled = append(f.pulled, name)
+	return nil
+}
 
 func (f *fakePodman) ImageRemove(string) error { return nil }
+
+func sliceContains(values []string, want string) bool {
+	for _, value := range values {
+		if value == want {
+			return true
+		}
+	}
+	return false
+}
 
 func TestStartContainerRejectsUnknownImage(t *testing.T) {
 	store := newTestStore(t)
@@ -481,10 +498,11 @@ func TestRebuildAllImagesNoImages(t *testing.T) {
 	if len(response.Rebuilt) != 0 {
 		t.Fatalf("expected no rebuilt images, got %#v", response.Rebuilt)
 	}
-	// No custom image exists, but the unusable builder still reports every base
-	// it could not ensure, instead of logging the failure only.
+	// No custom image exists, but the unusable podman connection still reports
+	// every base whose availability could not be checked, instead of logging
+	// the failure only.
 	if len(response.Skipped) != len(imagebuild.BaseImages) {
-		t.Fatalf("expected the unbuildable bases to be reported, got %#v", response.Skipped)
+		t.Fatalf("expected the uncheckable bases to be reported, got %#v", response.Skipped)
 	}
 }
 
@@ -501,8 +519,8 @@ func TestRebuildAllImagesFailingBuilderSkipsAll(t *testing.T) {
 	if len(response.Rebuilt) != 0 {
 		t.Fatalf("expected no rebuilt images, got %#v", response.Rebuilt)
 	}
-	// The base images the builder could not ensure come first, then the custom
-	// images and their dependents.
+	// The base images whose availability could not be checked come first, then
+	// the custom images and their dependents.
 	want := make([]string, 0, len(imagebuild.BaseImages)+2)
 	for _, base := range imagebuild.BaseImages {
 		want = append(want, base.ID)
@@ -510,6 +528,93 @@ func TestRebuildAllImagesFailingBuilderSkipsAll(t *testing.T) {
 	want = append(want, "mid", "top")
 	if !sameStrings(response.Skipped, want) {
 		t.Fatalf("expected skipped %#v, got %#v", want, response.Skipped)
+	}
+}
+
+func TestRebuildAllRebuildsOnlyPresentBases(t *testing.T) {
+	store := newTestStore(t)
+	podman := newFakePodman()
+	server := &Server{Store: store, Podman: podman, ImageBuilder: &imagebuild.Builder{}, Logger: silentLogger()}
+	// archlinux exists locally; ubuntu and alpine were never built.
+	podman.images = map[string]bool{
+		server.baseTag("archlinux"): true,
+		server.baseTag("ubuntu"):    false,
+		server.baseTag("alpine"):    false,
+	}
+	response, err := server.RebuildAllImages(context.Background(), &ctl.RebuildAllImagesRequest{})
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	// The present base's primitive is pulled before its (failing) rebuild.
+	if !sliceContains(podman.pulled, "docker.io/library/archlinux:latest") {
+		t.Fatalf("expected the archlinux primitive to be pulled before its rebuild, got %#v", podman.pulled)
+	}
+	// Missing bases are neither pulled nor rebuilt by the base pass.
+	if sliceContains(podman.pulled, "docker.io/library/ubuntu:latest") ||
+		sliceContains(podman.pulled, "docker.io/library/alpine:latest") {
+		t.Fatalf("missing bases must not be pulled, got %#v", podman.pulled)
+	}
+	if !sameStrings(response.Skipped, []string{"archlinux"}) {
+		t.Fatalf("expected only the failed base rebuild reported, got %#v", response.Skipped)
+	}
+}
+
+func TestRebuildAllMissingBasesAreLeftAlone(t *testing.T) {
+	podman := newFakePodman()
+	server := &Server{Store: newTestStore(t), Podman: podman, ImageBuilder: &imagebuild.Builder{}, Logger: silentLogger()}
+	podman.images = map[string]bool{
+		server.baseTag("archlinux"): false,
+		server.baseTag("ubuntu"):    false,
+		server.baseTag("alpine"):    false,
+	}
+	response, err := server.RebuildAllImages(context.Background(), &ctl.RebuildAllImagesRequest{})
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if len(podman.pulled) != 0 {
+		t.Fatalf("missing bases must not be pulled, got %#v", podman.pulled)
+	}
+	if len(response.Rebuilt) != 0 || len(response.Skipped) != 0 {
+		t.Fatalf("expected no activity for missing bases, got rebuilt=%#v skipped=%#v", response.Rebuilt, response.Skipped)
+	}
+}
+
+func TestRebuildAllRebuildsCustomImagesWhoseBaseParentIsMissing(t *testing.T) {
+	store := newTestStore(t)
+	if err := store.SaveImages([]state.Image{{
+		ImageID: "dev", Parent: "archlinux", PackageManager: "pacman", ImageTag: "localhost/dsh-podman/dev:latest",
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	podman := newFakePodman()
+	server := &Server{Store: store, Podman: podman, ImageBuilder: &imagebuild.Builder{}, Logger: silentLogger()}
+	podman.images = map[string]bool{
+		server.baseTag("archlinux"): false,
+	}
+	response, err := server.RebuildAllImages(context.Background(), &ctl.RebuildAllImagesRequest{})
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	// The custom image is still rebuilt even though its base parent is missing:
+	// the parent is provisioned on demand, and the failing builder reports the
+	// custom image in skipped. The missing base itself is not reported.
+	if !sameStrings(response.Skipped, []string{"dev"}) {
+		t.Fatalf("expected the custom image attempted and reported, got %#v", response.Skipped)
+	}
+	if len(podman.pulled) != 0 {
+		t.Fatalf("the base pass must not pull a missing base, got %#v", podman.pulled)
+	}
+}
+
+func TestRebuildBaseImagePullsPrimitive(t *testing.T) {
+	podman := newFakePodman()
+	server := &Server{Store: newTestStore(t), Podman: podman, ImageBuilder: &imagebuild.Builder{}, Logger: silentLogger()}
+	_, err := server.RebuildBaseImage(context.Background(), &ctl.RebuildBaseImageRequest{Name: "archlinux"})
+	if status.Code(err) != codes.Internal {
+		t.Fatalf("expected the build to fail on the unusable builder, got %v", err)
+	}
+	if !sliceContains(podman.pulled, "docker.io/library/archlinux:latest") {
+		t.Fatalf("expected the primitive to be pulled before the rebuild, got %#v", podman.pulled)
 	}
 }
 

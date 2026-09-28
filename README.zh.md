@@ -21,6 +21,15 @@ SPDX-License-Identifier: MIT
 dsh-podman 将所有的 shell 执行与文件访问都路由到一次性、按项目隔离的 Podman
 容器中。
 
+## 特性
+
+- 一次性、按项目隔离的容器
+- 每个工作区可添加额外的容器
+- 创建基于 Arch Linux、Ubuntu 和 Alpine Linux 的容器镜像
+- 感知审批的权限提升
+- 在容器中运行进程（守护进程）
+- 在容器中运行终端
+
 ## 文档
 
 - **[使用 rootless Podman 安装 DeepSeek Harness 与 dsh-podman](docs/install-dsh-and-dsh-podman.zh.md)**

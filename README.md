@@ -21,6 +21,15 @@ English | [中文](README.zh.md)
 dsh-podman routes all shell execution and file access through disposable and
 per-project Podman containers.
 
+## Features
+
+- Disposable, per-project containers
+- Additional containers per workspace
+- Create container images based on Arch Linux, Ubuntu and Alpine Linux
+- Approval-aware escalation
+- Run processes in containers (daemons)
+- Run a terminal in containers
+
 ## Documentation
 
 - **[Install DeepSeek Harness & dsh-podman with rootless Podman](docs/install-dsh-and-dsh-podman.md)**

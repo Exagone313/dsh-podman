@@ -1,6 +1,6 @@
 {
   "name": "@exagone313/dsh-podman",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Podman-backed execution for DeepSeek Harness (dsh).",
   "license": "MIT",
   "repository": {

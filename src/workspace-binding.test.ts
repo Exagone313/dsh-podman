@@ -9,7 +9,7 @@ import loader from "@grpc/proto-loader";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 import { tmpdir } from "node:os";
-import { mkdirSync } from "node:fs";
+import { existsSync, mkdirSync, rmSync } from "node:fs";
 import { controlClient, guestClient } from "./grpc/runtime-client.js";
 import {
   containerNotFound,
@@ -266,9 +266,21 @@ async function startControlServer(
     versions,
     createRequests,
     recreateRequests,
-    stop: () => server.forceShutdown(),
+    stop: () => {
+      server.forceShutdown();
+      // gRPC unlinks its sockets on shutdown; drop the root too so repeated
+      // runs do not accumulate directories under the system temp dir.
+      rmSync(socketsRoot, { recursive: true, force: true });
+    },
   };
 }
+
+test("the control server cleanup removes its temp root", async () => {
+  const control = await startControlServer();
+  assert.ok(existsSync(control.socketsRoot));
+  control.stop();
+  assert.equal(existsSync(control.socketsRoot), false);
+});
 
 test("control calls carry the bearer token", async () => {
   const { socketsRoot, received, versions, stop } = await startControlServer();

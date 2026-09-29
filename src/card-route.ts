@@ -179,6 +179,7 @@ function dshWorkspaceCwd(registry: any, slug: string): string {
 export async function cardSnapshot(
   resolver: WorkspaceResolver,
   workspaceRegistry: any,
+  harnessVersion: string = dshVersion(),
 ): Promise<CardSnapshot> {
   // The handshake RPC is exempt from the orchestrator's version check, so it
   // succeeds even when the rest is refused; an older orchestrator that has no
@@ -203,7 +204,7 @@ export async function cardSnapshot(
     return {
       version: VERSION,
       commit: GIT_COMMIT,
-      dshVersion: dshVersion(),
+      dshVersion: harnessVersion,
       orchestratorVersion,
       versionState: "major-mismatch",
       projectsRoot: resolver.getConfig().projectsRoot,
@@ -219,7 +220,7 @@ export async function cardSnapshot(
   return {
     version: VERSION,
     commit: GIT_COMMIT,
-    dshVersion: dshVersion(),
+    dshVersion: harnessVersion,
     orchestratorVersion,
     versionState: pluginVersionState(VERSION, orchestratorVersion),
     projectsRoot: resolver.getConfig().projectsRoot,
@@ -611,10 +612,14 @@ async function handleCardRequest(
   resolver: WorkspaceResolver,
   workspaceRegistry: any,
   readLocale?: () => ReasonLocale,
+  harnessVersion?: string,
 ): Promise<Response> {
   if (request.method === "GET") {
     try {
-      return jsonResponse(200, await cardSnapshot(resolver, workspaceRegistry));
+      return jsonResponse(
+        200,
+        await cardSnapshot(resolver, workspaceRegistry, harnessVersion),
+      );
     } catch (error) {
       return jsonResponse(500, {
         error: error instanceof Error ? error.message : String(error),
@@ -661,6 +666,7 @@ export function registerCardRoute(
   resolver: WorkspaceResolver,
   workspaceRegistry?: any,
   readLocale?: () => ReasonLocale,
+  harnessVersion?: string,
 ): void {
   ctx.inject(["connection"], (connectionCtx: any) => {
     connectionCtx.connection.fetch.register({
@@ -674,6 +680,7 @@ export function registerCardRoute(
           resolver,
           workspaceRegistry,
           readLocale,
+          harnessVersion,
         ),
     });
   });

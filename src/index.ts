@@ -28,6 +28,7 @@ import {
 } from "./tool-schemas.js";
 import { toolCallView, toolResultView } from "./tool-views.js";
 import { registerCardRoute } from "./card-route.js";
+import { dshVersion } from "./dsh-version.js";
 import { registerTerminalRoutes } from "./terminal-route.js";
 import { TerminalSessions } from "./terminal-sessions.js";
 import { type Config } from "./settings-schema.js";
@@ -150,7 +151,17 @@ export function apply(ctx: any, config: Config): void {
       "podman: settings presentation",
     );
   });
-  registerCardRoute(ctx, resolver, ctx.workspaceRegistry, readLocale);
+  // The harness version is read through the profile's package lookup: the dsh
+  // app package is served from the loader's in-memory table, not a physical
+  // node_modules entry. It is resolved once and served with every snapshot.
+  const dshVersionValue = dshVersion(ctx.get("pluginPackages"));
+  registerCardRoute(
+    ctx,
+    resolver,
+    ctx.workspaceRegistry,
+    readLocale,
+    dshVersionValue,
+  );
   // The Podman terminal tab talks to guest ptys through its own routes; the
   // registry keeps shells alive while the browser is away.
   const terminalSessions = new TerminalSessions({ resolver });

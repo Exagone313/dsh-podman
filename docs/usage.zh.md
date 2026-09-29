@@ -42,6 +42,17 @@ dsh-podman 将容器运行的镜像组织为三个层级：
 镜像引用（`imageId`、`parent`、`image`）**只能是短名称**（没有镜像仓库前缀，没有
 `:tag`）。
 
+### 基础镜像
+
+每个基础镜像都从其原始引用构建，安装同一份由 dsh-podman
+拥有的固定软件包列表；自定义镜像继承其父镜像的软件包管理器。
+
+| 短名称      | 软件包管理器 | 原始镜像                             | 软件包                                                                                                                                                                                                  |
+| ----------- | ------------ | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `archlinux` | `pacman`     | `docker.io/library/archlinux:latest` | `base-devel`、`ca-certificates`、`curl`、`diffutils`、`fd`、`git`、`inetutils`、`jq`、`less`、`openbsd-netcat`、`openssh`、`patch`、`procps-ng`、`python`、`ripgrep`、`tree`、`unzip`、`wget`、`zstd`   |
+| `ubuntu`    | `apt`        | `docker.io/library/ubuntu:latest`    | `build-essential`、`ca-certificates`、`curl`、`diffutils`、`fd-find`、`git`、`jq`、`less`、`netcat-openbsd`、`openssh-client`、`patch`、`procps`、`python3`、`ripgrep`、`tree`、`unzip`、`wget`、`zstd` |
+| `alpine`    | `apk`        | `docker.io/library/alpine:latest`    | `bash`、`build-base`、`ca-certificates`、`curl`、`diffutils`、`fd`、`git`、`jq`、`less`、`openssh-client`、`patch`、`procps`、`python3`、`ripgrep`、`tree`、`unzip`、`wget`、`zstd`                     |
+
 ## 工具
 
 插件注册了以下面向模型的工具。标记 `✱`

@@ -49,6 +49,18 @@ dsh-podman organizes the images its containers run into three tiers:
 Image references (`imageId`, `parent`, `image`) are **short names only** (no
 registry prefix, no `:tag`).
 
+### Base images
+
+Each base image is built from its primitive reference with the same fixed,
+dsh-podman-owned package list, and a custom image inherits its parent's package
+manager.
+
+| Short name  | Package manager | Primitive                            | Packages                                                                                                                                                                                                |
+| ----------- | --------------- | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `archlinux` | `pacman`        | `docker.io/library/archlinux:latest` | `base-devel`, `ca-certificates`, `curl`, `diffutils`, `fd`, `git`, `inetutils`, `jq`, `less`, `openbsd-netcat`, `openssh`, `patch`, `procps-ng`, `python`, `ripgrep`, `tree`, `unzip`, `wget`, `zstd`   |
+| `ubuntu`    | `apt`           | `docker.io/library/ubuntu:latest`    | `build-essential`, `ca-certificates`, `curl`, `diffutils`, `fd-find`, `git`, `jq`, `less`, `netcat-openbsd`, `openssh-client`, `patch`, `procps`, `python3`, `ripgrep`, `tree`, `unzip`, `wget`, `zstd` |
+| `alpine`    | `apk`           | `docker.io/library/alpine:latest`    | `bash`, `build-base`, `ca-certificates`, `curl`, `diffutils`, `fd`, `git`, `jq`, `less`, `openssh-client`, `patch`, `procps`, `python3`, `ripgrep`, `tree`, `unzip`, `wget`, `zstd`                     |
+
 ## Tools
 
 The plugin registers the following model-facing tools. Tools marked `✱` require

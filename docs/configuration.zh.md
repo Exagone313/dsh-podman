@@ -177,5 +177,7 @@ Quadlet 会挂载 `%h/.dsh/dsh-podman/state`。orchestrator
 `<DSH_PODMAN_SOCKETS_ROOT>/<container>`。由于只挂载了这一个按工作区划分的目录，guest
 容器永远看不到 orchestrator 的
 `orchestrator.sock`，也看不到任何其他工作区的套接字目录。控制套接字和每个 guest
-套接字都以权限模式 `0600` 创建，两个进程都会在启动时设置 `0077`
-umask，这样套接字在 `bind` 和 `chmod` 之间永远不会被短暂访问。
+套接字都以权限模式 `0600` 创建，两个进程都会在 `0077` umask
+下创建它们，这样套接字在 `bind` 和 `chmod` 之间永远不会被短暂访问。随后 guest
+agent 会恢复常规的 `0022` umask，因此它运行的命令创建的文件为 `0644`、目录为
+`0755`。

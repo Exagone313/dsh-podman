@@ -266,6 +266,11 @@ func TestWriteFilePreservesMode(t *testing.T) {
 	if err := os.WriteFile(target, []byte("old"), 0755); err != nil {
 		t.Fatal(err)
 	}
+	// os.WriteFile applies the test process's umask, so set the mode the test
+	// wants to see preserved instead of depending on the runner's mask.
+	if err := os.Chmod(target, 0755); err != nil {
+		t.Fatal(err)
+	}
 	stream := &writeFileStream{chunks: []*guest.WriteFileChunk{
 		{Payload: &guest.WriteFileChunk_Start{Start: &guest.WriteFileStart{Path: "/workspace/script", Create: true, Truncate: true}}},
 		{Payload: &guest.WriteFileChunk_DataChunk{DataChunk: []byte("new")}},

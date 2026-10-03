@@ -8,6 +8,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"syscall"
 	"testing"
 )
 
@@ -32,6 +33,31 @@ func TestListenRestrictsTheSocket(t *testing.T) {
 	}
 	if mode := dir.Mode().Perm(); mode != 0700 {
 		t.Errorf("socket directory mode is %04o, want 0700", mode)
+	}
+}
+
+// currentUmask reads the process creation mask, which the kernel only exposes
+// by setting it.
+func currentUmask() int {
+	mask := syscall.Umask(0)
+	syscall.Umask(mask)
+	return mask
+}
+
+// TestRestrictAndRelaxScopeTheCreationMask covers the two states the guest
+// agent relies on: a private window while the socket is created, then the
+// conventional mask so commands create 0644 files and 0755 directories.
+func TestRestrictAndRelaxScopeTheCreationMask(t *testing.T) {
+	original := currentUmask()
+	t.Cleanup(func() { syscall.Umask(original) })
+
+	Restrict()
+	if got := currentUmask(); got != 0o077 {
+		t.Fatalf("mask after Restrict = %04o, want 0077", got)
+	}
+	Relax()
+	if got := currentUmask(); got != 0o022 {
+		t.Fatalf("mask after Relax = %04o, want 0022", got)
 	}
 }
 

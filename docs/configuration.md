@@ -197,5 +197,7 @@ host directory `<DSH_PODMAN_HOST_SOCKETS_ROOT>/<container>` is mounted at
 single per-workspace directory is mounted, a guest container never sees the
 orchestrator's `orchestrator.sock` nor any other workspace's socket directory.
 Both the control socket and each guest socket are created with mode `0600`, and
-both processes set a `0077` umask at startup so the socket is never briefly
-reachable between `bind` and `chmod`.
+both processes create them under a `0077` umask so the socket is never briefly
+reachable between `bind` and `chmod`. The guest agent then restores the
+conventional `0022` mask, so the commands it runs create files `0644` and
+directories `0755`.

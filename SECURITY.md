@@ -37,8 +37,10 @@ Access to that socket is controlled by **filesystem permissions**:
 
 - the socket is created with mode `0600`;
 - the orchestrator refuses to start unless its directory is `0700`;
-- both the orchestrator and the guest agents set a `0077` umask at startup, so a
-  socket is never briefly reachable between `bind` and `chmod`.
+- both the orchestrator and the guest agents create their sockets under a `0077`
+  umask, so a socket is never briefly reachable between `bind` and `chmod`; the
+  guest agent then restores the conventional `0022` mask, so the commands it
+  runs create files `0644` and directories `0755`.
 
 `DSH_PODMAN_ORCHESTRATOR_TOKEN` is **defence in depth, not the security
 boundary**. Running without a token is a supported configuration: a client that

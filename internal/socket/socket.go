@@ -15,16 +15,21 @@ import (
 	"syscall"
 )
 
-// Restrict sets a umask that keeps everything the process creates private to
-// its owner.
+// Restrict sets a 0077 creation mask for the private window in which a
+// listening socket is created.
 //
-// It must run before anything creates a file, because the umask is
-// process-wide state and is applied at creation time. It matters most for the
-// listening socket: bind(2) creates it with 0777 &^ umask, and the chmod that
-// follows is a separate step, so without a restrictive umask the socket is
-// briefly reachable by other users on the host.
+// bind(2) applies the process mask when it creates the socket, and the chmod
+// that follows is a separate step, so without a restrictive mask the socket is
+// briefly reachable by other users on the host. A caller that goes on to run
+// commands restores the conventional mask with [Relax] once the socket exists.
 func Restrict() {
 	syscall.Umask(0o077)
+}
+
+// Relax restores the conventional 0022 creation mask, so files a process
+// creates afterwards are 0644 and directories 0755.
+func Relax() {
+	syscall.Umask(0o022)
 }
 
 // Listen creates the parent directory of path if needed, replaces a stale

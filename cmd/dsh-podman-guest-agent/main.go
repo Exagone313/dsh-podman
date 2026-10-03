@@ -45,6 +45,10 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+	// Only the socket needed the private creation mask: the commands this
+	// agent runs must create files 0644 and directories 0755, so the
+	// conventional mask is restored before anything can spawn a child.
+	socketpkg.Relax()
 	extra, err := guestMounts(os.Getenv("DSH_PODMAN_GUEST_MOUNTS"))
 	if err != nil {
 		panic(err)

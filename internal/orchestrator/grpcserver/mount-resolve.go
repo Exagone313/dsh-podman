@@ -33,14 +33,19 @@ func validProjectPath(path string) bool {
 }
 
 // resolveDirUnderRoot resolves rel beneath root and returns both the resolved
-// root and the resolved directory. Resolution follows symlinks but is
-// confined to root: a component escaping it, through a symlink or otherwise,
-// is an error. rel must already be lexically clean and relative.
+// root and the resolved directory. Resolution is confined to root: a component
+// escaping it, through a symlink or otherwise, is an error. rel must already be
+// lexically clean and relative.
 //
 // The confinement decision is made by os.Root, which on Linux resolves the
 // path with openat2(RESOLVE_BENEATH) in a single step and so cannot be raced
-// into accepting a path that never existed as a whole.  EvalSymlinks only
+// into accepting a path that never existed as a whole. EvalSymlinks only
 // produces the resolved string, cross-checked against the resolved root.
+//
+// Symlink components are refused outright: the project-mount conflict check
+// compares lexical project paths, so a path that resolves elsewhere would make
+// that comparison unsound. The root itself may be a symlink (a symlinked TMPDIR
+// or home directory is supported); only the components below it are checked.
 func resolveDirUnderRoot(root, rel string) (resolvedRoot, resolved string, err error) {
 	handle, err := os.OpenRoot(root)
 	if err != nil {
@@ -58,6 +63,11 @@ func resolveDirUnderRoot(root, rel string) (resolvedRoot, resolved string, err e
 	if !info.IsDir() {
 		return "", "", fmt.Errorf("%q is not a directory", rel)
 	}
+	if rel != "" {
+		if err := assertNoSymlinkComponents(handle, filepath.FromSlash(rel)); err != nil {
+			return "", "", err
+		}
+	}
 	resolvedRoot, err = filepath.EvalSymlinks(root)
 	if err != nil {
 		return "", "", err
@@ -66,10 +76,36 @@ func resolveDirUnderRoot(root, rel string) (resolvedRoot, resolved string, err e
 	if err != nil {
 		return "", "", err
 	}
-	if resolved != resolvedRoot && !strings.HasPrefix(resolved, withSeparator(resolvedRoot)) {
+	if resolved == resolvedRoot {
+		return "", "", fmt.Errorf("%q is the projects root", rel)
+	}
+	if !strings.HasPrefix(resolved, withSeparator(resolvedRoot)) {
 		return "", "", fmt.Errorf("%q escapes %q", rel, root)
 	}
 	return resolvedRoot, resolved, nil
+}
+
+// assertNoSymlinkComponents refuses a project path any of whose components,
+// including the final one, is a symlink. Each component is inspected with
+// Lstat relative to the root handle, so a component that is a symlink is seen
+// as one rather than followed. Intermediate components must be directories.
+func assertNoSymlinkComponents(handle *os.Root, rel string) error {
+	parts := strings.Split(rel, string(filepath.Separator))
+	current := ""
+	for i, part := range parts {
+		current = filepath.Join(current, part)
+		info, err := handle.Lstat(current)
+		if err != nil {
+			return err
+		}
+		if info.Mode()&os.ModeSymlink != 0 {
+			return fmt.Errorf("%q is a symlink", current)
+		}
+		if i < len(parts)-1 && !info.IsDir() {
+			return fmt.Errorf("%q is not a directory", current)
+		}
+	}
+	return nil
 }
 
 // reservedDestinations lists the container paths a mount must not shadow: the
@@ -96,6 +132,14 @@ func withSeparator(path string) string {
 // whether either contains the other.
 func pathsOverlap(a, b string) bool {
 	return a == b || strings.HasPrefix(a, withSeparator(b)) || strings.HasPrefix(b, withSeparator(a))
+}
+
+// pathsStrictAncestor reports whether parent is a strict ancestor of child:
+// child is inside parent, and the two are not the same path. A container
+// holding a read-write mount at parent can replace the next component of
+// child, which is exactly the swap the mount conflict check refuses.
+func pathsStrictAncestor(parent, child string) bool {
+	return parent != child && strings.HasPrefix(child, withSeparator(parent))
 }
 
 // nonProjectDestination validates a tmpfs, named-volume, or secret mount
@@ -134,23 +178,22 @@ func (s *Server) nonProjectDestination(dest string) error {
 // destination. The empty destination defaults to a mirror of the host source
 // under projectsRoot.
 //
-// The project path (which may name a subdirectory) is resolved through symlinks
-// and confined to projectsRoot, so a symlink planted inside a writable project
-// cannot make podman bind-mount a path outside the projects root. Note that
-// podman resolves the source again, in the host's mount namespace, when it
-// performs the mount: the source handed to it is the resolved path precisely
-// because every component was a real directory at validation time, so
-// redirecting the mount afterwards means replacing a directory with a symlink
-// (rmdir refuses a non-empty directory) rather than repointing an existing
-// symlink. That narrows the race; it does not remove it, and it cannot be
-// removed from here while podman takes a path rather than a file descriptor.
+// The project path (which may name a subdirectory) must contain no symlink
+// component and is confined to projectsRoot, so a symlink planted inside a
+// writable project can neither escape the projects root nor make the lexical
+// path differ from the mounted one. Podman resolves the source again, in the
+// host's mount namespace, when it performs the mount, so a component could
+// still be replaced with a symlink between validation and that resolution;
+// checkProjectMountConflicts refuses a new mount while another container holds a
+// read-write mount that is a strict ancestor of it, which is what makes that
+// window unwritable.
 func resolveMount(projectsRoot, hostProjectsRoot string, mount state.Mount) (hostPath, destination string, err error) {
 	if !validProjectPath(mount.ProjectName) {
 		return "", "", fmt.Errorf("invalid project path %q", mount.ProjectName)
 	}
 	resolvedRoot, resolved, err := resolveDirUnderRoot(projectsRoot, filepath.FromSlash(mount.ProjectName))
 	if err != nil {
-		return "", "", fmt.Errorf("project path %q does not exist under %q", mount.ProjectName, projectsRoot)
+		return "", "", fmt.Errorf("project path %q is not mountable under %q: %w", mount.ProjectName, projectsRoot, err)
 	}
 	// hostProjectsRoot names the same tree as projectsRoot in the host's
 	// mount namespace, so the resolved path is re-expressed relative to the
@@ -223,14 +266,14 @@ func (s *Server) podmanMounts(mounts []state.Mount) ([]specs.Mount, error) {
 
 // ValidateProject resolves a project name to its real directory under root.
 // The name must be lexically clean and relative, and the directory it names
-// must resolve, through any symlinks, to a path confined to root.
+// must be confined to root and contain no symlink component.
 func ValidateProject(root, name string) (string, error) {
 	if !validProjectPath(name) {
 		return "", fmt.Errorf("invalid project name %q", name)
 	}
 	_, resolved, err := resolveDirUnderRoot(root, filepath.FromSlash(name))
 	if err != nil {
-		return "", fmt.Errorf("project %q does not exist under %q", name, root)
+		return "", fmt.Errorf("project %q is not usable under %q: %w", name, root, err)
 	}
 	return resolved, nil
 }

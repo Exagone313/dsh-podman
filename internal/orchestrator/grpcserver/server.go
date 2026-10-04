@@ -24,6 +24,7 @@ type podmanAPI interface {
 	ContainerExists(name string) (bool, error)
 	ContainerRunning(name string) (bool, error)
 	ContainerAgentState(name string) (bool, string, error)
+	ListContainerWriteMounts(namePrefix string) (map[string][]string, error)
 	CreateWorkspace(pod, name, image, token string, mounts []specs.Mount, secrets []specgen.Secret, envSecrets map[string]string, env map[string]string, paths []string) error
 	RecreateWorkspace(pod, name, image, token string, mounts []specs.Mount, secrets []specgen.Secret, envSecrets map[string]string, env map[string]string, paths []string) error
 	Remove(name string) error
@@ -66,6 +67,19 @@ type Server struct {
 	// which is unique per workspace and container.
 	locksMu        sync.Mutex
 	containerLocks map[string]*sync.Mutex
+
+	// mountsMu serializes the project-mount conflict check with the container
+	// create it guards, so two creates cannot both pass the check and then
+	// mount overlapping paths.
+	mountsMu sync.Mutex
+}
+
+// lockProjectMounts takes the project-mount lock and returns its unlock
+// function. It is held across the conflict check and the podman create that
+// follows, and is always taken after any per-container lock.
+func (s *Server) lockProjectMounts() func() {
+	s.mountsMu.Lock()
+	return s.mountsMu.Unlock
 }
 
 // lockContainer takes the per-container lock and returns its unlock function.

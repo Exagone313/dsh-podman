@@ -103,10 +103,13 @@ process working directory, so a discovery listing the harness starts with an
 absolute search root runs from that root: `glob`'s `pattern` then anchors to its
 `path` while the printed paths stay absolute.
 
-Project mounts resolve through symlinks and are confined to the projects root,
-so a symlink inside a writable project cannot redirect the bind mount to a path
-outside it. Symlinks with absolute targets are never followed; name the other
-project directly instead.
+Project mounts must contain no symlink component and are confined to the
+projects root, so a symlink inside a writable project can neither redirect the
+bind mount to a path outside it nor make the path the orchestrator validates
+differ from the path podman mounts. A new project mount is also refused while
+another container holds a read-write mount that is a strict ancestor of it: that
+container's agent could otherwise rename a component of the new path to a
+symlink before podman resolves it.
 
 ## Guest agent and daemons
 

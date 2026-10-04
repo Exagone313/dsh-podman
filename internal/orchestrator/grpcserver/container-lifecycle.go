@@ -68,7 +68,6 @@ func (s *Server) ensureAgentToken(record *state.Container) (string, error) {
 // the podman container with the given image tag and agent token, using the
 // container's effective mounts.
 func (s *Server) recreateContainer(ctx context.Context, workspace state.Workspace, record *state.Container, imageTag, newToken string, env map[string]string) error {
-	s.stopContainerDaemons(ctx, *record)
 	podmanMounts, err := s.podmanMounts(containerMounts(workspace, *record))
 	if err != nil {
 		return err
@@ -78,7 +77,41 @@ func (s *Server) recreateContainer(ctx context.Context, workspace state.Workspac
 		return err
 	}
 	envSecrets := s.containerEnvSecrets(record.SecretEnv)
-	return s.Podman.RecreateWorkspace(podNameFor(workspace.WorkspaceSlug), record.PodmanName, imageTag, newToken, podmanMounts, secrets, envSecrets, env, record.Paths)
+	// The conflict check and the recreate it guards must be atomic: a create
+	// that passed the check in between could mount an overlapping path. The
+	// check runs before the daemons are stopped, so a refused recreate leaves
+	// the existing container untouched.
+	unlock := s.lockProjectMounts()
+	defer unlock()
+	if err := s.checkProjectMountConflicts(podmanMounts, record.PodmanName); err != nil {
+		return err
+	}
+	s.stopContainerDaemons(ctx, *record)
+	if err := s.Podman.RecreateWorkspace(podNameFor(workspace.WorkspaceSlug), record.PodmanName, imageTag, newToken, podmanMounts, secrets, envSecrets, env, record.Paths); err != nil {
+		return err
+	}
+	return s.confirmContainerExists(record.PodmanName)
+}
+
+// confirmContainerExists waits, briefly, for a just-created container to become
+// observable, so the project-mount lock is not released before the next
+// conflict check can see it. Podman's create is synchronous, so the first probe
+// normally succeeds and the wait is not paid.
+func (s *Server) confirmContainerExists(name string) error {
+	const attempts = 20
+	for attempt := 0; attempt < attempts; attempt++ {
+		exists, err := s.Podman.ContainerExists(name)
+		if err != nil {
+			return err
+		}
+		if exists {
+			return nil
+		}
+		if attempt < attempts-1 {
+			time.Sleep(100 * time.Millisecond)
+		}
+	}
+	return fmt.Errorf("container %q is not observable after creation", name)
 }
 
 // recreateOrRestore recreates a container and, when the recreate fails,
@@ -197,6 +230,16 @@ func (s *Server) EnsureContainer(ctx context.Context, request *ctl.EnsureContain
 	if err != nil {
 		s.log().Error("control request failed", "method", "EnsureContainer", "workspace_slug", request.GetWorkspaceSlug(), "container", container, "error", err)
 		return nil, status.Error(codes.Internal, err.Error())
+	}
+	if usable {
+		// A container podman restarted on its own re-resolved its stored mount
+		// source path. Re-check those paths against the current filesystem
+		// before handing the container out, so a component swapped since it was
+		// created cannot be used.
+		if _, mountErr := s.podmanMounts(containerMounts(workspace, *record)); mountErr != nil {
+			s.log().Warn("container project mounts no longer resolve; recreating", "workspace_slug", workspace.WorkspaceSlug, "container", container, "error", mountErr)
+			usable = false
+		}
 	}
 	if usable {
 		s.log().Info("control request completed", "method", "EnsureContainer", "workspace_slug", workspace.WorkspaceSlug, "container", container)
@@ -434,55 +477,82 @@ func (s *Server) StartContainer(ctx context.Context, request *ctl.StartContainer
 	if err := s.validateSecretReferences(record.SecretEnv, recordMounts); err != nil {
 		return nil, err
 	}
+	// The conflict check and the replace/create it guards must be atomic. It
+	// excludes the container being replaced, so its own mounts do not conflict
+	// with themselves, and it runs before that container is stopped or removed,
+	// so a refused start leaves it untouched.
+	unlock := s.lockProjectMounts()
+	if err := s.checkProjectMountConflicts(podmanMounts, record.PodmanName); err != nil {
+		unlock()
+		s.log().Warn("control request failed", "method", "StartContainer", "workspace_slug", request.GetWorkspaceSlug(), "container", request.GetContainer(), "reason", "project mount conflict", "error", err)
+		return nil, err
+	}
 	var existingSnapshot *state.Container
-	if existing, ok := containerByLogical(&workspace, request.GetContainer()); ok {
-		snapshot := snapshotContainer(*existing)
-		existingSnapshot = &snapshot
-		s.stopContainerDaemons(ctx, *existing)
-		record.AgentToken = existing.AgentToken
-		if err := s.Podman.Stop(existing.PodmanName); err != nil {
-			s.log().Warn("StartContainer replace stop failed", "workspace_slug", workspace.WorkspaceSlug, "container", request.GetContainer(), "error", err)
-		}
-		if err := s.Podman.Remove(record.PodmanName); err != nil {
-			s.log().Error("control request failed", "method", "StartContainer", "workspace_slug", workspace.WorkspaceSlug, "container", request.GetContainer(), "error", err)
-			return nil, status.Error(codes.Internal, err.Error())
-		}
-	} else {
-		// No stored record owns the derived name, but a podman container may
-		// still exist (an earlier create failed after making it, or it was
-		// removed outside dsh-podman). Drop it so the create below is not
-		// blocked by an untracked container.
-		untracked, existsErr := s.Podman.ContainerExists(record.PodmanName)
-		if existsErr != nil {
-			return nil, status.Error(codes.Internal, existsErr.Error())
-		}
-		if untracked {
-			s.log().Warn("StartContainer removing untracked container", "workspace_slug", workspace.WorkspaceSlug, "container", request.GetContainer(), "podman_name", record.PodmanName)
+	createAttempted := false
+	// The locked section is a closure so every early return releases the lock
+	// before the failure path below runs restoreSnapshot, which takes the lock
+	// again.
+	lockedErr := func() error {
+		if existing, ok := containerByLogical(&workspace, request.GetContainer()); ok {
+			snapshot := snapshotContainer(*existing)
+			existingSnapshot = &snapshot
+			s.stopContainerDaemons(ctx, *existing)
+			record.AgentToken = existing.AgentToken
+			if err := s.Podman.Stop(existing.PodmanName); err != nil {
+				s.log().Warn("StartContainer replace stop failed", "workspace_slug", workspace.WorkspaceSlug, "container", request.GetContainer(), "error", err)
+			}
 			if err := s.Podman.Remove(record.PodmanName); err != nil {
 				s.log().Error("control request failed", "method", "StartContainer", "workspace_slug", workspace.WorkspaceSlug, "container", request.GetContainer(), "error", err)
-				return nil, status.Error(codes.Internal, err.Error())
+				return status.Error(codes.Internal, err.Error())
+			}
+		} else {
+			// No stored record owns the derived name, but a podman container may
+			// still exist (an earlier create failed after making it, or it was
+			// removed outside dsh-podman). Drop it so the create below is not
+			// blocked by an untracked container.
+			untracked, existsErr := s.Podman.ContainerExists(record.PodmanName)
+			if existsErr != nil {
+				return status.Error(codes.Internal, existsErr.Error())
+			}
+			if untracked {
+				s.log().Warn("StartContainer removing untracked container", "workspace_slug", workspace.WorkspaceSlug, "container", request.GetContainer(), "podman_name", record.PodmanName)
+				if err := s.Podman.Remove(record.PodmanName); err != nil {
+					s.log().Error("control request failed", "method", "StartContainer", "workspace_slug", workspace.WorkspaceSlug, "container", request.GetContainer(), "error", err)
+					return status.Error(codes.Internal, err.Error())
+				}
 			}
 		}
-	}
-	secret, err := s.ensureAgentToken(&record)
-	if err != nil {
-		return nil, status.Error(codes.Internal, err.Error())
-	}
-	if err := s.Podman.CreateWorkspace(podNameFor(workspace.WorkspaceSlug), record.PodmanName, imageTag, secret, podmanMounts, secrets, envSecrets, record.Env, record.Paths); err != nil {
+		secret, err := s.ensureAgentToken(&record)
+		if err != nil {
+			return status.Error(codes.Internal, err.Error())
+		}
+		createAttempted = true
+		if err := s.Podman.CreateWorkspace(podNameFor(workspace.WorkspaceSlug), record.PodmanName, imageTag, secret, podmanMounts, secrets, envSecrets, record.Env, record.Paths); err != nil {
+			return status.Error(codes.Internal, err.Error())
+		}
+		if err := s.confirmContainerExists(record.PodmanName); err != nil {
+			return status.Error(codes.Internal, err.Error())
+		}
+		record.AgentToken = secret
+		return nil
+	}()
+	unlock()
+	if lockedErr != nil {
 		// A failed create may have left a container behind; remove it so a retry
 		// is not blocked by a stale name, then restore the container this call
 		// replaced (when there was one).
-		if removeErr := s.Podman.Remove(record.PodmanName); removeErr != nil {
-			s.log().Warn("StartContainer cleanup after create failure failed", "workspace_slug", workspace.WorkspaceSlug, "container", request.GetContainer(), "error", removeErr)
+		if createAttempted {
+			if removeErr := s.Podman.Remove(record.PodmanName); removeErr != nil {
+				s.log().Warn("StartContainer cleanup after create failure failed", "workspace_slug", workspace.WorkspaceSlug, "container", request.GetContainer(), "error", removeErr)
+			}
 		}
 		s.restoreSnapshot(workspace, existingSnapshot)
-		s.log().Error("control request failed", "method", "StartContainer", "workspace_slug", request.GetWorkspaceSlug(), "container", request.GetContainer(), "error", err)
-		return nil, status.Error(codes.Internal, err.Error())
+		s.log().Error("control request failed", "method", "StartContainer", "workspace_slug", request.GetWorkspaceSlug(), "container", request.GetContainer(), "error", lockedErr)
+		return nil, lockedErr
 	}
 	record.Status = "running"
 	record.CreatedAt = time.Now().UTC().Format(time.RFC3339)
 	record.AgentSocketPath = filepath.Join(s.SocketsRoot, record.PodmanName, "guest.sock")
-	record.AgentToken = secret
 	updated, err := s.upsertContainer(workspace, record)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())

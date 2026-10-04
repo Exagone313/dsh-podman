@@ -81,9 +81,13 @@ The plugin does not validate on the orchestrator's behalf. Every rule below is
 enforced in the orchestrator and re-checked on each container-creating path,
 including against state read back from disk:
 
-- project mounts are confined to `DSH_PODMAN_PROJECTS_ROOT`, resolved through
-  symlinks, so a symlink planted in a writable project cannot redirect a bind
-  mount outside it; symlinks with absolute targets are never followed;
+- project mounts are confined to `DSH_PODMAN_PROJECTS_ROOT` and must contain no
+  symlink component, so a symlink planted in a writable project can neither
+  redirect a bind mount outside it nor make the validated path differ from the
+  path podman mounts;
+- a new project mount is refused while another orchestrator container holds a
+  read-write mount that is a strict ancestor of it, and that check is serialized
+  with the create it guards;
 - tmpfs, volume and secret mount destinations may not overlap a reserved path
   (the projects root, the sockets root, or the guest agent mount) — as an
   ancestor or as a descendant;
@@ -128,12 +132,16 @@ do, so an attacker holding either has not crossed a boundary.
 
 ## Known residual risks
 
-- **Mount source races.** Project mounts are resolved and then handed to podman
-  as a path, which podman resolves again when it performs the mount. A workload
-  able to write to the projects root can in principle replace a path component
-  in that window. Passing the resolved path narrows this considerably — every
-  component was a real directory at validation time — but it cannot be closed
-  while podman takes a path rather than a file descriptor.
+- **Mount source races.** Project mounts are handed to podman as a path, which
+  podman resolves again when it performs the mount. Two rules close that window
+  for the containers the orchestrator manages: every component must be a real
+  directory (a symlink component is refused), and a new mount is refused while
+  another container holds a read-write mount that is a strict ancestor of it, so
+  no container's agent has write access to a directory on the new path. The
+  check and the create are serialized, and a container reused through the
+  control API has its stored paths re-checked against the current filesystem. A
+  host user with write access to the projects root, or to the podman socket, is
+  outside this boundary.
 - **The guest agent runs as root inside its container.** The generated workspace
   images declare no unprivileged user. Container-level isolation, not
   in-container privilege separation, is what keeps a workspace contained.

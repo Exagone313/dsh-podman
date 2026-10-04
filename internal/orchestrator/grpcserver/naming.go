@@ -67,6 +67,10 @@ func validContainerName(name string) bool {
 	return name != "" && name != "default" && containerLogicalName.MatchString(name)
 }
 
+// containerNamePrefix is the prefix of every podman resource the orchestrator
+// creates: a pod is dsh-podman-<slug> and a container dsh-podman-<slug>-<name>.
+const containerNamePrefix = "dsh-podman-"
+
 // podmanContainerName derives the podman container name for a workspace's
 // logical container: dsh-podman-<slug>-<logical>, where the "default"/"" logical
 // name is "default".
@@ -74,13 +78,13 @@ func podmanContainerName(slug, logical string) string {
 	if logical == "" {
 		logical = "default"
 	}
-	return "dsh-podman-" + slug + "-" + logical
+	return containerNamePrefix + slug + "-" + logical
 }
 
 // podNameFor derives the podman pod name for a workspace. All containers of a
 // workspace live in this pod, sharing its network namespace.
 func podNameFor(slug string) string {
-	return "dsh-podman-" + slug
+	return containerNamePrefix + slug
 }
 
 // containerByLogical returns the container record for the given logical name.

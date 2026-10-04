@@ -263,6 +263,15 @@ func (s *Server) CreateWorkspace(ctx context.Context, request *ctl.CreateWorkspa
 		return nil, status.Error(codes.NotFound, fmt.Sprintf("image %q not found", imageID))
 	}
 	name := podmanContainerName(request.GetWorkspaceSlug(), "default")
+	// The conflict check and the create it guards must be atomic. It excludes
+	// the name being created (an untracked container with that name is removed
+	// below), and runs before that removal so a refused create changes nothing.
+	unlock := s.lockProjectMounts()
+	defer unlock()
+	if err := s.checkProjectMountConflicts(podmanMounts, name); err != nil {
+		s.log().Warn("control request failed", "method", "CreateWorkspace", "workspace_slug", request.GetWorkspaceSlug(), "reason", "project mount conflict", "error", err)
+		return nil, err
+	}
 	// A stored default container whose podman container still exists means the
 	// workspace is already created; report that clearly instead of letting
 	// podman fail with a duplicate-name error. A container without a stored
@@ -285,6 +294,9 @@ func (s *Server) CreateWorkspace(ctx context.Context, request *ctl.CreateWorkspa
 	}
 	if err := s.Podman.CreateWorkspace(podNameFor(request.GetWorkspaceSlug()), name, imageTag, secret, podmanMounts, secrets, envSecrets, userEnv, defaultPaths); err != nil {
 		s.log().Error("control request failed", "method", "CreateWorkspace", "workspace_slug", request.GetWorkspaceSlug(), "error", err)
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	if err := s.confirmContainerExists(name); err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 	agentSocket := filepath.Join(s.SocketsRoot, name, "guest.sock")

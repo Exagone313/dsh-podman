@@ -263,8 +263,10 @@ func TestResolveMountSymlinkedRoot(t *testing.T) {
 }
 
 // TestResolveMountSymlinks covers the symlinks a writable project can contain.
-// Links leaving the projects root must be refused; links staying inside it
-// resolve, since mounting another project directory is supported.
+// Every symlink component is refused, whether it leaves the projects root or
+// stays inside it: the mount conflict check compares lexical project paths, so
+// a path that resolves elsewhere would make that comparison unsound. The
+// projects root itself may still be a symlink (see TestResolveMountSymlinkedRoot).
 func TestResolveMountSymlinks(t *testing.T) {
 	root := tempRoot(t)
 	outside := tempRoot(t)
@@ -284,34 +286,29 @@ func TestResolveMountSymlinks(t *testing.T) {
 		"team/inside":   filepath.Join("..", "other", "shared"),
 		"team/absolute": filepath.Join(root, "other", "shared"),
 		"team/loop":     filepath.Join(root, "team", "loop"),
+		"team/mid":      filepath.Join("..", "other"),
+		"team/self":     ".",
 	}
 	for name, target := range links {
 		if err := os.Symlink(target, filepath.Join(root, filepath.FromSlash(name))); err != nil {
 			t.Fatal(err)
 		}
 	}
-	// "absolute" points inside the projects root but through an absolute
-	// target. Resolution is confined with openat2(RESOLVE_BENEATH), which
-	// refuses absolute symlinks outright, so it is rejected too: that is the
-	// shape a planted link takes, and naming the other project directly is
-	// the supported way to mount it.
+	// Escaping links (including absolute targets) are refused by the confined
+	// resolution before the symlink walk sees them.
 	for _, path := range []string{"escape", "slash", "loop", "absolute"} {
 		if _, _, err := resolveMount(root, hostRoot, state.Mount{ProjectName: "team/" + path}); err == nil {
 			t.Errorf("accepted symlinked project path %q", path)
 		}
 	}
-	// A relative symlink that stays inside the projects root resolves to its
-	// target, and the host source is re-expressed against the host root.
-	host, dest, err := resolveMount(root, hostRoot, state.Mount{ProjectName: "team/inside"})
-	if err != nil {
-		t.Fatalf("rejected an internal symlink: %v", err)
-	}
-	if host != filepath.Join(hostRoot, "other", "shared") {
-		t.Errorf("host source not resolved: %q", host)
-	}
-	// The container-side path keeps the requested shape.
-	if dest != filepath.Join(root, "team", "inside") {
-		t.Errorf("destination should mirror the request: %q", dest)
+	// Links that stay inside the root resolve successfully under the confined
+	// lookup, so they are the ones the no-symlink walk must name.
+	for _, path := range []string{"inside", "mid/shared", "self"} {
+		if _, _, err := resolveMount(root, hostRoot, state.Mount{ProjectName: "team/" + path}); err == nil {
+			t.Errorf("accepted symlinked project path %q", path)
+		} else if !strings.Contains(err.Error(), "symlink") {
+			t.Errorf("rejection for %q should name the symlink, got %v", path, err)
+		}
 	}
 	// A symlinked project entry is refused the same way.
 	if err := os.Symlink(filepath.Join(outside, "secrets"), filepath.Join(root, "linked")); err != nil {

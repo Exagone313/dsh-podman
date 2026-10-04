@@ -355,6 +355,58 @@ func (c *Client) ContainerAgentState(name string) (stale bool, token string, err
 	return true, token, nil
 }
 
+// ListContainerWriteMounts returns, for every container whose podman name
+// starts with namePrefix, running or stopped, the host source paths of its
+// read-write bind mounts, keyed by podman name.
+//
+// It is the orchestrator's view of which containers could rewrite a project
+// path: a read-only bind cannot be written by the container's own processes, so
+// only read-write binds matter to the project-mount conflict check. Untracked
+// containers are included, so a leftover from a failed create is seen too.
+func (c *Client) ListContainerWriteMounts(namePrefix string) (map[string][]string, error) {
+	ctx, cancel := c.lookupContext()
+	defer cancel()
+	all := true
+	listed, err := containers.List(ctx, &containers.ListOptions{All: &all})
+	if err != nil {
+		c.log().Error("guest container list failed", "error", err)
+		return nil, err
+	}
+	result := make(map[string][]string)
+	for _, container := range listed {
+		if container.IsInfra {
+			continue
+		}
+		name := ""
+		for _, candidate := range container.Names {
+			if strings.HasPrefix(candidate, namePrefix) {
+				name = candidate
+				break
+			}
+		}
+		if name == "" {
+			continue
+		}
+		inspect, err := containers.Inspect(ctx, name, nil)
+		if err != nil {
+			// A container removed between the list and the inspect cannot mount
+			// anything, so it is skipped; any other lookup failure is real.
+			exists, existsErr := containers.Exists(ctx, name, nil)
+			if existsErr == nil && !exists {
+				continue
+			}
+			c.log().Error("guest container inspect failed", "container_name", name, "error", err)
+			return nil, err
+		}
+		for _, mount := range inspect.Mounts {
+			if mount.Type == "bind" && mount.RW {
+				result[name] = append(result[name], mount.Source)
+			}
+		}
+	}
+	return result, nil
+}
+
 func boolPtr(value bool) *bool {
 	return &value
 }

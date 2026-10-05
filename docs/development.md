@@ -41,6 +41,8 @@ make test-go        # go test with the build tags
 make test           # test-go + pnpm test (JS tests, which run against dist/)
 make fmt            # gofmt -s + deno fmt (TypeScript and Markdown)
 make fmt-check      # verify the formatting without rewriting anything
+make proto          # regenerate the protobuf Go bindings with buf
+make proto-check    # buf lint + buf breaking + check the committed bindings are current
 make download-licenses  # generate third-party-licenses.pkg from the project and third-party Go licenses
 make image          # build the orchestrator, guest-agent and dsh container images
 ```
@@ -60,15 +62,15 @@ have run first (the `test` target handles this).
 
 The `.proto` sources live in `proto/`; the generated Go bindings in
 `internal/genproto/` are committed. After changing a `.proto`, regenerate them
-with Buf (`buf generate`), which must be installed separately (it has no `make`
-target) — pin it with `go install github.com/bufbuild/buf/cmd/buf@v1.73.0`.
-Commit the `.proto` change together with the regenerated Go bindings.
+with `make proto`, which runs `buf generate`; Buf must be installed separately —
+pin it with `go install github.com/bufbuild/buf/cmd/buf@v1.73.0`. Commit the
+`.proto` change together with the regenerated Go bindings.
 
 The JS side loads the raw `.proto` files at runtime via `@grpc/proto-loader`
 (copied to `dist/grpc/proto/` at build time); no TypeScript bindings are
-generated. CI runs `buf lint`, `buf breaking` against the latest release tag,
-and `buf generate`, and fails when the committed bindings differ from the
-regenerated ones.
+generated. `make proto-check`, which CI runs, lints the schema, runs
+`buf breaking` against the latest release tag, and fails when the committed
+bindings differ from the regenerated ones.
 
 ## Naming
 

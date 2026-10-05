@@ -16,6 +16,8 @@ exclude_graphdriver_devicemapper`).
   check first)
 - `make fmt` / `make fmt-check` — format / verify Go, TypeScript and Markdown
 - `make test` — Go tests + pnpm tests
+- `make proto` / `make proto-check` — regenerate / verify the protobuf Go
+  bindings (needs `buf`, pinned in `docs/development.md`)
 
 `pnpm test` runs against `dist/`, so run `pnpm build` first (or `make test`).
 
@@ -48,6 +50,8 @@ Markdown and TypeScript share one formatter — `deno fmt`, configured by
   `make vet` and the `go` CI job fail on an unformatted file. `third_party/` is
   an upstream replacement module (`replace` in `go.mod`) left as published.
 - Prefer implementing with subagents when possible.
+- After changing a `.proto`, run `make proto` and commit the regenerated
+  `internal/genproto/` in the same commit; CI fails on stale bindings.
 - Name proto fields in `lower_snake_case` and read them in TypeScript through
   proto-loader's camelCase projection (`secret_env` → `secretEnv`); never spell
   a proto field in snake_case in TS, because proto-loader silently drops unknown

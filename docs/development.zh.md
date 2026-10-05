@@ -41,6 +41,8 @@ make test-go        # go test with the build tags
 make test           # test-go + pnpm test (JS tests, which run against dist/)
 make fmt            # gofmt -s + deno fmt (TypeScript and Markdown)
 make fmt-check      # verify the formatting without rewriting anything
+make proto          # regenerate the protobuf Go bindings with buf
+make proto-check    # buf lint + buf breaking + check the committed bindings are current
 make download-licenses  # generate third-party-licenses.pkg from the project and third-party Go licenses
 make image          # build the orchestrator, guest-agent and dsh container images
 ```
@@ -59,15 +61,15 @@ orchestrator 和 guest-agent 镜像，位于
 ## Protobuf
 
 `.proto` 源文件位于 `proto/`；生成的 Go 绑定位于
-`internal/genproto/`，会被提交。修改 `.proto` 后，需要使用单独安装的
-Buf（`buf generate`）重新生成（没有对应的 `make` 目标）——请用
+`internal/genproto/`，会被提交。修改 `.proto` 后，请用 `make proto`（即运行
+`buf generate`）重新生成。Buf 需单独安装——请用
 `go install github.com/bufbuild/buf/cmd/buf@v1.73.0` 固定版本。请将 `.proto`
 改动与重新生成的 Go 绑定一起提交。
 
 JS 端在运行时通过 `@grpc/proto-loader` 加载原始 `.proto` 文件（构建时复制到
-`dist/grpc/proto/`）；不生成 TypeScript 绑定。CI 会运行
-`buf lint`、针对最新发布标签的 `buf breaking` 以及
-`buf generate`，若已提交的绑定与重新生成的结果不一致则失败。
+`dist/grpc/proto/`）；不生成 TypeScript 绑定。CI 运行的 `make proto-check`
+会校验 schema、针对最新发布标签运行
+`buf breaking`，若已提交的绑定与重新生成的结果不一致则失败。
 
 ## 命名
 

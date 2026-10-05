@@ -5,6 +5,7 @@
 GO ?= go
 GOFMT ?= gofmt
 DENO ?= deno
+BUF ?= buf
 GO_BUILD_TAGS = containers_image_openpgp exclude_graphdriver_btrfs exclude_graphdriver_devicemapper
 GO_BUILD_FLAGS = -tags "$(GO_BUILD_TAGS)"
 GOOS ?= linux
@@ -31,7 +32,7 @@ GOFMT_SOURCES := $(shell find cmd internal scripts -type f -name '*.go' -print)
 TS_SOURCES = "src/**/*.ts" "src/**/*.tsx" "scripts/**/*.mjs"
 MD_SOURCES = "**/*.md"
 
-.PHONY: all build build-go vet test test-go fmt fmt-go fmt-ts fmt-md fmt-check fmt-check-go fmt-check-ts fmt-check-md image image-orchestrator image-guestagent image-dsh download-licenses pnpm-install pnpm-build pnpm-test pnpm-prune clean
+.PHONY: all build build-go vet test test-go fmt fmt-go fmt-ts fmt-md fmt-check fmt-check-go fmt-check-ts fmt-check-md image image-orchestrator image-guestagent image-dsh download-licenses pnpm-install pnpm-build pnpm-test pnpm-prune clean proto proto-check
 
 all: build
 
@@ -103,6 +104,22 @@ $(BIN_DIR)/$(GOOS)-$(GOARCH)/dsh-podman-guest-agent: $(GO_SOURCES) go.mod go.sum
 $(BIN_DIR)/$(GOOS)-$(GOARCH)/dsh-podman-orchestrator: $(GO_SOURCES) go.mod go.sum
 	mkdir -p $(BIN_DIR)/$(GOOS)-$(GOARCH)
 	CGO_ENABLED=0 GOOS=$(GOOS) GOARCH=$(GOARCH) $(GO) build $(GO_BUILD_FLAGS) $(GO_LDFLAGS) -o $(BIN_DIR)/$(GOOS)-$(GOARCH)/dsh-podman-orchestrator ./cmd/dsh-podman-orchestrator
+
+# Protobuf. proto regenerates internal/genproto with the plugins pinned in
+# buf.gen.yaml; proto-check is what CI runs: lint, no breaking change since the
+# latest release tag, and committed bindings matching a fresh generation.
+proto:
+	$(BUF) generate
+
+proto-check:
+	$(BUF) lint
+	$(BUF) breaking --against ".git#tag=$$(git describe --tags --abbrev=0)"
+	$(BUF) generate
+	@if [ -n "$$(git status --porcelain -- internal/genproto)" ]; then \
+		git status --short -- internal/genproto >&2; \
+		printf "internal/genproto is out of date: run 'make proto' and commit the result\n" >&2; \
+		exit 1; \
+	fi
 
 pnpm-install:
 	pnpm install --frozen-lockfile

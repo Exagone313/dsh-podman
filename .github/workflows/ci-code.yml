@@ -90,21 +90,8 @@ jobs:
         run: |
           go install github.com/bufbuild/buf/cmd/buf@v1.73.0
           echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
-      - name: Lint
-        run: buf lint
-      - name: Check for breaking changes
-        run: |
-          tag="$(git describe --tags --abbrev=0)"
-          buf breaking --against ".git#tag=$tag"
-      - name: Check the generated bindings are current
-        run: |
-          buf generate
-          if [ -n "$(git status --porcelain -- internal/genproto)" ]; then
-            git status --short -- internal/genproto
-            git diff -- internal/genproto
-            echo "::error::internal/genproto is out of date: run 'buf generate' and commit the result"
-            exit 1
-          fi
+      - name: Check the schema and the generated bindings
+        run: make proto-check
 
   js:
     name: JS plugin

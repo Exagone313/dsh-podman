@@ -37,6 +37,8 @@
   },
   "files": [
     "dist",
+    "!dist/**/*.test.*",
+    "!dist/**/*test-support.*",
     "docs",
     "locale/*.json",
     "quadlet",

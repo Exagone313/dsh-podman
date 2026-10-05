@@ -544,7 +544,13 @@ func (f *fakePodman) RecreateWorkspace(pod, name, image, token string, mounts []
 	return f.CreateWorkspace(pod, name, image, token, mounts, secrets, envSecrets, env, paths)
 }
 
-func (f *fakePodman) Stop(name string) error { f.running[name] = false; return nil }
+func (f *fakePodman) Stop(name string) error {
+	if f.onStop != nil {
+		f.onStop(name)
+	}
+	f.running[name] = false
+	return nil
+}
 
 func TestStartContainerRequiresPodman(t *testing.T) {
 	store := newTestStore(t)

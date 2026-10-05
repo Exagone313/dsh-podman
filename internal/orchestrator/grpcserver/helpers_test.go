@@ -78,15 +78,20 @@ type fakePodman struct {
 	images map[string]bool
 	// pulled records every image name ImagePull was asked to pull.
 	pulled []string
-	// writeMounts is the read-write bind-mount map ListContainerWriteMounts
-	// serves, keyed by podman name. It is seeded directly by tests that need an
-	// existing conflicting mount; creates do not record into it, so tests that
-	// only exercise creation see no conflicts.
+	// writeMounts and readMounts are the read-write and read-only bind-mount
+	// maps ListContainerBindMounts serves, keyed by podman name. They are
+	// seeded directly by tests that need an existing conflicting mount; creates
+	// do not record into them, so tests that only exercise creation see no
+	// conflicts.
 	writeMounts map[string][]string
+	readMounts  map[string][]string
+	// onStop, when set, runs as Stop is called: it stands in for what the
+	// stopping container's processes did last.
+	onStop func(name string)
 }
 
 func newFakePodman() *fakePodman {
-	return &fakePodman{exists: map[string]bool{}, running: map[string]bool{}, agentStale: map[string]bool{}, agentToken: map[string]string{}, secretMissing: map[string]bool{}, writeMounts: map[string][]string{}}
+	return &fakePodman{exists: map[string]bool{}, running: map[string]bool{}, agentStale: map[string]bool{}, agentToken: map[string]string{}, secretMissing: map[string]bool{}, writeMounts: map[string][]string{}, readMounts: map[string][]string{}}
 }
 
 const (

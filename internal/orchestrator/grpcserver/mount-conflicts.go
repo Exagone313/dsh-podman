@@ -7,50 +7,70 @@ package grpcserver
 import (
 	"fmt"
 
+	"github.com/Exagone313/dsh-podman/internal/orchestrator/state"
 	"github.com/opencontainers/runtime-spec/specs-go"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
 
-// bindSources returns the host source paths of the bind mounts in mounts.
-// podmanMounts emits a bind mount only for a project mount, so these are the
-// project directories the container would reach.
-func bindSources(mounts []specs.Mount) []string {
-	var sources []string
+// projectBinds returns the bind mounts in mounts. podmanMounts emits a bind
+// mount only for a project mount, so these are the project directories the
+// container would reach.
+func projectBinds(mounts []specs.Mount) []specs.Mount {
+	var binds []specs.Mount
 	for _, mount := range mounts {
 		if mount.Type == "bind" {
-			sources = append(sources, mount.Source)
+			binds = append(binds, mount)
 		}
 	}
-	return sources
+	return binds
 }
 
-// checkProjectMountConflicts refuses a new container when an existing
-// orchestrator container holds a read-write mount that is a strict ancestor of
-// one of its project mounts.
+// bindReadWrite reports whether a bind mount is mounted read-write.
+func bindReadWrite(mount specs.Mount) bool {
+	for _, option := range mount.Options {
+		if option == "rw" {
+			return true
+		}
+	}
+	return false
+}
+
+// checkProjectMountConflicts refuses a new container when one of its project
+// mounts and a project mount of an existing orchestrator container are nested,
+// and the outer one of the pair is read-write. It applies in both directions:
+// the existing container's read-write mount may be the outer one, or the new
+// container's.
 //
-// Podman takes a path, not a file descriptor, and resolves it again when it
-// performs the mount. A container with a read-write mount at an ancestor of a
-// new mount path can therefore rename the next component of that path to a
-// symlink between validation and podman's resolution, redirecting the new
-// mount. A read-only mount cannot be written by the container's own processes,
-// so it is safe; a mount at the new path itself, or below it, cannot rename an
-// ancestor of its own root, so it is safe too. Only the read-write strict
-// ancestor is refused.
+// Podman takes a path, not a file descriptor, and resolves it again whenever it
+// performs the mount: on this create, and on every later start, including the
+// restarts its restart policy performs on its own. A container with a
+// read-write mount at a strict ancestor of another container's mount path can
+// rename the next component of that path to a symlink before podman resolves
+// it, redirecting the inner mount. Refusing the pair whichever container comes
+// first keeps the invariant that no container can write above another
+// container's mount, so neither this create nor a later restart of either
+// container can be redirected. A read-only outer mount cannot be written by the
+// container's own processes, so it is safe; equal mounts cannot rename their
+// own root, so they are safe too.
 //
 // excludePodmanName is the container being created or replaced: its own mounts
-// must not conflict with themselves. The caller holds lockProjectMounts, so the
-// check and the create it guards cannot interleave with another create.
+// must not conflict with themselves. Until it stops, though, its processes can
+// still write to its read-write mounts, so the caller stops it and resolves the
+// mounts again (podmanMounts) before creating: a component swapped for a
+// symlink before the stop is caught there, and after it no running container
+// can write above the new mounts. The caller holds lockProjectMounts,
+// so the check and the create it guards cannot interleave with another create.
 func (s *Server) checkProjectMountConflicts(mounts []specs.Mount, excludePodmanName string) error {
-	projectSources := bindSources(mounts)
-	if len(projectSources) == 0 {
+	projects := projectBinds(mounts)
+	if len(projects) == 0 {
 		return nil
 	}
-	existing, err := s.Podman.ListContainerWriteMounts(containerNamePrefix)
+	existing, err := s.Podman.ListContainerBindMounts(containerNamePrefix)
 	if err != nil {
 		return grpcError(err)
 	}
-	for name, sources := range existing {
+	for name, binds := range existing {
 		if name == excludePodmanName {
 			continue
 		}
@@ -60,13 +80,30 @@ func (s *Server) checkProjectMountConflicts(mounts []specs.Mount, excludePodmanN
 		if !ok {
 			continue
 		}
-		for _, source := range sources {
-			for _, project := range projectSources {
-				if pathsStrictAncestor(source, project) {
-					return status.Error(codes.FailedPrecondition, fmt.Sprintf("project mount %q is inside the read-write mount %q of container %q in workspace %q; stop that container or mount a disjoint project", project, source, logical, slug))
+		for _, bind := range binds {
+			for _, project := range projects {
+				if bindReadWrite(bind) && pathsStrictAncestor(bind.Source, project.Source) {
+					return status.Error(codes.FailedPrecondition, fmt.Sprintf("project mount %q is inside the read-write mount %q of container %q in workspace %q; stop that container or mount a disjoint project", project.Source, bind.Source, logical, slug))
+				}
+				if bindReadWrite(project) && pathsStrictAncestor(project.Source, bind.Source) {
+					return status.Error(codes.FailedPrecondition, fmt.Sprintf("read-write project mount %q contains the mount %q of container %q in workspace %q; mount it read-only, remove that container, or mount a disjoint project", project.Source, bind.Source, logical, slug))
 				}
 			}
 		}
 	}
 	return nil
+}
+
+// checkExistingMountConflicts runs checkProjectMountConflicts for a container
+// that already exists, against every other orchestrator container. It holds
+// the project-mount lock only for the check, so it may be called under a
+// per-container lock.
+func (s *Server) checkExistingMountConflicts(workspace state.Workspace, record state.Container) error {
+	mounts, err := s.podmanMounts(containerMounts(workspace, record))
+	if err != nil {
+		return err
+	}
+	unlock := s.lockProjectMounts()
+	defer unlock()
+	return s.checkProjectMountConflicts(mounts, record.PodmanName)
 }

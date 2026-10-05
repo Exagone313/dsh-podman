@@ -18,13 +18,19 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-// ListContainerWriteMounts serves the seeded read-write bind mounts, filtered
-// by name prefix, mirroring the real client's list-and-inspect shape.
-func (f *fakePodman) ListContainerWriteMounts(namePrefix string) (map[string][]string, error) {
-	result := map[string][]string{}
-	for name, sources := range f.writeMounts {
-		if strings.HasPrefix(name, namePrefix) {
-			result[name] = append([]string(nil), sources...)
+// ListContainerBindMounts serves the seeded bind mounts, read-write ones from
+// writeMounts and read-only ones from readMounts, filtered by name prefix,
+// mirroring the real client's list-and-inspect shape.
+func (f *fakePodman) ListContainerBindMounts(namePrefix string) (map[string][]specs.Mount, error) {
+	result := map[string][]specs.Mount{}
+	for mode, seeded := range map[string]map[string][]string{"rw": f.writeMounts, "ro": f.readMounts} {
+		for name, sources := range seeded {
+			if !strings.HasPrefix(name, namePrefix) {
+				continue
+			}
+			for _, source := range sources {
+				result[name] = append(result[name], specs.Mount{Type: "bind", Source: source, Destination: source, Options: []string{mode}})
+			}
 		}
 	}
 	return result, nil
@@ -279,4 +285,163 @@ func TestMountMutationsReportConflicts(t *testing.T) {
 		})
 		assertConflict(t, err)
 	})
+}
+
+// TestCheckProjectMountConflictsBothDirections pins the reverse direction: a
+// new read-write mount that contains another container's mount, read-write or
+// read-only, is refused, because podman resolves that inner path again on
+// every start of the other container. A read-only new mount cannot rewrite the
+// inner path, so it is allowed.
+func TestCheckProjectMountConflictsBothDirections(t *testing.T) {
+	const slug = "11111111-1111-1111-1111-111111111111"
+	other := "dsh-podman-" + slug + "-other"
+	cases := []struct {
+		name    string
+		mode    string
+		write   map[string][]string
+		read    map[string][]string
+		wantErr bool
+	}{
+		{"read-write mount over a read-write descendant is refused", "rw", map[string][]string{other: {"/projects/team/src"}}, nil, true},
+		{"read-write mount over a read-only descendant is refused", "rw", nil, map[string][]string{other: {"/projects/team/src"}}, true},
+		{"read-only mount over a descendant is allowed", "ro", map[string][]string{other: {"/projects/team/src"}}, nil, false},
+		{"read-write equal mount is allowed", "rw", map[string][]string{other: {"/projects/team"}}, nil, false},
+		{"read-write disjoint mount is allowed", "rw", map[string][]string{other: {"/projects/teammate"}}, nil, false},
+		{"read-only ancestor is allowed", "rw", nil, map[string][]string{other: {"/projects"}}, false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			podman := newFakePodman()
+			for name, sources := range tc.write {
+				podman.writeMounts[name] = sources
+			}
+			for name, sources := range tc.read {
+				podman.readMounts[name] = sources
+			}
+			server := &Server{Podman: podman, Logger: silentLogger()}
+			newMounts := []specs.Mount{{Type: "bind", Source: "/projects/team", Destination: "/projects/team", Options: []string{tc.mode}}}
+			err := server.checkProjectMountConflicts(newMounts, "")
+			if tc.wantErr {
+				if status.Code(err) != codes.FailedPrecondition {
+					t.Fatalf("expected FailedPrecondition, got %v", err)
+				}
+				if strings.Contains(err.Error(), containerNamePrefix) {
+					t.Fatalf("conflict must not leak the podman name: %v", err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected conflict: %v", err)
+			}
+		})
+	}
+}
+
+// swapToSymlinkOnStop makes the fake's Stop replace rel under root with a
+// symlink to a sibling directory, standing in for a container that swaps a
+// path component in its last moments before it is stopped.
+func swapToSymlinkOnStop(t *testing.T, fake *fakePodman, root, rel string) {
+	t.Helper()
+	fake.onStop = func(string) {
+		if err := os.MkdirAll(filepath.Join(root, "elsewhere"), 0755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.RemoveAll(filepath.Join(root, rel)); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Symlink(filepath.Join(root, "elsewhere"), filepath.Join(root, rel)); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
+// selfNestedFixture returns a server whose "dev" container holds team
+// read-write and team/src, and is running.
+func selfNestedFixture(t *testing.T) (*Server, *fakePodman, string) {
+	t.Helper()
+	root := tempRoot(t)
+	if err := os.MkdirAll(filepath.Join(root, "team", "src"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	store := newTestStore(t)
+	if err := store.SaveImages([]state.Image{{ImageID: "arch", ImageTag: "localhost/dsh-podman/arch:latest"}}); err != nil {
+		t.Fatal(err)
+	}
+	dev := containerNamePrefix + testWorkspaceSlug + "-dev"
+	mounts := []state.Mount{{ProjectName: "team", Mode: "read_write"}, {ProjectName: "team/src", Mode: "read_write"}}
+	if err := store.SaveWorkspaces([]state.Workspace{{
+		WorkspaceSlug: testWorkspaceSlug,
+		ProjectName:   "team",
+		Containers:    []state.Container{{Name: "dev", PodmanName: dev, ImageID: "arch", Status: "running", AgentToken: "tok", Mounts: mounts}},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	fake := newFakePodman()
+	fake.exists[dev] = true
+	fake.running[dev] = true
+	fake.writeMounts[dev] = []string{filepath.Join(root, "team"), filepath.Join(root, "team", "src")}
+	return &Server{Store: store, Podman: fake, ProjectsRoot: root, Logger: silentLogger()}, fake, root
+}
+
+// TestRecreateRevalidatesAfterStop pins the self-exclusion case: the container
+// being recreated is excluded from the conflict check, so a path component it
+// swaps before it stops must be caught by resolving the mounts again after the
+// stop, and nothing is created on the swapped path.
+func TestRecreateRevalidatesAfterStop(t *testing.T) {
+	server, fake, root := selfNestedFixture(t)
+	swapToSymlinkOnStop(t, fake, root, filepath.Join("team", "src"))
+	_, err := server.RecreateContainer(context.Background(), &ctl.RecreateContainerRequest{WorkspaceSlug: testWorkspaceSlug, Container: "dev"})
+	if status.Code(err) != codes.InvalidArgument {
+		t.Fatalf("expected the swapped path to be refused, got %v", err)
+	}
+	if len(fake.created) != 0 {
+		t.Fatalf("nothing may be created on a swapped path: %v", fake.created)
+	}
+}
+
+// TestStartContainerRevalidatesAfterStop pins the same for a replacing start.
+func TestStartContainerRevalidatesAfterStop(t *testing.T) {
+	server, fake, root := selfNestedFixture(t)
+	swapToSymlinkOnStop(t, fake, root, filepath.Join("team", "src"))
+	_, err := server.StartContainer(context.Background(), &ctl.StartContainerRequest{WorkspaceSlug: testWorkspaceSlug, Container: "dev", ImageId: "arch"})
+	if status.Code(err) != codes.InvalidArgument {
+		t.Fatalf("expected the swapped path to be refused, got %v", err)
+	}
+	if len(fake.created) != 0 {
+		t.Fatalf("nothing may be created on a swapped path: %v", fake.created)
+	}
+}
+
+// TestEnsureContainerRefusesANestedPair pins that a running container left
+// nested under another container's read-write mount (created before the check
+// was two-way) is not handed out.
+func TestEnsureContainerRefusesANestedPair(t *testing.T) {
+	root := tempRoot(t)
+	if err := os.MkdirAll(filepath.Join(root, "team", "app"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	store := newTestStore(t)
+	if err := store.SaveImages([]state.Image{{ImageID: "arch", ImageTag: "localhost/dsh-podman/arch:latest"}}); err != nil {
+		t.Fatal(err)
+	}
+	mounts := []state.Mount{{ProjectName: "team/app", Mode: "read_write"}}
+	if err := store.SaveWorkspaces([]state.Workspace{{
+		WorkspaceSlug: testWorkspaceSlug,
+		ProjectName:   "team/app",
+		ContainerName: testDefaultContainer,
+		Mounts:        mounts,
+		Containers:    []state.Container{{Name: "default", PodmanName: testDefaultContainer, ImageID: "arch", Status: "running", AgentToken: "tok", Mounts: mounts}},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	fake := newFakePodman()
+	fake.exists[testDefaultContainer] = true
+	fake.running[testDefaultContainer] = true
+	fake.agentToken[testDefaultContainer] = "tok"
+	fake.writeMounts[containerNamePrefix+"11111111-1111-1111-1111-111111111111-default"] = []string{filepath.Join(root, "team")}
+	server := &Server{Store: store, Podman: fake, ProjectsRoot: root, Logger: silentLogger()}
+	_, err := server.EnsureContainer(context.Background(), &ctl.EnsureContainerRequest{WorkspaceSlug: testWorkspaceSlug})
+	if status.Code(err) != codes.FailedPrecondition {
+		t.Fatalf("expected FailedPrecondition, got %v", err)
+	}
 }

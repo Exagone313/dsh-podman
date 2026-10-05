@@ -355,15 +355,17 @@ func (c *Client) ContainerAgentState(name string) (stale bool, token string, err
 	return true, token, nil
 }
 
-// ListContainerWriteMounts returns, for every container whose podman name
-// starts with namePrefix, running or stopped, the host source paths of its
-// read-write bind mounts, keyed by podman name.
+// ListContainerBindMounts returns, for every container whose podman name starts
+// with namePrefix, running or stopped, its bind mounts keyed by podman name:
+// the host source path, with an "rw" or "ro" option.
 //
 // It is the orchestrator's view of which containers could rewrite a project
-// path: a read-only bind cannot be written by the container's own processes, so
-// only read-write binds matter to the project-mount conflict check. Untracked
-// containers are included, so a leftover from a failed create is seen too.
-func (c *Client) ListContainerWriteMounts(namePrefix string) (map[string][]string, error) {
+// path (their read-write binds) and of which paths podman will resolve again
+// when a container starts (all binds), both of which the project-mount
+// conflict check compares against. Stopped containers are included because
+// podman restarts them on its own; untracked containers are included, so a
+// leftover from a failed create is seen too.
+func (c *Client) ListContainerBindMounts(namePrefix string) (map[string][]specs.Mount, error) {
 	ctx, cancel := c.lookupContext()
 	defer cancel()
 	all := true
@@ -372,7 +374,7 @@ func (c *Client) ListContainerWriteMounts(namePrefix string) (map[string][]strin
 		c.log().Error("guest container list failed", "error", err)
 		return nil, err
 	}
-	result := make(map[string][]string)
+	result := make(map[string][]specs.Mount)
 	for _, container := range listed {
 		if container.IsInfra {
 			continue
@@ -399,9 +401,14 @@ func (c *Client) ListContainerWriteMounts(namePrefix string) (map[string][]strin
 			return nil, err
 		}
 		for _, mount := range inspect.Mounts {
-			if mount.Type == "bind" && mount.RW {
-				result[name] = append(result[name], mount.Source)
+			if mount.Type != "bind" {
+				continue
 			}
+			mode := "ro"
+			if mount.RW {
+				mode = "rw"
+			}
+			result[name] = append(result[name], specs.Mount{Type: "bind", Source: mount.Source, Destination: mount.Destination, Options: []string{mode}})
 		}
 	}
 	return result, nil

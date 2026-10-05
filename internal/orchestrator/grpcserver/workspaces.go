@@ -265,7 +265,8 @@ func (s *Server) CreateWorkspace(ctx context.Context, request *ctl.CreateWorkspa
 	name := podmanContainerName(request.GetWorkspaceSlug(), "default")
 	// The conflict check and the create it guards must be atomic. It excludes
 	// the name being created (an untracked container with that name is removed
-	// below), and runs before that removal so a refused create changes nothing.
+	// below, and the mounts resolved again once it is gone), and runs before
+	// that removal so a refused create changes nothing.
 	unlock := s.lockProjectMounts()
 	defer unlock()
 	if err := s.checkProjectMountConflicts(podmanMounts, name); err != nil {
@@ -291,6 +292,14 @@ func (s *Server) CreateWorkspace(ctx context.Context, request *ctl.CreateWorkspa
 		if removeErr := s.Podman.Remove(name); removeErr != nil {
 			return nil, status.Error(codes.Internal, removeErr.Error())
 		}
+		// The conflict check excluded the untracked container, which could
+		// write to its mounts until it was removed: resolve the mounts again
+		// now that it is gone.
+		resolved, resolveErr := s.podmanMounts(defaultMounts)
+		if resolveErr != nil {
+			return nil, resolveErr
+		}
+		podmanMounts = resolved
 	}
 	if err := s.Podman.CreateWorkspace(podNameFor(request.GetWorkspaceSlug()), name, imageTag, secret, podmanMounts, secrets, envSecrets, userEnv, defaultPaths); err != nil {
 		s.log().Error("control request failed", "method", "CreateWorkspace", "workspace_slug", request.GetWorkspaceSlug(), "error", err)

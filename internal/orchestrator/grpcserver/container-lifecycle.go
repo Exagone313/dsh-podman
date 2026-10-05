@@ -87,6 +87,23 @@ func (s *Server) recreateContainer(ctx context.Context, workspace state.Workspac
 		return err
 	}
 	s.stopContainerDaemons(ctx, *record)
+	// The check excludes this container, whose processes can write to its own
+	// read-write mounts until it stops. Stop it, then resolve the mounts again,
+	// so a component it swapped for a symlink before stopping is refused
+	// rather than mounted. A refusal here leaves the container stopped.
+	exists, err := s.Podman.ContainerExists(record.PodmanName)
+	if err != nil {
+		return err
+	}
+	if exists {
+		if err := s.Podman.Stop(record.PodmanName); err != nil {
+			return err
+		}
+	}
+	podmanMounts, err = s.podmanMounts(containerMounts(workspace, *record))
+	if err != nil {
+		return err
+	}
 	if err := s.Podman.RecreateWorkspace(podNameFor(workspace.WorkspaceSlug), record.PodmanName, imageTag, newToken, podmanMounts, secrets, envSecrets, env, record.Paths); err != nil {
 		return err
 	}
@@ -242,6 +259,13 @@ func (s *Server) EnsureContainer(ctx context.Context, request *ctl.EnsureContain
 		}
 	}
 	if usable {
+		// A container created before the conflict check was two-way may sit
+		// nested with another container's mount. Podman restarts either on its
+		// own, so refuse to hand it out until the pair is resolved.
+		if conflictErr := s.checkExistingMountConflicts(workspace, *record); conflictErr != nil {
+			s.log().Warn("control request failed", "method", "EnsureContainer", "workspace_slug", workspace.WorkspaceSlug, "container", container, "reason", "project mount conflict", "error", conflictErr)
+			return nil, conflictErr
+		}
 		s.log().Info("control request completed", "method", "EnsureContainer", "workspace_slug", workspace.WorkspaceSlug, "container", container)
 		return containerProto(workspace, *record), nil
 	}
@@ -522,6 +546,15 @@ func (s *Server) StartContainer(ctx context.Context, request *ctl.StartContainer
 				}
 			}
 		}
+		// The conflict check excluded the replaced (or untracked) container,
+		// which could write to its read-write mounts until it was removed.
+		// Resolve the mounts again now that it is gone, so a component it
+		// swapped for a symlink is refused rather than mounted.
+		resolved, err := s.podmanMounts(containerMounts(workspace, record))
+		if err != nil {
+			return err
+		}
+		podmanMounts = resolved
 		secret, err := s.ensureAgentToken(&record)
 		if err != nil {
 			return status.Error(codes.Internal, err.Error())

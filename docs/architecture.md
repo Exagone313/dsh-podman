@@ -106,10 +106,12 @@ absolute search root runs from that root: `glob`'s `pattern` then anchors to its
 Project mounts must contain no symlink component and are confined to the
 projects root, so a symlink inside a writable project can neither redirect the
 bind mount to a path outside it nor make the path the orchestrator validates
-differ from the path podman mounts. A new project mount is also refused while
-another container holds a read-write mount that is a strict ancestor of it: that
-container's agent could otherwise rename a component of the new path to a
-symlink before podman resolves it.
+differ from the path podman mounts. Two containers may also not hold nested
+project mounts when the outer one is read-write, whichever was created first:
+the outer container's agent could otherwise rename a component of the inner path
+to a symlink before podman resolves it, on a create or on any later restart. A
+container being replaced is stopped before its mounts are resolved again, so its
+own processes cannot race the create either.
 
 ## Guest agent and daemons
 

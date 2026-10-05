@@ -85,9 +85,12 @@ including against state read back from disk:
   symlink component, so a symlink planted in a writable project can neither
   redirect a bind mount outside it nor make the validated path differ from the
   path podman mounts;
-- a new project mount is refused while another orchestrator container holds a
-  read-write mount that is a strict ancestor of it, and that check is serialized
-  with the create it guards;
+- two orchestrator containers may not hold nested project mounts when the outer
+  one is read-write, whichever was created first: a new mount is refused inside
+  another container's read-write mount, and a new read-write mount is refused
+  over another container's mount. The check is serialized with the create it
+  guards, and a container being replaced is stopped before its mounts are
+  resolved again for the create;
 - tmpfs, volume and secret mount destinations may not overlap a reserved path
   (the projects root, the sockets root, or the guest agent mount) — as an
   ancestor or as a descendant;
@@ -135,13 +138,15 @@ do, so an attacker holding either has not crossed a boundary.
 - **Mount source races.** Project mounts are handed to podman as a path, which
   podman resolves again when it performs the mount. Two rules close that window
   for the containers the orchestrator manages: every component must be a real
-  directory (a symlink component is refused), and a new mount is refused while
-  another container holds a read-write mount that is a strict ancestor of it, so
-  no container's agent has write access to a directory on the new path. The
-  check and the create are serialized, and a container reused through the
-  control API has its stored paths re-checked against the current filesystem. A
-  host user with write access to the projects root, or to the podman socket, is
-  outside this boundary.
+  directory (a symlink component is refused), and no container may hold a
+  read-write mount above another container's mount, in either creation order, so
+  no other container's agent has write access to a directory on a mount path —
+  including when podman restarts a container on its own. The container being
+  replaced is stopped before its mounts are resolved again, so its own processes
+  cannot race the create. The check and the create are serialized, and a
+  container reused through the control API has its stored paths and conflicts
+  re-checked. A host user with write access to the projects root, or to the
+  podman socket, is outside this boundary.
 - **The guest agent runs as root inside its container.** The generated workspace
   images declare no unprivileged user. Container-level isolation, not
   in-container privilege separation, is what keeps a workspace contained.

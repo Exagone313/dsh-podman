@@ -20,6 +20,14 @@ updates:
       # The harness packages are pinned to the supported dsh release and must
       # move together with it, not on their own.
       - dependency-name: "@deepseek-ai/*"
+  - package-ecosystem: "docker"
+    # Keeps the digest-pinned base image of Containerfile.dsh current; the
+    # orchestrator and guest-agent images are FROM scratch.
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    cooldown:
+      default-days: 7
   - package-ecosystem: "gomod"
     directory: "/"
     schedule:

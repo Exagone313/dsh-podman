@@ -114,6 +114,13 @@ layered on top of the orchestrator, never a substitute for it.
 Setting the harness approval policy to `never` removes all of them, and the
 orchestrator will accept whatever it is then sent.
 
+The read-only sandbox mode is enforced per container, on the one a tool targets,
+not across a workspace. Because a workspace is a single trust domain — its
+containers share a pod network namespace and any of them may hold a read-write
+mount — a read-only session can reach a sibling container over localhost and
+have it write. Read-only confines the session's own container; it does not
+guarantee that nothing in the workspace is written.
+
 ### Secrets
 
 Secret values are write-only through the control API: they are never returned by

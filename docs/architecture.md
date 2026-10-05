@@ -153,6 +153,13 @@ the read-write mounts forced read-only before running the tool. The harness's
 `sandbox_permissions` escalation is granted without prompting for the same
 reason: the widening it asks for has no effect here.
 
+Read-only is enforced on the container a tool targets, not on the whole
+workspace. Other containers in the same workspace may still hold read-write
+mounts and run daemons, and a workspace's containers share a pod network
+namespace, so a command that is allowed under read-only can reach a sibling
+container over localhost and have it write. Read-only confines the session's own
+container; it is not a guarantee that nothing in the workspace can be written.
+
 Recreating a container or shutting down the orchestrator first asks the
 container's guest agent to gracefully stop its daemons (SIGTERM, ~10s grace)
 before podman tears the container down.

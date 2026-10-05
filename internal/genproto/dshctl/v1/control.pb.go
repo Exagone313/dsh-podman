@@ -1178,6 +1178,11 @@ func (*RebuildAllImagesRequest) Descriptor() ([]byte, []int) {
 	return file_dshctl_v1_control_proto_rawDescGZIP(), []int{17}
 }
 
+// The images one RebuildAllImages call rebuilt or could not provide. `rebuilt`
+// names the stored custom images that were rebuilt, in dependency order; a base
+// image ensured beforehand is not listed. `skipped` names every image the call
+// could not make available: base short names first, then the custom images
+// whose rebuild failed and the images that depend on them.
 type RebuildAllImagesResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Rebuilt       []string               `protobuf:"bytes,1,rep,name=rebuilt,proto3" json:"rebuilt,omitempty"`

@@ -76,6 +76,12 @@ func TestCheckProjectMountConflicts(t *testing.T) {
 				if status.Code(err) != codes.FailedPrecondition {
 					t.Fatalf("expected FailedPrecondition, got %v", err)
 				}
+				if !strings.Contains(err.Error(), `"other"`) || !strings.Contains(err.Error(), slug) {
+					t.Fatalf("conflict should name the logical container and workspace: %v", err)
+				}
+				if strings.Contains(err.Error(), containerNamePrefix) {
+					t.Fatalf("conflict must not leak the podman name: %v", err)
+				}
 				return
 			}
 			if err != nil {
@@ -170,17 +176,107 @@ func TestEnsureContainerRefusesAStaleMountPath(t *testing.T) {
 	fake.running[testDefaultContainer] = true
 	fake.agentToken[testDefaultContainer] = "tok"
 	server := &Server{Store: store, Podman: fake, ProjectsRoot: root, Logger: silentLogger()}
-	// Swap the project directory for a symlink after the container was created.
+	// Swap the project directory for a symlink that stays inside the projects
+	// root, so the no-symlink walk is what refuses it.
+	if err := os.MkdirAll(filepath.Join(root, "other"), 0755); err != nil {
+		t.Fatal(err)
+	}
 	if err := os.RemoveAll(filepath.Join(root, "team")); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.Symlink(filepath.Join(root, "elsewhere"), filepath.Join(root, "team")); err != nil {
+	if err := os.Symlink("other", filepath.Join(root, "team")); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := server.EnsureContainer(context.Background(), &ctl.EnsureContainerRequest{WorkspaceSlug: testWorkspaceSlug}); err == nil {
-		t.Fatal("expected the swapped mount path to be refused")
+	_, err := server.EnsureContainer(context.Background(), &ctl.EnsureContainerRequest{WorkspaceSlug: testWorkspaceSlug})
+	if status.Code(err) != codes.InvalidArgument {
+		t.Fatalf("expected InvalidArgument, got %v", err)
+	}
+	if !strings.Contains(err.Error(), "is a symlink") {
+		t.Fatalf("stale mount message lost: %v", err)
 	}
 	if len(fake.recreated) != 0 {
 		t.Fatalf("nothing should be recreated on an invalid path: %v", fake.recreated)
 	}
+}
+
+func TestLogicalContainerName(t *testing.T) {
+	const slug = "11111111-1111-1111-1111-111111111111"
+	gotSlug, logical, ok := logicalContainerName(containerNamePrefix + slug + "-dev")
+	if !ok || gotSlug != slug || logical != "dev" {
+		t.Fatalf("logicalContainerName = %q, %q, %v", gotSlug, logical, ok)
+	}
+	for _, name := range []string{"", "default", "dsh-podman-x", containerNamePrefix + slug} {
+		if _, _, ok := logicalContainerName(name); ok {
+			t.Errorf("accepted non-orchestrator name %q", name)
+		}
+	}
+}
+
+// conflictFixture returns a server whose "other" container holds a read-write
+// mount of team, and a workspace whose "dev" container is the mutation target
+// with the given mounts.
+func conflictFixture(t *testing.T, devMounts []state.Mount) *Server {
+	t.Helper()
+	root := tempRoot(t)
+	if err := os.MkdirAll(filepath.Join(root, "team", "src"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	store := newTestStore(t)
+	if err := store.SaveImages([]state.Image{{ImageID: "arch", ImageTag: "localhost/dsh-podman/arch:latest"}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.SaveWorkspaces([]state.Workspace{{
+		WorkspaceSlug: testWorkspaceSlug,
+		ProjectName:   "team",
+		Containers:    []state.Container{{Name: "dev", PodmanName: containerNamePrefix + testWorkspaceSlug + "-dev", ImageID: "arch", Status: "running", Mounts: devMounts}},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	fake := newFakePodman()
+	fake.writeMounts[containerNamePrefix+testWorkspaceSlug+"-other"] = []string{filepath.Join(root, "team")}
+	return &Server{Store: store, Podman: fake, ProjectsRoot: root, Logger: silentLogger()}
+}
+
+func assertConflict(t *testing.T, err error) {
+	t.Helper()
+	if status.Code(err) != codes.FailedPrecondition {
+		t.Fatalf("expected FailedPrecondition, got %v", err)
+	}
+	if !strings.Contains(err.Error(), "is inside the read-write mount") {
+		t.Fatalf("conflict message lost: %v", err)
+	}
+}
+
+// TestMountMutationsReportConflicts pins that the mount mutations surface a
+// conflict as FailedPrecondition with its message, rather than collapsing it
+// into an opaque Internal error.
+func TestMountMutationsReportConflicts(t *testing.T) {
+	t.Run("add", func(t *testing.T) {
+		server := conflictFixture(t, nil)
+		_, err := server.AddContainerMount(context.Background(), &ctl.AddContainerMountRequest{
+			WorkspaceSlug: testWorkspaceSlug,
+			Container:     "dev",
+			Project:       "team/src",
+			Mode:          ctl.MountMode_MOUNT_MODE_READ_WRITE,
+		})
+		assertConflict(t, err)
+	})
+	t.Run("update", func(t *testing.T) {
+		server := conflictFixture(t, []state.Mount{{ProjectName: "team/src", Mode: "read_only"}})
+		_, err := server.UpdateContainerMount(context.Background(), &ctl.UpdateContainerMountRequest{
+			WorkspaceSlug: testWorkspaceSlug,
+			Container:     "dev",
+			Project:       "team/src",
+			Mode:          ctl.MountMode_MOUNT_MODE_READ_WRITE,
+		})
+		assertConflict(t, err)
+	})
+	t.Run("recreate", func(t *testing.T) {
+		server := conflictFixture(t, []state.Mount{{ProjectName: "team/src", Mode: "read_write"}})
+		_, err := server.RecreateContainer(context.Background(), &ctl.RecreateContainerRequest{
+			WorkspaceSlug: testWorkspaceSlug,
+			Container:     "dev",
+		})
+		assertConflict(t, err)
+	})
 }

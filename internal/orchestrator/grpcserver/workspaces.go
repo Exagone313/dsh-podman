@@ -72,7 +72,7 @@ func (s *Server) refreshContainer(ctx context.Context, workspace state.Workspace
 	}
 	if err := s.recreateContainer(ctx, workspace, record, imageTag, token, record.Env); err != nil {
 		s.log().Error("recreating guest container failed", "workspace_slug", workspace.WorkspaceSlug, "container", record.Name, "error", err)
-		return workspace, status.Error(codes.Internal, err.Error())
+		return workspace, grpcError(err)
 	}
 	record.Status = "running"
 	record.AgentToken = token

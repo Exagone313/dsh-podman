@@ -51,13 +51,19 @@ func (s *Server) checkProjectMountConflicts(mounts []specs.Mount, excludePodmanN
 		return grpcError(err)
 	}
 	for name, sources := range existing {
-		if name == excludePodmanName || !containerPodmanName.MatchString(name) {
+		if name == excludePodmanName {
+			continue
+		}
+		// Name the container by its logical name and workspace, never by the
+		// podman name: the internal name must not reach a caller.
+		slug, logical, ok := logicalContainerName(name)
+		if !ok {
 			continue
 		}
 		for _, source := range sources {
 			for _, project := range projectSources {
 				if pathsStrictAncestor(source, project) {
-					return status.Error(codes.FailedPrecondition, fmt.Sprintf("project mount %q is inside the read-write mount %q of container %q; stop that container or mount a disjoint project", project, source, name))
+					return status.Error(codes.FailedPrecondition, fmt.Sprintf("project mount %q is inside the read-write mount %q of container %q in workspace %q; stop that container or mount a disjoint project", project, source, logical, slug))
 				}
 			}
 		}

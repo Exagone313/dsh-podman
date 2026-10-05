@@ -374,7 +374,7 @@ func (s *Server) RecreateContainer(ctx context.Context, request *ctl.RecreateCon
 	}
 	if err := s.recreateOrRestore(ctx, workspace, record, imageTag, secret, &snapshot); err != nil {
 		s.log().Error("control request failed", "method", "RecreateContainer", "workspace_slug", request.GetWorkspaceSlug(), "container", container, "error", err)
-		return nil, status.Error(codes.Internal, err.Error())
+		return nil, grpcError(err)
 	}
 	record.ImageID = imageID
 	record.Status = "running"

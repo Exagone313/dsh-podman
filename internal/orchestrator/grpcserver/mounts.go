@@ -108,7 +108,7 @@ func (s *Server) AddContainerMount(ctx context.Context, request *ctl.AddContaine
 	}
 	if err := s.recreateOrRestore(ctx, workspace, record, imageTag, secret, &snapshot); err != nil {
 		s.log().Error("control request failed", "method", "AddContainerMount", "workspace_slug", request.GetWorkspaceSlug(), "container", request.GetContainer(), "error", err)
-		return nil, status.Error(codes.Internal, err.Error())
+		return nil, grpcError(err)
 	}
 	record.Status = "running"
 	record.AgentToken = secret
@@ -190,7 +190,7 @@ func (s *Server) RemoveContainerMount(ctx context.Context, request *ctl.RemoveCo
 	}
 	if err := s.recreateOrRestore(ctx, workspace, record, imageTag, secret, &snapshot); err != nil {
 		s.log().Error("control request failed", "method", "RemoveContainerMount", "workspace_slug", request.GetWorkspaceSlug(), "container", request.GetContainer(), "error", err)
-		return nil, status.Error(codes.Internal, err.Error())
+		return nil, grpcError(err)
 	}
 	record.Status = "running"
 	record.AgentToken = secret
@@ -281,7 +281,7 @@ func (s *Server) UpdateContainerMount(ctx context.Context, request *ctl.UpdateCo
 	}
 	if err := s.recreateOrRestore(ctx, workspace, record, imageTag, secret, &snapshot); err != nil {
 		s.log().Error("control request failed", "method", "UpdateContainerMount", "workspace_slug", request.GetWorkspaceSlug(), "container", request.GetContainer(), "error", err)
-		return nil, status.Error(codes.Internal, err.Error())
+		return nil, grpcError(err)
 	}
 	record.Status = "running"
 	record.AgentToken = secret

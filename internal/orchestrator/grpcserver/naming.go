@@ -30,12 +30,26 @@ var containerLogicalName = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{0,30}$`)
 
 // containerPodmanName is the exact shape of orchestrator-created guest
 // containers (dsh-podman-<slug>-<logical>); any workspace state that does not
-// match it is treated as invalid rather than acted upon.
-var containerPodmanName = regexp.MustCompile(`^dsh-podman-` + uuidPattern + `-[a-z0-9][a-z0-9-]{0,30}$`)
+// match it is treated as invalid rather than acted upon. The capture groups are
+// the workspace slug and the logical container name, so a caller that must name
+// a container in a message can use the logical name rather than the podman name.
+var containerPodmanName = regexp.MustCompile(`^dsh-podman-(` + uuidPattern + `)-([a-z0-9][a-z0-9-]{0,30})$`)
 
 // containerNamePattern is the exact shape of orchestrator-created guest
 // containers; see containerPodmanName.
 var containerNamePattern = containerPodmanName
+
+// logicalContainerName splits an orchestrator podman container name into its
+// workspace slug and logical container name. It reports false for a name that
+// does not have the orchestrator's shape, so a caller never derives a label from
+// a foreign container.
+func logicalContainerName(podmanName string) (slug, logical string, ok bool) {
+	match := containerPodmanName.FindStringSubmatch(podmanName)
+	if match == nil {
+		return "", "", false
+	}
+	return match[1], match[2], true
+}
 
 // volumeName restricts short named-volume names to the shape podman accepts
 // when the orchestrator prefixes them; the full podman name is never exposed

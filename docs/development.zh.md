@@ -65,8 +65,9 @@ Buf（`buf generate`）重新生成（没有对应的 `make` 目标）——请�
 改动与重新生成的 Go 绑定一起提交。
 
 JS 端在运行时通过 `@grpc/proto-loader` 加载原始 `.proto` 文件（构建时复制到
-`dist/grpc/proto/`）；不生成 TypeScript 绑定。也可以使用 `buf lint` 和
-`buf breaking` 校验 schema。
+`dist/grpc/proto/`）；不生成 TypeScript 绑定。CI 会运行
+`buf lint`、针对最新发布标签的 `buf breaking` 以及
+`buf generate`，若已提交的绑定与重新生成的结果不一致则失败。
 
 ## 命名
 

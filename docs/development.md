@@ -66,7 +66,9 @@ Commit the `.proto` change together with the regenerated Go bindings.
 
 The JS side loads the raw `.proto` files at runtime via `@grpc/proto-loader`
 (copied to `dist/grpc/proto/` at build time); no TypeScript bindings are
-generated. Optionally validate the schema with `buf lint` and `buf breaking`.
+generated. CI runs `buf lint`, `buf breaking` against the latest release tag,
+and `buf generate`, and fails when the committed bindings differ from the
+regenerated ones.
 
 ## Naming
 

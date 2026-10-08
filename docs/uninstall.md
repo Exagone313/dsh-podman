@@ -7,8 +7,8 @@ SPDX-License-Identifier: MIT
 # Uninstall
 
 This page undoes the [installation guide](install-dsh-and-dsh-podman.md): it
-assumes dsh runs from the dsh-podman image with the orchestrator, both started
-from Quadlet units.
+assumes dsh runs from the dsh-podman image with the orchestrator and the
+gateway, all started from Quadlet units.
 
 The dsh image installs the dsh-podman plugin at container start, and the
 plugin's bundle layer is what disables dsh's own `subprocess`, `fs-sandbox`,
@@ -20,9 +20,10 @@ dsh user, with no container isolation.
 ## Stop the containers and remove the Quadlet units
 
 ```bash
-systemctl --user stop dsh dsh-podman-orchestrator
+systemctl --user stop dsh dsh-podman-orchestrator dsh-podman-gateway
 rm ~/.config/containers/systemd/dsh.container
 rm ~/.config/containers/systemd/dsh-podman-orchestrator.container
+rm ~/.config/containers/systemd/dsh-podman-gateway.container
 systemctl --user daemon-reload
 ```
 

@@ -122,6 +122,13 @@ Environment=DSH_PODMAN_GUEST_AGENT_IMAGE=localhost/dsh-podman-guest-agent:latest
 `:latest` 标签；orchestrator 因此无法察觉 guest agent
 已被重建，详见[更新工作区容器](#更新工作区容器)。
 
+在 `~/.config/containers/systemd/dsh-podman-gateway.container` 中：
+
+```ini
+#Image=ghcr.io/exagone313/dsh-podman/gateway:1
+Image=localhost/dsh-podman-gateway:latest
+```
+
 编辑单元后重新加载 systemd：
 
 ```bash
@@ -132,9 +139,9 @@ systemctl --user daemon-reload
 
 ```bash
 make            # Go binaries + the plugin bundle
-make image      # orchestrator, guest-agent and dsh images
+make image      # orchestrator, guest-agent, gateway and dsh images
 npm pack        # the plugin archive the dsh entrypoint installs
-systemctl --user restart dsh dsh-podman-orchestrator
+systemctl --user restart dsh dsh-podman-orchestrator dsh-podman-gateway
 ```
 
 dsh 镜像会在容器启动时安装插件，因此重启 dsh 才会重新安装刚打包的归档；重启

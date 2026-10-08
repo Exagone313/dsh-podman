@@ -71,6 +71,7 @@ for secrets (see [Secrets](usage.md#secrets)).
 | `DSH_PODMAN_HOST_GUEST_AGENT_BIN`              | —                             | Host-side guest agent binary path; bind-mounted when set; see [Variable details](#variable-details)                                                                                                                |
 | `DSH_PODMAN_HOST_PACMAN_CACHE`                 | —                             | Host-absolute directory mounted at `/var/cache/pacman/pkg` to persist downloaded packages across pacman builds; unset disables caching                                                                             |
 | `DSH_PODMAN_HOST_PROJECTS_ROOT`                | `DSH_PODMAN_PROJECTS_ROOT`    | Host-side projects root used as the source of bind mounts                                                                                                                                                          |
+| `DSH_PODMAN_GATEWAY_TOKEN`                     | —                             | Optional shared secret for gateway calls (`orchestrator` → gateway); see [Variable details](#variable-details)                                                                                                     |
 | `DSH_PODMAN_HOST_SOCKETS_ROOT`                 | required                      | Host-side sockets root for guest socket bind mounts; see [Variable details](#variable-details)                                                                                                                     |
 | `DSH_PODMAN_IMAGE_PREFIX`                      | `localhost/dsh-podman/`       | Prefix prepended to built workspace image references                                                                                                                                                               |
 | `DSH_PODMAN_ORCHESTRATOR_PODMAN_SOCKET`        | required                      | Podman API socket, e.g. `unix:///run/podman/podman.sock`                                                                                                                                                           |
@@ -88,6 +89,19 @@ for secrets (see [Secrets](usage.md#secrets)).
 | `DSH_PODMAN_GUEST_SOCKET`  | required    | Unix socket the guest agent serves on; the orchestrator sets it when starting the container |
 | `DSH_PODMAN_GUEST_TOKEN`   | —           | Bearer token required on every gRPC call; see [Variable details](#variable-details)         |
 | `DSH_PODMAN_PROJECTS_ROOT` | `/projects` | Root where the workspace's project(s) are mounted                                           |
+
+## Gateway (`dsh-podman-gateway`)
+
+| Variable                          | Default                       | Description                                                                                     |
+| --------------------------------- | ----------------------------- | ----------------------------------------------------------------------------------------------- |
+| `DSH_PODMAN_GATEWAY_SOCKET`       | `<sockets root>/gateway.sock` | Unix socket the gateway serves its control API on                                               |
+| `DSH_PODMAN_GATEWAY_SOCKETS_ROOT` | `/run/dsh-podman`             | Shared socket root; the gateway reaches each container's published socket below it              |
+| `DSH_PODMAN_GATEWAY_TOKEN`        | —                             | Optional bearer token required on every control call; see [Variable details](#variable-details) |
+
+The standard install runs the gateway. It is optional — only publishing pod
+ports needs it (see [Usage](usage.md#published-ports)) — and it binds
+`127.0.0.1` and nothing else, so a published port is reachable from the host
+alone.
 
 ## Variable details
 
@@ -163,6 +177,17 @@ agree on; every control-plane request carries it as the gRPC metadata header
 orchestrator has no token set, it accepts unauthenticated control-plane calls
 (relying on the socket's file permissions instead); when a token is set,
 requests without the matching header are rejected with `Unauthenticated`.
+
+### `DSH_PODMAN_GATEWAY_TOKEN`
+
+An arbitrary shared secret string that the gateway and the orchestrator must
+agree on; every gateway control call carries it as the gRPC metadata header
+`authorization: bearer <token>`. Use a long, random value — for example
+`openssl rand -hex 32` — and set the same value on both sides. When the gateway
+has no token set, it accepts unauthenticated control calls (relying on the
+socket's file permissions instead) and logs a warning; when a token is set,
+calls without the matching header are rejected with `Unauthenticated`. The dsh
+plugin does not talk to the gateway and does not need this variable.
 
 ### `DSH_PODMAN_ORCHESTRATOR_STATE`
 

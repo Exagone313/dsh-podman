@@ -128,6 +128,13 @@ reference. The local build reuses a single `:latest` tag instead; the
 orchestrator then cannot tell that the agent was rebuilt, which is what
 [Update workspace containers](#update-workspace-containers) is about.
 
+In `~/.config/containers/systemd/dsh-podman-gateway.container`:
+
+```ini
+#Image=ghcr.io/exagone313/dsh-podman/gateway:1
+Image=localhost/dsh-podman-gateway:latest
+```
+
 Reload systemd after editing the units:
 
 ```bash
@@ -138,9 +145,9 @@ systemctl --user daemon-reload
 
 ```bash
 make            # Go binaries + the plugin bundle
-make image      # orchestrator, guest-agent and dsh images
+make image      # orchestrator, guest-agent, gateway and dsh images
 npm pack        # the plugin archive the dsh entrypoint installs
-systemctl --user restart dsh dsh-podman-orchestrator
+systemctl --user restart dsh dsh-podman-orchestrator dsh-podman-gateway
 ```
 
 The dsh image installs the plugin at container start, so restarting dsh is what

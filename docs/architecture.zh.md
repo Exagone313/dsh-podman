@@ -6,13 +6,14 @@ SPDX-License-Identifier: MIT
 
 # 架构
 
-dsh-podman 由三个组件组成：
+dsh-podman 由四个组件组成：
 
-| 组件                      | 运行位置                     | 功能                                                                   |
-| ------------------------- | ---------------------------- | ---------------------------------------------------------------------- |
-| `@exagone313/dsh-podman`  | dsh 内部                     | 注册由 orchestrator 提供支撑的 `ctx.subprocess` 和 `ctx.fs`            |
-| `dsh-podman-guest-agent`  | 每个 guest 容器内部          | 为一个工作区提供 exec/filesystem gRPC API                              |
-| `dsh-podman-orchestrator` | 一个可访问 Podman API 的容器 | 持有 control socket 和持久化状态；创建/删除 guest 容器；构建工作区镜像 |
+| 组件                      | 运行位置                                   | 功能                                                                   |
+| ------------------------- | ------------------------------------------ | ---------------------------------------------------------------------- |
+| `@exagone313/dsh-podman`  | dsh 内部                                   | 注册由 orchestrator 提供支撑的 `ctx.subprocess` 和 `ctx.fs`            |
+| `dsh-podman-guest-agent`  | 每个 guest 容器内部                        | 为一个工作区提供 exec/filesystem gRPC API                              |
+| `dsh-podman-orchestrator` | 一个可访问 Podman API 的容器               | 持有 control socket 和持久化状态；创建/删除 guest 容器；构建工作区镜像 |
+| `dsh-podman-gateway`      | 由标准安装一并部署、运行在主机网络上的容器 | 将已发布的 pod 端口桥接到主机回环地址                                  |
 
 该插件会自动使用其配置的默认镜像和单个读写项目挂载来创建缺失的工作区；`container_mount_update`
 可将该挂载重新挂载为只读。它绝不会回退到主机执行。
@@ -130,6 +131,37 @@ pod 网络命名空间，因此在只读模式下被允许的命令可以通过 
 
 重新创建容器或关闭 orchestrator 时，会先要求容器的 guest agent
 优雅地停止其守护进程（SIGTERM，约 10 秒宽限期），然后 podman 才会拆除该容器。
+
+## 端口发布
+
+pod 内监听的守护进程无法从主机访问：每个 pod
+都有自己的网络命名空间，也不会发布任何端口。`container_publish_port`
+通过两段转发把一个 TCP 端口带出来：
+
+```
+客户端 -> <地址>:<端口> -> gateway -> UNIX 套接字（套接字根目录）-> guest agent -> 127.0.0.1:<pod 端口>
+```
+
+**guest agent** 在容器自己的套接字目录中（与
+orchestrator、插件共享，也就是它自己的 `guest.sock`
+所在目录）监听一个简短的确定性 UNIX 套接字，并把每个连接转发到 pod 内的
+`127.0.0.1:<端口>`。**gateway**
+是由标准安装一并部署、运行在主机网络上的容器，挂载同一个套接字根目录，绑定
+`127.0.0.1:<主机端口>`
+并转发到该套接字。它把地址和端口一起返回，因此工具可以给出
+`tcp://127.0.0.1:6666`；地址由 gateway 决定，这也让将来的 HTTP
+发布可以返回主机名。
+
+**orchestrator**
+负责整个生命周期：它把每个已发布端口记录在容器上，在容器重建后重新创建 guest
+套接字（gateway
+的绑定仍在，因此主机端口不会变化），并在取消发布、移除容器或销毁工作区时释放绑定。已发布端口的状态不会只存在于
+gateway 中：只有在 orchestrator 保持租约流打开时 gateway 才持有绑定，因此
+orchestrator 停止或崩溃不会留下主机端口，gateway 重启后也会从存储中重新绑定。
+
+目前只实现 TCP。线上格式、存储记录和返回的地址字符串都已带协议字段，因此将来增加
+UDP 或 HTTP 无需改动它们。gateway
+是可选的：只有发布端口需要它，没有它时发布操作会报告其未运行，其他功能不受影响。
 
 ## 镜像
 

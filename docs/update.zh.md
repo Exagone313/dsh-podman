@@ -14,18 +14,35 @@ SPDX-License-Identifier: MIT
 
 启用自动更新后，也可以在 agent 运行时跳过更新。请继续阅读以了解如何设置。
 
+## 从 1.1.0 之前的版本更新
+
+`dsh-podman-gateway` 容器是 1.1.0 新增的：更早的版本不会提供它的
+Quadlet。gateway 是可选的，只在发布 pod
+端口时需要（见[用法](usage.zh.md#端口发布)）；没有它时，`container_publish_port`
+会报错，提示你安装并启动 gateway Quadlet。
+
+从 1.1.0 之前的版本更新时，请先把
+[dsh-podman-gateway.container](../quadlet/dsh-podman-gateway.container) 复制到
+`~/.config/containers/systemd/`，并启动它一次，然后再执行后续步骤：
+
+```bash
+cp quadlet/dsh-podman-gateway.container ~/.config/containers/systemd/
+systemctl --user daemon-reload
+systemctl --user start dsh-podman-gateway
+```
+
 ## 手动更新
 
 拉取新镜像：
 
 ```bash
-podman pull ghcr.io/exagone313/dsh-podman/dsh:1 ghcr.io/exagone313/dsh-podman/orchestrator:1
+podman pull ghcr.io/exagone313/dsh-podman/dsh:1 ghcr.io/exagone313/dsh-podman/orchestrator:1 ghcr.io/exagone313/dsh-podman/gateway:1
 ```
 
-重启 dsh 和 dsh-podman-orchestrator：
+重启 dsh、dsh-podman-orchestrator 和 dsh-podman-gateway：
 
 ```bash
-systemctl --user restart dsh dsh-podman-orchestrator
+systemctl --user restart dsh dsh-podman-orchestrator dsh-podman-gateway
 ```
 
 ## 升级到新的主版本
@@ -35,9 +52,9 @@ systemctl --user restart dsh dsh-podman-orchestrator
 
 ## 启用自动更新
 
-dsh 和 dsh-podman-orchestrator 的 quadlet 配置启用了镜像自动更新
-（`AutoUpdate=registry`）。要使其生效，需要启用 `podman-auto-update` systemd
-计时器：
+dsh、dsh-podman-orchestrator 和 dsh-podman-gateway 的 quadlet
+配置启用了镜像自动更新 （`AutoUpdate=registry`）。要使其生效，需要启用
+`podman-auto-update` systemd 计时器：
 
 ```bash
 systemctl --user enable --now podman-auto-update.timer

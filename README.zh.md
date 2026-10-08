@@ -12,6 +12,7 @@ SPDX-License-Identifier: MIT
 [![dsh](https://img.shields.io/badge/dsh-GHCR-blue)](https://github.com/Exagone313/dsh-podman/pkgs/container/dsh-podman%2Fdsh)
 [![orchestrator](https://img.shields.io/badge/orchestrator-GHCR-blue)](https://github.com/Exagone313/dsh-podman/pkgs/container/dsh-podman%2Forchestrator)
 [![guest-agent](https://img.shields.io/badge/guest--agent-GHCR-blue)](https://github.com/Exagone313/dsh-podman/pkgs/container/dsh-podman%2Fguest-agent)
+[![gateway](https://img.shields.io/badge/gateway-GHCR-blue)](https://github.com/Exagone313/dsh-podman/pkgs/container/dsh-podman%2Fgateway)
 
 [English](README.md) | 中文
 

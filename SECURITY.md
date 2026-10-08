@@ -129,6 +129,29 @@ readable by everything running in that container, whether it is mounted as a
 file or exposed as an environment variable. Secrets exist to get values _into_ a
 workload, not to keep them from it.
 
+### Published ports
+
+A published port is an explicit, approval-gated decision to make one pod port
+reachable from the host. The gateway binds `127.0.0.1` and nothing else, so the
+exposure is confined to the host's loopback — but "loopback" means every process
+of every local user, not just the one running podman. Treat a published port as
+public to the machine.
+
+The gateway is a separate container on the host network, shipped by the standard
+install. It holds a host port only while the orchestrator that asked for it
+stays connected and keeps a lease; if the orchestrator stops or crashes, the
+gateway releases every binding, so a host port cannot outlive the decision that
+created it. The optional `DSH_PODMAN_GATEWAY_TOKEN` authenticates the
+orchestrator to the gateway in the same defence-in-depth spirit as the control
+token above: the plugin does not talk to the gateway, and the token is not a
+boundary against a local process that can already reach the socket root.
+
+The guest-side forwarding socket lives in the container's own socket directory,
+mode 0600 under a 0700 root, and forwards only to `127.0.0.1:<port>` inside the
+pod — never to a caller-supplied address. A process with access to the socket
+root can reach a published pod port without going through the gateway, which is
+why the socket root is the thing to protect, not the gateway.
+
 ## Out of scope
 
 **Denial of service and resource exhaustion.** There are no quotas on

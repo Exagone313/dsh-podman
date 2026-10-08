@@ -17,18 +17,35 @@ startup.
 When enabling auto-updates, it is possible to skip updates while an agent is
 running. Read further to set this up.
 
+## Update from before 1.1.0
+
+The `dsh-podman-gateway` container is new in 1.1.0: earlier versions did not
+ship its Quadlet. The gateway is optional and only needed to publish pod ports
+(see [Usage](usage.md#published-ports)); without it, `container_publish_port`
+fails with an error telling you to install and start the gateway Quadlet.
+
+When you update from a version before 1.1.0, copy
+[dsh-podman-gateway.container](../quadlet/dsh-podman-gateway.container) to
+`~/.config/containers/systemd/` and start it once, before the steps below:
+
+```bash
+cp quadlet/dsh-podman-gateway.container ~/.config/containers/systemd/
+systemctl --user daemon-reload
+systemctl --user start dsh-podman-gateway
+```
+
 ## Update manually
 
 Pull the new images:
 
 ```bash
-podman pull ghcr.io/exagone313/dsh-podman/dsh:1 ghcr.io/exagone313/dsh-podman/orchestrator:1
+podman pull ghcr.io/exagone313/dsh-podman/dsh:1 ghcr.io/exagone313/dsh-podman/orchestrator:1 ghcr.io/exagone313/dsh-podman/gateway:1
 ```
 
-Restart dsh and dsh-podman-orchestrator:
+Restart dsh, dsh-podman-orchestrator and dsh-podman-gateway:
 
 ```bash
-systemctl --user restart dsh dsh-podman-orchestrator
+systemctl --user restart dsh dsh-podman-orchestrator dsh-podman-gateway
 ```
 
 ## Upgrade to a new major version
@@ -39,9 +56,9 @@ above, check the
 
 ## Enable auto-updates
 
-The quadlet configuration for dsh and dsh-podman-orchestrator enables
-auto-update of images (`AutoUpdate=registry`). The `podman-auto-update` systemd
-timer needs to be enabled for this to work:
+The quadlet configuration for dsh, dsh-podman-orchestrator and
+dsh-podman-gateway enables auto-update of images (`AutoUpdate=registry`). The
+`podman-auto-update` systemd timer needs to be enabled for this to work:
 
 ```bash
 systemctl --user enable --now podman-auto-update.timer

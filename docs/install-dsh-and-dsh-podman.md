@@ -47,6 +47,8 @@ could be added in the future.
 - **dsh-podman orchestrator**: the daemon that receives connections from the
   dsh-podman plugin, has access to the Podman socket and manages containers and
   other resources; it runs in a container; referred to later as _orchestrator_
+- **dsh-podman gateway**: the host-network container that publishes guest pod
+  ports on the host's loopback; referred to later as _gateway_
 - **Podman socket**: while the Podman client can be used without a daemon, it is
   still possible to enable management through a socket, which is required by the
   orchestrator to work as if it were running on the host system
@@ -109,8 +111,9 @@ which requires online access.
    ```bash
    mkdir -p ~/.config/containers/systemd
    ```
-2. Copy the files [dsh.container](../quadlet/dsh.container) and
+2. Copy the files [dsh.container](../quadlet/dsh.container),
    [dsh-podman-orchestrator.container](../quadlet/dsh-podman-orchestrator.container)
+   and [dsh-podman-gateway.container](../quadlet/dsh-podman-gateway.container)
    to `~/.config/containers/systemd/`.
    ```bash
    cp quadlet/* ~/.config/containers/systemd/
@@ -124,16 +127,19 @@ which requires online access.
    ```bash
    journalctl --user -e
    ```
-5. Start dsh and dsh-podman-orchestrator:
+5. Start dsh, dsh-podman-orchestrator and dsh-podman-gateway:
    ```bash
-   systemctl --user start dsh dsh-podman-orchestrator
+   systemctl --user start dsh dsh-podman-orchestrator dsh-podman-gateway
    ```
-6. Check if there are startup errors from either container:
+6. Check if there are startup errors from any container:
    ```bash
    journalctl --user -eu dsh
    ```
    ```bash
    journalctl --user -eu dsh-podman-orchestrator
+   ```
+   ```bash
+   journalctl --user -eu dsh-podman-gateway
    ```
 7. View the dsh container logs:
    ```bash

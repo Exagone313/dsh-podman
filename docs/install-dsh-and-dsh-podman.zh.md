@@ -37,6 +37,8 @@ SPDX-License-Identifier: MIT
   UI，并连接编排器；下文简称 _plugin_
 - **dsh-podman 编排器**：接收来自 dsh-podman 插件连接的守护进程，可访问 Podman
   套接字并管理容器和其他资源；它在容器中运行；下文简称 _orchestrator_
+- **dsh-podman gateway**：运行在主机网络上的容器，把 guest pod
+  端口发布到主机回环地址；下文简称 _gateway_
 - **Podman 套接字**：虽然 Podman
   客户端可以在没有守护进程的情况下使用，但仍然可以通过套接字启用管理，这是编排器以仿佛在主机系统上运行的方式工作所必需的
 - **guest 容器**：由 dsh-podman 编排器创建的容器，与 dsh 工作区相关联
@@ -90,8 +92,9 @@ SPDX-License-Identifier: MIT
    ```bash
    mkdir -p ~/.config/containers/systemd
    ```
-2. 将文件 [dsh.container](../quadlet/dsh.container) 和
+2. 将文件 [dsh.container](../quadlet/dsh.container)、
    [dsh-podman-orchestrator.container](../quadlet/dsh-podman-orchestrator.container)
+   和 [dsh-podman-gateway.container](../quadlet/dsh-podman-gateway.container)
    复制到 `~/.config/containers/systemd/`。
    ```bash
    cp quadlet/* ~/.config/containers/systemd/
@@ -105,9 +108,9 @@ SPDX-License-Identifier: MIT
    ```bash
    journalctl --user -e
    ```
-5. 启动 dsh 和 dsh-podman-orchestrator：
+5. 启动 dsh、dsh-podman-orchestrator 和 dsh-podman-gateway：
    ```bash
-   systemctl --user start dsh dsh-podman-orchestrator
+   systemctl --user start dsh dsh-podman-orchestrator dsh-podman-gateway
    ```
 6. 检查任一容器是否有启动错误：
    ```bash
@@ -115,6 +118,9 @@ SPDX-License-Identifier: MIT
    ```
    ```bash
    journalctl --user -eu dsh-podman-orchestrator
+   ```
+   ```bash
+   journalctl --user -eu dsh-podman-gateway
    ```
 7. 查看 dsh 容器日志：
    ```bash

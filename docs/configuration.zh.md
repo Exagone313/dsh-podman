@@ -65,6 +65,7 @@ Podman
 | `DSH_PODMAN_HOST_GUEST_AGENT_BIN`              | —                             | 主机侧的 guest agent 二进制路径；设置后会绑定挂载；见[变量详解](#变量详解)                                                                                          |
 | `DSH_PODMAN_HOST_PACMAN_CACHE`                 | —                             | 挂载在 `/var/cache/pacman/pkg` 的主机绝对路径目录，用于在 pacman 构建之间持久化已下载的软件包；未设置时禁用缓存                                                     |
 | `DSH_PODMAN_HOST_PROJECTS_ROOT`                | `DSH_PODMAN_PROJECTS_ROOT`    | 用作绑定挂载源的主机侧项目根目录                                                                                                                                    |
+| `DSH_PODMAN_GATEWAY_TOKEN`                     | —                             | gateway 调用（`orchestrator` → gateway）的可选共享机密；见[变量详解](#变量详解)                                                                                     |
 | `DSH_PODMAN_HOST_SOCKETS_ROOT`                 | required                      | 用于 guest 套接字绑定挂载的主机侧套接字根目录；见[变量详解](#变量详解)                                                                                              |
 | `DSH_PODMAN_IMAGE_PREFIX`                      | `localhost/dsh-podman/`       | 前置到已构建的工作区镜像引用上的前缀                                                                                                                                |
 | `DSH_PODMAN_ORCHESTRATOR_PODMAN_SOCKET`        | required                      | Podman API 套接字，例如 `unix:///run/podman/podman.sock`                                                                                                            |
@@ -82,6 +83,18 @@ Podman
 | `DSH_PODMAN_GUEST_SOCKET`  | required    | guest agent 提供服务的 Unix 套接字；orchestrator 在启动容器时设置它 |
 | `DSH_PODMAN_GUEST_TOKEN`   | —           | 每次 gRPC 调用所需的 Bearer 令牌；见[变量详解](#变量详解)           |
 | `DSH_PODMAN_PROJECTS_ROOT` | `/projects` | 工作区的项目被挂载到的根目录                                        |
+
+## Gateway（`dsh-podman-gateway`）
+
+| 变量                              | 默认值                        | 说明                                                    |
+| --------------------------------- | ----------------------------- | ------------------------------------------------------- |
+| `DSH_PODMAN_GATEWAY_SOCKET`       | `<套接字根目录>/gateway.sock` | gateway 提供控制 API 的 Unix 套接字                     |
+| `DSH_PODMAN_GATEWAY_SOCKETS_ROOT` | `/run/dsh-podman`             | 共享套接字根目录；gateway 在其下访问各容器发布的套接字  |
+| `DSH_PODMAN_GATEWAY_TOKEN`        | —                             | 每次控制调用的可选 Bearer 令牌；见[变量详解](#变量详解) |
+
+标准安装会运行 gateway。它是可选的：只有发布 pod
+端口时才需要它（见[用法](usage.zh.md#端口发布)）。它只绑定
+`127.0.0.1`，因此已发布端口只能从本机访问。
 
 ## 变量详解
 
@@ -146,6 +159,16 @@ orchestrator 和插件必须约定的任意共享机密字符串；每个控制�
 `openssl rand -hex 32`——并在两端设置相同的值。当 orchestrator
 未设置令牌时，它接受未经认证的控制平面调用（转而依赖套接字的文件权限）；当设置了令牌时，不带匹配头的请求会被以
 `Unauthenticated` 拒绝。
+
+### `DSH_PODMAN_GATEWAY_TOKEN`
+
+gateway 与 orchestrator 必须一致的任意共享机密字符串；每次 gateway
+控制调用都会以 gRPC 元数据标头 `authorization: bearer <token>`
+携带它。请使用足够长的随机值——例如
+`openssl rand -hex
+32`——并在两端设置相同的值。gateway
+未设置令牌时会接受未经认证的控制调用（改由套接字文件权限保护）并记录一条警告；设置了令牌后，缺少匹配标头的调用会被拒绝并返回
+`Unauthenticated`。dsh 插件不访问 gateway，因此不需要该变量。
 
 ### `DSH_PODMAN_ORCHESTRATOR_STATE`
 

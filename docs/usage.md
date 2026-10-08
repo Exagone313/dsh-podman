@@ -345,6 +345,36 @@ guest agent has, including environment secrets attached with
 variables are not visible. `daemon_restart` replays the mode the daemon was
 started with.
 
+### Published ports
+
+| Tool                       | Params                                                                | Description                                                                    |
+| -------------------------- | --------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| `container_publish_port`   | `container`, `port`, optional `protocol` (`tcp`), `suggestedHostPort` | Expose a TCP port of the pod on the host's `127.0.0.1`, and return its address |
+| `container_unpublish_port` | `container`, `port`, optional `protocol` (`tcp`)                      | Stop exposing a published port                                                 |
+
+A pod's ports are not reachable from the host by default. Publishing brings one
+TCP port out through the `dsh-podman-gateway` container the standard install
+runs (see [Install](install-dsh-and-dsh-podman.md)): the guest agent forwards to
+the port inside the pod over a Unix socket in the shared socket root, and the
+gateway binds a host address and port to that socket and forwards to it. Only
+`127.0.0.1` is ever bound, so a published port is reachable from this host alone
+— by any local process, which is why the tool asks for approval.
+
+`container_publish_port` returns the address to show the user, for example
+`tcp://127.0.0.1:6666`. Pass `suggestedHostPort` (1024-65535) to ask for a
+specific host port; omit it and the gateway chooses a free one, and the returned
+address carries whichever port was bound. Publishing the same port twice is
+idempotent. A published port survives a container recreate on the same host
+port, and is released when it is unpublished, when its container is removed, or
+when its workspace is torn down — the gateway holds no host port of its own
+beyond what the orchestrator keeps a lease for.
+
+Only TCP is implemented for now; `protocol` defaults to `tcp`, and the request,
+the stored record and the returned address already carry a protocol, so `udp`
+and `http` can be added without changing the tool's shape. The gateway is
+optional: without it, both tools report that it is not running and every other
+feature keeps working.
+
 ## Container management UI
 
 The plugin ships a browser half that registers its card on the **dsh-podman**
@@ -362,19 +392,24 @@ rows show their environment and secret-environment variables and their mounts,
 let you edit environment variables and add/remove mounts (each removal is
 confirmed), and attach/detach named secrets to a container's environment
 variables; each row also offers **Remove**, **Recreate** (same image), and
-**Recreate with image**. Every workspace row also offers **Remove pod**, which
-removes the workspace's pod, all of its containers, and the orchestrator's
-record for it (volumes, secrets, and project data are kept); removing a
-workspace's last container removes its pod as well, so an empty pod is never
-left behind. The page re-reads the live state whenever the Plugins panel opens
-it, and its footer has a **Reload this view** button. The images section can
-rebuild a single image or **rebuild all** in dependency order; **Build image**
-opens a popup with an image-id/base-image form and a chip input for the package
-list (type a name and press space/comma, or paste a list, to add removable
-chips). Volumes and secrets are listed as individual expandable rows, each with
-its own actions, and **Create volume** / **Create secret** open popup forms (the
-secret form takes an optional length; a secret's value can be overwritten, never
-read). Card actions are direct control calls and are not approval-gated.
+**Recreate with image**. A row's **Ports** section lists the pod ports exposed
+on the host and publishes another: give the pod port and, optionally, the host
+port to prefer (the gateway chooses a free one otherwise, and the notice names
+the endpoint it bound), and unpublish with a confirmation; publishing is
+disabled with a hint while the gateway is not running or the container is
+stopped. Every workspace row also offers **Remove pod**, which removes the
+workspace's pod, all of its containers, and the orchestrator's record for it
+(volumes, secrets, and project data are kept); removing a workspace's last
+container removes its pod as well, so an empty pod is never left behind. The
+page re-reads the live state whenever the Plugins panel opens it, and its footer
+has a **Reload this view** button. The images section can rebuild a single image
+or **rebuild all** in dependency order; **Build image** opens a popup with an
+image-id/base-image form and a chip input for the package list (type a name and
+press space/comma, or paste a list, to add removable chips). Volumes and secrets
+are listed as individual expandable rows, each with its own actions, and
+**Create volume** / **Create secret** open popup forms (the secret form takes an
+optional length; a secret's value can be overwritten, never read). Card actions
+are direct control calls and are not approval-gated.
 
 A **Package caches** section reports the size of every configured build cache
 (`DSH_PODMAN_HOST_PACMAN_CACHE`, `DSH_PODMAN_HOST_APT_CACHE`,

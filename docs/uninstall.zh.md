@@ -7,7 +7,7 @@ SPDX-License-Identifier: MIT
 # 卸载
 
 本页用于撤销[安装指南](install-dsh-and-dsh-podman.zh.md)中的操作：其中假设 dsh
-运行在 dsh-podman 镜像中，并与编排器一同由 Quadlet 单元启动。
+运行在 dsh-podman 镜像中，并与编排器和 gateway 一同由 Quadlet 单元启动。
 
 dsh 镜像会在容器启动时安装 dsh-podman 插件，而该插件的 bundle 层正是禁用 dsh
 自带的 `subprocess`、`fs-sandbox`、`spill-local`
@@ -18,9 +18,10 @@ dsh-podman 运行 dsh：其内置的 shell 与文件系统工具会重新启用�
 ## 停止容器并移除 Quadlet 单元
 
 ```bash
-systemctl --user stop dsh dsh-podman-orchestrator
+systemctl --user stop dsh dsh-podman-orchestrator dsh-podman-gateway
 rm ~/.config/containers/systemd/dsh.container
 rm ~/.config/containers/systemd/dsh-podman-orchestrator.container
+rm ~/.config/containers/systemd/dsh-podman-gateway.container
 systemctl --user daemon-reload
 ```
 

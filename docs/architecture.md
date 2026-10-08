@@ -6,13 +6,14 @@ SPDX-License-Identifier: MIT
 
 # Architecture
 
-dsh-podman has three components:
+dsh-podman has four components:
 
-| Component                 | Runs                                      | What it does                                                                                           |
-| ------------------------- | ----------------------------------------- | ------------------------------------------------------------------------------------------------------ |
-| `@exagone313/dsh-podman`  | Inside dsh itself                         | Registers `ctx.subprocess` and `ctx.fs` backed by the orchestrator                                     |
-| `dsh-podman-guest-agent`  | Inside every guest container              | Serves the exec/filesystem gRPC API for one workspace                                                  |
-| `dsh-podman-orchestrator` | A container with access to the Podman API | Owns the control socket and persisted state; creates/removes guest containers; builds workspace images |
+| Component                 | Runs                                                             | What it does                                                                                           |
+| ------------------------- | ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| `@exagone313/dsh-podman`  | Inside dsh itself                                                | Registers `ctx.subprocess` and `ctx.fs` backed by the orchestrator                                     |
+| `dsh-podman-guest-agent`  | Inside every guest container                                     | Serves the exec/filesystem gRPC API for one workspace                                                  |
+| `dsh-podman-orchestrator` | A container with access to the Podman API                        | Owns the control socket and persisted state; creates/removes guest containers; builds workspace images |
+| `dsh-podman-gateway`      | A container on the host network, shipped by the standard install | Bridges a published pod port to the host loopback                                                      |
 
 The plugin auto-creates a missing workspace using its configured default image
 and a single read-write project mount; `container_mount_update` can remount that
@@ -52,7 +53,8 @@ workspace's current image), `RemoveContainer`, `AddContainerMount`,
 `AddContainerSecret`, and `RemoveContainerSecret`. The service also exposes the
 workspace, volume, secret, image (build, rebuild, remove and base-image pull),
 and cache (list and clean) operations that back the Podman page, plus
-`GetVersion`.
+`GetVersion`, `GetGatewayStatus`, and `PublishPort` / `UnpublishPort` /
+`ListPublishedPorts` for [published ports](#published-ports).
 
 ## Workspaces and pods
 
@@ -163,6 +165,41 @@ container; it is not a guarantee that nothing in the workspace can be written.
 Recreating a container or shutting down the orchestrator first asks the
 container's guest agent to gracefully stop its daemons (SIGTERM, ~10s grace)
 before podman tears the container down.
+
+## Published ports
+
+A daemon listening inside a pod is not reachable from the host: each pod has its
+own network namespace and nothing publishes ports. `container_publish_port`
+brings one TCP port out, through two forwards:
+
+```
+client -> <address>:<port> -> gateway -> unix socket (socket root) -> guest agent -> 127.0.0.1:<pod port>
+```
+
+The **guest agent** listens on a short, deterministic Unix socket inside the
+container's own socket directory — the one shared with the orchestrator and the
+plugin, where its own `guest.sock` lives — and forwards each connection to
+`127.0.0.1:<port>` inside the pod. The **gateway** — a container the standard
+install ships, on the host network — mounts the same socket root, binds
+`127.0.0.1:<host port>` and forwards to that socket. It returns the address
+alongside the port, so the tool can answer `tcp://127.0.0.1:6666`; the address
+belongs to the gateway, which is what would let a later HTTP publish answer a
+hostname instead.
+
+The **orchestrator** owns the lifecycle. It records every published port on the
+container, re-creates the guest socket after a container recreate (the gateway
+binding survives, so the host port does not move) and releases the binding when
+the port is unpublished, the container is removed, or its workspace is torn
+down. No published port lives only in the gateway: it holds bindings only while
+the orchestrator keeps a lease stream open, so an orchestrator that stops or
+crashes cannot leave a host port behind, and a gateway that restarts is re-bound
+from the store.
+
+Only TCP is implemented. The wire format, the stored record and the returned
+address string already carry a protocol, so a later UDP or HTTP publish does not
+have to change them. The gateway is optional: only publishing needs it, and
+without it that tool reports it is not running while every other feature is
+unaffected.
 
 ## Images
 

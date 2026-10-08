@@ -44,6 +44,19 @@ export type ReasonFact =
   | { kind: "container_mount_add"; container: string; mount: MountFact }
   | { kind: "container_mount_remove"; container: string; mount: MountFact }
   | { kind: "container_mount_update"; container: string; mount: MountFact }
+  | {
+    kind: "container_publish_port";
+    container: string;
+    port: number;
+    protocol: string;
+    suggestedHostPort?: number;
+  }
+  | {
+    kind: "container_unpublish_port";
+    container: string;
+    port: number;
+    protocol: string;
+  }
   | { kind: "container_path_set"; container: string; paths: readonly string[] }
   | { kind: "container_path_add"; container: string; path: string }
   | { kind: "container_path_remove"; container: string; path: string }
@@ -339,6 +352,35 @@ export function renderReason(locale: ReasonLocale, fact: ReasonFact): string {
         `在容器 ${quoted(locale, fact.container)} 中添加挂载：${
           mountText(locale, fact.mount)
         }。`,
+      );
+    case "container_publish_port": {
+      const target = `${fact.port}/${fact.protocol}`;
+      const where = fact.suggestedHostPort === undefined
+        ? pick(locale, "a free host port", "主机上的一个空闲端口")
+        : pick(
+          locale,
+          `the host port ${fact.suggestedHostPort}`,
+          `主机端口 ${fact.suggestedHostPort}`,
+        );
+      return pick(
+        locale,
+        `Publish ${target} from container ${
+          quoted(locale, fact.container)
+        } on ${where}; it becomes reachable on the host.`,
+        `将容器 ${
+          quoted(locale, fact.container)
+        } 的 ${target} 发布到${where}；主机将可访问该端口。`,
+      );
+    }
+    case "container_unpublish_port":
+      return pick(
+        locale,
+        `Stop publishing ${fact.port}/${fact.protocol} from container ${
+          quoted(locale, fact.container)
+        }.`,
+        `停止发布容器 ${
+          quoted(locale, fact.container)
+        } 的 ${fact.port}/${fact.protocol}。`,
       );
     case "container_mount_remove":
       return pick(

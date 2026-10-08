@@ -69,10 +69,12 @@ test("the destructive mutations require approval", () => {
     "container_path_add",
     "container_path_remove",
     "container_path_set",
+    "container_publish_port",
     "container_recreate",
     "container_remove",
     "container_secret_add",
     "container_secret_remove",
+    "container_unpublish_port",
     "image_build",
     "image_rebuild",
     "image_rebuild_all",
@@ -133,6 +135,17 @@ test("approvalDecision gates exactly the approval-flagged tools", () => {
     container_secret_remove: {
       container: "valkey-ctr",
       env: "REDIS_PASSWORD",
+    },
+    container_publish_port: {
+      container: "valkey-ctr",
+      port: 6379,
+      protocol: "tcp",
+      suggestedHostPort: 26379,
+    },
+    container_unpublish_port: {
+      container: "valkey-ctr",
+      port: 6379,
+      protocol: "tcp",
     },
   };
   for (const tool of TOOLS) {

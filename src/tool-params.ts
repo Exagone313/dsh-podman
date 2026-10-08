@@ -291,6 +291,53 @@ export const containerMountUpdateParameters = {
   required: ["container", "mode"],
 };
 
+export const containerPublishPortParameters = {
+  type: "object",
+  properties: {
+    container: containerParam,
+    port: {
+      type: "integer",
+      minimum: 1,
+      maximum: 65535,
+      description:
+        "TCP port the service listens on inside the pod's network namespace.",
+    },
+    protocol: {
+      type: "string",
+      enum: ["tcp"],
+      description:
+        "Transport to publish. Only tcp is supported for now; udp and http are reserved for later.",
+    },
+    suggestedHostPort: {
+      type: "integer",
+      minimum: 1024,
+      maximum: 65535,
+      description:
+        "Host port to prefer, between 1024 and 65535. Omit to let the gateway choose a free one.",
+    },
+  },
+  required: ["container", "port"],
+};
+
+export const containerUnpublishPortParameters = {
+  type: "object",
+  properties: {
+    container: containerParam,
+    port: {
+      type: "integer",
+      minimum: 1,
+      maximum: 65535,
+      description: "Pod port whose host exposure is removed.",
+    },
+    protocol: {
+      type: "string",
+      enum: ["tcp"],
+      description: "Transport to unpublish. Only tcp is supported for now.",
+    },
+  },
+  required: ["container", "port"],
+};
+
 export const containerPathSetParameters = {
   type: "object",
   properties: {

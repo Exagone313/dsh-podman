@@ -84,6 +84,7 @@ test("container_list returns sanitized container objects with env values", async
       paths: [],
       env: { PATH: "/bin", HOME: "/root" },
       secretEnv: {},
+      publishedPorts: [],
     },
     {
       containerName: "db",
@@ -92,6 +93,7 @@ test("container_list returns sanitized container objects with env values", async
       paths: [],
       env: { PORT: "5432", DB: "main", X: "1", Y: "2" },
       secretEnv: {},
+      publishedPorts: [],
     },
     {
       containerName: "worker",
@@ -100,6 +102,7 @@ test("container_list returns sanitized container objects with env values", async
       paths: [],
       env: {},
       secretEnv: {},
+      publishedPorts: [],
     },
   ]);
 });

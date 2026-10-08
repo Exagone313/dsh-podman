@@ -233,6 +233,7 @@ test("container_list returns secretEnv maps on container rows", async () => {
       paths: [],
       env: {},
       secretEnv: { REDIS_PASSWORD: "db-pass" },
+      publishedPorts: [],
     },
     {
       containerName: "db",
@@ -252,6 +253,7 @@ test("container_list returns secretEnv maps on container rows", async () => {
         I: "i",
         J: "j",
       },
+      publishedPorts: [],
     },
     {
       containerName: "worker",
@@ -260,6 +262,7 @@ test("container_list returns secretEnv maps on container rows", async () => {
       paths: [],
       env: {},
       secretEnv: {},
+      publishedPorts: [],
     },
   ]);
 });

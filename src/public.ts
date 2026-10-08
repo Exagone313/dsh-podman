@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: MIT
 
 import { mountKindFromProto, mountModeFromProto } from "./mount-enums.js";
+import { portProtocolFromProto } from "./publish-port.js";
 
 // Rebuild API objects so tool results never expose internal fields (see
 // AGENTS.md "Security"): only allow-listed attributes reach the model.
@@ -19,6 +20,19 @@ export function publicMount(mount: any): Record<string, unknown> {
   };
 }
 
+/// A published pod port: the address string plus the parts it was built from.
+/// The gateway owns the address, so it is echoed rather than assumed.
+export function publicPublishedPort(port: any): Record<string, unknown> {
+  const protocol = portProtocolFromProto(port?.protocol);
+  return {
+    ...(protocol !== undefined ? { protocol } : {}),
+    port: port?.port ?? 0,
+    address: port?.address ?? "",
+    hostPort: port?.hostPort ?? 0,
+    endpoint: port?.endpoint ?? "",
+  };
+}
+
 export function publicContainer(row: any): Record<string, unknown> {
   return {
     containerName: row?.containerName ?? "",
@@ -28,6 +42,7 @@ export function publicContainer(row: any): Record<string, unknown> {
     paths: row?.paths ?? [],
     env: row?.env ?? {},
     secretEnv: row?.secretEnv ?? {},
+    publishedPorts: (row?.publishedPorts ?? []).map(publicPublishedPort),
   };
 }
 

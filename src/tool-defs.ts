@@ -16,12 +16,14 @@ import {
   containerPathAddParameters,
   containerPathRemoveParameters,
   containerPathSetParameters,
+  containerPublishPortParameters,
   containerReadParameters,
   containerRecreateParameters,
   containerRemoveParameters,
   containerSecretAddParameters,
   containerSecretRemoveParameters,
   containerStartParameters,
+  containerUnpublishPortParameters,
   containerWriteParameters,
   daemonListParameters,
   daemonLogsParameters,
@@ -135,6 +137,16 @@ export const TOOLS: ToolDefinition[] = [
     approval: true,
   },
   {
+    name: "container_publish_port",
+    parameters: containerPublishPortParameters,
+    approval: true,
+  },
+  {
+    name: "container_unpublish_port",
+    parameters: containerUnpublishPortParameters,
+    approval: true,
+  },
+  {
     name: "container_path_set",
     parameters: containerPathSetParameters,
     approval: true,
@@ -217,6 +229,10 @@ export const TOOL_DESCRIPTIONS: Record<string, string> = {
     "Remove a mount from a container in the current workspace. Identify it by kind plus its own handle: project for a project mount, volume for a named volume, secret for a secret, and destination for tmpfs. A handle that matches more than one mount is rejected, so pass destination as well when a volume or secret is mounted more than once; copy the exact values from container_mount_list. Recreates the container, terminating its running processes; bind-mounted volume data persists. Requires approval: removing a mount changes the container filesystem view.",
   container_mount_update:
     "Change the mode of an existing project or volume mount in the current workspace (read_only or read_write). Identify it by kind plus its own handle, exactly like container_mount_remove; a handle that matches more than one mount is rejected. The default container's workspace project mount can be remounted read-only. Recreates the container, terminating its running processes; bind-mounted volume data persists. Requires approval: changing a mount's mode changes the container filesystem view.",
+  container_publish_port:
+    "Expose a TCP port a daemon listens on inside the current workspace's pod on the host's loopback, and return the address to show the user. The dsh-podman gateway must be installed and running. Pass suggestedHostPort to ask for a specific host port (1024-65535) or omit it to get a free one. The exposure survives a container recreate. Requires approval: publishing a port reaches a service from the host.",
+  container_unpublish_port:
+    "Stop exposing a published pod port in the current workspace. Identify it by the port inside the pod and its protocol, exactly as passed to container_publish_port. Unpublishing a port that is not published is a no-op. Requires approval: it changes what the host reaches.",
   container_path_set:
     "Replace the directories the container prepends to PATH for every command it runs, highest priority first. Applied immediately to future shell, exec, terminal, and daemon runs without recreating the container; already-running daemons keep their old PATH. A recreated container restores the list. Requires approval: changing PATH changes which binaries run.",
   container_path_add:
@@ -272,6 +288,8 @@ export const TOOL_UI: Record<string, { title: string; kind: string }> = {
   container_mount_add: { title: "Add mount", kind: "edit" },
   container_mount_remove: { title: "Remove mount", kind: "delete" },
   container_mount_update: { title: "Change mount mode", kind: "edit" },
+  container_publish_port: { title: "Publish port", kind: "execute" },
+  container_unpublish_port: { title: "Unpublish port", kind: "delete" },
   container_path_set: { title: "Set PATH additions", kind: "edit" },
   container_path_add: { title: "Add PATH entry", kind: "edit" },
   container_path_remove: { title: "Remove PATH entry", kind: "delete" },

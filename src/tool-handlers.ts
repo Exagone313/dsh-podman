@@ -28,7 +28,9 @@ import {
   publicDaemon,
   publicImage,
   publicMount,
+  publicPublishedPort,
 } from "./public.js";
+import { portProtocolToProto } from "./publish-port.js";
 import { grpc } from "./grpc/runtime-client.js";
 import {
   defaultMountMode,
@@ -621,6 +623,35 @@ export const toolHandlers: Record<
     }
     const row = await resolver.control("updateContainerMount", request);
     return publicContainer(row);
+  },
+  container_publish_port: async (resolver, input, exec) => {
+    const request: Record<string, unknown> = {
+      workspaceSlug: await sessionWorkspaceSlug(resolver, currentCwd(exec)),
+      container: input.container,
+      port: input.port,
+      protocol: portProtocolToProto(input.protocol),
+    };
+    // An omitted suggestion asks the gateway to choose a free host port.
+    if (input.suggestedHostPort !== undefined) {
+      request.suggestedHostPort = input.suggestedHostPort;
+    }
+    const published = await resolver.control("publishPort", request);
+    return { container: input.container, ...publicPublishedPort(published) };
+  },
+  container_unpublish_port: async (resolver, input, exec) => {
+    const request: Record<string, unknown> = {
+      workspaceSlug: await sessionWorkspaceSlug(resolver, currentCwd(exec)),
+      container: input.container,
+      port: input.port,
+      protocol: portProtocolToProto(input.protocol),
+    };
+    await resolver.control("unpublishPort", request);
+    return {
+      container: input.container,
+      port: input.port,
+      protocol: input.protocol ?? "tcp",
+      unpublished: true,
+    };
   },
   container_path_set: async (resolver, input, exec) => {
     const sessionCwd = currentCwd(exec);

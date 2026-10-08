@@ -111,6 +111,8 @@ export const EXPECTED_TOOLS = [
   "container_mount_add",
   "container_mount_remove",
   "container_mount_update",
+  "container_publish_port",
+  "container_unpublish_port",
   "container_path_set",
   "container_path_add",
   "container_path_remove",

@@ -28,210 +28,59 @@ import type {
   TranslateNS,
 } from "@deepseek-ai/dsh-client-ui-slots";
 import type { ToolCallViewProps } from "@deepseek-ai/dsh-client-ui-tool/client";
-import { type ContainerPluginKey, NS } from "./locales.js";
+import { NS } from "./locales.js";
+import { TOOL_PRESENTATION, toolPresentation } from "./tool-presentations.js";
+
+export { TOOL_VIEW_KEYS } from "./tool-presentations.js";
 import { TERMINAL_CLASS } from "./terminal-styles.js";
 
 // A domain-owned row for every podman tool, registered over the keyed
 // `tool.call.toolview` slot. Without it the shipped client renders each call as
 // "Tool call · <tool name>"; this row owns the icon, title, summary and body.
 
-interface ToolPresentation {
-  readonly titleKey: ContainerPluginKey;
-  readonly icon: ReactNode;
-  readonly summaryKeys: readonly string[];
-}
-
-const TOOL_PRESENTATION: Record<string, ToolPresentation> = {
-  container_bash: {
-    titleKey: "toolTitle_container_bash",
-    icon: <IconApiOutlineRegular size={14} />,
-    summaryKeys: ["description", "command"],
-  },
-  container_exec: {
-    titleKey: "toolTitle_container_exec",
-    icon: <IconApiOutlineRegular size={14} />,
-    summaryKeys: ["description", "argv"],
-  },
-  container_read: {
-    titleKey: "toolTitle_container_read",
-    icon: <IconBrowseOutlineRegular size={14} />,
-    summaryKeys: ["file_path"],
-  },
-  container_write: {
-    titleKey: "toolTitle_container_write",
-    icon: <IconEditOutlineRegular size={14} />,
-    summaryKeys: ["file_path"],
-  },
-  container_edit: {
-    titleKey: "toolTitle_container_edit",
-    icon: <IconEditOutlineRegular size={14} />,
-    summaryKeys: ["file_path"],
-  },
-  container_glob: {
-    titleKey: "toolTitle_container_glob",
-    icon: <IconSearchOutlineRegular size={14} />,
-    summaryKeys: ["pattern"],
-  },
-  container_grep: {
-    titleKey: "toolTitle_container_grep",
-    icon: <IconSearchOutlineRegular size={14} />,
-    summaryKeys: ["pattern"],
-  },
-  container_list: {
-    titleKey: "toolTitle_container_list",
-    icon: <IconDataOutlineRegular size={14} />,
-    summaryKeys: [],
-  },
-  container_start: {
-    titleKey: "toolTitle_container_start",
-    icon: <IconPlayOutlineRegular size={14} />,
-    summaryKeys: ["container", "image"],
-  },
-  container_recreate: {
-    titleKey: "toolTitle_container_recreate",
-    icon: <IconRefreshOutlineRegular size={14} />,
-    summaryKeys: ["container", "image"],
-  },
-  container_remove: {
-    titleKey: "toolTitle_container_remove",
-    icon: <IconTrashOutlineRegular size={14} />,
-    summaryKeys: ["container"],
-  },
-  container_mount_list: {
-    titleKey: "toolTitle_container_mount_list",
-    icon: <IconFolderOpenOutlineRegular size={14} />,
-    summaryKeys: ["container"],
-  },
-  container_mount_add: {
-    titleKey: "toolTitle_container_mount_add",
-    icon: <IconFolderOpenOutlineRegular size={14} />,
-    summaryKeys: ["container", "kind"],
-  },
-  container_mount_remove: {
-    titleKey: "toolTitle_container_mount_remove",
-    icon: <IconTrashOutlineRegular size={14} />,
-    summaryKeys: ["container"],
-  },
-  container_mount_update: {
-    titleKey: "toolTitle_container_mount_update",
-    icon: <IconRefreshOutlineRegular size={14} />,
-    summaryKeys: ["container", "mode"],
-  },
-  container_path_set: {
-    titleKey: "toolTitle_container_path_set",
-    icon: <IconEditOutlineRegular size={14} />,
-    summaryKeys: ["container"],
-  },
-  container_path_add: {
-    titleKey: "toolTitle_container_path_add",
-    icon: <IconPlusOutlineRegular size={14} />,
-    summaryKeys: ["container", "path"],
-  },
-  container_path_remove: {
-    titleKey: "toolTitle_container_path_remove",
-    icon: <IconTrashOutlineRegular size={14} />,
-    summaryKeys: ["container", "path"],
-  },
-  container_secret_add: {
-    titleKey: "toolTitle_container_secret_add",
-    icon: <IconLinkOutlineRegular size={14} />,
-    summaryKeys: ["container", "env"],
-  },
-  container_secret_remove: {
-    titleKey: "toolTitle_container_secret_remove",
-    icon: <IconLinkOutlineRegular size={14} />,
-    summaryKeys: ["container", "env"],
-  },
-  image_list: {
-    titleKey: "toolTitle_image_list",
-    icon: <IconArchiveOutlineRegular size={14} />,
-    summaryKeys: [],
-  },
-  image_get: {
-    titleKey: "toolTitle_image_get",
-    icon: <IconArchiveOutlineRegular size={14} />,
-    summaryKeys: ["imageId"],
-  },
-  image_build: {
-    titleKey: "toolTitle_image_build",
-    icon: <IconPlusOutlineRegular size={14} />,
-    summaryKeys: ["imageId", "parent"],
-  },
-  image_rebuild: {
-    titleKey: "toolTitle_image_rebuild",
-    icon: <IconRefreshOutlineRegular size={14} />,
-    summaryKeys: ["imageId"],
-  },
-  image_rebuild_all: {
-    titleKey: "toolTitle_image_rebuild_all",
-    icon: <IconRefreshOutlineRegular size={14} />,
-    summaryKeys: [],
-  },
-  image_remove: {
-    titleKey: "toolTitle_image_remove",
-    icon: <IconTrashOutlineRegular size={14} />,
-    summaryKeys: ["imageId"],
-  },
-  volume_list: {
-    titleKey: "toolTitle_volume_list",
-    icon: <IconDataOutlineRegular size={14} />,
-    summaryKeys: [],
-  },
-  volume_create: {
-    titleKey: "toolTitle_volume_create",
-    icon: <IconPlusOutlineRegular size={14} />,
-    summaryKeys: ["name"],
-  },
-  volume_remove: {
-    titleKey: "toolTitle_volume_remove",
-    icon: <IconTrashOutlineRegular size={14} />,
-    summaryKeys: ["name"],
-  },
-  secret_list: {
-    titleKey: "toolTitle_secret_list",
-    icon: <IconLinkOutlineRegular size={14} />,
-    summaryKeys: [],
-  },
-  secret_create: {
-    titleKey: "toolTitle_secret_create",
-    icon: <IconPlusOutlineRegular size={14} />,
-    summaryKeys: ["name"],
-  },
-  secret_remove: {
-    titleKey: "toolTitle_secret_remove",
-    icon: <IconTrashOutlineRegular size={14} />,
-    summaryKeys: ["name"],
-  },
-  daemon_start: {
-    titleKey: "toolTitle_daemon_start",
-    icon: <IconPlayOutlineRegular size={14} />,
-    summaryKeys: ["name"],
-  },
-  daemon_list: {
-    titleKey: "toolTitle_daemon_list",
-    icon: <IconPlayOutlineRegular size={14} />,
-    summaryKeys: ["container"],
-  },
-  daemon_logs: {
-    titleKey: "toolTitle_daemon_logs",
-    icon: <IconBrowseOutlineRegular size={14} />,
-    summaryKeys: ["name"],
-  },
-  daemon_restart: {
-    titleKey: "toolTitle_daemon_restart",
-    icon: <IconRefreshOutlineRegular size={14} />,
-    summaryKeys: ["name"],
-  },
-  daemon_stop: {
-    titleKey: "toolTitle_daemon_stop",
-    icon: <IconStopFillRegular size={14} />,
-    summaryKeys: ["name"],
-  },
+// The icon each row leads with, exhaustive over the data table: a tool added
+// without an icon fails the build rather than silently falling back.
+const TOOL_ICONS: Record<keyof typeof TOOL_PRESENTATION, ReactNode> = {
+  container_bash: <IconApiOutlineRegular size={14} />,
+  container_exec: <IconApiOutlineRegular size={14} />,
+  container_read: <IconBrowseOutlineRegular size={14} />,
+  container_write: <IconEditOutlineRegular size={14} />,
+  container_edit: <IconEditOutlineRegular size={14} />,
+  container_glob: <IconSearchOutlineRegular size={14} />,
+  container_grep: <IconSearchOutlineRegular size={14} />,
+  container_list: <IconDataOutlineRegular size={14} />,
+  container_start: <IconPlayOutlineRegular size={14} />,
+  container_recreate: <IconRefreshOutlineRegular size={14} />,
+  container_remove: <IconTrashOutlineRegular size={14} />,
+  container_mount_list: <IconFolderOpenOutlineRegular size={14} />,
+  container_mount_add: <IconFolderOpenOutlineRegular size={14} />,
+  container_mount_remove: <IconTrashOutlineRegular size={14} />,
+  container_mount_update: <IconRefreshOutlineRegular size={14} />,
+  container_publish_port: <IconLinkOutlineRegular size={14} />,
+  container_unpublish_port: <IconTrashOutlineRegular size={14} />,
+  container_path_set: <IconEditOutlineRegular size={14} />,
+  container_path_add: <IconPlusOutlineRegular size={14} />,
+  container_path_remove: <IconTrashOutlineRegular size={14} />,
+  container_secret_add: <IconLinkOutlineRegular size={14} />,
+  container_secret_remove: <IconLinkOutlineRegular size={14} />,
+  image_list: <IconArchiveOutlineRegular size={14} />,
+  image_get: <IconArchiveOutlineRegular size={14} />,
+  image_build: <IconPlusOutlineRegular size={14} />,
+  image_rebuild: <IconRefreshOutlineRegular size={14} />,
+  image_rebuild_all: <IconRefreshOutlineRegular size={14} />,
+  image_remove: <IconTrashOutlineRegular size={14} />,
+  volume_list: <IconDataOutlineRegular size={14} />,
+  volume_create: <IconPlusOutlineRegular size={14} />,
+  volume_remove: <IconTrashOutlineRegular size={14} />,
+  secret_list: <IconLinkOutlineRegular size={14} />,
+  secret_create: <IconPlusOutlineRegular size={14} />,
+  secret_remove: <IconTrashOutlineRegular size={14} />,
+  daemon_start: <IconPlayOutlineRegular size={14} />,
+  daemon_list: <IconPlayOutlineRegular size={14} />,
+  daemon_logs: <IconBrowseOutlineRegular size={14} />,
+  daemon_restart: <IconRefreshOutlineRegular size={14} />,
+  daemon_stop: <IconStopFillRegular size={14} />,
 };
-
-/** The wire tool names this package owns a row for. */
-export const TOOL_VIEW_KEYS: readonly string[] = Object.keys(TOOL_PRESENTATION);
-
 const sepStyle: CSSProperties = {
   flex: "none",
   width: "2px",
@@ -311,6 +160,8 @@ function argSummary(
   for (const key of keys) {
     const value = args[key];
     if (typeof value === "string" && value !== "") return firstLine(value);
+    // Numeric operands (a pod port) are JSON numbers, not strings.
+    if (typeof value === "number") return String(value);
     if (Array.isArray(value) && value.length > 0) {
       return firstLine(value.map((item) => String(item)).join(" "));
     }
@@ -450,7 +301,7 @@ export function PodmanToolRow({
   inspect,
   t,
 }: PodmanToolRowProps) {
-  const presentation = TOOL_PRESENTATION[toolName];
+  const presentation = toolPresentation(toolName);
   const title = presentation === undefined
     ? toolName
     : t(presentation.titleKey);
@@ -482,7 +333,9 @@ export function PodmanToolRow({
     : state === "stopped"
     ? <StateDot state="warning" />
     : (
-      presentation?.icon ?? <IconSparkleRegular size={14} />
+      presentation === undefined
+        ? <IconSparkleRegular size={14} />
+        : TOOL_ICONS[toolName as keyof typeof TOOL_PRESENTATION]
     );
   void inspect;
   return (

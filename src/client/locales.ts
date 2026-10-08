@@ -187,6 +187,8 @@ export type ContainerPluginKey =
   | "toolTitle_container_path_remove"
   | "toolTitle_container_secret_add"
   | "toolTitle_container_secret_remove"
+  | "toolTitle_container_publish_port"
+  | "toolTitle_container_unpublish_port"
   | "toolTitle_image_list"
   | "toolTitle_image_get"
   | "toolTitle_image_build"
@@ -432,6 +434,8 @@ export const en: Record<ContainerPluginKey, string> = {
   toolTitle_container_path_remove: "Remove PATH entry",
   toolTitle_container_secret_add: "Attach secret",
   toolTitle_container_secret_remove: "Detach secret",
+  toolTitle_container_publish_port: "Publish port",
+  toolTitle_container_unpublish_port: "Unpublish port",
   toolTitle_image_list: "List images",
   toolTitle_image_get: "Inspect image",
   toolTitle_image_build: "Build image",
@@ -659,6 +663,8 @@ export const zh: Record<ContainerPluginKey, string> = {
   toolTitle_container_path_remove: "移除 PATH 条目",
   toolTitle_container_secret_add: "注入机密",
   toolTitle_container_secret_remove: "移除机密注入",
+  toolTitle_container_publish_port: "发布端口",
+  toolTitle_container_unpublish_port: "取消发布端口",
   toolTitle_image_list: "列出镜像",
   toolTitle_image_get: "查看镜像",
   toolTitle_image_build: "构建镜像",

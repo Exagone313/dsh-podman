@@ -164,6 +164,26 @@ export function reasonFact(
         ? undefined
         : { kind: "container_remove", container };
     }
+    case "container_publish_port":
+    case "container_unpublish_port": {
+      const container = str("container");
+      const port = typeof args.port === "number" ? args.port : undefined;
+      if (container === undefined || port === undefined) return undefined;
+      const protocol = str("protocol") ?? "tcp";
+      if (name === "container_unpublish_port") {
+        return { kind: "container_unpublish_port", container, port, protocol };
+      }
+      const suggestedHostPort = typeof args.suggestedHostPort === "number"
+        ? args.suggestedHostPort
+        : undefined;
+      return {
+        kind: "container_publish_port",
+        container,
+        port,
+        protocol,
+        ...(suggestedHostPort === undefined ? {} : { suggestedHostPort }),
+      };
+    }
     case "volume_remove": {
       const volume = str("name");
       return volume === undefined

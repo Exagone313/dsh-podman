@@ -242,7 +242,9 @@ export {
   publicDaemon,
   publicImage,
   publicMount,
+  publicPublishedPort,
 } from "./public.js";
+export { portProtocolFromProto, portProtocolToProto } from "./publish-port.js";
 export {
   createSubprocessProvider,
   OutputReader,
@@ -260,12 +262,14 @@ export {
   containerMountAddParameters,
   containerMountListParameters,
   containerMountRemoveParameters,
+  containerPublishPortParameters,
   containerReadParameters,
   containerRecreateParameters,
   containerRemoveParameters,
   containerSecretAddParameters,
   containerSecretRemoveParameters,
   containerStartParameters,
+  containerUnpublishPortParameters,
   containerWriteParameters,
   daemonListParameters,
   daemonLogsParameters,

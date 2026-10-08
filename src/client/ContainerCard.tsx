@@ -65,7 +65,7 @@ export function ContainerCard(props: ContainerCardProps): ReactNode {
       }`,
       `${t("orchestrator")} ${
         state.orchestratorVersion || t("versionUnknown")
-      }`,
+      }${state.orchestratorCommit ? ` · ${state.orchestratorCommit}` : ""}`,
       `${t("gateway")} ${
         state.gatewayState === "running"
           ? `${state.gatewayVersion}${
@@ -428,6 +428,7 @@ export function ContainerCard(props: ContainerCardProps): ReactNode {
                 </span>
               </>
             )}
+          {state.orchestratorCommit ? ` · ${state.orchestratorCommit}` : ""}
         </span>
         <span>
           <span style={versionLabel}>{t("gateway")}</span>

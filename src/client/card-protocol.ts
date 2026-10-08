@@ -156,6 +156,8 @@ export interface CardSnapshot {
   dshVersion: string;
   // The orchestrator's version, or "" when it predates the handshake.
   orchestratorVersion: string;
+  // The orchestrator's short commit, or "" when it predates the handshake.
+  orchestratorCommit: string;
   versionState: "ok" | "minor-mismatch" | "major-mismatch";
   // The optional port-publishing gateway. "unknown" means the orchestrator
   // predates the status RPC or has not probed the gateway yet, which the card

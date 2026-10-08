@@ -119,6 +119,7 @@ test("the card route serves the live snapshot on GET", async () => {
   );
   assert.equal(typeof snapshot.dshVersion, "string");
   assert.equal(snapshot.orchestratorVersion, "9.9.9");
+  assert.equal(snapshot.orchestratorCommit, "abc");
   assert.equal(
     snapshot.versionState,
     "major-mismatch",
@@ -145,6 +146,7 @@ test("a refused control call reports the version mismatch instead of an empty sn
   const snapshot = (await response.json()) as any;
   assert.equal(typeof snapshot.dshVersion, "string");
   assert.equal(snapshot.orchestratorVersion, "9.9.9");
+  assert.equal(snapshot.orchestratorCommit, "abc");
   assert.equal(snapshot.versionState, "major-mismatch");
   assert.deepEqual(snapshot.containers, []);
   assert.deepEqual(snapshot.workspaces, []);

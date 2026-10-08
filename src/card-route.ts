@@ -40,16 +40,20 @@ import { GIT_COMMIT, VERSION } from "./generated/version.js";
 import { versionState as pluginVersionState } from "./version-compat.js";
 import { dshVersion } from "./dsh-version.js";
 
-// readOrchestratorVersion asks the orchestrator for its version, or returns ""
-// when the call fails (an orchestrator predating the handshake).
+// readOrchestratorVersion asks the orchestrator for its version and commit, or
+// returns empty strings when the call fails (an orchestrator predating the
+// handshake).
 async function readOrchestratorVersion(
   resolver: WorkspaceResolver,
-): Promise<string> {
+): Promise<{ version: string; commit: string }> {
   try {
     const response: any = await resolver.control("getVersion", {});
-    return String(response?.version ?? "");
+    return {
+      version: String(response?.version ?? ""),
+      commit: String(response?.commit ?? ""),
+    };
   } catch {
-    return "";
+    return { version: "", commit: "" };
   }
 }
 
@@ -237,7 +241,8 @@ export async function cardSnapshot(
   // The handshake RPC is exempt from the orchestrator's version check, so it
   // succeeds even when the rest is refused; an older orchestrator that has no
   // GetVersion yet leaves the version unknown.
-  const orchestratorVersion = await readOrchestratorVersion(resolver);
+  const { version: orchestratorVersion, commit: orchestratorCommit } =
+    await readOrchestratorVersion(resolver);
   const gateway = await readGatewayStatus(resolver);
   let listings: readonly unknown[];
   try {
@@ -260,6 +265,7 @@ export async function cardSnapshot(
       commit: GIT_COMMIT,
       dshVersion: harnessVersion,
       orchestratorVersion,
+      orchestratorCommit,
       versionState: "major-mismatch",
       ...gateway,
       gatewayVersionState: "ok",
@@ -278,6 +284,7 @@ export async function cardSnapshot(
     commit: GIT_COMMIT,
     dshVersion: harnessVersion,
     orchestratorVersion,
+    orchestratorCommit,
     versionState: pluginVersionState(VERSION, orchestratorVersion),
     ...gateway,
     // Absent or unreadable is not a mismatch: the gateway is optional.

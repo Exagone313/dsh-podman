@@ -72,6 +72,7 @@ export interface CardState {
   commit: string;
   dshVersion: string;
   orchestratorVersion: string;
+  orchestratorCommit: string;
   versionState: "ok" | "minor-mismatch" | "major-mismatch";
   gatewayState: "unknown" | "running" | "absent" | "incompatible";
   gatewayVersion: string;
@@ -189,6 +190,7 @@ const EMPTY_SNAPSHOT: CardSnapshot = {
   commit: "",
   dshVersion: "",
   orchestratorVersion: "",
+  orchestratorCommit: "",
   versionState: "ok",
   gatewayState: "unknown",
   gatewayVersion: "",
@@ -248,6 +250,7 @@ export class ContainerCardController {
       commit: this.snapshot.commit,
       dshVersion: this.snapshot.dshVersion,
       orchestratorVersion: this.snapshot.orchestratorVersion,
+      orchestratorCommit: this.snapshot.orchestratorCommit,
       versionState: this.snapshot.versionState,
       gatewayState: this.snapshot.gatewayState,
       gatewayVersion: this.snapshot.gatewayVersion,

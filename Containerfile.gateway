@@ -1,0 +1,11 @@
+# SPDX-FileCopyrightText: 2026 Elouan Martinet <exa@elou.world>
+#
+# SPDX-License-Identifier: MIT
+
+FROM scratch
+ENV PATH=/bin
+ARG TARGETOS
+ARG TARGETARCH
+COPY bin/${TARGETOS}-${TARGETARCH}/dsh-podman-gateway /bin/dsh-podman-gateway
+COPY third-party-licenses.pkg /usr/share/licenses/dsh-podman/LICENSE
+ENTRYPOINT ["/bin/dsh-podman-gateway"]

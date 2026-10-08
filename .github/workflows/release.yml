@@ -145,6 +145,18 @@ jobs:
             type=semver,pattern={{major}},enable=${{ env.STABLE }}
             type=raw,value=latest,enable=${{ env.STABLE }}
 
+      - name: Metadata (gateway)
+        id: meta-gateway
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
+        with:
+          images: ghcr.io/exagone313/dsh-podman/gateway
+          flavor: |
+            latest=false
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}},enable=${{ env.STABLE }}
+            type=raw,value=latest,enable=${{ env.STABLE }}
+
       - name: Build and push dsh image
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
@@ -176,6 +188,16 @@ jobs:
           push: true
           tags: ${{ steps.meta-guestagent.outputs.tags }}
           labels: ${{ steps.meta-guestagent.outputs.labels }}
+
+      - name: Build and push gateway image
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: Containerfile.gateway
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta-gateway.outputs.tags }}
+          labels: ${{ steps.meta-gateway.outputs.labels }}
 
       - name: Pack npm tarball
         run: npm pack

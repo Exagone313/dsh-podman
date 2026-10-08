@@ -1,0 +1,23 @@
+[Unit]
+Description=dsh-podman gateway
+Before=dsh-podman-orchestrator.service
+
+[Container]
+Network=host
+Image=ghcr.io/exagone313/dsh-podman/gateway:1
+ContainerName=dsh-podman-gateway
+AutoUpdate=registry
+ReadOnly=true
+
+Volume=%t/dsh-podman:/run/dsh-podman
+Environment=DSH_PODMAN_GATEWAY_SOCKET=/run/dsh-podman/gateway.sock
+Environment=DSH_PODMAN_GATEWAY_SOCKETS_ROOT=/run/dsh-podman
+
+[Service]
+ExecStartPre=/usr/bin/mkdir -p -m 0700 %t/dsh-podman ; /usr/bin/chmod 0700 %t/dsh-podman
+Restart=on-failure
+RestartSec=3
+SuccessExitStatus=0 143
+
+[Install]
+WantedBy=dsh-podman-orchestrator.service

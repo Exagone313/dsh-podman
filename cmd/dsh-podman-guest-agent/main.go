@@ -72,8 +72,13 @@ func main() {
 		grpc.ChainStreamInterceptor(grpclog.Stream(logger), auth.Stream(token), recovery.Stream(logger)),
 		grpcopts.KeepalivePolicy(),
 	)
-	agent := grpcserver.New().WithFS(filesystem)
+	agent := grpcserver.New().WithFS(filesystem).WithPublish(filepath.Dir(socket))
 	agent.Paths.Set(paths)
+	// A previous agent process may have left published sockets behind; they are
+	// stale because the sockets they pointed at died with it.
+	if err := agent.Publish.Sweep(); err != nil {
+		logger.Warn("could not sweep stale published sockets", "error", err)
+	}
 	guest.RegisterWorkspaceGuestAgentServer(server, agent)
 	logger.Info("guest agent listening", "socket", socket)
 	if err := server.Serve(listener); err != nil {

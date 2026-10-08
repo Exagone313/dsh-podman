@@ -14,6 +14,7 @@ import (
 	"github.com/Exagone313/dsh-podman/internal/guestagent/daemon"
 	"github.com/Exagone313/dsh-podman/internal/guestagent/exec"
 	workspacefs "github.com/Exagone313/dsh-podman/internal/guestagent/fs"
+	"github.com/Exagone313/dsh-podman/internal/guestagent/publish"
 	"github.com/Exagone313/dsh-podman/internal/guestagent/terminal"
 )
 
@@ -27,6 +28,9 @@ type Server struct {
 	Daemons   *daemon.Manager
 	Terminals *terminal.Manager
 	FS        *workspacefs.WorkspaceFS
+	// Publish owns the Unix sockets this container publishes for pod ports.
+	// It is nil until WithPublish configures a socket directory.
+	Publish *publish.Manager
 	// Paths holds the additions prepended to every child's PATH.
 	Paths *childenv.Paths
 }
@@ -42,6 +46,13 @@ func New() *Server {
 }
 
 func (s *Server) WithFS(filesystem *workspacefs.WorkspaceFS) *Server { s.FS = filesystem; return s }
+
+// WithPublish enables port publishing, using dir as the container's socket
+// directory.
+func (s *Server) WithPublish(dir string) *Server {
+	s.Publish = publish.New(dir)
+	return s
+}
 
 func (s *Server) ValidateProcessID(id string) bool {
 	_, err := strconv.ParseUint(id, 10, 64)

@@ -9,6 +9,7 @@ package socket
 
 import (
 	"errors"
+	"fmt"
 	"net"
 	"os"
 	"path/filepath"
@@ -50,4 +51,22 @@ func Listen(path string) (net.Listener, error) {
 		return nil, err
 	}
 	return listener, nil
+}
+
+// RequirePrivateDir checks that dir exists, is a directory, and is reachable
+// only by its owner. A socket created 0600 is still exposed when the directory
+// above it can be traversed by other users, so every component that hosts a
+// control or data socket in a shared root verifies this before listening.
+func RequirePrivateDir(dir string) error {
+	info, err := os.Stat(dir)
+	if err != nil {
+		return fmt.Errorf("socket root %q is not accessible: %w", dir, err)
+	}
+	if !info.IsDir() {
+		return fmt.Errorf("socket root %q is not a directory", dir)
+	}
+	if mode := info.Mode().Perm(); mode&0o077 != 0 {
+		return fmt.Errorf("socket root %q is group- or world-accessible (mode %04o); it must be 0700", dir, mode)
+	}
+	return nil
 }

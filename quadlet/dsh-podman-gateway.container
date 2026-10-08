@@ -14,7 +14,7 @@ Environment=DSH_PODMAN_GATEWAY_SOCKET=/run/dsh-podman/gateway.sock
 Environment=DSH_PODMAN_GATEWAY_SOCKETS_ROOT=/run/dsh-podman
 
 [Service]
-ExecStartPre=/usr/bin/mkdir -p -m 0700 %t/dsh-podman ; /usr/bin/chmod 0700 %t/dsh-podman
+ExecStartPre=/usr/bin/env mkdir -p -m 0700 %t/dsh-podman ; /usr/bin/env chmod 0700 %t/dsh-podman
 Restart=on-failure
 RestartSec=3
 SuccessExitStatus=0 143

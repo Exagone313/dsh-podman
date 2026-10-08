@@ -66,6 +66,15 @@ export function ContainerCard(props: ContainerCardProps): ReactNode {
       `${t("orchestrator")} ${
         state.orchestratorVersion || t("versionUnknown")
       }`,
+      `${t("gateway")} ${
+        state.gatewayState === "running"
+          ? `${state.gatewayVersion}${
+            state.gatewayCommit ? ` · ${state.gatewayCommit}` : ""
+          }`
+          : state.gatewayState === "incompatible"
+          ? t("gatewayIncompatible")
+          : t("gatewayNotRunning")
+      }`,
     ];
     setCopyState(
       (await writeClipboard(lines.join("\n"))) ? "copied" : "failed",
@@ -176,6 +185,10 @@ export function ContainerCard(props: ContainerCardProps): ReactNode {
             onSetContainerPaths={props.setContainerPaths}
             onAddContainerSecret={props.addContainerSecret}
             onRemoveContainerSecret={props.removeContainerSecret}
+            onPublishContainerPort={props.publishContainerPort}
+            onUnpublishContainerPort={props.unpublishContainerPort}
+            gatewayUnavailable={state.gatewayState === "absent" ||
+              state.gatewayState === "incompatible"}
             onSyncDefaults={props.syncDefaultEnv}
             defaultEnvCount={Object.keys(state.containerEnv).length}
           />
@@ -412,6 +425,27 @@ export function ContainerCard(props: ContainerCardProps): ReactNode {
                   style={{ color: "var(--dsw-alias-state-error-primary)" }}
                 >
                   {t("versionUnknown")}
+                </span>
+              </>
+            )}
+        </span>
+        <span>
+          <span style={versionLabel}>{t("gateway")}</span>
+          {state.gatewayState === "running"
+            ? ` ${state.gatewayVersion}${
+              state.gatewayCommit ? ` · ${state.gatewayCommit}` : ""
+            }`
+            : (
+              <>
+                {" "}
+                <span
+                  style={state.gatewayState === "incompatible"
+                    ? { color: "var(--dsw-alias-state-error-primary)" }
+                    : undefined}
+                >
+                  {state.gatewayState === "incompatible"
+                    ? t("gatewayIncompatible")
+                    : t("gatewayNotRunning")}
                 </span>
               </>
             )}

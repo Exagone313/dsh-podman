@@ -77,6 +77,21 @@ export function WorkspaceSection(props: {
     container: string,
     envVar: string,
   ) => void;
+  onPublishContainerPort: (
+    workspace: string,
+    container: string,
+    port: number,
+    suggestedHostPort?: number,
+  ) => void;
+  onUnpublishContainerPort: (
+    workspace: string,
+    container: string,
+    port: number,
+    protocol: string,
+  ) => void;
+  // Whether the port-publishing gateway is known to be missing, forwarded to
+  // each row.
+  gatewayUnavailable: boolean;
   // Adds the default container environment to this workspace's containers.
   onSyncDefaults: (workspace: string) => void;
   // How many default variables exist; the sync action is pointless without any.
@@ -104,6 +119,9 @@ export function WorkspaceSection(props: {
     onSetContainerPaths,
     onAddContainerSecret,
     onRemoveContainerSecret,
+    onPublishContainerPort,
+    onUnpublishContainerPort,
+    gatewayUnavailable,
     onSyncDefaults,
     defaultEnvCount,
   } = props;
@@ -164,6 +182,9 @@ export function WorkspaceSection(props: {
                   directoryPicker={directoryPicker}
                   onAddContainerSecret={onAddContainerSecret}
                   onRemoveContainerSecret={onRemoveContainerSecret}
+                  onPublishContainerPort={onPublishContainerPort}
+                  onUnpublishContainerPort={onUnpublishContainerPort}
+                  gatewayUnavailable={gatewayUnavailable}
                 />
               ))}
               <div>

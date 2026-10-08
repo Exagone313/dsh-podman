@@ -16,15 +16,18 @@ import {
   type ContainerView,
   type ImageView,
   type MountInput,
+  type PublishedPortView,
   type WorkspaceView,
 } from "./client/card-protocol.js";
 import {
   type ReasonLocale,
   renderCacheCleanNotice,
   renderDefaultEnvSyncNotice,
+  renderPublishNotice,
   resolveReasonLocale,
 } from "./approval-reasons.js";
 import { mergeDefaultEnv, missingDefaultEnv } from "./container-env.js";
+import { portProtocolFromProto, portProtocolToProto } from "./publish-port.js";
 import {
   defaultMountMode,
   mountKindToProto,
@@ -47,6 +50,41 @@ async function readOrchestratorVersion(
     return String(response?.version ?? "");
   } catch {
     return "";
+  }
+}
+
+// The gateway states the control plane reports, mapped to the card's
+// vocabulary. Anything else, including a status an older orchestrator cannot
+// answer, reads as "unknown".
+const GATEWAY_STATES: Record<string, CardSnapshot["gatewayState"]> = {
+  GATEWAY_STATE_RUNNING: "running",
+  GATEWAY_STATE_ABSENT: "absent",
+  GATEWAY_STATE_INCOMPATIBLE: "incompatible",
+};
+
+type GatewaySnapshot = Pick<
+  CardSnapshot,
+  "gatewayState" | "gatewayVersion" | "gatewayCommit"
+>;
+
+// readGatewayStatus asks the orchestrator for the optional gateway's cached
+// status, or reports it unknown when the RPC is missing (an older orchestrator)
+// or fails. It never dials the gateway itself.
+async function readGatewayStatus(
+  resolver: WorkspaceResolver,
+): Promise<GatewaySnapshot> {
+  try {
+    const response: any = await resolver.control("getGatewayStatus", {});
+    const proto = String(response?.state ?? "");
+    return {
+      gatewayState: Object.prototype.hasOwnProperty.call(GATEWAY_STATES, proto)
+        ? GATEWAY_STATES[proto]
+        : "unknown",
+      gatewayVersion: String(response?.version ?? ""),
+      gatewayCommit: String(response?.commit ?? ""),
+    };
+  } catch {
+    return { gatewayState: "unknown", gatewayVersion: "", gatewayCommit: "" };
   }
 }
 
@@ -83,6 +121,21 @@ function containerMountView(mount: any): {
     mode: stringField(mount?.mode),
     volume: stringField(mount?.volume),
     secret: stringField(mount?.secret),
+  };
+}
+
+// publishedPortView keeps the address the gateway chose; the proto row also
+// carries the container name, which the surrounding row already knows. The card
+// works in logical protocol names ("tcp"), and an unknown enum value is kept
+// verbatim so a newer orchestrator is not silently mislabelled.
+function publishedPortView(port: any): PublishedPortView {
+  const proto = stringField(port?.protocol);
+  return {
+    protocol: portProtocolFromProto(proto) ?? proto,
+    port: Number(port?.port ?? 0),
+    address: stringField(port?.address),
+    hostPort: Number(port?.hostPort ?? 0),
+    endpoint: stringField(port?.endpoint),
   };
 }
 
@@ -185,6 +238,7 @@ export async function cardSnapshot(
   // succeeds even when the rest is refused; an older orchestrator that has no
   // GetVersion yet leaves the version unknown.
   const orchestratorVersion = await readOrchestratorVersion(resolver);
+  const gateway = await readGatewayStatus(resolver);
   let listings: readonly unknown[];
   try {
     listings = await Promise.all([
@@ -207,6 +261,8 @@ export async function cardSnapshot(
       dshVersion: harnessVersion,
       orchestratorVersion,
       versionState: "major-mismatch",
+      ...gateway,
+      gatewayVersionState: "ok",
       projectsRoot: resolver.getConfig().projectsRoot,
       workspaces: [],
       containers: [],
@@ -223,6 +279,14 @@ export async function cardSnapshot(
     dshVersion: harnessVersion,
     orchestratorVersion,
     versionState: pluginVersionState(VERSION, orchestratorVersion),
+    ...gateway,
+    // Absent or unreadable is not a mismatch: the gateway is optional.
+    gatewayVersionState: gateway.gatewayVersion === ""
+      ? "ok"
+      : pluginVersionState(
+        gateway.gatewayVersion,
+        orchestratorVersion || VERSION,
+      ),
     projectsRoot: resolver.getConfig().projectsRoot,
     workspaces: mergeWorkspaceViews(
       dshWorkspaceViews(workspaceRegistry, resolver.getConfig().projectsRoot),
@@ -239,6 +303,9 @@ export async function cardSnapshot(
         paths: container.paths ?? [],
         env: container.env ?? {},
         secretEnv: container.secretEnv ?? {},
+        publishedPorts: (container.publishedPorts ?? []).map(
+          publishedPortView,
+        ),
       }),
     ),
     images: (((images as any).images ?? []) as any[]).map(imageView),
@@ -382,6 +449,41 @@ export async function runCommand(
       await resolver.control("updateContainerMount", request);
       break;
     }
+    case "container_publish_port": {
+      // A published port belongs to the pod, not to the workspace's mounts, so
+      // the orchestrator does the validation; the card only mirrors it.
+      const request: Record<string, unknown> = {
+        workspaceSlug: command.workspace,
+        container: command.container || "default",
+        port: command.port,
+        protocol: portProtocolToProto(
+          command.protocol === "" ? "tcp" : command.protocol,
+        ),
+      };
+      if (command.suggestedHostPort > 0) {
+        request.suggestedHostPort = command.suggestedHostPort;
+      }
+      const published = (await resolver.control("publishPort", request)) as {
+        endpoint?: unknown;
+      };
+      // A random host port is only knowable from the answer, so the notice
+      // names the endpoint the gateway actually bound.
+      notice = renderPublishNotice(
+        resolveReasonLocale(readLocale?.()),
+        stringField(published?.endpoint),
+      );
+      break;
+    }
+    case "container_unpublish_port":
+      await resolver.control("unpublishPort", {
+        workspaceSlug: command.workspace,
+        container: command.container || "default",
+        port: command.port,
+        protocol: portProtocolToProto(
+          command.protocol === "" ? "tcp" : command.protocol,
+        ),
+      });
+      break;
     case "container_path_set": {
       const paths = [...command.paths];
       await resolver.control("setContainerPaths", {
@@ -603,6 +705,11 @@ function normalizeCommand(raw: Record<string, unknown>): CommandRequest {
     secretEnv: stringMap(raw.secretEnv),
     cacheMode: stringField(raw.cacheMode),
     mount: mountField(raw.mount),
+    port: typeof raw.port === "number" ? raw.port : 0,
+    protocol: stringField(raw.protocol),
+    suggestedHostPort: typeof raw.suggestedHostPort === "number"
+      ? raw.suggestedHostPort
+      : 0,
   };
 }
 

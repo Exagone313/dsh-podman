@@ -26,6 +26,7 @@ const SUBJECTS: readonly (readonly [keyof typeof en, string])[] = [
   ["confirmRemountReadOnly", "mount"],
   ["confirmRemountReadWrite", "mount"],
   ["confirmRemoveMount", "mount"],
+  ["confirmUnpublishPort", "port"],
 ];
 
 test("every object-naming confirmation interpolates its subject", () => {

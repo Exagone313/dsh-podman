@@ -19,6 +19,13 @@ function fakeResolver(): { resolver: any; calls: Array<[string, unknown]> } {
     async control(method: string, request: unknown) {
       calls.push([method, request]);
       if (method === "getVersion") return { version: "9.9.9", commit: "abc" };
+      if (method === "getGatewayStatus") {
+        return {
+          state: "GATEWAY_STATE_RUNNING",
+          version: "9.9.9",
+          commit: "def",
+        };
+      }
       if (method === "listContainers") {
         return { containers: [{ containerName: "c1" }] };
       }
@@ -101,6 +108,7 @@ test("the card route serves the live snapshot on GET", async () => {
     calls.map(([method]) => method),
     [
       "getVersion",
+      "getGatewayStatus",
       "listContainers",
       "listImages",
       "listWorkspaces",
@@ -116,6 +124,10 @@ test("the card route serves the live snapshot on GET", async () => {
     "major-mismatch",
     "a differing major is surfaced on the card",
   );
+  assert.equal(snapshot.gatewayState, "running");
+  assert.equal(snapshot.gatewayVersion, "9.9.9");
+  assert.equal(snapshot.gatewayCommit, "def");
+  assert.equal(snapshot.gatewayVersionState, "ok");
 });
 
 test("a refused control call reports the version mismatch instead of an empty snapshot", async () => {

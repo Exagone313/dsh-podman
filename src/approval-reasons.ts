@@ -582,6 +582,16 @@ export function renderCacheCleanNotice(
   );
 }
 
+// Render the settings notice shown after a port was published. The gateway may
+// have chosen the host port when the caller suggested none, so the notice names
+// the endpoint it reported rather than the port that was asked for.
+export function renderPublishNotice(
+  locale: ReasonLocale,
+  endpoint: string,
+): string {
+  return pick(locale, `published on ${endpoint}`, `已发布到 ${endpoint}`);
+}
+
 // Render the settings notice shown after the default environment was applied
 // to existing containers: how many were recreated, and how many stopped
 // containers were left for their next start.

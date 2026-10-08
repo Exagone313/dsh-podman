@@ -9,6 +9,7 @@ import {
 import { EnvEditor, MountsEditor } from "./container-card-editors.js";
 import { type DirectoryPickerFace } from "./directory-picker.js";
 import { PathsEditor } from "./container-card-paths.js";
+import { PortsEditor } from "./container-card-ports.js";
 import {
   ConfirmButton,
   mountKindShort,
@@ -121,6 +122,21 @@ export function ContainerRow(props: {
     container: string,
     envVar: string,
   ) => void;
+  onPublishContainerPort: (
+    workspace: string,
+    container: string,
+    port: number,
+    suggestedHostPort?: number,
+  ) => void;
+  onUnpublishContainerPort: (
+    workspace: string,
+    container: string,
+    port: number,
+    protocol: string,
+  ) => void;
+  // Whether the snapshot knows the port-publishing gateway is missing or
+  // incompatible, so the editor can say so instead of failing on a dial.
+  gatewayUnavailable: boolean;
   projectName: string;
   projectsRoot: string;
   directoryPicker?: DirectoryPickerFace;
@@ -140,6 +156,9 @@ export function ContainerRow(props: {
     onSetContainerPaths,
     onAddContainerSecret,
     onRemoveContainerSecret,
+    onPublishContainerPort,
+    onUnpublishContainerPort,
+    gatewayUnavailable,
     projectName,
     projectsRoot,
     directoryPicker,
@@ -162,9 +181,14 @@ export function ContainerRow(props: {
   const [mountOpen, setMountOpen] = useState(false);
   const [pathOpen, setPathOpen] = useState(false);
   const [secretOpen, setSecretOpen] = useState(false);
+  const [portOpen, setPortOpen] = useState(false);
   const [attachSecret, setAttachSecret] = useState("");
   const [attachVar, setAttachVar] = useState("");
   const enabled = container.workspaceSlug !== "" && !busy;
+  // Publishing needs a live guest agent to create the forwarding socket, and a
+  // running gateway to bind the host port; the editor reflects both.
+  const canPublish = enabled && container.status === "running" &&
+    !gatewayUnavailable;
   const mountRows = mountSummaries(container.mounts);
   const envEntries = Object.entries(container.env);
   const secretEntries = Object.entries(container.secretEnv);
@@ -220,6 +244,20 @@ export function ContainerRow(props: {
                 <td style={tdStyle}>
                   {secretEntries
                     .map(([envVar, secretName]) => `${envVar}=${secretName}`)
+                    .join(", ")}
+                </td>
+              </tr>
+            )
+            : null}
+          {container.publishedPorts.length > 0
+            ? (
+              <tr>
+                <th style={thStyle} scope="row">{t("portsTitle")}</th>
+                <td style={tdStyle}>
+                  {container.publishedPorts
+                    .map((published) =>
+                      `${published.port}/${published.protocol} → ${published.endpoint}`
+                    )
                     .join(", ")}
                 </td>
               </tr>
@@ -457,6 +495,38 @@ export function ContainerRow(props: {
               {t("attachSecret")}
             </Button>
           </div>
+        </div>
+      </DisclosureRow>
+      <DisclosureRow
+        icon={<span />}
+        title={t("portsTitle")}
+        open={portOpen}
+        expandable
+        onToggle={() => setPortOpen(!portOpen)}
+      >
+        <div style={wsBody}>
+          <PortsEditor
+            t={t}
+            ports={container.publishedPorts}
+            busy={busy}
+            enabled={enabled}
+            canPublish={canPublish}
+            gatewayUnavailable={gatewayUnavailable}
+            onPublish={(port, suggestedHostPort) =>
+              onPublishContainerPort(
+                container.workspaceSlug,
+                container.containerName,
+                port,
+                suggestedHostPort,
+              )}
+            onUnpublish={(port, protocol) =>
+              onUnpublishContainerPort(
+                container.workspaceSlug,
+                container.containerName,
+                port,
+                protocol,
+              )}
+          />
         </div>
       </DisclosureRow>
     </div>

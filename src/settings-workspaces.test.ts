@@ -50,6 +50,7 @@ test("refresh on install publishes containers, images and workspaces", async () 
     calls.map(([method]) => method),
     [
       "getVersion",
+      "getGatewayStatus",
       "listContainers",
       "listImages",
       "listWorkspaces",

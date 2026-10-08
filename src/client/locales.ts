@@ -13,6 +13,9 @@ export type ContainerPluginKey =
   | "versionMismatchMinor"
   | "versionsTitle"
   | "orchestrator"
+  | "gateway"
+  | "gatewayNotRunning"
+  | "gatewayIncompatible"
   | "versionUnknown"
   | "dsh"
   | "copyVersions"
@@ -90,6 +93,16 @@ export type ContainerPluginKey =
   | "attachSecret"
   | "secretEnvName"
   | "detachSecret"
+  | "portsTitle"
+  | "publishPort"
+  | "unpublishPort"
+  | "podPort"
+  | "hostPortOptional"
+  | "invalidPort"
+  | "invalidHostPort"
+  | "publishNeedsGateway"
+  | "containerNotRunning"
+  | "confirmUnpublishPort"
   | "none"
   | "unavailable"
   | "busy"
@@ -243,6 +256,9 @@ export const en: Record<ContainerPluginKey, string> = {
     "This plugin and the orchestrator have compatible but different versions; consider updating both images.",
   versionsTitle: "Versions",
   orchestrator: "dsh-podman-orchestrator",
+  gateway: "dsh-podman-gateway",
+  gatewayNotRunning: "not running",
+  gatewayIncompatible: "incompatible",
   versionUnknown: "unknown",
   dsh: "dsh",
   copyVersions: "Copy versions",
@@ -324,6 +340,19 @@ export const en: Record<ContainerPluginKey, string> = {
   attachSecret: "Attach",
   secretEnvName: "Env var",
   detachSecret: "Detach",
+  portsTitle: "Ports",
+  publishPort: "Publish",
+  unpublishPort: "Unpublish",
+  podPort: "Pod port",
+  hostPortOptional: "Host port (optional)",
+  invalidPort: "Port must be between 1 and 65535",
+  invalidHostPort: "Host port must be between 1024 and 65535",
+  publishNeedsGateway:
+    "The dsh-podman gateway is not running; start the gateway Quadlet to publish ports.",
+  containerNotRunning:
+    "The container is not running; start it to publish a port.",
+  confirmUnpublishPort:
+    "Stop publishing {port}/{protocol}? The host port becomes unreachable.",
   none: "None",
   unavailable: "The container plugin is not available.",
   busy: "Working…",
@@ -482,6 +511,9 @@ export const zh: Record<ContainerPluginKey, string> = {
     "此插件与 orchestrator 的版本不同但兼容；建议同时更新两个镜像。",
   versionsTitle: "版本",
   orchestrator: "dsh-podman-orchestrator",
+  gateway: "dsh-podman-gateway",
+  gatewayNotRunning: "未运行",
+  gatewayIncompatible: "版本不兼容",
   versionUnknown: "未知",
   dsh: "dsh",
   copyVersions: "复制版本",
@@ -563,6 +595,17 @@ export const zh: Record<ContainerPluginKey, string> = {
   attachSecret: "注入",
   secretEnvName: "变量名",
   detachSecret: "移除",
+  portsTitle: "端口",
+  publishPort: "发布",
+  unpublishPort: "取消发布",
+  podPort: "pod 端口",
+  hostPortOptional: "主机端口（可选）",
+  invalidPort: "端口必须在 1 到 65535 之间",
+  invalidHostPort: "主机端口必须在 1024 到 65535 之间",
+  publishNeedsGateway:
+    "dsh-podman gateway 未运行；请启动 gateway Quadlet 后再发布端口。",
+  containerNotRunning: "容器未运行；请先启动容器再发布端口。",
+  confirmUnpublishPort: "停止发布 {port}/{protocol}？该主机端口将不再可访问。",
   none: "无",
   unavailable: "容器插件不可用。",
   busy: "处理中…",

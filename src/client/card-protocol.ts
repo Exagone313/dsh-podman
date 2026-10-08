@@ -41,6 +41,8 @@ export type CommandOp =
   | "container_mount_add"
   | "container_mount_remove"
   | "container_mount_update"
+  | "container_publish_port"
+  | "container_unpublish_port"
   | "container_path_set"
   | "default_env_sync"
   | "cache_clean";
@@ -63,6 +65,21 @@ export interface CommandRequest {
   secretEnv: Record<string, string>;
   cacheMode: string;
   mount: MountInput | null;
+  // The pod port a publish/unpublish command names, its transport, and the host
+  // port to prefer (0 asks the gateway to choose a free one).
+  port: number;
+  protocol: string;
+  suggestedHostPort: number;
+}
+
+// A published pod port as the card renders it: the endpoint the gateway chose
+// plus the parts it was built from.
+export interface PublishedPortView {
+  protocol: string;
+  port: number;
+  address: string;
+  hostPort: number;
+  endpoint: string;
 }
 
 export interface ContainerView {
@@ -86,6 +103,7 @@ export interface ContainerView {
   paths: readonly string[];
   env: Record<string, string>;
   secretEnv: Record<string, string>;
+  publishedPorts: readonly PublishedPortView[];
 }
 
 export interface ImageView {
@@ -139,6 +157,15 @@ export interface CardSnapshot {
   // The orchestrator's version, or "" when it predates the handshake.
   orchestratorVersion: string;
   versionState: "ok" | "minor-mismatch" | "major-mismatch";
+  // The optional port-publishing gateway. "unknown" means the orchestrator
+  // predates the status RPC or has not probed the gateway yet, which the card
+  // renders neutrally: the gateway is not required.
+  gatewayState: "unknown" | "running" | "absent" | "incompatible";
+  gatewayVersion: string;
+  gatewayCommit: string;
+  // How the gateway's major version compares with the orchestrator's, its
+  // direct peer. Absent or unparseable reads as "ok".
+  gatewayVersionState: "ok" | "minor-mismatch" | "major-mismatch";
   projectsRoot: string;
   workspaces: readonly WorkspaceView[];
   containers: readonly ContainerView[];

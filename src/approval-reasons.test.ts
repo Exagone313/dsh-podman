@@ -9,6 +9,7 @@ import {
   renderCacheCleanNotice,
   renderDefaultEnvSyncNotice,
   renderDenial,
+  renderPublishNotice,
   renderReason,
   resolveReasonLocale,
 } from "./approval-reasons.js";
@@ -162,6 +163,17 @@ test("renderCacheCleanNotice reports the removed file count", () => {
   assert.equal(renderCacheCleanNotice("en", 1), "removed 1 cached file");
   assert.equal(renderCacheCleanNotice("en", 3), "removed 3 cached files");
   assert.equal(renderCacheCleanNotice("zh", 3), "已移除 3 个缓存文件");
+});
+
+test("renderPublishNotice names the endpoint the gateway bound", () => {
+  assert.equal(
+    renderPublishNotice("en", "tcp://127.0.0.1:26000"),
+    "published on tcp://127.0.0.1:26000",
+  );
+  assert.equal(
+    renderPublishNotice("zh", "tcp://127.0.0.1:26000"),
+    "已发布到 tcp://127.0.0.1:26000",
+  );
 });
 
 test("renderReason renders the read-only remount plan", () => {

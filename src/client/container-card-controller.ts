@@ -18,6 +18,7 @@ import type {
   ContainerView,
   ImageView,
   MountInput,
+  PublishedPortView,
   SecretView,
   VolumeView,
   WorkspaceView,
@@ -56,6 +57,7 @@ export type {
   ContainerView,
   ImageView,
   MountInput,
+  PublishedPortView,
   SecretView,
   VolumeView,
   WorkspaceView,
@@ -71,6 +73,10 @@ export interface CardState {
   dshVersion: string;
   orchestratorVersion: string;
   versionState: "ok" | "minor-mismatch" | "major-mismatch";
+  gatewayState: "unknown" | "running" | "absent" | "incompatible";
+  gatewayVersion: string;
+  gatewayCommit: string;
+  gatewayVersionState: "ok" | "minor-mismatch" | "major-mismatch";
   defaultImage: string;
   // The default container environment, seeded into new containers (see
   // container-env.ts).
@@ -133,6 +139,20 @@ export interface ContainerCardFace {
     container: string,
     paths: readonly string[],
   ) => void;
+  // Expose a pod port on the host's loopback; an omitted host port lets the
+  // gateway choose a free one, which the notice then names.
+  publishContainerPort: (
+    workspace: string,
+    container: string,
+    port: number,
+    suggestedHostPort?: number,
+  ) => void;
+  unpublishContainerPort: (
+    workspace: string,
+    container: string,
+    port: number,
+    protocol: string,
+  ) => void;
   createVolume: (name: string) => void;
   removeVolume: (name: string) => void;
   removeImage: (imageId: string) => void;
@@ -170,6 +190,10 @@ const EMPTY_SNAPSHOT: CardSnapshot = {
   dshVersion: "",
   orchestratorVersion: "",
   versionState: "ok",
+  gatewayState: "unknown",
+  gatewayVersion: "",
+  gatewayCommit: "",
+  gatewayVersionState: "ok",
   projectsRoot: "",
   workspaces: [],
   containers: [],
@@ -225,6 +249,10 @@ export class ContainerCardController {
       dshVersion: this.snapshot.dshVersion,
       orchestratorVersion: this.snapshot.orchestratorVersion,
       versionState: this.snapshot.versionState,
+      gatewayState: this.snapshot.gatewayState,
+      gatewayVersion: this.snapshot.gatewayVersion,
+      gatewayCommit: this.snapshot.gatewayCommit,
+      gatewayVersionState: this.snapshot.gatewayVersionState,
       defaultImage: value?.defaultImage ?? "",
       containerEnv: value?.containerEnv ?? {},
       projectsRoot: this.snapshot.projectsRoot,
@@ -270,6 +298,9 @@ export class ContainerCardController {
       secretEnv?: Record<string, string>;
       cacheMode?: string;
       mount?: MountInput | null;
+      port?: number;
+      protocol?: string;
+      suggestedHostPort?: number;
     } = {},
   ): void {
     void this.dispatch({
@@ -290,6 +321,9 @@ export class ContainerCardController {
       secretEnv: extra.secretEnv ?? {},
       cacheMode: extra.cacheMode ?? "",
       mount: extra.mount ?? null,
+      port: extra.port ?? 0,
+      protocol: extra.protocol ?? "",
+      suggestedHostPort: extra.suggestedHostPort ?? 0,
     });
   }
 
@@ -429,6 +463,18 @@ export class ContainerCardController {
         }),
       setContainerPaths: (workspace, container, paths) =>
         this.command("container_path_set", workspace, "", { container, paths }),
+      publishContainerPort: (workspace, container, port, suggestedHostPort) =>
+        this.command("container_publish_port", workspace, "", {
+          container,
+          port,
+          ...(suggestedHostPort ? { suggestedHostPort } : {}),
+        }),
+      unpublishContainerPort: (workspace, container, port, protocol) =>
+        this.command("container_unpublish_port", workspace, "", {
+          container,
+          port,
+          protocol,
+        }),
       createVolume: (name) => this.command("volume_create", name, ""),
       removeVolume: (name) => this.command("volume_remove", name, ""),
       removeImage: (imageId) => this.command("image_remove", imageId, ""),

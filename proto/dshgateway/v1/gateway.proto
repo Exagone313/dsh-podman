@@ -1,0 +1,89 @@
+// SPDX-FileCopyrightText: 2026 Elouan Martinet <exa@elou.world>
+//
+// SPDX-License-Identifier: MIT
+
+syntax = "proto3";
+package dshgateway.v1;
+option go_package = "github.com/Exagone313/dsh-podman/internal/genproto/dshgateway/v1;dshgatewayv1";
+
+// Gateway bridges a host address to the Unix socket a guest agent publishes for
+// a pod port. It runs on the host network so it can bind the host's loopback,
+// and it mounts the same socket root as the orchestrator and the plugin.
+//
+// It is optional and never a source of truth: the orchestrator keeps the
+// desired binding set in its own state and re-binds it on startup, after a
+// gateway restart and after a container recreate. The gateway holds bindings
+// only while a Lease stream is open, so a host port cannot outlive the
+// orchestrator that asked for it.
+service Gateway {
+  // GetVersion reports the gateway's version. It is exempt from the
+  // orchestrator-version check so a caller can always read it.
+  rpc GetVersion(GetVersionRequest) returns (GetVersionResponse);
+  // Bind exposes a published socket on a host address and returns the address
+  // and port it chose. It is idempotent per (podman_name, socket_name,
+  // protocol): binding an already-bound target returns the same pair.
+  rpc Bind(BindRequest) returns (BindResponse);
+  rpc Unbind(UnbindRequest) returns (UnbindResponse);
+  rpc List(ListRequest) returns (ListResponse);
+  // Lease ties every binding to the caller's liveness. The orchestrator holds
+  // the stream open and pings it; when the stream ends, because the
+  // orchestrator stopped or crashed, the gateway releases everything.
+  rpc Lease(stream LeaseRequest) returns (stream LeaseResponse);
+}
+
+// Protocol is the transport a published port speaks. Only TCP is implemented;
+// the others are reserved so the wire format does not have to change.
+enum Protocol {
+  PROTOCOL_UNSPECIFIED = 0;
+  PROTOCOL_TCP = 1;
+  PROTOCOL_UDP = 2;
+  PROTOCOL_HTTP = 3;
+}
+
+message GetVersionRequest {}
+message GetVersionResponse {
+  string version = 1;
+  string commit = 2;
+  // A random id generated once per gateway process, so a caller can tell a
+  // live gateway from a restarted one and re-establish its bindings.
+  string instance = 3;
+}
+
+message BindRequest {
+  // The guest container's podman name, which locates its socket directory
+  // under the socket root. Internal to the deployment; never returned.
+  string podman_name = 1;
+  // The socket file name inside that directory, e.g. "t8080".
+  string socket_name = 2;
+  Protocol protocol = 3;
+  // The host port to prefer. 0 asks the gateway to choose a free one.
+  uint32 suggested_host_port = 4;
+}
+// The address is returned alongside the port because the gateway owns the
+// address: loopback today, a hostname once HTTP publishing lands.
+message BindResponse {
+  string address = 1;
+  uint32 port = 2;
+}
+
+message UnbindRequest {
+  string podman_name = 1;
+  string socket_name = 2;
+  Protocol protocol = 3;
+}
+message UnbindResponse {}
+
+message ListRequest {}
+message ListResponse { repeated Binding bindings = 1; }
+message Binding {
+  string podman_name = 1;
+  string socket_name = 2;
+  Protocol protocol = 3;
+  string address = 4;
+  uint32 port = 5;
+}
+
+// LeaseRequest is a liveness ping; LeaseResponse acknowledges one. An empty
+// request is a valid ping and an empty response a valid acknowledgement.
+message LeaseRequest {}
+message LeaseResponse {}

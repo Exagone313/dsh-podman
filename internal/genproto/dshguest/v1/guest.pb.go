@@ -26,6 +26,61 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+// Protocol is the transport a published pod port speaks. Only TCP is
+// implemented today; the others are reserved so the wire format does not have
+// to change when they land.
+type Protocol int32
+
+const (
+	Protocol_PROTOCOL_UNSPECIFIED Protocol = 0
+	Protocol_PROTOCOL_TCP         Protocol = 1
+	Protocol_PROTOCOL_UDP         Protocol = 2
+	Protocol_PROTOCOL_HTTP        Protocol = 3
+)
+
+// Enum value maps for Protocol.
+var (
+	Protocol_name = map[int32]string{
+		0: "PROTOCOL_UNSPECIFIED",
+		1: "PROTOCOL_TCP",
+		2: "PROTOCOL_UDP",
+		3: "PROTOCOL_HTTP",
+	}
+	Protocol_value = map[string]int32{
+		"PROTOCOL_UNSPECIFIED": 0,
+		"PROTOCOL_TCP":         1,
+		"PROTOCOL_UDP":         2,
+		"PROTOCOL_HTTP":        3,
+	}
+)
+
+func (x Protocol) Enum() *Protocol {
+	p := new(Protocol)
+	*p = x
+	return p
+}
+
+func (x Protocol) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (Protocol) Descriptor() protoreflect.EnumDescriptor {
+	return file_dshguest_v1_guest_proto_enumTypes[0].Descriptor()
+}
+
+func (Protocol) Type() protoreflect.EnumType {
+	return &file_dshguest_v1_guest_proto_enumTypes[0]
+}
+
+func (x Protocol) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use Protocol.Descriptor instead.
+func (Protocol) EnumDescriptor() ([]byte, []int) {
+	return file_dshguest_v1_guest_proto_rawDescGZIP(), []int{0}
+}
+
 type PingRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	unknownFields protoimpl.UnknownFields
@@ -2822,6 +2877,195 @@ func (x *TerminalSignalled) GetProcessGroupId() int32 {
 	return 0
 }
 
+// PublishPort makes the agent listen on a Unix socket inside the container's
+// socket directory and forward every connection to 127.0.0.1:<port> in the
+// pod's network namespace. The socket name is deterministic (see
+// internal/guestagent/publish), so publishing again after a recreate lands on
+// the same path and the gateway's binding keeps working.
+type PublishPortRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Port          uint32                 `protobuf:"varint,1,opt,name=port,proto3" json:"port,omitempty"`
+	Protocol      Protocol               `protobuf:"varint,2,opt,name=protocol,proto3,enum=dshguest.v1.Protocol" json:"protocol,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PublishPortRequest) Reset() {
+	*x = PublishPortRequest{}
+	mi := &file_dshguest_v1_guest_proto_msgTypes[46]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PublishPortRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PublishPortRequest) ProtoMessage() {}
+
+func (x *PublishPortRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_dshguest_v1_guest_proto_msgTypes[46]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PublishPortRequest.ProtoReflect.Descriptor instead.
+func (*PublishPortRequest) Descriptor() ([]byte, []int) {
+	return file_dshguest_v1_guest_proto_rawDescGZIP(), []int{46}
+}
+
+func (x *PublishPortRequest) GetPort() uint32 {
+	if x != nil {
+		return x.Port
+	}
+	return 0
+}
+
+func (x *PublishPortRequest) GetProtocol() Protocol {
+	if x != nil {
+		return x.Protocol
+	}
+	return Protocol_PROTOCOL_UNSPECIFIED
+}
+
+type PublishPortResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	SocketName    string                 `protobuf:"bytes,1,opt,name=socket_name,json=socketName,proto3" json:"socket_name,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PublishPortResponse) Reset() {
+	*x = PublishPortResponse{}
+	mi := &file_dshguest_v1_guest_proto_msgTypes[47]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PublishPortResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PublishPortResponse) ProtoMessage() {}
+
+func (x *PublishPortResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_dshguest_v1_guest_proto_msgTypes[47]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PublishPortResponse.ProtoReflect.Descriptor instead.
+func (*PublishPortResponse) Descriptor() ([]byte, []int) {
+	return file_dshguest_v1_guest_proto_rawDescGZIP(), []int{47}
+}
+
+func (x *PublishPortResponse) GetSocketName() string {
+	if x != nil {
+		return x.SocketName
+	}
+	return ""
+}
+
+type UnpublishPortRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Port          uint32                 `protobuf:"varint,1,opt,name=port,proto3" json:"port,omitempty"`
+	Protocol      Protocol               `protobuf:"varint,2,opt,name=protocol,proto3,enum=dshguest.v1.Protocol" json:"protocol,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UnpublishPortRequest) Reset() {
+	*x = UnpublishPortRequest{}
+	mi := &file_dshguest_v1_guest_proto_msgTypes[48]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UnpublishPortRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UnpublishPortRequest) ProtoMessage() {}
+
+func (x *UnpublishPortRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_dshguest_v1_guest_proto_msgTypes[48]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UnpublishPortRequest.ProtoReflect.Descriptor instead.
+func (*UnpublishPortRequest) Descriptor() ([]byte, []int) {
+	return file_dshguest_v1_guest_proto_rawDescGZIP(), []int{48}
+}
+
+func (x *UnpublishPortRequest) GetPort() uint32 {
+	if x != nil {
+		return x.Port
+	}
+	return 0
+}
+
+func (x *UnpublishPortRequest) GetProtocol() Protocol {
+	if x != nil {
+		return x.Protocol
+	}
+	return Protocol_PROTOCOL_UNSPECIFIED
+}
+
+type UnpublishPortResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UnpublishPortResponse) Reset() {
+	*x = UnpublishPortResponse{}
+	mi := &file_dshguest_v1_guest_proto_msgTypes[49]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UnpublishPortResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UnpublishPortResponse) ProtoMessage() {}
+
+func (x *UnpublishPortResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_dshguest_v1_guest_proto_msgTypes[49]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UnpublishPortResponse.ProtoReflect.Descriptor instead.
+func (*UnpublishPortResponse) Descriptor() ([]byte, []int) {
+	return file_dshguest_v1_guest_proto_rawDescGZIP(), []int{49}
+}
+
 var File_dshguest_v1_guest_proto protoreflect.FileDescriptor
 
 const file_dshguest_v1_guest_proto_rawDesc = "" +
@@ -3021,8 +3265,22 @@ const file_dshguest_v1_guest_proto_rawDesc = "" +
 	"\n" +
 	"request_id\x18\x01 \x01(\tR\trequestId\x12\x14\n" +
 	"\x05found\x18\x02 \x01(\bR\x05found\x12(\n" +
-	"\x10process_group_id\x18\x03 \x01(\x05R\x0eprocessGroupId2\xa2\n" +
-	"\n" +
+	"\x10process_group_id\x18\x03 \x01(\x05R\x0eprocessGroupId\"[\n" +
+	"\x12PublishPortRequest\x12\x12\n" +
+	"\x04port\x18\x01 \x01(\rR\x04port\x121\n" +
+	"\bprotocol\x18\x02 \x01(\x0e2\x15.dshguest.v1.ProtocolR\bprotocol\"6\n" +
+	"\x13PublishPortResponse\x12\x1f\n" +
+	"\vsocket_name\x18\x01 \x01(\tR\n" +
+	"socketName\"]\n" +
+	"\x14UnpublishPortRequest\x12\x12\n" +
+	"\x04port\x18\x01 \x01(\rR\x04port\x121\n" +
+	"\bprotocol\x18\x02 \x01(\x0e2\x15.dshguest.v1.ProtocolR\bprotocol\"\x17\n" +
+	"\x15UnpublishPortResponse*[\n" +
+	"\bProtocol\x12\x18\n" +
+	"\x14PROTOCOL_UNSPECIFIED\x10\x00\x12\x10\n" +
+	"\fPROTOCOL_TCP\x10\x01\x12\x10\n" +
+	"\fPROTOCOL_UDP\x10\x02\x12\x11\n" +
+	"\rPROTOCOL_HTTP\x10\x032\xcc\v\n" +
 	"\x13WorkspaceGuestAgent\x12;\n" +
 	"\x04Ping\x12\x18.dshguest.v1.PingRequest\x1a\x19.dshguest.v1.PingResponse\x12;\n" +
 	"\x04Exec\x12\x16.dshguest.v1.ExecInput\x1a\x17.dshguest.v1.ExecOutput(\x010\x01\x12A\n" +
@@ -3042,7 +3300,9 @@ const file_dshguest_v1_guest_proto_rawDesc = "" +
 	"\x0eStopAllDaemons\x12\".dshguest.v1.StopAllDaemonsRequest\x1a#.dshguest.v1.StopAllDaemonsResponse\x12K\n" +
 	"\rRestartDaemon\x12!.dshguest.v1.RestartDaemonRequest\x1a\x17.dshguest.v1.DaemonInfo\x12M\n" +
 	"\n" +
-	"DaemonLogs\x12\x1e.dshguest.v1.DaemonLogsRequest\x1a\x1f.dshguest.v1.DaemonLogsResponse\x12G\n" +
+	"DaemonLogs\x12\x1e.dshguest.v1.DaemonLogsRequest\x1a\x1f.dshguest.v1.DaemonLogsResponse\x12P\n" +
+	"\vPublishPort\x12\x1f.dshguest.v1.PublishPortRequest\x1a .dshguest.v1.PublishPortResponse\x12V\n" +
+	"\rUnpublishPort\x12!.dshguest.v1.UnpublishPortRequest\x1a\".dshguest.v1.UnpublishPortResponse\x12G\n" +
 	"\bTerminal\x12\x1a.dshguest.v1.TerminalInput\x1a\x1b.dshguest.v1.TerminalOutput(\x010\x01BKZIgithub.com/Exagone313/dsh-podman/internal/genproto/dshguest/v1;dshguestv1b\x06proto3"
 
 var (
@@ -3057,124 +3317,136 @@ func file_dshguest_v1_guest_proto_rawDescGZIP() []byte {
 	return file_dshguest_v1_guest_proto_rawDescData
 }
 
-var file_dshguest_v1_guest_proto_msgTypes = make([]protoimpl.MessageInfo, 49)
+var file_dshguest_v1_guest_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
+var file_dshguest_v1_guest_proto_msgTypes = make([]protoimpl.MessageInfo, 53)
 var file_dshguest_v1_guest_proto_goTypes = []any{
-	(*PingRequest)(nil),            // 0: dshguest.v1.PingRequest
-	(*PingResponse)(nil),           // 1: dshguest.v1.PingResponse
-	(*ExecInput)(nil),              // 2: dshguest.v1.ExecInput
-	(*ExecStart)(nil),              // 3: dshguest.v1.ExecStart
-	(*ExecOutput)(nil),             // 4: dshguest.v1.ExecOutput
-	(*ExecExit)(nil),               // 5: dshguest.v1.ExecExit
-	(*SpillTarget)(nil),            // 6: dshguest.v1.SpillTarget
-	(*SignalRequest)(nil),          // 7: dshguest.v1.SignalRequest
-	(*SignalResponse)(nil),         // 8: dshguest.v1.SignalResponse
-	(*ReadFileRequest)(nil),        // 9: dshguest.v1.ReadFileRequest
-	(*ReadFileChunk)(nil),          // 10: dshguest.v1.ReadFileChunk
-	(*WriteFileChunk)(nil),         // 11: dshguest.v1.WriteFileChunk
-	(*WriteFileStart)(nil),         // 12: dshguest.v1.WriteFileStart
-	(*WriteFileResponse)(nil),      // 13: dshguest.v1.WriteFileResponse
-	(*StatRequest)(nil),            // 14: dshguest.v1.StatRequest
-	(*StatResponse)(nil),           // 15: dshguest.v1.StatResponse
-	(*ReadDirRequest)(nil),         // 16: dshguest.v1.ReadDirRequest
-	(*ReadDirResponse)(nil),        // 17: dshguest.v1.ReadDirResponse
-	(*DirEntry)(nil),               // 18: dshguest.v1.DirEntry
-	(*MkdirRequest)(nil),           // 19: dshguest.v1.MkdirRequest
-	(*MkdirResponse)(nil),          // 20: dshguest.v1.MkdirResponse
-	(*DeleteRequest)(nil),          // 21: dshguest.v1.DeleteRequest
-	(*DeleteResponse)(nil),         // 22: dshguest.v1.DeleteResponse
-	(*SetPathsRequest)(nil),        // 23: dshguest.v1.SetPathsRequest
-	(*GetPathsRequest)(nil),        // 24: dshguest.v1.GetPathsRequest
-	(*PathsResponse)(nil),          // 25: dshguest.v1.PathsResponse
-	(*StartDaemonRequest)(nil),     // 26: dshguest.v1.StartDaemonRequest
-	(*DaemonInfo)(nil),             // 27: dshguest.v1.DaemonInfo
-	(*ListDaemonsRequest)(nil),     // 28: dshguest.v1.ListDaemonsRequest
-	(*ListDaemonsResponse)(nil),    // 29: dshguest.v1.ListDaemonsResponse
-	(*StopDaemonRequest)(nil),      // 30: dshguest.v1.StopDaemonRequest
-	(*StopDaemonResponse)(nil),     // 31: dshguest.v1.StopDaemonResponse
-	(*StopAllDaemonsRequest)(nil),  // 32: dshguest.v1.StopAllDaemonsRequest
-	(*StopAllDaemonsResponse)(nil), // 33: dshguest.v1.StopAllDaemonsResponse
-	(*RestartDaemonRequest)(nil),   // 34: dshguest.v1.RestartDaemonRequest
-	(*DaemonLogsRequest)(nil),      // 35: dshguest.v1.DaemonLogsRequest
-	(*DaemonLogsResponse)(nil),     // 36: dshguest.v1.DaemonLogsResponse
-	(*TerminalInput)(nil),          // 37: dshguest.v1.TerminalInput
-	(*TerminalStart)(nil),          // 38: dshguest.v1.TerminalStart
-	(*TerminalResize)(nil),         // 39: dshguest.v1.TerminalResize
-	(*TerminalSignal)(nil),         // 40: dshguest.v1.TerminalSignal
-	(*TerminalOutput)(nil),         // 41: dshguest.v1.TerminalOutput
-	(*TerminalStarted)(nil),        // 42: dshguest.v1.TerminalStarted
-	(*TerminalExit)(nil),           // 43: dshguest.v1.TerminalExit
-	(*TerminalForeground)(nil),     // 44: dshguest.v1.TerminalForeground
-	(*TerminalSignalled)(nil),      // 45: dshguest.v1.TerminalSignalled
-	nil,                            // 46: dshguest.v1.ExecStart.EnvEntry
-	nil,                            // 47: dshguest.v1.StartDaemonRequest.EnvEntry
-	nil,                            // 48: dshguest.v1.TerminalStart.EnvEntry
-	(*wrapperspb.Int32Value)(nil),  // 49: google.protobuf.Int32Value
-	(*wrapperspb.BoolValue)(nil),   // 50: google.protobuf.BoolValue
+	(Protocol)(0),                  // 0: dshguest.v1.Protocol
+	(*PingRequest)(nil),            // 1: dshguest.v1.PingRequest
+	(*PingResponse)(nil),           // 2: dshguest.v1.PingResponse
+	(*ExecInput)(nil),              // 3: dshguest.v1.ExecInput
+	(*ExecStart)(nil),              // 4: dshguest.v1.ExecStart
+	(*ExecOutput)(nil),             // 5: dshguest.v1.ExecOutput
+	(*ExecExit)(nil),               // 6: dshguest.v1.ExecExit
+	(*SpillTarget)(nil),            // 7: dshguest.v1.SpillTarget
+	(*SignalRequest)(nil),          // 8: dshguest.v1.SignalRequest
+	(*SignalResponse)(nil),         // 9: dshguest.v1.SignalResponse
+	(*ReadFileRequest)(nil),        // 10: dshguest.v1.ReadFileRequest
+	(*ReadFileChunk)(nil),          // 11: dshguest.v1.ReadFileChunk
+	(*WriteFileChunk)(nil),         // 12: dshguest.v1.WriteFileChunk
+	(*WriteFileStart)(nil),         // 13: dshguest.v1.WriteFileStart
+	(*WriteFileResponse)(nil),      // 14: dshguest.v1.WriteFileResponse
+	(*StatRequest)(nil),            // 15: dshguest.v1.StatRequest
+	(*StatResponse)(nil),           // 16: dshguest.v1.StatResponse
+	(*ReadDirRequest)(nil),         // 17: dshguest.v1.ReadDirRequest
+	(*ReadDirResponse)(nil),        // 18: dshguest.v1.ReadDirResponse
+	(*DirEntry)(nil),               // 19: dshguest.v1.DirEntry
+	(*MkdirRequest)(nil),           // 20: dshguest.v1.MkdirRequest
+	(*MkdirResponse)(nil),          // 21: dshguest.v1.MkdirResponse
+	(*DeleteRequest)(nil),          // 22: dshguest.v1.DeleteRequest
+	(*DeleteResponse)(nil),         // 23: dshguest.v1.DeleteResponse
+	(*SetPathsRequest)(nil),        // 24: dshguest.v1.SetPathsRequest
+	(*GetPathsRequest)(nil),        // 25: dshguest.v1.GetPathsRequest
+	(*PathsResponse)(nil),          // 26: dshguest.v1.PathsResponse
+	(*StartDaemonRequest)(nil),     // 27: dshguest.v1.StartDaemonRequest
+	(*DaemonInfo)(nil),             // 28: dshguest.v1.DaemonInfo
+	(*ListDaemonsRequest)(nil),     // 29: dshguest.v1.ListDaemonsRequest
+	(*ListDaemonsResponse)(nil),    // 30: dshguest.v1.ListDaemonsResponse
+	(*StopDaemonRequest)(nil),      // 31: dshguest.v1.StopDaemonRequest
+	(*StopDaemonResponse)(nil),     // 32: dshguest.v1.StopDaemonResponse
+	(*StopAllDaemonsRequest)(nil),  // 33: dshguest.v1.StopAllDaemonsRequest
+	(*StopAllDaemonsResponse)(nil), // 34: dshguest.v1.StopAllDaemonsResponse
+	(*RestartDaemonRequest)(nil),   // 35: dshguest.v1.RestartDaemonRequest
+	(*DaemonLogsRequest)(nil),      // 36: dshguest.v1.DaemonLogsRequest
+	(*DaemonLogsResponse)(nil),     // 37: dshguest.v1.DaemonLogsResponse
+	(*TerminalInput)(nil),          // 38: dshguest.v1.TerminalInput
+	(*TerminalStart)(nil),          // 39: dshguest.v1.TerminalStart
+	(*TerminalResize)(nil),         // 40: dshguest.v1.TerminalResize
+	(*TerminalSignal)(nil),         // 41: dshguest.v1.TerminalSignal
+	(*TerminalOutput)(nil),         // 42: dshguest.v1.TerminalOutput
+	(*TerminalStarted)(nil),        // 43: dshguest.v1.TerminalStarted
+	(*TerminalExit)(nil),           // 44: dshguest.v1.TerminalExit
+	(*TerminalForeground)(nil),     // 45: dshguest.v1.TerminalForeground
+	(*TerminalSignalled)(nil),      // 46: dshguest.v1.TerminalSignalled
+	(*PublishPortRequest)(nil),     // 47: dshguest.v1.PublishPortRequest
+	(*PublishPortResponse)(nil),    // 48: dshguest.v1.PublishPortResponse
+	(*UnpublishPortRequest)(nil),   // 49: dshguest.v1.UnpublishPortRequest
+	(*UnpublishPortResponse)(nil),  // 50: dshguest.v1.UnpublishPortResponse
+	nil,                            // 51: dshguest.v1.ExecStart.EnvEntry
+	nil,                            // 52: dshguest.v1.StartDaemonRequest.EnvEntry
+	nil,                            // 53: dshguest.v1.TerminalStart.EnvEntry
+	(*wrapperspb.Int32Value)(nil),  // 54: google.protobuf.Int32Value
+	(*wrapperspb.BoolValue)(nil),   // 55: google.protobuf.BoolValue
 }
 var file_dshguest_v1_guest_proto_depIdxs = []int32{
-	3,  // 0: dshguest.v1.ExecInput.start:type_name -> dshguest.v1.ExecStart
-	46, // 1: dshguest.v1.ExecStart.env:type_name -> dshguest.v1.ExecStart.EnvEntry
-	6,  // 2: dshguest.v1.ExecStart.spill_stdout:type_name -> dshguest.v1.SpillTarget
-	6,  // 3: dshguest.v1.ExecStart.spill_stderr:type_name -> dshguest.v1.SpillTarget
-	49, // 4: dshguest.v1.ExecStart.uid:type_name -> google.protobuf.Int32Value
-	49, // 5: dshguest.v1.ExecStart.gid:type_name -> google.protobuf.Int32Value
-	5,  // 6: dshguest.v1.ExecOutput.exit:type_name -> dshguest.v1.ExecExit
-	12, // 7: dshguest.v1.WriteFileChunk.start:type_name -> dshguest.v1.WriteFileStart
-	18, // 8: dshguest.v1.ReadDirResponse.entries:type_name -> dshguest.v1.DirEntry
-	47, // 9: dshguest.v1.StartDaemonRequest.env:type_name -> dshguest.v1.StartDaemonRequest.EnvEntry
-	49, // 10: dshguest.v1.StartDaemonRequest.uid:type_name -> google.protobuf.Int32Value
-	49, // 11: dshguest.v1.StartDaemonRequest.gid:type_name -> google.protobuf.Int32Value
-	50, // 12: dshguest.v1.StartDaemonRequest.inherit_env:type_name -> google.protobuf.BoolValue
-	27, // 13: dshguest.v1.ListDaemonsResponse.daemons:type_name -> dshguest.v1.DaemonInfo
-	38, // 14: dshguest.v1.TerminalInput.start:type_name -> dshguest.v1.TerminalStart
-	39, // 15: dshguest.v1.TerminalInput.resize:type_name -> dshguest.v1.TerminalResize
-	40, // 16: dshguest.v1.TerminalInput.signal:type_name -> dshguest.v1.TerminalSignal
-	48, // 17: dshguest.v1.TerminalStart.env:type_name -> dshguest.v1.TerminalStart.EnvEntry
-	42, // 18: dshguest.v1.TerminalOutput.started:type_name -> dshguest.v1.TerminalStarted
-	43, // 19: dshguest.v1.TerminalOutput.exit:type_name -> dshguest.v1.TerminalExit
-	44, // 20: dshguest.v1.TerminalOutput.foreground:type_name -> dshguest.v1.TerminalForeground
-	45, // 21: dshguest.v1.TerminalOutput.signalled:type_name -> dshguest.v1.TerminalSignalled
-	0,  // 22: dshguest.v1.WorkspaceGuestAgent.Ping:input_type -> dshguest.v1.PingRequest
-	2,  // 23: dshguest.v1.WorkspaceGuestAgent.Exec:input_type -> dshguest.v1.ExecInput
-	7,  // 24: dshguest.v1.WorkspaceGuestAgent.Signal:input_type -> dshguest.v1.SignalRequest
-	9,  // 25: dshguest.v1.WorkspaceGuestAgent.ReadFile:input_type -> dshguest.v1.ReadFileRequest
-	11, // 26: dshguest.v1.WorkspaceGuestAgent.WriteFile:input_type -> dshguest.v1.WriteFileChunk
-	14, // 27: dshguest.v1.WorkspaceGuestAgent.Stat:input_type -> dshguest.v1.StatRequest
-	16, // 28: dshguest.v1.WorkspaceGuestAgent.ReadDir:input_type -> dshguest.v1.ReadDirRequest
-	19, // 29: dshguest.v1.WorkspaceGuestAgent.Mkdir:input_type -> dshguest.v1.MkdirRequest
-	21, // 30: dshguest.v1.WorkspaceGuestAgent.Delete:input_type -> dshguest.v1.DeleteRequest
-	23, // 31: dshguest.v1.WorkspaceGuestAgent.SetPaths:input_type -> dshguest.v1.SetPathsRequest
-	24, // 32: dshguest.v1.WorkspaceGuestAgent.GetPaths:input_type -> dshguest.v1.GetPathsRequest
-	26, // 33: dshguest.v1.WorkspaceGuestAgent.StartDaemon:input_type -> dshguest.v1.StartDaemonRequest
-	28, // 34: dshguest.v1.WorkspaceGuestAgent.ListDaemons:input_type -> dshguest.v1.ListDaemonsRequest
-	30, // 35: dshguest.v1.WorkspaceGuestAgent.StopDaemon:input_type -> dshguest.v1.StopDaemonRequest
-	32, // 36: dshguest.v1.WorkspaceGuestAgent.StopAllDaemons:input_type -> dshguest.v1.StopAllDaemonsRequest
-	34, // 37: dshguest.v1.WorkspaceGuestAgent.RestartDaemon:input_type -> dshguest.v1.RestartDaemonRequest
-	35, // 38: dshguest.v1.WorkspaceGuestAgent.DaemonLogs:input_type -> dshguest.v1.DaemonLogsRequest
-	37, // 39: dshguest.v1.WorkspaceGuestAgent.Terminal:input_type -> dshguest.v1.TerminalInput
-	1,  // 40: dshguest.v1.WorkspaceGuestAgent.Ping:output_type -> dshguest.v1.PingResponse
-	4,  // 41: dshguest.v1.WorkspaceGuestAgent.Exec:output_type -> dshguest.v1.ExecOutput
-	8,  // 42: dshguest.v1.WorkspaceGuestAgent.Signal:output_type -> dshguest.v1.SignalResponse
-	10, // 43: dshguest.v1.WorkspaceGuestAgent.ReadFile:output_type -> dshguest.v1.ReadFileChunk
-	13, // 44: dshguest.v1.WorkspaceGuestAgent.WriteFile:output_type -> dshguest.v1.WriteFileResponse
-	15, // 45: dshguest.v1.WorkspaceGuestAgent.Stat:output_type -> dshguest.v1.StatResponse
-	17, // 46: dshguest.v1.WorkspaceGuestAgent.ReadDir:output_type -> dshguest.v1.ReadDirResponse
-	20, // 47: dshguest.v1.WorkspaceGuestAgent.Mkdir:output_type -> dshguest.v1.MkdirResponse
-	22, // 48: dshguest.v1.WorkspaceGuestAgent.Delete:output_type -> dshguest.v1.DeleteResponse
-	25, // 49: dshguest.v1.WorkspaceGuestAgent.SetPaths:output_type -> dshguest.v1.PathsResponse
-	25, // 50: dshguest.v1.WorkspaceGuestAgent.GetPaths:output_type -> dshguest.v1.PathsResponse
-	27, // 51: dshguest.v1.WorkspaceGuestAgent.StartDaemon:output_type -> dshguest.v1.DaemonInfo
-	29, // 52: dshguest.v1.WorkspaceGuestAgent.ListDaemons:output_type -> dshguest.v1.ListDaemonsResponse
-	31, // 53: dshguest.v1.WorkspaceGuestAgent.StopDaemon:output_type -> dshguest.v1.StopDaemonResponse
-	33, // 54: dshguest.v1.WorkspaceGuestAgent.StopAllDaemons:output_type -> dshguest.v1.StopAllDaemonsResponse
-	27, // 55: dshguest.v1.WorkspaceGuestAgent.RestartDaemon:output_type -> dshguest.v1.DaemonInfo
-	36, // 56: dshguest.v1.WorkspaceGuestAgent.DaemonLogs:output_type -> dshguest.v1.DaemonLogsResponse
-	41, // 57: dshguest.v1.WorkspaceGuestAgent.Terminal:output_type -> dshguest.v1.TerminalOutput
-	40, // [40:58] is the sub-list for method output_type
-	22, // [22:40] is the sub-list for method input_type
-	22, // [22:22] is the sub-list for extension type_name
-	22, // [22:22] is the sub-list for extension extendee
-	0,  // [0:22] is the sub-list for field type_name
+	4,  // 0: dshguest.v1.ExecInput.start:type_name -> dshguest.v1.ExecStart
+	51, // 1: dshguest.v1.ExecStart.env:type_name -> dshguest.v1.ExecStart.EnvEntry
+	7,  // 2: dshguest.v1.ExecStart.spill_stdout:type_name -> dshguest.v1.SpillTarget
+	7,  // 3: dshguest.v1.ExecStart.spill_stderr:type_name -> dshguest.v1.SpillTarget
+	54, // 4: dshguest.v1.ExecStart.uid:type_name -> google.protobuf.Int32Value
+	54, // 5: dshguest.v1.ExecStart.gid:type_name -> google.protobuf.Int32Value
+	6,  // 6: dshguest.v1.ExecOutput.exit:type_name -> dshguest.v1.ExecExit
+	13, // 7: dshguest.v1.WriteFileChunk.start:type_name -> dshguest.v1.WriteFileStart
+	19, // 8: dshguest.v1.ReadDirResponse.entries:type_name -> dshguest.v1.DirEntry
+	52, // 9: dshguest.v1.StartDaemonRequest.env:type_name -> dshguest.v1.StartDaemonRequest.EnvEntry
+	54, // 10: dshguest.v1.StartDaemonRequest.uid:type_name -> google.protobuf.Int32Value
+	54, // 11: dshguest.v1.StartDaemonRequest.gid:type_name -> google.protobuf.Int32Value
+	55, // 12: dshguest.v1.StartDaemonRequest.inherit_env:type_name -> google.protobuf.BoolValue
+	28, // 13: dshguest.v1.ListDaemonsResponse.daemons:type_name -> dshguest.v1.DaemonInfo
+	39, // 14: dshguest.v1.TerminalInput.start:type_name -> dshguest.v1.TerminalStart
+	40, // 15: dshguest.v1.TerminalInput.resize:type_name -> dshguest.v1.TerminalResize
+	41, // 16: dshguest.v1.TerminalInput.signal:type_name -> dshguest.v1.TerminalSignal
+	53, // 17: dshguest.v1.TerminalStart.env:type_name -> dshguest.v1.TerminalStart.EnvEntry
+	43, // 18: dshguest.v1.TerminalOutput.started:type_name -> dshguest.v1.TerminalStarted
+	44, // 19: dshguest.v1.TerminalOutput.exit:type_name -> dshguest.v1.TerminalExit
+	45, // 20: dshguest.v1.TerminalOutput.foreground:type_name -> dshguest.v1.TerminalForeground
+	46, // 21: dshguest.v1.TerminalOutput.signalled:type_name -> dshguest.v1.TerminalSignalled
+	0,  // 22: dshguest.v1.PublishPortRequest.protocol:type_name -> dshguest.v1.Protocol
+	0,  // 23: dshguest.v1.UnpublishPortRequest.protocol:type_name -> dshguest.v1.Protocol
+	1,  // 24: dshguest.v1.WorkspaceGuestAgent.Ping:input_type -> dshguest.v1.PingRequest
+	3,  // 25: dshguest.v1.WorkspaceGuestAgent.Exec:input_type -> dshguest.v1.ExecInput
+	8,  // 26: dshguest.v1.WorkspaceGuestAgent.Signal:input_type -> dshguest.v1.SignalRequest
+	10, // 27: dshguest.v1.WorkspaceGuestAgent.ReadFile:input_type -> dshguest.v1.ReadFileRequest
+	12, // 28: dshguest.v1.WorkspaceGuestAgent.WriteFile:input_type -> dshguest.v1.WriteFileChunk
+	15, // 29: dshguest.v1.WorkspaceGuestAgent.Stat:input_type -> dshguest.v1.StatRequest
+	17, // 30: dshguest.v1.WorkspaceGuestAgent.ReadDir:input_type -> dshguest.v1.ReadDirRequest
+	20, // 31: dshguest.v1.WorkspaceGuestAgent.Mkdir:input_type -> dshguest.v1.MkdirRequest
+	22, // 32: dshguest.v1.WorkspaceGuestAgent.Delete:input_type -> dshguest.v1.DeleteRequest
+	24, // 33: dshguest.v1.WorkspaceGuestAgent.SetPaths:input_type -> dshguest.v1.SetPathsRequest
+	25, // 34: dshguest.v1.WorkspaceGuestAgent.GetPaths:input_type -> dshguest.v1.GetPathsRequest
+	27, // 35: dshguest.v1.WorkspaceGuestAgent.StartDaemon:input_type -> dshguest.v1.StartDaemonRequest
+	29, // 36: dshguest.v1.WorkspaceGuestAgent.ListDaemons:input_type -> dshguest.v1.ListDaemonsRequest
+	31, // 37: dshguest.v1.WorkspaceGuestAgent.StopDaemon:input_type -> dshguest.v1.StopDaemonRequest
+	33, // 38: dshguest.v1.WorkspaceGuestAgent.StopAllDaemons:input_type -> dshguest.v1.StopAllDaemonsRequest
+	35, // 39: dshguest.v1.WorkspaceGuestAgent.RestartDaemon:input_type -> dshguest.v1.RestartDaemonRequest
+	36, // 40: dshguest.v1.WorkspaceGuestAgent.DaemonLogs:input_type -> dshguest.v1.DaemonLogsRequest
+	47, // 41: dshguest.v1.WorkspaceGuestAgent.PublishPort:input_type -> dshguest.v1.PublishPortRequest
+	49, // 42: dshguest.v1.WorkspaceGuestAgent.UnpublishPort:input_type -> dshguest.v1.UnpublishPortRequest
+	38, // 43: dshguest.v1.WorkspaceGuestAgent.Terminal:input_type -> dshguest.v1.TerminalInput
+	2,  // 44: dshguest.v1.WorkspaceGuestAgent.Ping:output_type -> dshguest.v1.PingResponse
+	5,  // 45: dshguest.v1.WorkspaceGuestAgent.Exec:output_type -> dshguest.v1.ExecOutput
+	9,  // 46: dshguest.v1.WorkspaceGuestAgent.Signal:output_type -> dshguest.v1.SignalResponse
+	11, // 47: dshguest.v1.WorkspaceGuestAgent.ReadFile:output_type -> dshguest.v1.ReadFileChunk
+	14, // 48: dshguest.v1.WorkspaceGuestAgent.WriteFile:output_type -> dshguest.v1.WriteFileResponse
+	16, // 49: dshguest.v1.WorkspaceGuestAgent.Stat:output_type -> dshguest.v1.StatResponse
+	18, // 50: dshguest.v1.WorkspaceGuestAgent.ReadDir:output_type -> dshguest.v1.ReadDirResponse
+	21, // 51: dshguest.v1.WorkspaceGuestAgent.Mkdir:output_type -> dshguest.v1.MkdirResponse
+	23, // 52: dshguest.v1.WorkspaceGuestAgent.Delete:output_type -> dshguest.v1.DeleteResponse
+	26, // 53: dshguest.v1.WorkspaceGuestAgent.SetPaths:output_type -> dshguest.v1.PathsResponse
+	26, // 54: dshguest.v1.WorkspaceGuestAgent.GetPaths:output_type -> dshguest.v1.PathsResponse
+	28, // 55: dshguest.v1.WorkspaceGuestAgent.StartDaemon:output_type -> dshguest.v1.DaemonInfo
+	30, // 56: dshguest.v1.WorkspaceGuestAgent.ListDaemons:output_type -> dshguest.v1.ListDaemonsResponse
+	32, // 57: dshguest.v1.WorkspaceGuestAgent.StopDaemon:output_type -> dshguest.v1.StopDaemonResponse
+	34, // 58: dshguest.v1.WorkspaceGuestAgent.StopAllDaemons:output_type -> dshguest.v1.StopAllDaemonsResponse
+	28, // 59: dshguest.v1.WorkspaceGuestAgent.RestartDaemon:output_type -> dshguest.v1.DaemonInfo
+	37, // 60: dshguest.v1.WorkspaceGuestAgent.DaemonLogs:output_type -> dshguest.v1.DaemonLogsResponse
+	48, // 61: dshguest.v1.WorkspaceGuestAgent.PublishPort:output_type -> dshguest.v1.PublishPortResponse
+	50, // 62: dshguest.v1.WorkspaceGuestAgent.UnpublishPort:output_type -> dshguest.v1.UnpublishPortResponse
+	42, // 63: dshguest.v1.WorkspaceGuestAgent.Terminal:output_type -> dshguest.v1.TerminalOutput
+	44, // [44:64] is the sub-list for method output_type
+	24, // [24:44] is the sub-list for method input_type
+	24, // [24:24] is the sub-list for extension type_name
+	24, // [24:24] is the sub-list for extension extendee
+	0,  // [0:24] is the sub-list for field type_name
 }
 
 func init() { file_dshguest_v1_guest_proto_init() }
@@ -3215,13 +3487,14 @@ func file_dshguest_v1_guest_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_dshguest_v1_guest_proto_rawDesc), len(file_dshguest_v1_guest_proto_rawDesc)),
-			NumEnums:      0,
-			NumMessages:   49,
+			NumEnums:      1,
+			NumMessages:   53,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
 		GoTypes:           file_dshguest_v1_guest_proto_goTypes,
 		DependencyIndexes: file_dshguest_v1_guest_proto_depIdxs,
+		EnumInfos:         file_dshguest_v1_guest_proto_enumTypes,
 		MessageInfos:      file_dshguest_v1_guest_proto_msgTypes,
 	}.Build()
 	File_dshguest_v1_guest_proto = out.File

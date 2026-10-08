@@ -57,6 +57,10 @@ const (
 	OrchestratorControl_RemoveSecret_FullMethodName          = "/dshctl.v1.OrchestratorControl/RemoveSecret"
 	OrchestratorControl_AddContainerSecret_FullMethodName    = "/dshctl.v1.OrchestratorControl/AddContainerSecret"
 	OrchestratorControl_RemoveContainerSecret_FullMethodName = "/dshctl.v1.OrchestratorControl/RemoveContainerSecret"
+	OrchestratorControl_PublishPort_FullMethodName           = "/dshctl.v1.OrchestratorControl/PublishPort"
+	OrchestratorControl_UnpublishPort_FullMethodName         = "/dshctl.v1.OrchestratorControl/UnpublishPort"
+	OrchestratorControl_ListPublishedPorts_FullMethodName    = "/dshctl.v1.OrchestratorControl/ListPublishedPorts"
+	OrchestratorControl_GetGatewayStatus_FullMethodName      = "/dshctl.v1.OrchestratorControl/GetGatewayStatus"
 )
 
 // OrchestratorControlClient is the client API for OrchestratorControl service.
@@ -97,6 +101,10 @@ type OrchestratorControlClient interface {
 	RemoveSecret(ctx context.Context, in *RemoveSecretRequest, opts ...grpc.CallOption) (*RemoveSecretResponse, error)
 	AddContainerSecret(ctx context.Context, in *AddContainerSecretRequest, opts ...grpc.CallOption) (*Container, error)
 	RemoveContainerSecret(ctx context.Context, in *RemoveContainerSecretRequest, opts ...grpc.CallOption) (*Container, error)
+	PublishPort(ctx context.Context, in *PublishPortRequest, opts ...grpc.CallOption) (*PublishedPort, error)
+	UnpublishPort(ctx context.Context, in *UnpublishPortRequest, opts ...grpc.CallOption) (*UnpublishPortResponse, error)
+	ListPublishedPorts(ctx context.Context, in *ListPublishedPortsRequest, opts ...grpc.CallOption) (*ListPublishedPortsResponse, error)
+	GetGatewayStatus(ctx context.Context, in *GetGatewayStatusRequest, opts ...grpc.CallOption) (*GetGatewayStatusResponse, error)
 }
 
 type orchestratorControlClient struct {
@@ -447,6 +455,46 @@ func (c *orchestratorControlClient) RemoveContainerSecret(ctx context.Context, i
 	return out, nil
 }
 
+func (c *orchestratorControlClient) PublishPort(ctx context.Context, in *PublishPortRequest, opts ...grpc.CallOption) (*PublishedPort, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(PublishedPort)
+	err := c.cc.Invoke(ctx, OrchestratorControl_PublishPort_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *orchestratorControlClient) UnpublishPort(ctx context.Context, in *UnpublishPortRequest, opts ...grpc.CallOption) (*UnpublishPortResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(UnpublishPortResponse)
+	err := c.cc.Invoke(ctx, OrchestratorControl_UnpublishPort_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *orchestratorControlClient) ListPublishedPorts(ctx context.Context, in *ListPublishedPortsRequest, opts ...grpc.CallOption) (*ListPublishedPortsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListPublishedPortsResponse)
+	err := c.cc.Invoke(ctx, OrchestratorControl_ListPublishedPorts_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *orchestratorControlClient) GetGatewayStatus(ctx context.Context, in *GetGatewayStatusRequest, opts ...grpc.CallOption) (*GetGatewayStatusResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetGatewayStatusResponse)
+	err := c.cc.Invoke(ctx, OrchestratorControl_GetGatewayStatus_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // OrchestratorControlServer is the server API for OrchestratorControl service.
 // All implementations must embed UnimplementedOrchestratorControlServer
 // for forward compatibility.
@@ -485,6 +533,10 @@ type OrchestratorControlServer interface {
 	RemoveSecret(context.Context, *RemoveSecretRequest) (*RemoveSecretResponse, error)
 	AddContainerSecret(context.Context, *AddContainerSecretRequest) (*Container, error)
 	RemoveContainerSecret(context.Context, *RemoveContainerSecretRequest) (*Container, error)
+	PublishPort(context.Context, *PublishPortRequest) (*PublishedPort, error)
+	UnpublishPort(context.Context, *UnpublishPortRequest) (*UnpublishPortResponse, error)
+	ListPublishedPorts(context.Context, *ListPublishedPortsRequest) (*ListPublishedPortsResponse, error)
+	GetGatewayStatus(context.Context, *GetGatewayStatusRequest) (*GetGatewayStatusResponse, error)
 	mustEmbedUnimplementedOrchestratorControlServer()
 }
 
@@ -596,6 +648,18 @@ func (UnimplementedOrchestratorControlServer) AddContainerSecret(context.Context
 }
 func (UnimplementedOrchestratorControlServer) RemoveContainerSecret(context.Context, *RemoveContainerSecretRequest) (*Container, error) {
 	return nil, status.Error(codes.Unimplemented, "method RemoveContainerSecret not implemented")
+}
+func (UnimplementedOrchestratorControlServer) PublishPort(context.Context, *PublishPortRequest) (*PublishedPort, error) {
+	return nil, status.Error(codes.Unimplemented, "method PublishPort not implemented")
+}
+func (UnimplementedOrchestratorControlServer) UnpublishPort(context.Context, *UnpublishPortRequest) (*UnpublishPortResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method UnpublishPort not implemented")
+}
+func (UnimplementedOrchestratorControlServer) ListPublishedPorts(context.Context, *ListPublishedPortsRequest) (*ListPublishedPortsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListPublishedPorts not implemented")
+}
+func (UnimplementedOrchestratorControlServer) GetGatewayStatus(context.Context, *GetGatewayStatusRequest) (*GetGatewayStatusResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetGatewayStatus not implemented")
 }
 func (UnimplementedOrchestratorControlServer) mustEmbedUnimplementedOrchestratorControlServer() {}
 func (UnimplementedOrchestratorControlServer) testEmbeddedByValue()                             {}
@@ -1230,6 +1294,78 @@ func _OrchestratorControl_RemoveContainerSecret_Handler(srv interface{}, ctx con
 	return interceptor(ctx, in, info, handler)
 }
 
+func _OrchestratorControl_PublishPort_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(PublishPortRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(OrchestratorControlServer).PublishPort(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: OrchestratorControl_PublishPort_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(OrchestratorControlServer).PublishPort(ctx, req.(*PublishPortRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _OrchestratorControl_UnpublishPort_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UnpublishPortRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(OrchestratorControlServer).UnpublishPort(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: OrchestratorControl_UnpublishPort_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(OrchestratorControlServer).UnpublishPort(ctx, req.(*UnpublishPortRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _OrchestratorControl_ListPublishedPorts_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListPublishedPortsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(OrchestratorControlServer).ListPublishedPorts(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: OrchestratorControl_ListPublishedPorts_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(OrchestratorControlServer).ListPublishedPorts(ctx, req.(*ListPublishedPortsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _OrchestratorControl_GetGatewayStatus_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetGatewayStatusRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(OrchestratorControlServer).GetGatewayStatus(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: OrchestratorControl_GetGatewayStatus_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(OrchestratorControlServer).GetGatewayStatus(ctx, req.(*GetGatewayStatusRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // OrchestratorControl_ServiceDesc is the grpc.ServiceDesc for OrchestratorControl service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -1372,6 +1508,22 @@ var OrchestratorControl_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "RemoveContainerSecret",
 			Handler:    _OrchestratorControl_RemoveContainerSecret_Handler,
+		},
+		{
+			MethodName: "PublishPort",
+			Handler:    _OrchestratorControl_PublishPort_Handler,
+		},
+		{
+			MethodName: "UnpublishPort",
+			Handler:    _OrchestratorControl_UnpublishPort_Handler,
+		},
+		{
+			MethodName: "ListPublishedPorts",
+			Handler:    _OrchestratorControl_ListPublishedPorts_Handler,
+		},
+		{
+			MethodName: "GetGatewayStatus",
+			Handler:    _OrchestratorControl_GetGatewayStatus_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

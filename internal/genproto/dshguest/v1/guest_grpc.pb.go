@@ -40,6 +40,8 @@ const (
 	WorkspaceGuestAgent_StopAllDaemons_FullMethodName = "/dshguest.v1.WorkspaceGuestAgent/StopAllDaemons"
 	WorkspaceGuestAgent_RestartDaemon_FullMethodName  = "/dshguest.v1.WorkspaceGuestAgent/RestartDaemon"
 	WorkspaceGuestAgent_DaemonLogs_FullMethodName     = "/dshguest.v1.WorkspaceGuestAgent/DaemonLogs"
+	WorkspaceGuestAgent_PublishPort_FullMethodName    = "/dshguest.v1.WorkspaceGuestAgent/PublishPort"
+	WorkspaceGuestAgent_UnpublishPort_FullMethodName  = "/dshguest.v1.WorkspaceGuestAgent/UnpublishPort"
 	WorkspaceGuestAgent_Terminal_FullMethodName       = "/dshguest.v1.WorkspaceGuestAgent/Terminal"
 )
 
@@ -66,6 +68,8 @@ type WorkspaceGuestAgentClient interface {
 	StopAllDaemons(ctx context.Context, in *StopAllDaemonsRequest, opts ...grpc.CallOption) (*StopAllDaemonsResponse, error)
 	RestartDaemon(ctx context.Context, in *RestartDaemonRequest, opts ...grpc.CallOption) (*DaemonInfo, error)
 	DaemonLogs(ctx context.Context, in *DaemonLogsRequest, opts ...grpc.CallOption) (*DaemonLogsResponse, error)
+	PublishPort(ctx context.Context, in *PublishPortRequest, opts ...grpc.CallOption) (*PublishPortResponse, error)
+	UnpublishPort(ctx context.Context, in *UnpublishPortRequest, opts ...grpc.CallOption) (*UnpublishPortResponse, error)
 	Terminal(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[TerminalInput, TerminalOutput], error)
 }
 
@@ -262,6 +266,26 @@ func (c *workspaceGuestAgentClient) DaemonLogs(ctx context.Context, in *DaemonLo
 	return out, nil
 }
 
+func (c *workspaceGuestAgentClient) PublishPort(ctx context.Context, in *PublishPortRequest, opts ...grpc.CallOption) (*PublishPortResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(PublishPortResponse)
+	err := c.cc.Invoke(ctx, WorkspaceGuestAgent_PublishPort_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *workspaceGuestAgentClient) UnpublishPort(ctx context.Context, in *UnpublishPortRequest, opts ...grpc.CallOption) (*UnpublishPortResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(UnpublishPortResponse)
+	err := c.cc.Invoke(ctx, WorkspaceGuestAgent_UnpublishPort_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *workspaceGuestAgentClient) Terminal(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[TerminalInput, TerminalOutput], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	stream, err := c.cc.NewStream(ctx, &WorkspaceGuestAgent_ServiceDesc.Streams[3], WorkspaceGuestAgent_Terminal_FullMethodName, cOpts...)
@@ -298,6 +322,8 @@ type WorkspaceGuestAgentServer interface {
 	StopAllDaemons(context.Context, *StopAllDaemonsRequest) (*StopAllDaemonsResponse, error)
 	RestartDaemon(context.Context, *RestartDaemonRequest) (*DaemonInfo, error)
 	DaemonLogs(context.Context, *DaemonLogsRequest) (*DaemonLogsResponse, error)
+	PublishPort(context.Context, *PublishPortRequest) (*PublishPortResponse, error)
+	UnpublishPort(context.Context, *UnpublishPortRequest) (*UnpublishPortResponse, error)
 	Terminal(grpc.BidiStreamingServer[TerminalInput, TerminalOutput]) error
 	mustEmbedUnimplementedWorkspaceGuestAgentServer()
 }
@@ -359,6 +385,12 @@ func (UnimplementedWorkspaceGuestAgentServer) RestartDaemon(context.Context, *Re
 }
 func (UnimplementedWorkspaceGuestAgentServer) DaemonLogs(context.Context, *DaemonLogsRequest) (*DaemonLogsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method DaemonLogs not implemented")
+}
+func (UnimplementedWorkspaceGuestAgentServer) PublishPort(context.Context, *PublishPortRequest) (*PublishPortResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method PublishPort not implemented")
+}
+func (UnimplementedWorkspaceGuestAgentServer) UnpublishPort(context.Context, *UnpublishPortRequest) (*UnpublishPortResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method UnpublishPort not implemented")
 }
 func (UnimplementedWorkspaceGuestAgentServer) Terminal(grpc.BidiStreamingServer[TerminalInput, TerminalOutput]) error {
 	return status.Error(codes.Unimplemented, "method Terminal not implemented")
@@ -661,6 +693,42 @@ func _WorkspaceGuestAgent_DaemonLogs_Handler(srv interface{}, ctx context.Contex
 	return interceptor(ctx, in, info, handler)
 }
 
+func _WorkspaceGuestAgent_PublishPort_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(PublishPortRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(WorkspaceGuestAgentServer).PublishPort(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: WorkspaceGuestAgent_PublishPort_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(WorkspaceGuestAgentServer).PublishPort(ctx, req.(*PublishPortRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _WorkspaceGuestAgent_UnpublishPort_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UnpublishPortRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(WorkspaceGuestAgentServer).UnpublishPort(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: WorkspaceGuestAgent_UnpublishPort_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(WorkspaceGuestAgentServer).UnpublishPort(ctx, req.(*UnpublishPortRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _WorkspaceGuestAgent_Terminal_Handler(srv interface{}, stream grpc.ServerStream) error {
 	return srv.(WorkspaceGuestAgentServer).Terminal(&grpc.GenericServerStream[TerminalInput, TerminalOutput]{ServerStream: stream})
 }
@@ -730,6 +798,14 @@ var WorkspaceGuestAgent_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "DaemonLogs",
 			Handler:    _WorkspaceGuestAgent_DaemonLogs_Handler,
+		},
+		{
+			MethodName: "PublishPort",
+			Handler:    _WorkspaceGuestAgent_PublishPort_Handler,
+		},
+		{
+			MethodName: "UnpublishPort",
+			Handler:    _WorkspaceGuestAgent_UnpublishPort_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{

@@ -28,6 +28,8 @@ service WorkspaceGuestAgent {
   rpc StopAllDaemons(StopAllDaemonsRequest) returns (StopAllDaemonsResponse);
   rpc RestartDaemon(RestartDaemonRequest) returns (DaemonInfo);
   rpc DaemonLogs(DaemonLogsRequest) returns (DaemonLogsResponse);
+  rpc PublishPort(PublishPortRequest) returns (PublishPortResponse);
+  rpc UnpublishPort(UnpublishPortRequest) returns (UnpublishPortResponse);
   rpc Terminal(stream TerminalInput) returns (stream TerminalOutput);
 }
 message PingRequest {}
@@ -82,3 +84,18 @@ message TerminalStarted { int32 pid = 1; }
 message TerminalExit { int32 exit_code = 1; bool signaled = 2; string signal = 3; }
 message TerminalForeground { string request_id = 1; bool found = 2; int32 process_group_id = 3; bool input_waiting = 4; }
 message TerminalSignalled { string request_id = 1; bool found = 2; int32 process_group_id = 3; }
+
+// Protocol is the transport a published pod port speaks. Only TCP is
+// implemented today; the others are reserved so the wire format does not have
+// to change when they land.
+enum Protocol { PROTOCOL_UNSPECIFIED = 0; PROTOCOL_TCP = 1; PROTOCOL_UDP = 2; PROTOCOL_HTTP = 3; }
+
+// PublishPort makes the agent listen on a Unix socket inside the container's
+// socket directory and forward every connection to 127.0.0.1:<port> in the
+// pod's network namespace. The socket name is deterministic (see
+// internal/guestagent/publish), so publishing again after a recreate lands on
+// the same path and the gateway's binding keeps working.
+message PublishPortRequest { uint32 port = 1; Protocol protocol = 2; }
+message PublishPortResponse { string socket_name = 1; }
+message UnpublishPortRequest { uint32 port = 1; Protocol protocol = 2; }
+message UnpublishPortResponse {}

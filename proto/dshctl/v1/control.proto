@@ -41,10 +41,14 @@ service OrchestratorControl {
   rpc RemoveSecret(RemoveSecretRequest) returns (RemoveSecretResponse);
   rpc AddContainerSecret(AddContainerSecretRequest) returns (Container);
   rpc RemoveContainerSecret(RemoveContainerSecretRequest) returns (Container);
+  rpc PublishPort(PublishPortRequest) returns (PublishedPort);
+  rpc UnpublishPort(UnpublishPortRequest) returns (UnpublishPortResponse);
+  rpc ListPublishedPorts(ListPublishedPortsRequest) returns (ListPublishedPortsResponse);
+  rpc GetGatewayStatus(GetGatewayStatusRequest) returns (GetGatewayStatusResponse);
 }
 
 message GetVersionRequest {}
-message GetVersionResponse { string version = 1; string commit = 2; }
+message GetVersionResponse { string version = 1; string commit = 2; repeated string features = 3; }
 message ListProjectsRequest {}
 message ListProjectsResponse { repeated Project projects = 1; }
 message Project { string name = 1; string host_path = 2; }
@@ -116,6 +120,7 @@ message Container {
   map<string, string> env = 10;
   map<string, string> secret_env = 11;
   repeated string paths = 12;
+  repeated PublishedPort published_ports = 13;
 }
 message StartContainerRequest { string workspace_slug = 1; string container = 2; string image_id = 3; repeated ProjectMount mounts = 4; map<string, string> env = 5; map<string, string> secret_env = 6; repeated string paths = 7; }
 message EnsureContainerRequest { string workspace_slug = 1; string container = 2; }
@@ -141,3 +146,44 @@ message RemoveSecretRequest { string name = 1; }
 message RemoveSecretResponse {}
 message AddContainerSecretRequest { string workspace_slug = 1; string container = 2; string env = 3; string secret = 4; }
 message RemoveContainerSecretRequest { string workspace_slug = 1; string container = 2; string env = 3; }
+
+// Protocol is the transport a published pod port speaks. Only TCP is
+// implemented today; the others are reserved so the wire format does not have
+// to change when they land.
+enum Protocol { PROTOCOL_UNSPECIFIED = 0; PROTOCOL_TCP = 1; PROTOCOL_UDP = 2; PROTOCOL_HTTP = 3; }
+
+// A pod port exposed on the host by the gateway. `address` is the host address
+// the gateway bound — loopback today, a hostname once HTTP publishing arrives —
+// and `endpoint` is the address string a caller shows the user, composed as
+// "<scheme>://<address>:<host_port>".
+message PublishedPort {
+  string container = 1;
+  Protocol protocol = 2;
+  uint32 port = 3;
+  string address = 4;
+  uint32 host_port = 5;
+  string endpoint = 6;
+}
+message PublishPortRequest { string workspace_slug = 1; string container = 2; uint32 port = 3; Protocol protocol = 4; uint32 suggested_host_port = 5; }
+message UnpublishPortRequest { string workspace_slug = 1; string container = 2; uint32 port = 3; Protocol protocol = 4; }
+message UnpublishPortResponse {}
+message ListPublishedPortsRequest { string workspace_slug = 1; }
+message ListPublishedPortsResponse { repeated PublishedPort published_ports = 1; }
+
+// GatewayState is a coarse, internals-free view of the optional gateway. The
+// settings card shows it, so it never carries a raw error or a socket path.
+// UNSPECIFIED means the orchestrator has not probed the gateway yet.
+enum GatewayState {
+  GATEWAY_STATE_UNSPECIFIED = 0;
+  GATEWAY_STATE_RUNNING = 1;
+  GATEWAY_STATE_ABSENT = 2;
+  GATEWAY_STATE_INCOMPATIBLE = 3;
+}
+message GetGatewayStatusRequest {}
+message GetGatewayStatusResponse {
+  GatewayState state = 1;
+  string version = 2;
+  string commit = 3;
+  string instance = 4;
+  uint32 bindings = 5;
+}

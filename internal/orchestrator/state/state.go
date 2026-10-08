@@ -30,6 +30,18 @@ type Mount struct {
 	Volume      string `toml:"volume,omitempty"`
 	Secret      string `toml:"secret,omitempty"`
 }
+
+// PublishedPort is a pod port exposed on the host by the gateway. Address and
+// HostPort are the gateway's choice, SocketName the guest agent's deterministic
+// socket file name; all three are kept so the orchestrator can re-bind the same
+// host port after a container recreate or a gateway restart.
+type PublishedPort struct {
+	Protocol   string `toml:"protocol"`
+	Port       int    `toml:"port"`
+	Address    string `toml:"address"`
+	HostPort   int    `toml:"host_port"`
+	SocketName string `toml:"socket_name"`
+}
 type Container struct {
 	Name            string            `toml:"name"` // "default" or logical name
 	PodmanName      string            `toml:"podman_name"`
@@ -42,6 +54,7 @@ type Container struct {
 	Paths           []string          `toml:"paths,omitempty"`
 	Env             map[string]string `toml:"env,omitempty"`
 	SecretEnv       map[string]string `toml:"secret_env,omitempty"`
+	PublishedPorts  []PublishedPort   `toml:"published_ports,omitempty"`
 }
 type Workspace struct {
 	WorkspaceSlug   string      `toml:"workspace_slug"`

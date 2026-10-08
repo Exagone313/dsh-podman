@@ -353,6 +353,9 @@ func (s *Server) RemoveWorkspace(ctx context.Context, request *ctl.RemoveWorkspa
 	}
 	for i := range workspace.Containers {
 		s.stopContainerDaemons(ctx, workspace.Containers[i])
+		// The pod is about to go, but the gateway's host ports are not part of
+		// it: release them explicitly so none survives the workspace.
+		s.releasePublishedPorts(ctx, workspace.Containers[i])
 	}
 	if err := s.Podman.RemovePod(podNameFor(slug)); err != nil {
 		s.log().Error("control request failed", "method", "RemoveWorkspace", "workspace_slug", slug, "error", err)

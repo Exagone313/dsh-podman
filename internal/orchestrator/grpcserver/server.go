@@ -62,6 +62,17 @@ type Server struct {
 	SecretPrefix    string
 	Logger          *slog.Logger
 
+	// Gateway is the optional port-publishing gateway. It is nil when none is
+	// configured, and the port RPCs then report that publishing is unavailable.
+	Gateway gatewayAPI
+
+	// GuestPorts publishes pod ports on a container's guest agent. It is nil in
+	// production, where the real dialer is used, and set by tests.
+	GuestPorts GuestPorts
+
+	// gatewayStatus caches the last gateway state the background loop observed.
+	gatewayStatus gatewayStatusCache
+
 	// containerLocks serializes work on one podman container so two concurrent
 	// ensures cannot recreate the same name at once. Keyed by podman name,
 	// which is unique per workspace and container.

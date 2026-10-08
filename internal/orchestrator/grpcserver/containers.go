@@ -51,6 +51,9 @@ func containerProto(ws state.Workspace, c state.Container) *ctl.Container {
 		}
 		row.Mounts = append(row.Mounts, &ctl.ProjectMount{ProjectName: mount.ProjectName, Destination: mount.Destination, Mode: mode, Kind: mountKindToProto(mount.Kind), Volume: mount.Volume, Secret: mount.Secret})
 	}
+	for _, port := range c.PublishedPorts {
+		row.PublishedPorts = append(row.PublishedPorts, publishedPortProto(c, port))
+	}
 	return row
 }
 

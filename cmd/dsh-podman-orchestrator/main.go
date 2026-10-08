@@ -19,6 +19,7 @@ import (
 	ctl "github.com/Exagone313/dsh-podman/internal/genproto/dshctl/v1"
 	"github.com/Exagone313/dsh-podman/internal/grpclog"
 	"github.com/Exagone313/dsh-podman/internal/grpcopts"
+	"github.com/Exagone313/dsh-podman/internal/orchestrator/gatewayclient"
 	"github.com/Exagone313/dsh-podman/internal/orchestrator/grpcserver"
 	"github.com/Exagone313/dsh-podman/internal/orchestrator/images"
 	"github.com/Exagone313/dsh-podman/internal/orchestrator/podman"
@@ -50,6 +51,7 @@ func main() {
 	hostAptCache := getenv("DSH_PODMAN_HOST_APT_CACHE", "")
 	hostApkCache := getenv("DSH_PODMAN_HOST_APK_CACHE", "")
 	controlToken := getenv("DSH_PODMAN_ORCHESTRATOR_TOKEN", "")
+	gatewayToken := getenv("DSH_PODMAN_GATEWAY_TOKEN", "")
 	guestAgentImage := getenv("DSH_PODMAN_GUEST_AGENT_IMAGE", "")
 	guestAgentBin := getenv("DSH_PODMAN_GUEST_AGENT_IMAGE_AGENT_BIN", "/bin/dsh-podman-guest-agent")
 	guestAgentMount := getenv("DSH_PODMAN_GUEST_AGENT_IMAGE_MOUNT", "/opt/dsh-podman/guest-agent")
@@ -118,13 +120,19 @@ func main() {
 		logger.Error("Podman API configuration is missing", "DSH_PODMAN_ORCHESTRATOR_PODMAN_SOCKET_present", orchSocketSet, "expected", "DSH_PODMAN_ORCHESTRATOR_PODMAN_SOCKET=unix:///run/podman/podman.sock")
 		panic("Podman API is not configured: DSH_PODMAN_ORCHESTRATOR_PODMAN_SOCKET is absent or empty")
 	}
-	controlServer := &grpcserver.Server{ProjectsRoot: root, HostProjectsRoot: hostProjectsRoot, SocketsRoot: socketsRoot, GuestAgentMount: guestAgentMount, Store: store, Podman: podmanClient, ImageBuilder: imageBuilder, BaseImagePrefix: getenv("DSH_PODMAN_BASE_IMAGE_PREFIX", "localhost/dsh-podman/base/"), VolumePrefix: getenv("DSH_PODMAN_VOLUME_PREFIX", "dsh-podman-"), SecretPrefix: getenv("DSH_PODMAN_SECRET_PREFIX", "dsh-podman-"), Logger: logger}
+	controlServer := &grpcserver.Server{ProjectsRoot: root, HostProjectsRoot: hostProjectsRoot, SocketsRoot: socketsRoot, GuestAgentMount: guestAgentMount, Store: store, Podman: podmanClient, ImageBuilder: imageBuilder, BaseImagePrefix: getenv("DSH_PODMAN_BASE_IMAGE_PREFIX", "localhost/dsh-podman/base/"), VolumePrefix: getenv("DSH_PODMAN_VOLUME_PREFIX", "dsh-podman-"), SecretPrefix: getenv("DSH_PODMAN_SECRET_PREFIX", "dsh-podman-"), Logger: logger, Gateway: &gatewayclient.Client{Socket: filepath.Join(socketsRoot, "gateway.sock"), Token: gatewayToken, Version: version.Version}}
 	ctl.RegisterOrchestratorControlServer(server, controlServer)
+	// The gateway is optional: the loop reports it absent when it is not
+	// running, and everything else keeps working.
+	gatewayCtx, cancelGateway := context.WithCancel(context.Background())
+	defer cancelGateway()
+	controlServer.StartGatewayLoop(gatewayCtx)
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGTERM, os.Interrupt)
 	go func() {
 		sig := <-sigCh
 		logger.Info("received signal, stopping container daemons", "signal", sig.String())
+		cancelGateway()
 		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 		controlServer.StopAllContainerDaemons(ctx)
 		cancel()

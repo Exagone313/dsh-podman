@@ -107,7 +107,16 @@ func (s *Server) recreateContainer(ctx context.Context, workspace state.Workspac
 	if err := s.Podman.RecreateWorkspace(podNameFor(workspace.WorkspaceSlug), record.PodmanName, imageTag, newToken, podmanMounts, secrets, envSecrets, env, record.Paths); err != nil {
 		return err
 	}
-	return s.confirmContainerExists(record.PodmanName)
+	if err := s.confirmContainerExists(record.PodmanName); err != nil {
+		return err
+	}
+	// The new container's guest agent starts without the forwarding sockets its
+	// predecessor had, so its published ports are restored in the background:
+	// the agent may still be starting, and this path holds the project-mount
+	// lock. The gateway binding survives the recreate, so the host port does
+	// not move.
+	go s.restorePublishedPorts(*record)
+	return nil
 }
 
 // confirmContainerExists waits, briefly, for a just-created container to become
@@ -265,6 +274,14 @@ func (s *Server) EnsureContainer(ctx context.Context, request *ctl.EnsureContain
 		if conflictErr := s.checkExistingMountConflicts(workspace, *record); conflictErr != nil {
 			s.log().Warn("control request failed", "method", "EnsureContainer", "workspace_slug", workspace.WorkspaceSlug, "container", container, "reason", "project mount conflict", "error", conflictErr)
 			return nil, conflictErr
+		}
+		// A container podman restarted in place may have lost its forwarding
+		// sockets. Restoring them is idempotent, and only runs when the
+		// container publishes a port.
+		if len(record.PublishedPorts) > 0 {
+			if err := s.reestablishPublishedPorts(ctx, *record); err != nil {
+				s.log().Warn("could not re-establish published ports", "container", record.Name, "error", err)
+			}
 		}
 		s.log().Info("control request completed", "method", "EnsureContainer", "workspace_slug", workspace.WorkspaceSlug, "container", container)
 		return containerProto(workspace, *record), nil
@@ -450,11 +467,13 @@ func (s *Server) StartContainer(ctx context.Context, request *ctl.StartContainer
 	}
 	record := state.Container{Name: container, PodmanName: podmanContainerName(workspace.WorkspaceSlug, container), ImageID: imageID, Mounts: recordMounts}
 	if existing, ok := containerByLogical(&workspace, container); ok {
-		// Replacing a container keeps its PATH additions, environment, and
-		// secret environment; an omitted map cannot express a clear.
+		// Replacing a container keeps its PATH additions, environment, secret
+		// environment, and published ports; an omitted map cannot express a
+		// clear, and a replacement should not silently drop a host port.
 		record.Paths = append([]string(nil), existing.Paths...)
 		record.Env = cloneMap(existing.Env)
 		record.SecretEnv = cloneMap(existing.SecretEnv)
+		record.PublishedPorts = append([]state.PublishedPort(nil), existing.PublishedPorts...)
 	}
 	// A start request may replace the PATH additions; without them a replaced
 	// container keeps the list it had.
@@ -590,6 +609,9 @@ func (s *Server) StartContainer(ctx context.Context, request *ctl.StartContainer
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
+	// A replaced container keeps its published ports, but its guest agent
+	// starts without the forwarding sockets, so restore them in the background.
+	go s.restorePublishedPorts(record)
 	s.log().Info("control request completed", "method", "StartContainer", "workspace_slug", request.GetWorkspaceSlug(), "container", request.GetContainer(), "podman_name", record.PodmanName)
 	return containerProto(updated, record), nil
 }
@@ -639,6 +661,9 @@ func (s *Server) RemoveContainer(ctx context.Context, request *ctl.RemoveContain
 	if s.Podman == nil {
 		return nil, status.Error(codes.FailedPrecondition, "podman is not configured")
 	}
+	// Release the container's host ports before it goes: the gateway binding
+	// outlives the container otherwise.
+	s.releasePublishedPorts(ctx, *record)
 	s.stopContainerDaemons(ctx, *record)
 	exists, err := s.Podman.ContainerExists(record.PodmanName)
 	if err != nil {

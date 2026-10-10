@@ -34,7 +34,7 @@ Go 构建标签会跳过 btrfs 和 devicemapper 存储驱动，它们需要宿�
 `Makefile` 封装了常见的工作流：
 
 ```sh
-make build-go       # build both Go binaries into bin/<os>-<arch>/
+make build-go       # build the Go binaries into bin/<os>-<arch>/
 make build          # build-go + pnpm-build
 make vet            # gofmt -s check + go vet with the build tags
 make test-go        # go test with the build tags
@@ -44,7 +44,8 @@ make fmt-check      # verify the formatting without rewriting anything
 make proto          # regenerate the protobuf Go bindings with buf
 make proto-check    # buf lint + buf breaking + check the committed bindings are current
 make download-licenses  # generate third-party-licenses.pkg from the project and third-party Go licenses
-make image          # build the orchestrator, guest-agent and dsh container images
+make image-go       # build the Go container images (orchestrator, guest-agent, gateway)
+make image          # image-go + the dsh container image
 ```
 
 `make image` 依赖 `third-party-licenses.pkg`：`download-licenses` 目标会运行

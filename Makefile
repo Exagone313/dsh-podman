@@ -32,7 +32,7 @@ GOFMT_SOURCES := $(shell find cmd internal scripts -type f -name '*.go' -print)
 TS_SOURCES = "src/**/*.ts" "src/**/*.tsx" "scripts/**/*.mjs"
 MD_SOURCES = "**/*.md"
 
-.PHONY: all build build-go vet test test-go fmt fmt-go fmt-ts fmt-md fmt-check fmt-check-go fmt-check-ts fmt-check-md image image-orchestrator image-guestagent image-gateway image-dsh download-licenses pnpm-install pnpm-build pnpm-test pnpm-prune clean proto proto-check
+.PHONY: all build build-go vet test test-go fmt fmt-go fmt-ts fmt-md fmt-check fmt-check-go fmt-check-ts fmt-check-md image image-go image-orchestrator image-guestagent image-gateway image-dsh download-licenses pnpm-install pnpm-build pnpm-test pnpm-prune clean proto proto-check
 
 all: build
 
@@ -78,7 +78,10 @@ fmt-check-md:
 
 build-go: $(BIN_DIR)/$(GOOS)-$(GOARCH)/dsh-podman-guest-agent $(BIN_DIR)/$(GOOS)-$(GOARCH)/dsh-podman-orchestrator $(BIN_DIR)/$(GOOS)-$(GOARCH)/dsh-podman-gateway
 
-image: image-orchestrator image-guestagent image-gateway image-dsh
+# The Go images; image adds the dsh (Node) image.
+image-go: image-orchestrator image-guestagent image-gateway
+
+image: image-go image-dsh
 
 image-orchestrator: $(BIN_DIR)/$(GOOS)-$(GOARCH)/dsh-podman-orchestrator third-party-licenses.pkg
 	$(CONTAINER) build --build-arg TARGETOS=$(GOOS) --build-arg TARGETARCH=$(GOARCH) -f Containerfile.orchestrator -t $(IMAGE_PREFIX)orchestrator:$(IMAGE_TAG) .

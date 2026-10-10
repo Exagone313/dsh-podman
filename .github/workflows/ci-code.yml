@@ -145,7 +145,7 @@ jobs:
           name: bin-linux-amd64
           path: bin/linux-amd64
       - name: Build dsh-podman images
-        run: make CONTAINER=docker image-orchestrator image-guestagent
+        run: make CONTAINER=docker image-go
 
   trivy:
     name: Trivy scan

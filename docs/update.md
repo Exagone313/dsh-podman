@@ -17,6 +17,39 @@ startup.
 When enabling auto-updates, it is possible to skip updates while an agent is
 running. Read further to set this up.
 
+## Update from before 1.2.0
+
+When you update from a version before 1.2.0, copy the updated
+[dsh.container](../quadlet/dsh.container) and
+[dsh-podman-orchestrator.container](../quadlet/dsh-podman-orchestrator.container)
+to `~/.config/containers/systemd/`, then reload systemd configuration and
+restart both services, before the steps below:
+
+```bash
+cp quadlet/dsh.container quadlet/dsh-podman-orchestrator.container ~/.config/containers/systemd/
+systemctl --user daemon-reload
+systemctl --user restart dsh-podman-orchestrator dsh
+```
+
+If you have customised those files, add the lines instead:
+
+- [dsh.container](../quadlet/dsh.container): the `%h/.agents` volume
+  (`Volume=%h/.agents:%h/.agents:ro`), `Environment=DSH_AGENTS_HOME=%h/.agents`,
+  and `mkdir -p -m 0700 %h/.agents/skills` in the existing `ExecStartPre`;
+- [dsh-podman-orchestrator.container](../quadlet/dsh-podman-orchestrator.container):
+  `Environment=DSH_PODMAN_HOST_SKILL_DIR=%h/.agents/skills` and the same `mkdir`
+  in the existing `ExecStartPre`.
+
+This version adds support for skills (see [Usage](usage.md#skills)). dsh now
+reads them in several locations:
+
+- user skills in `~/.dsh/skills` and `~/.agents/skills`;
+- per-project skills in `.dsh/skills` and `.agents/skills` inside a workspace.
+
+To let an agent run the code a user skill brings, `~/.agents/skills` is mounted
+read-only into every guest container. `~/.dsh/skills` is read but never mounted
+into a guest container, for security reasons.
+
 ## Update from before 1.1.0
 
 The `dsh-podman-gateway` container is new in 1.1.0: earlier versions did not

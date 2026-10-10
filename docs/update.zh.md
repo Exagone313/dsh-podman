@@ -14,6 +14,40 @@ SPDX-License-Identifier: MIT
 
 启用自动更新后，也可以在 agent 运行时跳过更新。请继续阅读以了解如何设置。
 
+## 从 1.2.0 之前的版本更新
+
+从 1.2.0 之前的版本更新时，请先把更新后的
+[dsh.container](../quadlet/dsh.container) 与
+[dsh-podman-orchestrator.container](../quadlet/dsh-podman-orchestrator.container)
+复制到 `~/.config/containers/systemd/`，然后重新加载 systemd
+配置并重启这两个服务，再执行后续步骤：
+
+```bash
+cp quadlet/dsh.container quadlet/dsh-podman-orchestrator.container ~/.config/containers/systemd/
+systemctl --user daemon-reload
+systemctl --user restart dsh-podman-orchestrator dsh
+```
+
+如果你自定义过这些文件，请改为添加以下内容：
+
+- [dsh.container](../quadlet/dsh.container)：`%h/.agents` 卷
+  （`Volume=%h/.agents:%h/.agents:ro`）、
+  `Environment=DSH_AGENTS_HOME=%h/.agents`，以及在现有 `ExecStartPre` 中加入
+  `mkdir -p -m 0700 %h/.agents/skills`；
+- [dsh-podman-orchestrator.container](../quadlet/dsh-podman-orchestrator.container)：
+  `Environment=DSH_PODMAN_HOST_SKILL_DIR=%h/.agents/skills`，以及在现有
+  `ExecStartPre` 中加入同样的 `mkdir`。
+
+本版本新增了对 skill 的支持（见[用法](usage.zh.md#技能)）。dsh
+现在会从多个位置读取它们：
+
+- 用户 skill：`~/.dsh/skills` 与 `~/.agents/skills`；
+- 项目 skill：工作区内的 `.dsh/skills` 与 `.agents/skills`。
+
+为了让 agent 能运行用户 skill 附带的代码，`~/.agents/skills`
+会以只读方式挂载进每个 guest 容器。`~/.dsh/skills` 会被读取，但绝不会挂载进任何
+guest 容器，出于安全原因。
+
 ## 从 1.1.0 之前的版本更新
 
 `dsh-podman-gateway` 容器是 1.1.0 新增的：更早的版本不会提供它的

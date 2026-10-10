@@ -65,6 +65,7 @@ Podman
 | `DSH_PODMAN_HOST_GUEST_AGENT_BIN`              | —                             | 主机侧的 guest agent 二进制路径；设置后会绑定挂载；见[变量详解](#变量详解)                                                                                          |
 | `DSH_PODMAN_HOST_PACMAN_CACHE`                 | —                             | 挂载在 `/var/cache/pacman/pkg` 的主机绝对路径目录，用于在 pacman 构建之间持久化已下载的软件包；未设置时禁用缓存                                                     |
 | `DSH_PODMAN_HOST_PROJECTS_ROOT`                | `DSH_PODMAN_PROJECTS_ROOT`    | 用作绑定挂载源的主机侧项目根目录                                                                                                                                    |
+| `DSH_PODMAN_HOST_SKILL_DIR`                    | —                             | 用户级 skill 的主机绝对路径目录，以只读方式按相同路径挂载进每个 guest 容器；未设置则不挂载；见[变量详解](#变量详解)                                                 |
 | `DSH_PODMAN_GATEWAY_TOKEN`                     | —                             | gateway 调用（`orchestrator` → gateway）的可选共享机密；见[变量详解](#变量详解)                                                                                     |
 | `DSH_PODMAN_HOST_SOCKETS_ROOT`                 | required                      | 用于 guest 套接字绑定挂载的主机侧套接字根目录；见[变量详解](#变量详解)                                                                                              |
 | `DSH_PODMAN_IMAGE_PREFIX`                      | `localhost/dsh-podman/`       | 前置到已构建的工作区镜像引用上的前缀                                                                                                                                |
@@ -204,3 +205,18 @@ Quadlet 会挂载 `%h/.dsh/dsh-podman/state`。orchestrator
 下创建它们，这样套接字在 `bind` 和 `chmod` 之间永远不会被短暂访问。随后 guest
 agent 会恢复常规的 `0022` umask，因此它运行的命令创建的文件为 `0644`、目录为
 `0755`。
+
+### `DSH_PODMAN_HOST_SKILL_DIR`
+
+用户级 skill 所在目录（随附的 Quadlet 中为
+`~/.agents/skills`），以只读方式按相同路径挂载进 每个 guest 容器，使 skill
+的脚本能在 agent 工作的地方运行。不设置则不挂载。
+
+该值必须是绝对且已规范化的路径，且不得与保留的容器路径重叠（`DSH_PODMAN_PROJECTS_ROOT`、
+`DSH_PODMAN_SOCKETS_ROOT`、`DSH_PODMAN_GUEST_AGENT_IMAGE_MOUNT`、溢出目录、`/tmp`、
+`/var/tmp`、`/`）；否则 orchestrator 会拒绝启动。
+
+它绝不能指向 DSH 根目录（`~/.dsh`）内的路径。该目录树以读写方式挂载进 dsh
+容器，而 podman
+会跟随绑定挂载源上的符号链接，因此插件可以把该目录替换为链接，让其目标被挂载进
+guest。正因如此，`~/.dsh/skills` 会被 dsh 读取，但绝不会挂载进任何容器。

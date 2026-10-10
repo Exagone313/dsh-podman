@@ -90,6 +90,16 @@ orchestrator 校验的路径与 podman
 agent 就能在 podman
 解析之前（创建时或之后任何一次重启时）把内层路径的某个组件改名为符号链接。被替换的容器会先停止，再重新解析其挂载，因此它自己的进程也无法与创建过程竞争。
 
+skill 从宿主机文件系统读取，而不是通过容器：本地 skill provider 会在没有会话 cwd
+的情况下探测 `<project>/.dsh/skills`、`<project>/.agents/skills`，以及用户根目录
+`<dshHome>/skills` 与
+`<agentsHome>/skills`，而由容器支撑的文件系统无法回答这类请求。插件只以只读方式提供这些路径并拒绝写入，任何携带
+cwd 的调用仍走容器路径。dsh 容器以只读方式挂载 `~/.agents`，orchestrator
+则把配置的宿主机 skill 目录——一个源路径与目标路径相同的只读绑定挂载，并在 guest
+文件 API 中登记——加到每个 guest 容器中。DSH 根目录下的目录绝不会挂载进容器：dsh
+容器本身就以读写方式挂载了 `~/.dsh`，因此被替换其中的符号链接会被 podman
+跟随，这正是上面项目挂载规则所防范的风险。
+
 ## Guest agent 与守护进程
 
 orchestrator 通过容器的套接字目录在每个容器内启动 guest agent（来宾代理）。guest

@@ -115,6 +115,19 @@ to a symlink before podman resolves it, on a create or on any later restart. A
 container being replaced is stopped before its mounts are resolved again, so its
 own processes cannot race the create either.
 
+Skills are read from the host filesystem rather than through a container: the
+local skill provider probes `<project>/.dsh/skills`, `<project>/.agents/skills`,
+and the user roots `<dshHome>/skills` and `<agentsHome>/skills` with no session
+cwd, which a container-backed filesystem cannot answer. The plugin serves
+exactly those paths read-only and refuses mutations, and every call carrying a
+cwd keeps the container route. The dsh container mounts `~/.agents` read-only,
+and the orchestrator adds the configured host skill directory — one read-only
+bind whose source and destination are the same path, listed in the guest file
+API — to every guest container. A directory under the DSH root is never mounted
+into a container: the dsh container mounts `~/.dsh` read-write itself, so a
+symlink swapped in there would be followed by podman, the hazard the
+project-mount rule above already prevents.
+
 ## Guest agent and daemons
 
 The orchestrator starts the guest agent inside each container over the

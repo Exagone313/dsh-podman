@@ -21,6 +21,26 @@ dsh-podman 还会添加自己的提示词区段，说明内置的 shell
 构建自定义镜像（再用 `container_start` 或 `container_recreate`
 启动），需要跨容器重建保留的数据应使用命名卷而非 `tmpfs`。
 
+## 技能
+
+skill 就是文件，不是 API：dsh
+从固定位置读取它们，而它们所在的位置决定了容器能否看到。
+
+- 项目 skill 位于工作区内的 `.dsh/skills` 或
+  `.agents/skills`。工作区以读写方式挂载进其容器， 因此这些 skill
+  及其脚本在任何地方都能使用。
+- 用户 skill 位于 `~/.agents/skills`（`DSH_AGENTS_HOME`）。dsh
+  容器以只读方式挂载该目录， 每个 guest 容器也以只读方式挂载它，因此用户 skill
+  及其脚本在任何地方都能使用。
+- `~/.dsh/skills`（`DSH_HOME`）中的用户 skill
+  会被读取和加载，但有意**不**挂载进容器：dsh 容器本身就以读写方式挂载了
+  `~/.dsh`，而挂载一个插件可以改写的目录并不安全，因为 podman
+  会跟随被替换到该位置的符号链接。因此其中的脚本无法在容器内运行。
+
+`skill` 工具与 `/` 菜单会列出已加载的 skill。harness
+会缓存已打开页面的菜单，因此在宿主机上新增 或修改 skill
+后，请重新加载页面（或新建会话）。
+
 ## 镜像模型
 
 dsh-podman 将容器运行的镜像组织为三个层级：

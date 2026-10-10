@@ -71,6 +71,7 @@ for secrets (see [Secrets](usage.md#secrets)).
 | `DSH_PODMAN_HOST_GUEST_AGENT_BIN`              | —                             | Host-side guest agent binary path; bind-mounted when set; see [Variable details](#variable-details)                                                                                                                |
 | `DSH_PODMAN_HOST_PACMAN_CACHE`                 | —                             | Host-absolute directory mounted at `/var/cache/pacman/pkg` to persist downloaded packages across pacman builds; unset disables caching                                                                             |
 | `DSH_PODMAN_HOST_PROJECTS_ROOT`                | `DSH_PODMAN_PROJECTS_ROOT`    | Host-side projects root used as the source of bind mounts                                                                                                                                                          |
+| `DSH_PODMAN_HOST_SKILL_DIR`                    | —                             | Host-absolute directory of user-level skills, mounted read-only at the same path in every guest container; unset disables it; see [Variable details](#variable-details)                                            |
 | `DSH_PODMAN_GATEWAY_TOKEN`                     | —                             | Optional shared secret for gateway calls (`orchestrator` → gateway); see [Variable details](#variable-details)                                                                                                     |
 | `DSH_PODMAN_HOST_SOCKETS_ROOT`                 | required                      | Host-side sockets root for guest socket bind mounts; see [Variable details](#variable-details)                                                                                                                     |
 | `DSH_PODMAN_IMAGE_PREFIX`                      | `localhost/dsh-podman/`       | Prefix prepended to built workspace image references                                                                                                                                                               |
@@ -226,3 +227,20 @@ both processes create them under a `0077` umask so the socket is never briefly
 reachable between `bind` and `chmod`. The guest agent then restores the
 conventional `0022` mask, so the commands it runs create files `0644` and
 directories `0755`.
+
+### `DSH_PODMAN_HOST_SKILL_DIR`
+
+The directory of user-level skills (`~/.agents/skills` in the shipped Quadlet),
+bind-mounted read-only at the same path into every guest container, so a skill's
+scripts run where the agent works. Unset it to mount nothing.
+
+The value must be an absolute, cleaned path that does not overlap a reserved
+container path (`DSH_PODMAN_PROJECTS_ROOT`, `DSH_PODMAN_SOCKETS_ROOT`,
+`DSH_PODMAN_GUEST_AGENT_IMAGE_MOUNT`, the spill root, `/tmp`, `/var/tmp`, `/`);
+the orchestrator refuses to start otherwise.
+
+It must never point inside the DSH root (`~/.dsh`). That tree is mounted
+read-write into the dsh container, and podman follows symlinks on a bind source,
+so a plugin could replace the directory with a link and have its target mounted
+into a guest. `~/.dsh/skills` is therefore read by dsh but never mounted into a
+container.

@@ -24,6 +24,27 @@ building a custom image with `image_build` (then `container_start` or
 `container_recreate`) for software installs, and toward named volumes rather
 than `tmpfs` for data that must survive a container recreate.
 
+## Skills
+
+Skills are files, not an API: dsh reads them from the usual locations, and where
+they live decides whether a container can see them.
+
+- Project skills live in `.dsh/skills` or `.agents/skills` inside a workspace.
+  Workspaces are mounted read-write in their containers, so those skills and
+  their scripts work everywhere.
+- User skills live in `~/.agents/skills` (`DSH_AGENTS_HOME`). The dsh container
+  mounts that directory read-only, and every guest container mounts it read-only
+  too, so a user skill and its scripts work everywhere.
+- User skills in `~/.dsh/skills` (`DSH_HOME`) are read and loaded, but are
+  intentionally **not** mounted into containers: the dsh container mounts
+  `~/.dsh` read-write itself, and mounting a directory a plugin can rewrite is
+  unsafe, because podman follows a symlink left in its place. Their scripts
+  therefore cannot run inside a container.
+
+The `skill` tool and the `/` menu list the loaded skills. The harness caches the
+menu for an open page, so reload it (or open a new session) after adding or
+editing a skill on the host.
+
 ## Image model
 
 dsh-podman organizes the images its containers run into three tiers:

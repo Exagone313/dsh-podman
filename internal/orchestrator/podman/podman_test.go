@@ -172,7 +172,7 @@ func TestGuestMountsEnv(t *testing.T) {
 		{Type: "volume", Source: "dsh-podman-data", Destination: "/data", Options: []string{"ro"}},
 		{Type: "volume", Source: "dsh-podman-logs", Destination: "/var/log", Options: []string{"rw"}},
 	}
-	encoded := guestMountsEnv(mounts)
+	encoded := guestMountsEnv(mounts, "/projects")
 	var entries []map[string]any
 	if err := json.Unmarshal([]byte(encoded), &entries); err != nil {
 		t.Fatalf("guest mounts must be valid JSON: %v", err)
@@ -189,11 +189,50 @@ func TestGuestMountsEnv(t *testing.T) {
 	if entries[2]["path"] != "/var/log" || entries[2]["read_only"] != false {
 		t.Fatalf("unexpected read-write volume entry: %#v", entries[2])
 	}
-	if onlyProject := guestMountsEnv([]specs.Mount{{Type: "bind", Source: "/host", Destination: "/projects/p"}}); onlyProject != "" {
+	if onlyProject := guestMountsEnv([]specs.Mount{{Type: "bind", Source: "/host", Destination: "/projects/p"}}, "/projects"); onlyProject != "" {
 		t.Fatalf("expected no guest mounts for a project-only container, got %q", onlyProject)
 	}
-	if empty := guestMountsEnv(nil); empty != "" {
+	if empty := guestMountsEnv(nil, "/projects"); empty != "" {
 		t.Fatalf("expected empty guest mounts env for nil, got %q", empty)
+	}
+}
+
+func TestGuestMountsEnvListsTheSkillBind(t *testing.T) {
+	mounts := []specs.Mount{
+		{Type: "bind", Source: "/host/proj", Destination: "/projects/proj", Options: []string{"rw"}},
+		{Type: "bind", Source: "/home/user/.agents/skills", Destination: "/home/user/.agents/skills", Options: []string{"ro"}},
+		{Type: "tmpfs", Destination: "/tmp/dsh-podman", Options: []string{"rw", "mode=1777"}},
+	}
+	encoded := guestMountsEnv(mounts, "/projects")
+	var entries []map[string]any
+	if err := json.Unmarshal([]byte(encoded), &entries); err != nil {
+		t.Fatalf("guest mounts must be valid JSON: %v", err)
+	}
+	if len(entries) != 2 {
+		t.Fatalf("expected the skill bind and the spill tmpfs only, got %#v", entries)
+	}
+	if entries[0]["path"] != "/home/user/.agents/skills" || entries[0]["read_only"] != true {
+		t.Fatalf("expected a read-only skill entry, got %#v", entries[0])
+	}
+	if entries[1]["path"] != "/tmp/dsh-podman" {
+		t.Fatalf("unexpected spill entry: %#v", entries[1])
+	}
+}
+
+func TestSkillMounts(t *testing.T) {
+	if mounts := (&Client{}).skillMounts(); mounts != nil {
+		t.Fatalf("expected no skill mount without a configured directory, got %#v", mounts)
+	}
+	mounts := (&Client{skillDir: "/home/user/.agents/skills"}).skillMounts()
+	if len(mounts) != 1 {
+		t.Fatalf("expected exactly one skill mount, got %#v", mounts)
+	}
+	mount := mounts[0]
+	if mount.Type != "bind" || mount.Source != "/home/user/.agents/skills" || mount.Destination != mount.Source {
+		t.Fatalf("unexpected skill mount: %#v", mount)
+	}
+	if !hasOption(mount.Options, "ro") {
+		t.Fatalf("skill mount must be read-only: %#v", mount)
 	}
 }
 
@@ -225,7 +264,7 @@ func TestSpillMountIsWritableTmpfs(t *testing.T) {
 	if !hasOption(mount.Options, "rw") {
 		t.Fatalf("spill mount must be read-write: %#v", mount.Options)
 	}
-	encoded := guestMountsEnv([]specs.Mount{mount})
+	encoded := guestMountsEnv([]specs.Mount{mount}, "/projects")
 	if encoded != `[{"path":"/tmp/dsh-podman","read_only":false}]` {
 		t.Fatalf("spill mount must reach the guest file API: %q", encoded)
 	}
@@ -248,7 +287,7 @@ func TestGuestFileMountsAddsTmp(t *testing.T) {
 	}
 	// Bind mounts are covered by the projects root and never reach the guest
 	// file API, so only the tmpfs mounts are encoded.
-	encoded := guestMountsEnv(fileMounts)
+	encoded := guestMountsEnv(fileMounts, "/projects")
 	if encoded != `[{"path":"/tmp/dsh-podman","read_only":false},{"path":"/tmp","read_only":false},{"path":"/var/tmp","read_only":false}]` {
 		t.Fatalf("guest file mounts must reach the guest file API: %q", encoded)
 	}

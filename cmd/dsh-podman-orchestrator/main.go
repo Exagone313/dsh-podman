@@ -55,6 +55,13 @@ func main() {
 	guestAgentImage := getenv("DSH_PODMAN_GUEST_AGENT_IMAGE", "")
 	guestAgentBin := getenv("DSH_PODMAN_GUEST_AGENT_IMAGE_AGENT_BIN", "/bin/dsh-podman-guest-agent")
 	guestAgentMount := getenv("DSH_PODMAN_GUEST_AGENT_IMAGE_MOUNT", "/opt/dsh-podman/guest-agent")
+	// Optional: the host directory of user-level skills, bind mounted read-only
+	// into every guest container. Fail at boot on a value that would shadow a path
+	// the guest relies on.
+	skillDir := getenv("DSH_PODMAN_HOST_SKILL_DIR", "")
+	if err := podman.ValidateSkillDir(skillDir, root, socketsRoot, guestAgentMount, guestAgentBin); err != nil {
+		panic(err)
+	}
 	if getenvBool("DSH_PODMAN_GUEST_AGENT_IMAGE_USE_VERSION_TAG") && guestAgentImage != "" {
 		guestAgentImage = imageRefWithTag(guestAgentImage, version.Version)
 	}
@@ -110,7 +117,7 @@ func main() {
 			panic(fmt.Errorf("Podman API is unreachable: %w", connectionErr))
 		}
 		logger.Info("Podman API reachable", "socket", podmanSocket)
-		podmanClient, err = podman.New(context.Background(), podmanSocket, socketsRoot, guestAgentImage, guestAgentBin, guestAgentMount, hostSocketsRoot, root, hostGuestBinary, logger)
+		podmanClient, err = podman.New(context.Background(), podmanSocket, socketsRoot, guestAgentImage, guestAgentBin, guestAgentMount, hostSocketsRoot, root, skillDir, hostGuestBinary, logger)
 		if err != nil {
 			panic(fmt.Errorf("initialize Podman client: %w", err))
 		}

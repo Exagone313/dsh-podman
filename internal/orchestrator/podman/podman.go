@@ -68,17 +68,18 @@ func applyGuestContainerPolicy(generator *specgen.SpecGenerator) {
 type Client struct {
 	ctx                                             context.Context
 	socketRoot, hostSocketRoot, projectRoot         string
+	skillDir                                        string
 	guestAgentImage, guestAgentBin, guestAgentMount string
 	hostGuestBinary                                 string
 	logger                                          *slog.Logger
 }
 
-func New(ctx context.Context, socket, socketRoot, guestAgentImage, guestAgentBin, guestAgentMount, hostSocketRoot, projectRoot, hostGuestBinary string, logger *slog.Logger) (*Client, error) {
+func New(ctx context.Context, socket, socketRoot, guestAgentImage, guestAgentBin, guestAgentMount, hostSocketRoot, projectRoot, skillDir, hostGuestBinary string, logger *slog.Logger) (*Client, error) {
 	connected, err := bindings.NewConnection(ctx, socket)
 	if err != nil {
 		return nil, err
 	}
-	return &Client{ctx: connected, socketRoot: socketRoot, hostSocketRoot: hostSocketRoot, projectRoot: projectRoot, guestAgentImage: guestAgentImage, guestAgentBin: guestAgentBin, guestAgentMount: guestAgentMount, hostGuestBinary: hostGuestBinary, logger: logger}, nil
+	return &Client{ctx: connected, socketRoot: socketRoot, hostSocketRoot: hostSocketRoot, projectRoot: projectRoot, skillDir: skillDir, guestAgentImage: guestAgentImage, guestAgentBin: guestAgentBin, guestAgentMount: guestAgentMount, hostGuestBinary: hostGuestBinary, logger: logger}, nil
 }
 
 func (c *Client) log() *slog.Logger {
@@ -157,7 +158,7 @@ func (c *Client) CreateWorkspace(pod, name, image, token string, mounts []specs.
 	generator.Name = name
 	generator.Pod = pod
 	generator.Command = []string{binaryDest}
-	containerMounts := append(append([]specs.Mount(nil), mounts...), spillMount())
+	containerMounts := append(append(append([]specs.Mount(nil), mounts...), c.skillMounts()...), spillMount())
 	generator.Env = containerEnv(c.socketRoot, name, c.projectRoot, token, env, guestFileMounts(containerMounts), paths)
 	generator.EnvSecrets = envSecrets
 	generator.Secrets = append(generator.Secrets, secrets...)
@@ -219,6 +220,20 @@ const spillRoot = "/tmp/dsh-podman"
 // writable by the agent regardless of the container user.
 func spillMount() specs.Mount {
 	return specs.Mount{Type: "tmpfs", Destination: spillRoot, Options: []string{"rw", "mode=1777"}}
+}
+
+// skillMounts returns the read-only bind mount exposing the configured host skill
+// directory to every guest container, or nil when none is configured. Source and
+// destination are the same path, so a skill's own references to its files resolve
+// inside the container; guestMountsEnv tells the guest file API about it, which is
+// also what keeps writes to it refused. The mount belongs to the container only:
+// it is appended to a copy of the caller's list, so it never reaches the persisted
+// workspace state.
+func (c *Client) skillMounts() []specs.Mount {
+	if c.skillDir == "" {
+		return nil
+	}
+	return []specs.Mount{{Type: "bind", Source: c.skillDir, Destination: c.skillDir, Options: []string{"ro"}}}
 }
 
 // guestFileMounts is the mount list the guest file API is told about: the
@@ -472,7 +487,7 @@ func containerEnv(socketRoot, name, projectRoot, token string, user map[string]s
 		"DSH_PODMAN_GUEST_SOCKET":  filepath.Join(socketRoot, name, "guest.sock"),
 		"DSH_PODMAN_PROJECTS_ROOT": projectRoot,
 	}
-	if encoded := guestMountsEnv(mounts); encoded != "" {
+	if encoded := guestMountsEnv(mounts, projectRoot); encoded != "" {
 		env["DSH_PODMAN_GUEST_MOUNTS"] = encoded
 	}
 	if encoded := guestPathsEnv(paths); encoded != "" {
@@ -501,15 +516,22 @@ func guestPathsEnv(paths []string) string {
 }
 
 // guestMountsEnv serializes the container's user mounts for the guest agent.
-// Project bind mounts are covered by the projects root and are not listed.
-// Secret mounts are deliberately omitted so the file API never reads them.
-func guestMountsEnv(mounts []specs.Mount) string {
+// Project bind mounts are covered by the projects root and are not listed; any
+// other bind mount, which is the configured skill directory, is listed so the file
+// API can read the files a skill runs. Secret mounts are deliberately omitted so
+// the file API never reads them.
+func guestMountsEnv(mounts []specs.Mount, projectRoot string) string {
 	entries := make([]map[string]any, 0, len(mounts))
 	for _, mount := range mounts {
 		switch mount.Type {
 		case "tmpfs":
 			entries = append(entries, map[string]any{"path": mount.Destination, "read_only": false})
 		case "volume":
+			entries = append(entries, map[string]any{"path": mount.Destination, "read_only": hasOption(mount.Options, "ro")})
+		case "bind":
+			if isUnderPath(mount.Destination, projectRoot) {
+				continue
+			}
 			entries = append(entries, map[string]any{"path": mount.Destination, "read_only": hasOption(mount.Options, "ro")})
 		}
 	}
@@ -521,6 +543,15 @@ func guestMountsEnv(mounts []specs.Mount) string {
 		return ""
 	}
 	return string(encoded)
+}
+
+// isUnderPath reports whether path is root itself or lies inside it. An empty root
+// matches nothing, so a missing projects root never swallows a mount.
+func isUnderPath(path, root string) bool {
+	if root == "" {
+		return false
+	}
+	return path == root || strings.HasPrefix(path, root+"/")
 }
 
 func hasOption(options []string, want string) bool {

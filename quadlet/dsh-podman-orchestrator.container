@@ -36,8 +36,11 @@ Environment=DSH_PODMAN_SOCKETS_ROOT=/run/dsh-podman
 Environment=DSH_PODMAN_GUEST_AGENT_IMAGE=ghcr.io/exagone313/dsh-podman/guest-agent
 Environment=DSH_PODMAN_GUEST_AGENT_IMAGE_USE_VERSION_TAG=true
 
+# Must never point to a directory in the DSH root (~/.dsh) for security reasons
+Environment=DSH_PODMAN_HOST_SKILL_DIR=%h/.agents/skills
+
 [Service]
-ExecStartPre=/usr/bin/env mkdir -p -m 0700 %h/project ; /usr/bin/env mkdir -p -m 0700 %t/dsh-podman ; /usr/bin/env chmod 0700 %t/dsh-podman ; /usr/bin/env mkdir -p -m 0700 %h/.dsh/dsh-podman/state ; /usr/bin/env mkdir -p -m 0755 %h/.dsh/dsh-podman/apk-cache ; /usr/bin/env mkdir -p -m 0755 %h/.dsh/dsh-podman/apt-cache ; /usr/bin/env mkdir -p -m 0755 %h/.dsh/dsh-podman/pacman-cache
+ExecStartPre=/usr/bin/env mkdir -p -m 0700 %h/project ; /usr/bin/env mkdir -p -m 0700 %t/dsh-podman ; /usr/bin/env chmod 0700 %t/dsh-podman ; /usr/bin/env mkdir -p -m 0700 %h/.dsh/dsh-podman/state ; /usr/bin/env mkdir -p -m 0755 %h/.dsh/dsh-podman/apk-cache ; /usr/bin/env mkdir -p -m 0755 %h/.dsh/dsh-podman/apt-cache ; /usr/bin/env mkdir -p -m 0755 %h/.dsh/dsh-podman/pacman-cache ; /usr/bin/env mkdir -p -m 0700 %h/.agents/skills
 Restart=on-failure
 RestartSec=3
 SuccessExitStatus=0 143

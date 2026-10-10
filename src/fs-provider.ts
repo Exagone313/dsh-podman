@@ -21,6 +21,19 @@ import {
   writeGuestFile,
 } from "./guest-rpc.js";
 import { WorkspaceResolver } from "./workspace-binding.js";
+import {
+  hostListDir,
+  hostLstat,
+  hostReadByteRange,
+  hostReadBytes,
+  hostReadText,
+  hostRefuse,
+  hostStat,
+  hostTarget,
+  hostTextChunks,
+  isHostTarget,
+} from "./host-fs.js";
+import { isProjectSkillPath } from "./skill-roots.js";
 import { isAbsolute, join, resolve as resolvePath } from "node:path";
 
 export interface FilesystemProvider {
@@ -69,9 +82,26 @@ export interface FilesystemProvider {
   ): Promise<() => Promise<void>>;
 }
 
+// The deployment values this provider needs beyond the resolver. Without a
+// projects root it never takes the host route below, so a provider built
+// without options behaves exactly as before.
+export interface FilesystemProviderOptions {
+  readonly projectsRoot?: string;
+}
+
 export function createFilesystemProvider(
   resolver: WorkspaceResolver,
+  options: FilesystemProviderOptions = {},
 ): FilesystemProvider {
+  const projectsRoot = options.projectsRoot ?? "";
+  // Host reads serve exactly one shape: a project skill root resolved without a
+  // session cwd, which is how the harness's local skill provider probes it. The
+  // harness scans `<project>/.dsh/skills` and `<project>/.agents/skills`, and
+  // those paths are already mounted read-only in the dsh container. Any call
+  // carrying a cwd keeps the container route, as does every other path.
+  const hostRead = (path: string, opts?: any): boolean =>
+    (opts?.cwd === undefined || opts?.cwd === "") &&
+    isProjectSkillPath(path, projectsRoot);
   return {
     resolve: async (path: string, opts?: any) => {
       throwIfAborted(opts?.signal, "resolve");
@@ -81,6 +111,12 @@ export function createFilesystemProvider(
       const container = typeof opts?.container === "string"
         ? opts.container
         : "";
+      if (
+        (container === "" || container === "default") &&
+        hostRead(resolved, opts)
+      ) {
+        return hostTarget(resolved);
+      }
       const binding = container !== "" && container !== "default"
         ? await resolver.containerBinding(opts?.cwd, container, opts?.signal)
         : await resolver.resolveForPath(resolved, opts?.cwd, opts?.signal);
@@ -100,14 +136,23 @@ export function createFilesystemProvider(
       child.targetKey === parent.targetKey ||
       child.targetKey.startsWith(`${parent.targetKey}/`),
     readText: (target: any, signal?: AbortSignal) =>
-      readGuestText(target, signal),
+      isHostTarget(target)
+        ? hostReadText(target, signal)
+        : readGuestText(target, signal),
     streamText: (target: any, signal?: AbortSignal) =>
-      Promise.resolve(guestTextChunks(target, signal)),
+      Promise.resolve(
+        isHostTarget(target)
+          ? hostTextChunks(target, signal)
+          : guestTextChunks(target, signal),
+      ),
     readBytes: async (
       target: any,
       signal: AbortSignal | undefined,
       maxBytes: number,
     ) => {
+      if (isHostTarget(target)) {
+        return await hostReadBytes(target, signal, maxBytes);
+      }
       const chunks: Buffer[] = [];
       let total = 0;
       for await (
@@ -133,6 +178,9 @@ export function createFilesystemProvider(
       range: { offset: number; length: number },
       signal?: AbortSignal,
     ) => {
+      if (isHostTarget(target)) {
+        return await hostReadByteRange(target, range, signal);
+      }
       if (range.length === 0) return new Uint8Array(0);
       const chunks: Buffer[] = [];
       let total = 0;
@@ -145,6 +193,7 @@ export function createFilesystemProvider(
     lstat: async (path: string, opts?: any, signal?: AbortSignal) => {
       throwIfAborted(signal, "lstat");
       const resolved = resolveGuestPath(path, opts?.cwd);
+      if (hostRead(resolved, opts)) return await hostLstat(resolved, signal);
       const binding = await resolver.resolveForPath(
         resolved,
         opts?.cwd,
@@ -175,6 +224,7 @@ export function createFilesystemProvider(
       expected?: any,
       signal?: AbortSignal,
     ) => {
+      if (isHostTarget(target)) hostRefuse("write", target);
       throwIfAborted(signal, "write");
       const current = await guestStatResponse(target, signal);
       if (current.exists && current.isDir) {
@@ -227,8 +277,12 @@ export function createFilesystemProvider(
         after: normalizeLineEndings(content),
       };
     },
-    stat: (target: any, signal?: AbortSignal) => guestStat(target, signal),
+    stat: (target: any, signal?: AbortSignal) =>
+      isHostTarget(target)
+        ? hostStat(target, signal)
+        : guestStat(target, signal),
     listDir: async (target: any, signal?: AbortSignal) => {
+      if (isHostTarget(target)) return await hostListDir(target, signal);
       const response: any = await unaryGuest(
         target,
         "readDir",
@@ -265,16 +319,27 @@ export function createFilesystemProvider(
         };
       });
     },
-    mkdir: async (target: any, parents = true) =>
-      unaryGuest(target, "mkdir", { path: target.targetKey, parents }),
-    remove: async (target: any, recursive = false) =>
-      unaryGuest(target, "delete", { path: target.targetKey, recursive }),
+    mkdir: async (target: any, parents = true) => {
+      if (isHostTarget(target)) hostRefuse("create", target);
+      return await unaryGuest(target, "mkdir", {
+        path: target.targetKey,
+        parents,
+      });
+    },
+    remove: async (target: any, recursive = false) => {
+      if (isHostTarget(target)) hostRefuse("remove", target);
+      return await unaryGuest(target, "delete", {
+        path: target.targetKey,
+        recursive,
+      });
+    },
     editText: async (
       target: any,
       edit: any,
       expected?: any,
       signal?: AbortSignal,
     ) => {
+      if (isHostTarget(target)) hostRefuse("edit", target);
       throwIfAborted(signal, "edit");
       const current = await guestStatResponse(target, signal);
       if (!current.exists) {

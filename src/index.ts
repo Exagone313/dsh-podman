@@ -128,7 +128,16 @@ export function apply(ctx: any, config: Config): void {
   const subprocess = createSubprocessProvider(resolver);
   ctx.provide("subprocess", subprocess);
   ctx.effect(() => () => subprocess.dispose(), "podman: subprocess cleanup");
-  ctx.provide("fs", createFilesystemProvider(resolver));
+  // The projects root is what the harness builds a project's skill roots under.
+  // The provider reads those roots from the host filesystem when a caller
+  // passes no session cwd, which is the shape the local skill provider probes
+  // with; every other call keeps the container route.
+  ctx.provide(
+    "fs",
+    createFilesystemProvider(resolver, {
+      projectsRoot: process.env.DSH_PODMAN_PROJECTS_ROOT ?? "/projects",
+    }),
+  );
   // Oversized tool results spill inside the session's container, so the agent
   // can read them back with the container file tools; the harness's local
   // (host-filesystem) spill backend is disabled by the bundle patch.

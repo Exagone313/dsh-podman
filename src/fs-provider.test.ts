@@ -4,6 +4,9 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
+import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { resolve } from "node:path";
 import {
   editGuest,
   editProvider,
@@ -414,4 +417,126 @@ test("filesystem provider reports watching as unsupported", async () => {
     () => provider.watch(target, () => {}, aborted.signal),
     (error: any) => error.code === "FS_ABORTED",
   );
+});
+
+// A throwaway projects root for the host-read tests.
+function tempRoot(prefix: string): string {
+  const root = resolve(
+    tmpdir(),
+    `dsh-${prefix}-${process.pid}-${Date.now()}-${Math.random()}`,
+  );
+  mkdirSync(root, { recursive: true });
+  return root;
+}
+
+test("filesystem provider reads project skill roots from the host without a cwd", async () => {
+  const root = tempRoot("skill-roots");
+  const bundle = resolve(root, "app/.agents/skills/demo");
+  mkdirSync(resolve(bundle, "scripts"), { recursive: true });
+  writeFileSync(resolve(bundle, "SKILL.md"), "---\nname: demo\n---\n");
+  writeFileSync(resolve(bundle, "scripts/check.sh"), "#!/bin/sh\n");
+  const asked: string[] = [];
+  const provider = createFilesystemProvider({
+    resolveForPath: async (path: string) => {
+      asked.push(path);
+      throw new Error("the container route is not expected for a skill root");
+    },
+  } as any, { projectsRoot: root });
+  try {
+    const skillsRoot = await provider.resolve(
+      resolve(root, "app/.agents/skills"),
+    );
+    assert.equal(skillsRoot.host, true);
+    const bundles = await provider.listDir(skillsRoot);
+    assert.deepEqual(
+      bundles.map((entry: any) => [entry.name, entry.type]),
+      [["demo", "directory"]],
+    );
+    assert.equal(bundles[0].target.host, true);
+    const files = await provider.listDir(bundles[0].target);
+    const skill = files.find((entry: any) => entry.name === "SKILL.md");
+    assert.equal(skill.type, "file");
+    assert.match(await provider.readText(skill.target), /name: demo/);
+    assert.match(
+      Buffer.from(await provider.readBytes(skill.target, undefined, 1024))
+        .toString("utf8"),
+      /name: demo/,
+    );
+    const info = await provider.stat(bundles[0].target);
+    assert.equal(info.type, "directory");
+    assert.match(info.version, /^host:/);
+    assert.deepEqual(asked, []);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("filesystem provider lstat reads a skill file from the host without a cwd", async () => {
+  const root = tempRoot("skill-lstat");
+  const file = resolve(root, "app/.dsh/skills/demo/SKILL.md");
+  mkdirSync(resolve(file, ".."), { recursive: true });
+  writeFileSync(file, "---\nname: demo\n---\n");
+  const provider = createFilesystemProvider(stubResolver, {
+    projectsRoot: root,
+  });
+  try {
+    const info = await provider.lstat(file);
+    assert.equal(info.type, "file");
+    assert.match(info.version, /^host:/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("filesystem provider keeps the container route when a cwd is given", async () => {
+  const asked: string[] = [];
+  const provider = createFilesystemProvider({
+    resolveForPath: async (path: string) => {
+      asked.push(path);
+      return { kind: "binding" };
+    },
+  } as any, { projectsRoot: "/projects" });
+  const target = await provider.resolve(
+    "/projects/app/.agents/skills/demo/SKILL.md",
+    { cwd: "/projects/app" },
+  );
+  assert.equal(target.host, undefined);
+  assert.deepEqual(target.binding, { kind: "binding" });
+  assert.deepEqual(asked, ["/projects/app/.agents/skills/demo/SKILL.md"]);
+});
+
+test("filesystem provider leaves cwd-less paths outside skill roots alone", async () => {
+  const asked: string[] = [];
+  const provider = createFilesystemProvider({
+    resolveForPath: async (path: string) => {
+      asked.push(path);
+      return { kind: "binding" };
+    },
+  } as any, { projectsRoot: "/projects" });
+  const target = await provider.resolve("/projects/app/README.md");
+  assert.equal(target.host, undefined);
+  assert.deepEqual(asked, ["/projects/app/README.md"]);
+});
+
+test("filesystem provider refuses to mutate a host skill root", async () => {
+  const root = tempRoot("skill-read-only");
+  const file = resolve(root, "app/.dsh/skills/demo/SKILL.md");
+  mkdirSync(resolve(file, ".."), { recursive: true });
+  writeFileSync(file, "---\nname: demo\n---\n");
+  const provider = createFilesystemProvider(stubResolver, {
+    projectsRoot: root,
+  });
+  try {
+    const target = await provider.resolve(file);
+    const refused = (error: any) => error.code === "FS_PERMISSION_DENIED";
+    await assert.rejects(() => provider.writeText(target, "x"), refused);
+    await assert.rejects(
+      () => provider.editText(target, { oldString: "a", newString: "b" }),
+      refused,
+    );
+    await assert.rejects(() => provider.mkdir(target), refused);
+    await assert.rejects(() => provider.remove(target), refused);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
 });

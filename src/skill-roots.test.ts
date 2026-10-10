@@ -4,7 +4,7 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
-import { isProjectSkillPath } from "./skill-roots.js";
+import { isProjectSkillPath, isUserSkillPath } from "./skill-roots.js";
 
 const ROOT = "/home/user/project";
 
@@ -61,4 +61,59 @@ test("an unusable projects root never matches", () => {
   assert.equal(isProjectSkillPath(path, ""), false);
   assert.equal(isProjectSkillPath(path, "project"), false);
   assert.equal(isProjectSkillPath("app/.agents/skills", ROOT), false);
+});
+
+const HOMES = { dshHome: "/home/user/.dsh", agentsHome: "/home/user/.agents" };
+
+test("user skill roots and their contents match", () => {
+  for (
+    const path of [
+      "/home/user/.dsh/skills",
+      "/home/user/.dsh/skills/demo",
+      "/home/user/.dsh/skills/demo/SKILL.md",
+      "/home/user/.agents/skills",
+      "/home/user/.agents/skills/demo.md",
+      "/home/user/.agents/skills/demo/scripts/check.sh",
+    ]
+  ) {
+    assert.equal(isUserSkillPath(path, HOMES), true, path);
+  }
+});
+
+test("paths outside the user skill roots never match", () => {
+  for (
+    const path of [
+      "/home/user/.dsh",
+      "/home/user/.dsh/config.yaml",
+      "/home/user/.dsh/skills-x",
+      "/home/user/.dsh/skillsystem/demo",
+      "/home/user/.agents",
+      "/home/user/.agents/skills-x",
+      "/home/user/other/skills",
+      "/etc/skills",
+      ".dsh/skills",
+    ]
+  ) {
+    assert.equal(isUserSkillPath(path, HOMES), false, path);
+  }
+});
+
+test("an unusable or moved user home never matches", () => {
+  const path = "/home/user/.dsh/skills/demo";
+  assert.equal(isUserSkillPath(path, { dshHome: "", agentsHome: "" }), false);
+  assert.equal(
+    isUserSkillPath(path, { dshHome: "relative", agentsHome: "" }),
+    false,
+  );
+  assert.equal(
+    isUserSkillPath(path, { dshHome: "/srv/dsh", agentsHome: "" }),
+    false,
+  );
+  assert.equal(
+    isUserSkillPath("/srv/dsh/skills/demo", {
+      dshHome: "/srv/dsh",
+      agentsHome: "",
+    }),
+    true,
+  );
 });

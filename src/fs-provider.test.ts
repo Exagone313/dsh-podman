@@ -540,3 +540,62 @@ test("filesystem provider refuses to mutate a host skill root", async () => {
     rmSync(root, { recursive: true, force: true });
   }
 });
+
+test("filesystem provider reads user skill roots from the host without a cwd", async () => {
+  const home = tempRoot("user-skill-roots");
+  const dshHome = resolve(home, ".dsh");
+  const agentsHome = resolve(home, ".agents");
+  const bundle = resolve(agentsHome, "skills/demo");
+  mkdirSync(resolve(bundle, "scripts"), { recursive: true });
+  mkdirSync(resolve(dshHome, "skills"), { recursive: true });
+  writeFileSync(resolve(bundle, "SKILL.md"), "---\nname: demo\n---\n");
+  writeFileSync(resolve(bundle, "scripts/check.sh"), "#!/bin/sh\n");
+  writeFileSync(resolve(dshHome, "skills/user.md"), "---\nname: user\n---\n");
+  const asked: string[] = [];
+  const provider = createFilesystemProvider({
+    resolveForPath: async (path: string) => {
+      asked.push(path);
+      throw new Error("the container route is not expected for a skill root");
+    },
+  } as any, { dshHome, agentsHome });
+  try {
+    const skillsRoot = await provider.resolve(resolve(agentsHome, "skills"));
+    assert.equal(skillsRoot.host, true);
+    const bundles = await provider.listDir(skillsRoot);
+    assert.deepEqual(
+      bundles.map((entry: any) => [entry.name, entry.type]),
+      [["demo", "directory"]],
+    );
+    const files = await provider.listDir(bundles[0].target);
+    const skill = files.find((entry: any) => entry.name === "SKILL.md");
+    assert.match(await provider.readText(skill.target), /name: demo/);
+    const userSkill = await provider.resolve(
+      resolve(dshHome, "skills/user.md"),
+    );
+    assert.equal(userSkill.host, true);
+    assert.match(await provider.readText(userSkill), /name: user/);
+    assert.deepEqual(asked, []);
+  } finally {
+    rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test("filesystem provider keeps the container route for a user root when a cwd is given", async () => {
+  const asked: string[] = [];
+  const provider = createFilesystemProvider({
+    resolveForPath: async (path: string) => {
+      asked.push(path);
+      return { kind: "binding" };
+    },
+  } as any, {
+    dshHome: "/home/user/.dsh",
+    agentsHome: "/home/user/.agents",
+  });
+  const target = await provider.resolve(
+    "/home/user/.agents/skills/demo/SKILL.md",
+    { cwd: "/projects/app" },
+  );
+  assert.equal(target.host, undefined);
+  assert.deepEqual(target.binding, { kind: "binding" });
+  assert.deepEqual(asked, ["/home/user/.agents/skills/demo/SKILL.md"]);
+});

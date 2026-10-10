@@ -2,6 +2,8 @@
 //
 // SPDX-License-Identifier: MIT
 
+import { homedir } from "node:os";
+import { join } from "node:path";
 import {
   isSandboxEscalation,
   preExecutePolicy,
@@ -128,14 +130,19 @@ export function apply(ctx: any, config: Config): void {
   const subprocess = createSubprocessProvider(resolver);
   ctx.provide("subprocess", subprocess);
   ctx.effect(() => () => subprocess.dispose(), "podman: subprocess cleanup");
-  // The projects root is what the harness builds a project's skill roots under.
-  // The provider reads those roots from the host filesystem when a caller
-  // passes no session cwd, which is the shape the local skill provider probes
-  // with; every other call keeps the container route.
+  // The projects root is what the harness builds a project's skill roots under,
+  // and the two user homes are what it builds the user-level skill roots under
+  // (`$DSH_HOME` or `~/.dsh`, `$DSH_AGENTS_HOME` or `~/.agents`). The provider
+  // reads those roots from the host filesystem when a caller passes no session
+  // cwd, which is the shape the local skill provider probes with; every other
+  // call keeps the container route.
+  const home = homedir();
   ctx.provide(
     "fs",
     createFilesystemProvider(resolver, {
       projectsRoot: process.env.DSH_PODMAN_PROJECTS_ROOT ?? "/projects",
+      dshHome: process.env.DSH_HOME ?? join(home, ".dsh"),
+      agentsHome: process.env.DSH_AGENTS_HOME ?? join(home, ".agents"),
     }),
   );
   // Oversized tool results spill inside the session's container, so the agent

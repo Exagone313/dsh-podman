@@ -33,7 +33,7 @@ import {
   hostTextChunks,
   isHostTarget,
 } from "./host-fs.js";
-import { isProjectSkillPath } from "./skill-roots.js";
+import { isProjectSkillPath, isUserSkillPath } from "./skill-roots.js";
 import { isAbsolute, join, resolve as resolvePath } from "node:path";
 
 export interface FilesystemProvider {
@@ -83,10 +83,12 @@ export interface FilesystemProvider {
 }
 
 // The deployment values this provider needs beyond the resolver. Without a
-// projects root it never takes the host route below, so a provider built
-// without options behaves exactly as before.
+// projects root or usable user homes it never takes the host route below, so a
+// provider built without options behaves exactly as before.
 export interface FilesystemProviderOptions {
   readonly projectsRoot?: string;
+  readonly dshHome?: string;
+  readonly agentsHome?: string;
 }
 
 export function createFilesystemProvider(
@@ -94,14 +96,20 @@ export function createFilesystemProvider(
   options: FilesystemProviderOptions = {},
 ): FilesystemProvider {
   const projectsRoot = options.projectsRoot ?? "";
-  // Host reads serve exactly one shape: a project skill root resolved without a
-  // session cwd, which is how the harness's local skill provider probes it. The
-  // harness scans `<project>/.dsh/skills` and `<project>/.agents/skills`, and
-  // those paths are already mounted read-only in the dsh container. Any call
-  // carrying a cwd keeps the container route, as does every other path.
+  const userRoots = {
+    dshHome: options.dshHome ?? "",
+    agentsHome: options.agentsHome ?? "",
+  };
+  // Host reads serve exactly one shape: a skill root resolved without a session
+  // cwd, which is how the harness's local skill provider probes it — a project's
+  // `<project>/.dsh/skills` or `<project>/.agents/skills`, or the user roots
+  // `<dshHome>/skills` and `<agentsHome>/skills`. Those are the same paths the
+  // dsh container sees as read-only host trees. Any call carrying a cwd keeps the
+  // container route, as does every other path.
   const hostRead = (path: string, opts?: any): boolean =>
     (opts?.cwd === undefined || opts?.cwd === "") &&
-    isProjectSkillPath(path, projectsRoot);
+    (isProjectSkillPath(path, projectsRoot) ||
+      isUserSkillPath(path, userRoots));
   return {
     resolve: async (path: string, opts?: any) => {
       throwIfAborted(opts?.signal, "resolve");

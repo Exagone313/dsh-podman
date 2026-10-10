@@ -6,6 +6,8 @@ SPDX-License-Identifier: MIT
 
 # Architecture
 
+English | [中文](architecture.zh.md)
+
 dsh-podman has four components:
 
 | Component                 | Runs                                                             | What it does                                                                                           |

@@ -6,6 +6,8 @@ SPDX-License-Identifier: MIT
 
 # 卸载
 
+[English](uninstall.md) | 中文
+
 本页用于撤销[安装指南](install-dsh-and-dsh-podman.zh.md)中的操作：其中假设 dsh
 运行在 dsh-podman 镜像中，并与编排器和 gateway 一同由 Quadlet 单元启动。
 

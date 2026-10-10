@@ -6,6 +6,8 @@ SPDX-License-Identifier: MIT
 
 # Install DeepSeek Harness & dsh-podman with rootless Podman
 
+English | [中文](install-dsh-and-dsh-podman.zh.md)
+
 ## Goals
 
 The goal of this guide is to install:

@@ -6,6 +6,8 @@ SPDX-License-Identifier: MIT
 
 # Uninstall
 
+English | [中文](uninstall.zh.md)
+
 This page undoes the [installation guide](install-dsh-and-dsh-podman.md): it
 assumes dsh runs from the dsh-podman image with the orchestrator and the
 gateway, all started from Quadlet units.

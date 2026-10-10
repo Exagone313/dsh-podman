@@ -6,6 +6,8 @@ SPDX-License-Identifier: MIT
 
 # 架构
 
+[English](architecture.md) | 中文
+
 dsh-podman 由四个组件组成：
 
 | 组件                      | 运行位置                                   | 功能                                                                   |

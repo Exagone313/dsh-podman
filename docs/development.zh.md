@@ -6,6 +6,8 @@ SPDX-License-Identifier: MIT
 
 # 开发
 
+[English](development.md) | 中文
+
 本页面向从本仓库构建插件的**贡献者**。
 
 ## 仓库结构

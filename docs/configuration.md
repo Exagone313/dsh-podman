@@ -6,6 +6,8 @@ SPDX-License-Identifier: MIT
 
 # Configuration
 
+English | [中文](configuration.zh.md)
+
 Environment variables use the `DSH_PODMAN_` prefix and are listed under the
 component that reads them (a variable read by several components appears in each
 of their sections). The plugin also exposes a few **UI settings** on its

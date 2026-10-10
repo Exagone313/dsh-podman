@@ -6,6 +6,8 @@ SPDX-License-Identifier: MIT
 
 # 更新
 
+[English](update.md) | 中文
+
 只应在没有 agent 运行时进行更新。
 
 现有的 guest 容器随后会被重建，因此运行中的进程和守护进程会被终止。

@@ -6,6 +6,8 @@ SPDX-License-Identifier: MIT
 
 # Development
 
+English | [中文](development.zh.md)
+
 This page is for **contributors** building the plugin from this repository.
 
 ## Repository layout

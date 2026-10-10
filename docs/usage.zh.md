@@ -6,6 +6,8 @@ SPDX-License-Identifier: MIT
 
 # 使用
 
+[English](usage.md) | 中文
+
 本页面记录了面向模型的工具、Podman
 页面以及镜像模型。参见[架构](architecture.zh.md)了解各部分如何组合在一起。
 

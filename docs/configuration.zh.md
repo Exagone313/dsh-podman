@@ -6,6 +6,8 @@ SPDX-License-Identifier: MIT
 
 # 配置
 
+[English](configuration.md) | 中文
+
 环境变量使用 `DSH_PODMAN_`
 前缀，并按读取它们的组件分组列出（被多个组件读取的变量会出现在每个组件的对应章节中）。插件还在
 侧边栏 **插件** 面板 → **已安装** 中的 **dsh-podman** 页面中暴露了一些 **UI

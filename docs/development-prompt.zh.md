@@ -6,6 +6,8 @@ SPDX-License-Identifier: MIT
 
 # 开发容器设置提示词
 
+[English](development-prompt.md) | 中文
+
 本页给出用于构建开发镜像、创建工具链卷并把工作区容器接好的提示词，参见[开发](development.zh.md#开发容器工具链)。其中没有任何东西是现成的。
 
 把下面的文本块粘贴到已接入该工作区的 dsh

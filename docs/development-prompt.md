@@ -6,6 +6,8 @@ SPDX-License-Identifier: MIT
 
 # Development container setup prompt
 
+English | [中文](development-prompt.zh.md)
+
 This page carries the prompt that builds a development image, creates the
 toolchain volume and wires the workspace container to it, as described in
 [Development](development.md#development-container-toolchain). Nothing it needs

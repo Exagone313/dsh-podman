@@ -6,6 +6,8 @@ SPDX-License-Identifier: MIT
 
 # Update
 
+English | [中文](update.zh.md)
+
 You should run updates only when no agents are running.
 
 Existing guest containers will be recreated afterwards, so running processes and

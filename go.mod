@@ -10,7 +10,7 @@ require (
 	github.com/creack/pty v1.1.24
 	github.com/opencontainers/runtime-spec v1.3.0
 	github.com/pelletier/go-toml/v2 v2.4.3
-	go.podman.io/podman/v6 v6.1.2
+	go.podman.io/podman/v6 v6.1.3
 	google.golang.org/grpc v1.85.0-dev.0.20260825072537-93e31b48545e
 	google.golang.org/protobuf v1.36.12
 )

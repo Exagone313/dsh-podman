@@ -31,10 +31,10 @@ what is missing or different, keeping whatever is already configured. Use the
 container tools; never run `make` or edit files on the host.
 
 1. Image: build a custom image named `dsh-podman-tooling` from the `archlinux`
-   base with packages `go`, `nodejs-lts-jod`, `npm`, `deno`, `reuse` and
-   `python-chardet`, unless an image of that name already exists in this
-   workspace. It is a local image, not a published one; leave an existing one
-   alone.
+   base with packages `go`, `nodejs`, `npm`, `deno`, `reuse` and
+   `python-chardet`. It is a local image, not a published one; leave an existing
+   one alone when it already carries exactly these packages, and rebuild it from
+   this list when it does not.
 2. Volume: create the workspace volume `dsh-podman-toolchain` unless it already
    exists.
 3. Container: inspect the default container's image, mounts, PATH additions and

@@ -189,7 +189,7 @@ A workspace container's root filesystem is read-only and disposable, so the
 toolchain a contributor builds with needs a workspace volume. No development
 image is distributed: build a custom one — the
 [setup prompt](development-prompt.md) builds `dsh-podman-tooling` from the
-`archlinux` base with `go`, `nodejs-lts-jod`, `npm`, `deno`, `reuse` and
+`archlinux` base with `go`, `nodejs` (Node 26), `npm`, `deno`, `reuse` and
 `python-chardet` — and create a workspace volume for the state an image cannot
 keep: the Go and npm caches, `gopath` with the `go install`ed tools, and pnpm,
 which `package.json` pins to a version the Arch repositories do not carry.

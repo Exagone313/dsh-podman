@@ -174,8 +174,8 @@ guest agent 之后，请自行重建容器：
 ### 开发容器工具链
 
 工作区容器的根文件系统是只读且一次性的，因此贡献者构建所用的工具链需要工作区的一个卷。项目并不分发开发镜像：请自行构建一个自定义镜像——[设置提示词](development-prompt.zh.md)
-会以 `archlinux` 为父镜像构建 `dsh-podman-tooling`，包含
-`go`、`nodejs-lts-jod`、`npm`、`deno`、`reuse` 和
+会以 `archlinux` 为父镜像构建 `dsh-podman-tooling`，包含 `go`、`nodejs`（Node
+26）、`npm`、`deno`、`reuse` 和
 `python-chardet`——并为镜像无法保存的状态创建工作区卷：Go 与 npm 缓存、含
 `go install` 工具的 `gopath`， 以及 `package.json` 固定版本、Arch 仓库没有的
 pnpm。

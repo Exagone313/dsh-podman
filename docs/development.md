@@ -39,6 +39,8 @@ The `Makefile` wraps the common workflows:
 make build-go       # build the Go binaries into bin/<os>-<arch>/
 make build          # build-go + pnpm-build
 make vet            # gofmt -s check + go vet with the build tags
+make lint           # vet + oxlint over the TypeScript sources
+make lint-ts        # oxlint only
 make test-go        # go test with the build tags
 make test           # test-go + pnpm test (JS tests, which run against dist/)
 make fmt            # gofmt -s + dprint (TypeScript and Markdown)
@@ -259,8 +261,8 @@ push runs only `release.yml`, which repeats the build, vet and tests itself:
 - **reuse** — REUSE license compliance.
 - **go** — build, `gofmt -s` check, vet, tests, and govulncheck (Go
   vulnerabilities). Unfixed findings don't fail the job; fixable ones do.
-- **js** — TypeScript formatting check, install, typecheck, build, tests, and
-  `pnpm audit`.
+- **js** — install, TypeScript formatting check, lint, typecheck, build, tests,
+  and `pnpm audit`.
 - **docs** — Markdown formatting check (`dprint` via `make fmt-check-md`).
 - **images** — builds the orchestrator and guest-agent images (runs only after
   the test jobs pass); **dsh image** builds `Containerfile.dsh`.

@@ -38,6 +38,8 @@ Go 构建标签会跳过 btrfs 和 devicemapper 存储驱动，它们需要宿�
 make build-go       # build the Go binaries into bin/<os>-<arch>/
 make build          # build-go + pnpm-build
 make vet            # gofmt -s check + go vet with the build tags
+make lint           # vet + oxlint over the TypeScript sources
+make lint-ts        # oxlint only
 make test-go        # go test with the build tags
 make test           # test-go + pnpm test (JS tests, which run against dist/)
 make fmt            # gofmt -s + dprint (TypeScript and Markdown)
@@ -240,7 +242,8 @@ zizmor）、`ci-code.yml`（Go、JS、镜像、Trivy）、`ci-docs.yml`（dprint
 - **reuse** — REUSE 许可证合规检查。
 - **go** — 构建、`gofmt -s` 检查、vet、测试和 govulncheck（Go 漏洞）。未修复的
   发现不会导致任务失败；可修复的会导致失败。
-- **js** — TypeScript 格式检查、安装、类型检查、构建、测试和 `pnpm audit`。
+- **js** — 安装、TypeScript 格式检查、lint、类型检查、构建、测试和
+  `pnpm audit`。
 - **docs** — Markdown 格式检查（通过 `make fmt-check-md` 运行 `dprint`）。
 - **images** — 构建 orchestrator 和 guest-agent
   镜像（仅在测试任务通过后运行）；**dsh image** 构建 `Containerfile.dsh`。

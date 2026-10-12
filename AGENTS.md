@@ -15,6 +15,8 @@ exclude_graphdriver_devicemapper`).
 - `make vet` / `make test-go` — Go checks with the tags (`vet` runs the gofmt
   check first)
 - `make fmt` / `make fmt-check` — format / verify Go, TypeScript and Markdown
+- `make lint` / `make lint-ts` — oxlint over the TypeScript sources (`lint` also
+  runs `vet`)
 - `make test` — Go tests + pnpm tests
 - `make proto` / `make proto-check` — regenerate / verify the protobuf Go
   bindings (needs `buf`, pinned in `docs/development.md`)
@@ -37,7 +39,9 @@ the plugin from npm — the local build is for development only.
 Markdown and TypeScript share one formatter — `dprint`, configured by
 `dprint.json` (line width, wrapped-prose policy, pinned plugin versions, and the
 formatted file set); run `make fmt`, and `make fmt-check` or the CI jobs verify
-it.
+it. TypeScript is linted with `oxlint`, configured by `.oxlintrc.json` and
+pinned in `devDependencies`: run `make lint-ts`, which the `js` CI job also
+runs.
 
 ## Conventions
 

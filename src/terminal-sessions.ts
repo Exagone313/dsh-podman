@@ -307,7 +307,7 @@ export class TerminalSessions {
   /** Close every terminal and stop the retention sweep. */
   dispose(): void {
     clearInterval(this.sweep);
-    for (const entry of [...this.entries.values()]) {
+    for (const entry of Array.from(this.entries.values())) {
       this.entries.delete(entry.key);
       this.byId.delete(entry.terminalId);
       void entry.terminal.terminate();
@@ -326,7 +326,7 @@ export class TerminalSessions {
   // reap closes terminals no browser has attached for the retention window.
   private reap(): void {
     const cutoff = Date.now() - this.retentionMs;
-    for (const entry of [...this.entries.values()]) {
+    for (const entry of Array.from(this.entries.values())) {
       if (entry.listener === undefined && entry.lastUsed < cutoff) {
         this.drop(entry.key);
         void entry.terminal.terminate();

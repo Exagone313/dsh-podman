@@ -26,7 +26,7 @@ export function fakeScope(initial: Record<string, unknown>): FakeScope {
     async update(patch: object) {
       const prev = scope.value;
       scope.value = { ...scope.value, ...patch };
-      for (const listener of [...scope.listeners]) {
+      for (const listener of scope.listeners.slice()) {
         await listener(scope.value, prev);
       }
     },

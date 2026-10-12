@@ -33,7 +33,7 @@ export function createSubprocessProvider(
   const live = new Set<() => void>();
   return {
     dispose: () => {
-      for (const terminate of [...live]) terminate();
+      for (const terminate of Array.from(live)) terminate();
     },
     // The harness's resolveExecutable carries no cwd, and this provider's
     // execution world is per-workspace (each workspace is its own container),

@@ -41,7 +41,7 @@ const PROBE_SCRIPT = [
   "done",
   "if [ -f /etc/shells ]; then",
   "  while IFS= read -r candidate; do",
-  '    case $candidate in ""|\#*) continue ;; esac',
+  '    case $candidate in ""|#*) continue ;; esac',
   '    case $candidate in /*) [ -x "$candidate" ] && printf "%s\\t%s\\n" "${candidate##*/}" "$candidate" ;; esac',
   "  done < /etc/shells",
   "fi",

@@ -307,7 +307,7 @@ test("control calls carry the bearer token", async () => {
 });
 
 test("control calls omit the token when unset", async () => {
-  const { socketsRoot, received, versions, stop } = await startControlServer();
+  const { socketsRoot, received, stop } = await startControlServer();
   try {
     const resolver = new WorkspaceResolver(
       {

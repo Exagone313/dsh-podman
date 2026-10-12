@@ -23,7 +23,7 @@ export function mergeDefaultEnv(
     if (key === "" || key.startsWith(RESERVED_ENV_PREFIX)) continue;
     merged[key] = value;
   }
-  return { ...merged, ...(env ?? {}) };
+  return { ...merged, ...env };
 }
 
 // missingDefaultEnv returns the defaults a container does not have yet, so a

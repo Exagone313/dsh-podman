@@ -87,7 +87,7 @@ export class WorkspaceResolver {
   // a removed (or recreated) workspace cannot serve stale rows.
   forgetWorkspace(slug: string): void {
     const prefix = `${slug}:`;
-    for (const key of [...this.containerBindings.keys()]) {
+    for (const key of Array.from(this.containerBindings.keys())) {
       if (key.startsWith(prefix)) this.containerBindings.delete(key);
     }
   }
@@ -210,7 +210,7 @@ export class WorkspaceResolver {
     slug: string,
     container: string,
     key: string,
-    signal?: AbortSignal,
+    _signal?: AbortSignal,
   ): Promise<{ binding: WorkspaceBinding; mounts: readonly any[] }> {
     let entry = this.containerBindings.get(key);
     if (entry === undefined) {

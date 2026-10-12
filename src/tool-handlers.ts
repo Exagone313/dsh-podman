@@ -9,13 +9,11 @@ import {
   fsError,
   guestCwd,
   outputLines,
-  resolveGuestPath,
   resolveToolBinding,
   runExec,
   sessionWorkspaceSlug,
   streamLines,
   unaryGuest,
-  writeGuestFile,
 } from "./guest-rpc.js";
 import {
   inferMountKind,
@@ -37,12 +35,7 @@ import {
   mountKindToProto,
   mountModeToProto,
 } from "./mount-enums.js";
-import {
-  containerNotFound,
-  metadata,
-  WorkspaceResolver,
-  workspaceSlug,
-} from "./workspace-binding.js";
+import { containerNotFound, WorkspaceResolver } from "./workspace-binding.js";
 
 // Cap on paths `container_glob` returns, matching the built-in glob tool's
 // default result limit; `--sort=modified` makes the retained head the newest.

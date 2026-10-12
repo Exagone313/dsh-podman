@@ -148,7 +148,7 @@ export function openGuestTerminal(
     settle(new Error("terminal stream ended before the process exited"));
   });
 
-  const env: Record<string, string> = { ...(options.env ?? {}) };
+  const env: Record<string, string> = { ...options.env };
   if (
     options.terminalType !== undefined &&
     options.terminalType !== "" &&

@@ -113,6 +113,8 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Check TypeScript formatting
         run: make fmt-check-ts
+      - name: Lint
+        run: make lint-ts
       - name: Typecheck
         run: pnpm typecheck
       - name: Build

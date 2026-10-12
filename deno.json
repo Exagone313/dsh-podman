@@ -1,6 +1,0 @@
-{
-  "fmt": {
-    "include": ["**/*.md", "src/**/*.ts", "src/**/*.tsx", "scripts/**/*.mjs"],
-    "exclude": ["bin", "dist", "node_modules", "third_party"]
-  }
-}

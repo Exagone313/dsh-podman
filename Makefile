@@ -4,7 +4,10 @@
 
 GO ?= go
 GOFMT ?= gofmt
-DENO ?= deno
+DPRINT ?= node_modules/.bin/dprint
+# dprint cannot create its default cache under the container's read-only root, so
+# keep the downloaded plugins inside the workspace instead.
+export DPRINT_CACHE_DIR ?= $(CURDIR)/node_modules/.cache/dprint
 BUF ?= buf
 GO_BUILD_TAGS = containers_image_openpgp exclude_graphdriver_btrfs exclude_graphdriver_devicemapper
 GO_BUILD_FLAGS = -tags "$(GO_BUILD_TAGS)"
@@ -27,8 +30,9 @@ NODE_MODULES_TSC := node_modules/.bin/tsc
 # Go sources the project owns; third_party/ is an upstream replacement module
 # (the replace directive in go.mod) and is left exactly as published.
 GOFMT_SOURCES := $(shell find cmd internal scripts -type f -name '*.go' -print)
-# Quoted so Deno expands the globs, not the shell. deno.json pins the width and
-# the wrapped-prose policy, which keeps the existing Markdown untouched.
+# Quoted so dprint expands the globs, not the shell. dprint.json pins the width,
+# the wrapped-prose policy and the plugin versions, which keeps the existing
+# TypeScript and Markdown untouched.
 TS_SOURCES = "src/**/*.ts" "src/**/*.tsx" "scripts/**/*.mjs"
 MD_SOURCES = "**/*.md"
 
@@ -55,10 +59,10 @@ fmt-go:
 	$(GOFMT) -s -w $(GOFMT_SOURCES)
 
 fmt-ts:
-	$(DENO) fmt $(TS_SOURCES)
+	$(DPRINT) fmt $(TS_SOURCES)
 
 fmt-md:
-	$(DENO) fmt $(MD_SOURCES)
+	$(DPRINT) fmt $(MD_SOURCES)
 
 fmt-check: fmt-check-go fmt-check-ts fmt-check-md
 
@@ -71,10 +75,10 @@ fmt-check-go:
 	fi
 
 fmt-check-ts:
-	$(DENO) fmt --check $(TS_SOURCES)
+	$(DPRINT) check $(TS_SOURCES)
 
 fmt-check-md:
-	$(DENO) fmt --check $(MD_SOURCES)
+	$(DPRINT) check $(MD_SOURCES)
 
 build-go: $(BIN_DIR)/$(GOOS)-$(GOARCH)/dsh-podman-guest-agent $(BIN_DIR)/$(GOOS)-$(GOARCH)/dsh-podman-orchestrator $(BIN_DIR)/$(GOOS)-$(GOARCH)/dsh-podman-gateway
 

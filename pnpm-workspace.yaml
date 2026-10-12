@@ -3,10 +3,11 @@
 # SPDX-License-Identifier: MIT
 
 # Build scripts pnpm may run. pnpm >= 11 denies every dependency's build scripts
-# by default and fails the install when one is denied, so the two packages that
-# need theirs (esbuild's binary check, protobufjs's postinstall) are approved
-# here.
+# by default and fails the install when one is denied, so the three packages that
+# need theirs (dprint's and esbuild's binary checks, protobufjs's postinstall) are
+# approved here.
 allowBuilds:
+  dprint: true
   esbuild: true
   protobufjs: true
 

@@ -50,6 +50,8 @@
   "scripts": {
     "build": "node scripts/generate-version.mjs && tsc -p tsconfig.json && tsc -p tsconfig.client.json && node scripts/copy-proto.mjs && node scripts/build-client-bundle.mjs",
     "typecheck": "node scripts/generate-version.mjs && tsc -p tsconfig.json --noEmit && tsc -p tsconfig.client.json --noEmit",
+    "lint": "oxlint --deny-warnings",
+    "lint:fix": "oxlint --fix",
     "test": "node --test dist/*.test.js",
     "bump-version": "node scripts/bump-version.mjs"
   },
@@ -83,6 +85,7 @@
     "@types/react": "^18.3.31",
     "dprint": "0.62.0",
     "esbuild": "^0.28.2",
+    "oxlint": "1.87.0",
     "typescript": "^7.0.2"
   },
   "engines": {

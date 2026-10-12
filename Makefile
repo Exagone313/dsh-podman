@@ -8,6 +8,7 @@ DPRINT ?= node_modules/.bin/dprint
 # dprint cannot create its default cache under the container's read-only root, so
 # keep the downloaded plugins inside the workspace instead.
 export DPRINT_CACHE_DIR ?= $(CURDIR)/node_modules/.cache/dprint
+OXLINT ?= node_modules/.bin/oxlint
 BUF ?= buf
 GO_BUILD_TAGS = containers_image_openpgp exclude_graphdriver_btrfs exclude_graphdriver_devicemapper
 GO_BUILD_FLAGS = -tags "$(GO_BUILD_TAGS)"
@@ -36,7 +37,7 @@ GOFMT_SOURCES := $(shell find cmd internal scripts -type f -name '*.go' -print)
 TS_SOURCES = "src/**/*.ts" "src/**/*.tsx" "scripts/**/*.mjs"
 MD_SOURCES = "**/*.md"
 
-.PHONY: all build build-go vet test test-go fmt fmt-go fmt-ts fmt-md fmt-check fmt-check-go fmt-check-ts fmt-check-md image image-go image-orchestrator image-guestagent image-gateway image-dsh download-licenses pnpm-install pnpm-build pnpm-test pnpm-prune clean proto proto-check
+.PHONY: all build build-go vet test test-go fmt fmt-go fmt-ts fmt-md fmt-check fmt-check-go fmt-check-ts fmt-check-md lint lint-ts image image-go image-orchestrator image-guestagent image-gateway image-dsh download-licenses pnpm-install pnpm-build pnpm-test pnpm-prune clean proto proto-check
 
 all: build
 
@@ -79,6 +80,13 @@ fmt-check-ts:
 
 fmt-check-md:
 	$(DPRINT) check $(MD_SOURCES)
+
+# Linting. lint-ts runs oxlint over every TypeScript source; lint adds the Go
+# checks (gofmt and go vet with the build tags).
+lint: vet lint-ts
+
+lint-ts:
+	$(OXLINT) --deny-warnings
 
 build-go: $(BIN_DIR)/$(GOOS)-$(GOARCH)/dsh-podman-guest-agent $(BIN_DIR)/$(GOOS)-$(GOARCH)/dsh-podman-orchestrator $(BIN_DIR)/$(GOOS)-$(GOARCH)/dsh-podman-gateway
 

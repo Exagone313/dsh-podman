@@ -20,6 +20,15 @@ updates:
       # The harness packages are pinned to the supported dsh release and must
       # move together with it, not on their own.
       - dependency-name: "@deepseek-ai/*"
+      # The client packages install React 18 and our optional React peer is ^18,
+      # so React 19 types or a 19 peer would describe a runtime that is not
+      # there. Revisit once the harness ships React 19.
+      - dependency-name: "react"
+        update-types:
+          - "version-update:semver-major"
+      - dependency-name: "@types/react"
+        update-types:
+          - "version-update:semver-major"
   - package-ecosystem: "docker"
     # Keeps the digest-pinned base image of Containerfile.dsh current; the
     # orchestrator and guest-agent images are FROM scratch.

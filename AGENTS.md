@@ -34,9 +34,10 @@ exclude_graphdriver_devicemapper`).
 User-facing docs live in `docs/`; `README.md` only links to them. Users install
 the plugin from npm — the local build is for development only.
 
-Markdown and TypeScript share one formatter — `deno fmt`, configured by
-`deno.json` (line width, wrapped-prose policy, and the formatted file set); run
-`make fmt`, and `make fmt-check` or the CI jobs verify it.
+Markdown and TypeScript share one formatter — `dprint`, configured by
+`dprint.json` (line width, wrapped-prose policy, pinned plugin versions, and the
+formatted file set); run `make fmt`, and `make fmt-check` or the CI jobs verify
+it.
 
 ## Conventions
 

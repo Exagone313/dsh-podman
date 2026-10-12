@@ -22,8 +22,8 @@ This page is for **contributors** building the plugin from this repository.
 
 ## Building
 
-Prerequisites: Go 1.27, Node ≥ 22, pnpm 12, Deno ≥ 2.9 (formatting), and (for
-the browser half) the `@deepseek-ai/dsh-client-*` packages published on npm.
+Prerequisites: Go 1.27, Node ≥ 22, pnpm 12, and (for the browser half) the
+`@deepseek-ai/dsh-client-*` packages published on npm.
 
 ```sh
 pnpm install
@@ -41,7 +41,7 @@ make build          # build-go + pnpm-build
 make vet            # gofmt -s check + go vet with the build tags
 make test-go        # go test with the build tags
 make test           # test-go + pnpm test (JS tests, which run against dist/)
-make fmt            # gofmt -s + deno fmt (TypeScript and Markdown)
+make fmt            # gofmt -s + dprint (TypeScript and Markdown)
 make fmt-check      # verify the formatting without rewriting anything
 make proto          # regenerate the protobuf Go bindings with buf
 make proto-check    # buf lint + buf breaking + check the committed bindings are current
@@ -189,19 +189,20 @@ A workspace container's root filesystem is read-only and disposable, so the
 toolchain a contributor builds with needs a workspace volume. No development
 image is distributed: build a custom one — the
 [setup prompt](development-prompt.md) builds `dsh-podman-tooling` from the
-`archlinux` base with `go`, `nodejs` (Node 26), `npm`, `deno`, `reuse` and
+`archlinux` base with `go`, `nodejs` (Node 26), `npm`, `reuse` and
 `python-chardet` — and create a workspace volume for the state an image cannot
 keep: the Go and npm caches, `gopath` with the `go install`ed tools, and pnpm,
-which `package.json` pins to a version the Arch repositories do not carry.
+which `package.json` pins to a version the Arch repositories do not carry
+(dprint ships with the project's `pnpm install`).
 
 The prompt mounts that volume as `dsh-podman-toolchain` at `/opt/toolchain`
 (read-write) and points the container's caches at it, so commands work without
 sourcing anything:
 
-| Container setting | Value                                                                                                                                                                                                                                                                                                                      |
-| ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| PATH additions    | `/opt/toolchain/gopath/bin`, `/opt/toolchain/npm-global/bin`, `/opt/toolchain/pnpm-home`                                                                                                                                                                                                                                   |
-| Environment       | `GOCACHE=/opt/toolchain/gocache`, `GOMODCACHE=/opt/toolchain/gomodcache`, `GOPATH=/opt/toolchain/gopath`, `npm_config_cache=/opt/toolchain/npm-cache`, `npm_config_prefix=/opt/toolchain/npm-global`, `PNPM_HOME=/opt/toolchain/pnpm-home`, `DENO_DIR=/opt/toolchain/deno-dir`, `GOENV=/opt/toolchain/home/.config/go/env` |
+| Container setting | Value                                                                                                                                                                                                                                                                                  |
+| ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| PATH additions    | `/opt/toolchain/gopath/bin`, `/opt/toolchain/npm-global/bin`, `/opt/toolchain/pnpm-home`                                                                                                                                                                                               |
+| Environment       | `GOCACHE=/opt/toolchain/gocache`, `GOMODCACHE=/opt/toolchain/gomodcache`, `GOPATH=/opt/toolchain/gopath`, `npm_config_cache=/opt/toolchain/npm-cache`, `npm_config_prefix=/opt/toolchain/npm-global`, `PNPM_HOME=/opt/toolchain/pnpm-home`, `GOENV=/opt/toolchain/home/.config/go/env` |
 
 Set the commit identity once on the Podman page (sidebar **Plugins** panel →
 **Installed** → **dsh-podman**) under
@@ -251,7 +252,7 @@ image) exactly, upgrading or downgrading the profile's copy to match.
 
 CI runs on every **branch** push and pull request, split across
 `.github/workflows/ci-common.yml` (REUSE lint and zizmor), `ci-code.yml` (Go,
-JS, images, Trivy), `ci-docs.yml` (Deno fmt) and `ci-dsh-image.yml`. A **tag**
+JS, images, Trivy), `ci-docs.yml` (dprint) and `ci-dsh-image.yml`. A **tag**
 push runs only `release.yml`, which repeats the build, vet and tests itself:
 
 - **actions-lint** — zizmor scans the workflows for insecure practices.
@@ -260,7 +261,7 @@ push runs only `release.yml`, which repeats the build, vet and tests itself:
   vulnerabilities). Unfixed findings don't fail the job; fixable ones do.
 - **js** — TypeScript formatting check, install, typecheck, build, tests, and
   `pnpm audit`.
-- **docs** — Markdown formatting check (`deno fmt` via `make fmt-check-md`).
+- **docs** — Markdown formatting check (`dprint` via `make fmt-check-md`).
 - **images** — builds the orchestrator and guest-agent images (runs only after
   the test jobs pass); **dsh image** builds `Containerfile.dsh`.
 - **trivy** — filesystem vulnerability scan (unfixed ignored) and container

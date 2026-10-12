@@ -21,8 +21,7 @@ SPDX-License-Identifier: MIT
 
 ## 构建
 
-前置要求：Go 1.27、Node ≥ 22、pnpm 12、Deno ≥
-2.9（用于格式化），以及（浏览器端所需的）发布在 npm 上的
+前置要求：Go 1.27、Node ≥ 22、pnpm 12，以及（浏览器端所需的）发布在 npm 上的
 `@deepseek-ai/dsh-client-*` 包。
 
 ```sh
@@ -41,7 +40,7 @@ make build          # build-go + pnpm-build
 make vet            # gofmt -s check + go vet with the build tags
 make test-go        # go test with the build tags
 make test           # test-go + pnpm test (JS tests, which run against dist/)
-make fmt            # gofmt -s + deno fmt (TypeScript and Markdown)
+make fmt            # gofmt -s + dprint (TypeScript and Markdown)
 make fmt-check      # verify the formatting without rewriting anything
 make proto          # regenerate the protobuf Go bindings with buf
 make proto-check    # buf lint + buf breaking + check the committed bindings are current
@@ -175,19 +174,18 @@ guest agent 之后，请自行重建容器：
 
 工作区容器的根文件系统是只读且一次性的，因此贡献者构建所用的工具链需要工作区的一个卷。项目并不分发开发镜像：请自行构建一个自定义镜像——[设置提示词](development-prompt.zh.md)
 会以 `archlinux` 为父镜像构建 `dsh-podman-tooling`，包含 `go`、`nodejs`（Node
-26）、`npm`、`deno`、`reuse` 和
-`python-chardet`——并为镜像无法保存的状态创建工作区卷：Go 与 npm 缓存、含
-`go install` 工具的 `gopath`， 以及 `package.json` 固定版本、Arch 仓库没有的
-pnpm。
+26）、`npm`、`reuse` 和 `python-chardet`——并为镜像无法保存的状态创建工作区卷：Go
+与 npm 缓存、含 `go install` 工具的 `gopath`， 以及 `package.json`
+固定版本、Arch 仓库没有的 pnpm（dprint 随项目的 `pnpm install` 一并安装）。
 
 提示词会把该卷以 `dsh-podman-toolchain` 挂载到
 `/opt/toolchain`（读写），并让容器的缓存都指向它，因此无需 source
 任何脚本即可使用：
 
-| 容器设置    | 值                                                                                                                                                                                                                                                                                                                         |
-| ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| PATH 追加项 | `/opt/toolchain/gopath/bin`、`/opt/toolchain/npm-global/bin`、`/opt/toolchain/pnpm-home`                                                                                                                                                                                                                                   |
-| 环境变量    | `GOCACHE=/opt/toolchain/gocache`、`GOMODCACHE=/opt/toolchain/gomodcache`、`GOPATH=/opt/toolchain/gopath`、`npm_config_cache=/opt/toolchain/npm-cache`、`npm_config_prefix=/opt/toolchain/npm-global`、`PNPM_HOME=/opt/toolchain/pnpm-home`、`DENO_DIR=/opt/toolchain/deno-dir`、`GOENV=/opt/toolchain/home/.config/go/env` |
+| 容器设置    | 值                                                                                                                                                                                                                                                                                     |
+| ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| PATH 追加项 | `/opt/toolchain/gopath/bin`、`/opt/toolchain/npm-global/bin`、`/opt/toolchain/pnpm-home`                                                                                                                                                                                               |
+| 环境变量    | `GOCACHE=/opt/toolchain/gocache`、`GOMODCACHE=/opt/toolchain/gomodcache`、`GOPATH=/opt/toolchain/gopath`、`npm_config_cache=/opt/toolchain/npm-cache`、`npm_config_prefix=/opt/toolchain/npm-global`、`PNPM_HOME=/opt/toolchain/pnpm-home`、`GOENV=/opt/toolchain/home/.config/go/env` |
 
 在 Podman 页面（侧边栏 **插件** 面板 → **已安装** →
 **dsh-podman**）的[默认环境变量](configuration.zh.md#默认环境变量) → **Git
@@ -234,7 +232,7 @@ Environment=DSH_PODMAN_PLUGIN_SOURCE=/mnt/dsh-podman.tgz
 
 CI 在每次**分支**推送和拉取请求时运行，分散在
 `.github/workflows/ci-common.yml`（REUSE lint 与
-zizmor）、`ci-code.yml`（Go、JS、镜像、Trivy）、`ci-docs.yml`（Deno fmt）和
+zizmor）、`ci-code.yml`（Go、JS、镜像、Trivy）、`ci-docs.yml`（dprint）和
 `ci-dsh-image.yml` 中。推送**标签**时只运行 `release.yml`，它自身会重复构建、vet
 和测试：
 
@@ -243,7 +241,7 @@ zizmor）、`ci-code.yml`（Go、JS、镜像、Trivy）、`ci-docs.yml`（Deno f
 - **go** — 构建、`gofmt -s` 检查、vet、测试和 govulncheck（Go 漏洞）。未修复的
   发现不会导致任务失败；可修复的会导致失败。
 - **js** — TypeScript 格式检查、安装、类型检查、构建、测试和 `pnpm audit`。
-- **docs** — Markdown 格式检查（通过 `make fmt-check-md` 运行 `deno fmt`）。
+- **docs** — Markdown 格式检查（通过 `make fmt-check-md` 运行 `dprint`）。
 - **images** — 构建 orchestrator 和 guest-agent
   镜像（仅在测试任务通过后运行）；**dsh image** 构建 `Containerfile.dsh`。
 - **trivy** — 文件系统漏洞扫描（未修复的被忽略）和容器 错误配置扫描（DS-0002

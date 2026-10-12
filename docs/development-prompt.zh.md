@@ -31,7 +31,7 @@ what is missing or different, keeping whatever is already configured. Use the
 container tools; never run `make` or edit files on the host.
 
 1. Image: build a custom image named `dsh-podman-tooling` from the `archlinux`
-   base with packages `go`, `nodejs`, `npm`, `deno`, `reuse` and
+   base with packages `go`, `nodejs`, `npm`, `reuse` and
    `python-chardet`. It is a local image, not a published one; leave an existing
    one alone when it already carries exactly these packages, and rebuild it from
    this list when it does not.
@@ -50,13 +50,13 @@ container tools; never run `make` or edit files on the host.
      `GOMODCACHE=/opt/toolchain/gomodcache`, `GOPATH=/opt/toolchain/gopath`,
      `npm_config_cache=/opt/toolchain/npm-cache`,
      `npm_config_prefix=/opt/toolchain/npm-global`,
-     `PNPM_HOME=/opt/toolchain/pnpm-home`,
-     `DENO_DIR=/opt/toolchain/deno-dir` and
+     `PNPM_HOME=/opt/toolchain/pnpm-home` and
      `GOENV=/opt/toolchain/home/.config/go/env`, merged with the variables
      already on the container.
 4. pnpm: the volume, not the image, carries pnpm. If `pnpm --version` does not
    report the version `package.json` pins in `packageManager`, install it with
-   `npm install -g pnpm@<that version>` and check again.
+   `npm install -g pnpm@<that version>` and check again. dprint, the formatter,
+   is a project devDependency and arrives with `pnpm install`.
 5. Git identity: do not write a `~/.gitconfig`. If no Git identity is
    configured, tell me to set it once on the Podman page (sidebar **Plugins**
    panel → **Installed** → **dsh-podman**): **Default

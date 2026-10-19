@@ -276,6 +276,7 @@ function terminalCard(
 // and `collapse` resolve from the shared common vocabulary.
 function terminalLabels(t: TranslateNS<typeof NS>): TerminalBlockLabels {
   return {
+    commandLine: (line) => t("terminalCommandLine", { n: line }),
     signal: (signal) => t("terminalSignal", { signal }),
     exitCode: (code) => t("terminalExitCode", { code }),
     noExitCode: t("terminalNoExitCode"),

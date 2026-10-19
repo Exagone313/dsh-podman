@@ -247,6 +247,7 @@ export type ContainerPluginKey =
   | "containerNameTaken"
   | "invalidName"
   | "invalidImageId"
+  | "terminalCommandLine"
   | "terminalSignal"
   | "terminalExitCode"
   | "terminalNoExitCode"
@@ -597,6 +598,7 @@ export const en: Record<ContainerPluginKey, string> = {
     "Start with a letter or digit; only letters, digits, '.', '_', '-' (max 64).",
   invalidImageId:
     "Start with a letter, digit, or '_'; only letters, digits, '.', '_', '-', '/', ':' (max 128).",
+  terminalCommandLine: "Command line {n}",
   terminalSignal: "signal {signal}",
   terminalExitCode: "exit code {code}",
   terminalNoExitCode: "no exit code",
@@ -915,6 +917,7 @@ export const zh: Record<ContainerPluginKey, string> = {
     "以字母或数字开头，仅可使用字母、数字、'.'、'_'、'-'（最长 64 个字符）。",
   invalidImageId:
     "以字母、数字或 '_' 开头，仅可使用字母、数字、'.'、'_'、'-'、'/'、':'（最长 128 个字符）。",
+  terminalCommandLine: "命令第 {n} 行",
   terminalSignal: "信号 {signal}",
   terminalExitCode: "退出码 {code}",
   terminalNoExitCode: "无退出码",

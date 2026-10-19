@@ -5,3 +5,4 @@
 *
 !dsh/
 !dsh/defaults.cordis.patch.yml
+!dsh/patch-wildcard-host.mjs

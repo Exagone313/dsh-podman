@@ -5,53 +5,72 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
-  commitEnvDraft,
-  emptyEnvDraft,
-  envKeyAvailable,
-  envRows,
-  removeEnvRow,
-  renameEnvKey,
-  setEnvValue,
+  conflictingEnvNames,
+  emptyEnvRow,
+  envEditRows,
+  envRecordFromRows,
+  firstDuplicateEnvName,
 } from "./env-rows.js";
 
-test("envRows lists the committed entries and then the pending draft", () => {
-  assert.deepEqual(envRows({}, undefined), []);
-  assert.deepEqual(envRows({ A: "1" }, undefined), [
-    { key: "A", value: "1", pending: false },
+test("envEditRows wraps a record's entries in display order, each with its own id", () => {
+  assert.deepEqual(envEditRows({}), []);
+  // The rows open as a container block lists them: by name, case-insensitively
+  // and ascending, whichever order the record holds.
+  const rows = envEditRows({ B: "2", a: "1" });
+  assert.deepEqual(rows.map((row) => [row.key, row.value]), [
+    ["a", "1"],
+    ["B", "2"],
   ]);
-  assert.deepEqual(envRows({ A: "1", B: "2" }, emptyEnvDraft()), [
-    { key: "A", value: "1", pending: false },
-    { key: "B", value: "2", pending: false },
-    { key: "", value: "", pending: true },
+  // Two names that differ only by case still read in one fixed order.
+  assert.deepEqual(
+    envEditRows({ a: "1", A: "2" }).map((row) => row.key),
+    ["A", "a"],
+  );
+  // Every row carries an id, which keeps its React key stable across a rename.
+  assert.equal(new Set(rows.map((row) => row.id)).size, 2);
+});
+
+test("emptyEnvRow is an unnamed, empty row with its own id", () => {
+  const one = emptyEnvRow();
+  const two = emptyEnvRow();
+  assert.equal(one.key, "");
+  assert.equal(one.value, "");
+  assert.notEqual(one.id, two.id);
+  assert.notEqual(one.id, envEditRows({ A: "1" })[0].id);
+});
+
+test("envRecordFromRows commits only the named rows, in order", () => {
+  assert.deepEqual(envRecordFromRows([]), {});
+  assert.deepEqual(
+    envRecordFromRows([
+      { id: 0, key: "A", value: "1" },
+      { id: 1, key: "", value: "2" },
+      { id: 2, key: "B", value: "3" },
+    ]),
+    { A: "1", B: "3" },
+  );
+});
+
+test("envRecordFromRows lets the last of a repeated name win", () => {
+  // The two rows stay side by side while the duplicate check refuses the apply,
+  // so the derived record can only carry one of them.
+  assert.deepEqual(
+    envRecordFromRows([
+      { id: 0, key: "A", value: "1" },
+      { id: 1, key: "A", value: "2" },
+    ]),
+    { A: "2" },
+  );
+});
+
+test("the conflict checks flag an empty or repeated name", () => {
+  assert.deepEqual([...conflictingEnvNames([])], []);
+  assert.deepEqual([...conflictingEnvNames(["A", "B"])], []);
+  assert.deepEqual([...conflictingEnvNames(["A", "A", "B", "B", ""])], [
+    "A",
+    "B",
+    "",
   ]);
-});
-
-test("envKeyAvailable accepts only a new, non-empty key", () => {
-  assert.equal(envKeyAvailable({}, ""), false);
-  assert.equal(envKeyAvailable({ A: "1" }, "A"), false);
-  assert.equal(envKeyAvailable({ A: "1" }, "B"), true);
-  // A key inherited from the prototype is not an existing variable.
-  assert.equal(envKeyAvailable({}, "toString"), true);
-});
-
-test("commitEnvDraft refuses an empty or duplicate key", () => {
-  assert.equal(commitEnvDraft({}, { key: "", value: "x" }), undefined);
-  assert.equal(commitEnvDraft({ A: "1" }, { key: "A", value: "x" }), undefined);
-});
-
-test("commitEnvDraft appends an accepted key with its value", () => {
-  assert.deepEqual(commitEnvDraft({ A: "1" }, { key: "B", value: "2" }), {
-    A: "1",
-    B: "2",
-  });
-  assert.deepEqual(commitEnvDraft({}, { key: "B", value: "" }), { B: "" });
-});
-
-test("env transformations keep row order", () => {
-  const env = { A: "1", B: "2", C: "3" };
-  assert.deepEqual(renameEnvKey(env, 1, "BB"), { A: "1", BB: "2", C: "3" });
-  assert.deepEqual(setEnvValue(env, 2, "33"), { A: "1", B: "2", C: "33" });
-  assert.deepEqual(removeEnvRow(env, 0), { B: "2", C: "3" });
-  // The input record is never mutated.
-  assert.deepEqual(env, { A: "1", B: "2", C: "3" });
+  assert.equal(firstDuplicateEnvName(["A", "B"]), undefined);
+  assert.equal(firstDuplicateEnvName(["", "A", "B", "A"]), "A");
 });

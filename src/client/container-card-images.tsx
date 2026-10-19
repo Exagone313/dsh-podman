@@ -7,227 +7,292 @@ import {
   ConfirmButton,
   Field,
   imageIdPattern,
-  sanitizeImageId,
+  imageStatusLabel,
+  imageStatusTone,
+  StatusChip,
   TagInput,
 } from "./container-card-shared.js";
+import { scopedActionKey } from "./card-protocol.js";
+import { FIELD_ROW_CLASS } from "./container-card-table-styles.js";
 import {
-  actions,
+  actionRow,
+  cardBlockRow,
+  containerNameHeading,
   hint,
+  imageFieldLabel,
+  imageFieldOwnLine,
+  imageFields,
+  imageFieldValue,
   imageSelect,
-  tableStyle,
-  tdStyle,
-  thStyle,
-  wsBody,
+  rowActions,
+  rowDivider,
+  rowMain,
 } from "./container-card-styles.js";
 import { type ImageView } from "./container-card-controller.js";
+import { relativeTimeLabel } from "./relative-time.js";
 import type { Translate } from "./locales.js";
 import {
   Button,
-  DisclosureRow,
   Input,
   Modal,
+  Pill,
 } from "@deepseek-ai/dsh-client-ui-primitives";
-import { type ReactNode, useId, useState } from "react";
+import { type ReactNode, useId } from "react";
 
+// The packages an image was built with, or the fact that none were recorded:
+// chips on their own line under the Packages label.
+function Packages(props: { t: Translate; image: ImageView }): ReactNode {
+  const { t, image } = props;
+  if (image.packages.length === 0) return t("noPackages");
+  return (
+    <>
+      {image.packages.map((pkg) => <Chip key={pkg} t={t} label={pkg} />)}
+    </>
+  );
+}
+
+// One labelled line of an image's block: the field's label, then its value. The
+// class keeps the label beside the value while the card has room and stacks it
+// above once the card is narrow.
+function ImageField(props: {
+  label: string;
+  ownLine?: boolean;
+  children: ReactNode;
+}): ReactNode {
+  const { label, ownLine, children } = props;
+  return (
+    <div className={FIELD_ROW_CLASS}>
+      <span style={imageFieldLabel}>{label}</span>
+      {ownLine === true
+        ? <div style={imageFieldOwnLine}>{children}</div>
+        : <span style={imageFieldValue}>{children}</span>}
+    </div>
+  );
+}
+
+// The image's own block: line one is the name (14/600) with its status chip and
+// the image's own actions at the line's right end, then one labelled line per
+// field. The block's action group drops below the name when it no longer fits
+// beside it; the destructive Remove is part of that same group, so a custom
+// image's three actions read together.
+function ImageBlock(props: {
+  t: Translate;
+  image: ImageView;
+  defaultImage: string;
+  // The plugin's active locale, for the build time's relative wording.
+  locale: string;
+  // The image's non-destructive actions (Build/Pull/Rebuild, Set default).
+  actions: ReactNode;
+}): ReactNode {
+  const { t, image, defaultImage, locale, actions } = props;
+  // The upstream image a base image is built from lives in `primitive`, while a
+  // custom image names its parent; both are the image this one descends from.
+  const source = image.parent !== "" ? image.parent : image.primitive;
+  return (
+    <div>
+      <div style={actionRow}>
+        <div style={rowMain}>
+          <span style={containerNameHeading}>{image.imageId}</span>
+          {image.imageId === defaultImage
+            ? <Pill>{t("defaultImage")}</Pill>
+            : null}
+          <StatusChip
+            tone={imageStatusTone(image.status)}
+            label={imageStatusLabel(t, image.status)}
+          />
+        </div>
+        <div style={rowActions}>{actions}</div>
+      </div>
+      <div style={imageFields}>
+        {
+          /* An image that was never built has no build moment, so the line is
+            absent rather than a placeholder; the exact instant stays available
+            as the tooltip, the way a container row dates itself. */
+        }
+        {image.builtAt === "" ? null : (
+          <ImageField label={t("built")}>
+            <span title={image.builtAt}>
+              {relativeTimeLabel(image.builtAt, locale)}
+            </span>
+          </ImageField>
+        )}
+        {source === ""
+          ? null
+          : <ImageField label={t("parentImage")}>{source}</ImageField>}
+        <ImageField label={t("packages")} ownLine>
+          <Packages t={t} image={image} />
+        </ImageField>
+      </div>
+    </div>
+  );
+}
+
+// One custom image row: the image block with its Rebuild, Set default and
+// destructive Remove together on the name line. The card's rows are hairline
+// separated; the last row carries no divider.
 export function ImageItem(props: {
   t: Translate;
   image: ImageView;
-  busy: boolean;
   defaultImage: string;
+  locale: string;
+  last: boolean;
+  pendingActions: readonly string[];
   onRemove: (imageId: string) => void;
   onRebuild: (imageId: string) => void;
   onSetDefault: (imageId: string) => void;
 }): ReactNode {
-  const { t, image, busy, defaultImage, onRemove, onRebuild, onSetDefault } =
-    props;
-  const [open, setOpen] = useState(false);
+  const {
+    t,
+    image,
+    defaultImage,
+    locale,
+    last,
+    pendingActions,
+    onRemove,
+    onRebuild,
+    onSetDefault,
+  } = props;
+  const rebuildPending = pendingActions.includes(
+    scopedActionKey("image_rebuild", image.imageId),
+  );
+  const removePending = pendingActions.includes(
+    scopedActionKey("image_remove", image.imageId),
+  );
   return (
-    <DisclosureRow
-      icon={<span />}
-      title={image.imageId}
-      open={open}
-      expandable
-      onToggle={() => setOpen(!open)}
-    >
-      <div style={wsBody}>
-        <table style={tableStyle}>
-          <tbody>
-            <tr>
-              <th style={thStyle} scope="row">{t("parent")}</th>
-              <td style={tdStyle}>{image.parent}</td>
-            </tr>
-            <tr>
-              <th style={thStyle} scope="row">{t("imageTag")}</th>
-              <td style={tdStyle}>{image.imageTag}</td>
-            </tr>
-            <tr>
-              <th style={thStyle} scope="row">{t("builtAt")}</th>
-              <td style={tdStyle}>{image.builtAt}</td>
-            </tr>
-            <tr>
-              <th style={thStyle} scope="row">{t("packages")}</th>
-              <td style={tdStyle}>
-                {image.packages.length === 0
-                  ? (
-                    t("none")
-                  )
-                  : (
-                    <div
-                      style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}
-                    >
-                      {image.packages.map((pkg) => (
-                        <Chip key={pkg} t={t} label={pkg} />
-                      ))}
-                    </div>
-                  )}
-              </td>
-            </tr>
-          </tbody>
-        </table>
-        <div style={actions}>
-          <ConfirmButton
-            t={t}
-            label={t("rebuildImage")}
-            title={t("confirmTitle")}
-            description={t("confirmRebuildImage", { image: image.imageId })}
-            disabled={busy}
-            onConfirm={() => onRebuild(image.imageId)}
-          />
-          <ConfirmButton
-            t={t}
-            label={t("removeImage")}
-            title={t("confirmTitle")}
-            description={t("confirmRemoveImage", { image: image.imageId })}
-            disabled={busy}
-            onConfirm={() => onRemove(image.imageId)}
-          />
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={busy || image.imageId === defaultImage}
-            onClick={() => onSetDefault(image.imageId)}
-          >
-            {t("setDefaultImage")}
-          </Button>
-        </div>
-      </div>
-    </DisclosureRow>
+    <div style={last ? cardBlockRow : { ...cardBlockRow, ...rowDivider }}>
+      <ImageBlock
+        t={t}
+        image={image}
+        defaultImage={defaultImage}
+        locale={locale}
+        actions={
+          <>
+            <ConfirmButton
+              t={t}
+              label={t("rebuildImage")}
+              title={t("rebuildImageTitle")}
+              description={t("confirmRebuildImage", { image: image.imageId })}
+              confirmLabel={t("rebuildImageTitle")}
+              pending={rebuildPending}
+              onConfirm={() => onRebuild(image.imageId)}
+            />
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={image.imageId === defaultImage}
+              onClick={() => onSetDefault(image.imageId)}
+            >
+              {t("setDefaultImage")}
+            </Button>
+            <ConfirmButton
+              t={t}
+              destructive
+              label={t("removeImage")}
+              title={t("removeImageTitle")}
+              description={t("confirmRemoveImage", { image: image.imageId })}
+              confirmLabel={t("removeImageTitle")}
+              pending={removePending}
+              onConfirm={() => onRemove(image.imageId)}
+            />
+          </>
+        }
+      />
+    </div>
   );
 }
 
+// One base image row: the same block and name-line actions, with the base
+// image's own control (Pull, Build or Rebuild, depending on what the snapshot
+// reports) beside Set default.
 export function BaseImageRow(props: {
   t: Translate;
   image: ImageView;
-  busy: boolean;
   defaultImage: string;
+  locale: string;
+  last: boolean;
+  pendingActions: readonly string[];
   onRebuild: (name: string) => void;
   onPull: (name: string) => void;
   onSetDefault: (imageId: string) => void;
 }): ReactNode {
-  const { t, image, busy, defaultImage, onRebuild, onPull, onSetDefault } =
-    props;
-  const [open, setOpen] = useState(false);
+  const {
+    t,
+    image,
+    defaultImage,
+    locale,
+    last,
+    pendingActions,
+    onRebuild,
+    onPull,
+    onSetDefault,
+  } = props;
+  const pullPending = pendingActions.includes(
+    scopedActionKey("image_base_pull", image.imageId),
+  );
+  const rebuildPending = pendingActions.includes(
+    scopedActionKey("image_base_rebuild", image.imageId),
+  );
   const pull = image.basePublic &&
     (image.status === "missing" || image.status === "pulled");
   const build = !image.basePublic && image.status === "missing";
   const rebuild = !image.basePublic && image.status === "built";
   return (
-    <DisclosureRow
-      icon={<span />}
-      title={image.imageId}
-      open={open}
-      expandable
-      onToggle={() => setOpen(!open)}
-    >
-      <div style={wsBody}>
-        <table style={tableStyle}>
-          <tbody>
-            <tr>
-              <th style={thStyle} scope="row">{t("primitive")}</th>
-              <td style={tdStyle}>{image.primitive}</td>
-            </tr>
-            <tr>
-              <th style={thStyle} scope="row">{t("packageManager")}</th>
-              <td style={tdStyle}>{image.packageManager}</td>
-            </tr>
-            <tr>
-              <th style={thStyle} scope="row">{t("status")}</th>
-              <td style={tdStyle}>{image.status}</td>
-            </tr>
-            <tr>
-              <th style={thStyle} scope="row">{t("builtAt")}</th>
-              <td style={tdStyle}>
-                {image.builtAt === "" ? t("none") : image.builtAt}
-              </td>
-            </tr>
-            <tr>
-              <th style={thStyle} scope="row">{t("packages")}</th>
-              <td style={tdStyle}>
-                {image.packages.length === 0
-                  ? (
-                    t("none")
-                  )
-                  : (
-                    <div
-                      style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}
-                    >
-                      {image.packages.map((pkg) => (
-                        <Chip key={pkg} t={t} label={pkg} />
-                      ))}
-                    </div>
-                  )}
-              </td>
-            </tr>
-          </tbody>
-        </table>
-        <div style={actions}>
-          {pull
-            ? (
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={busy}
-                onClick={() => onPull(image.imageId)}
-              >
-                {t("pullImage")}
-              </Button>
-            )
-            : null}
-          {build
-            ? (
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={busy}
-                onClick={() => onRebuild(image.imageId)}
-              >
-                {t("build")}
-              </Button>
-            )
-            : null}
-          {rebuild
-            ? (
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={busy}
-                onClick={() => onRebuild(image.imageId)}
-              >
-                {t("rebuildImage")}
-              </Button>
-            )
-            : null}
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={busy || image.imageId === defaultImage}
-            onClick={() => onSetDefault(image.imageId)}
-          >
-            {t("setDefaultImage")}
-          </Button>
-        </div>
-      </div>
-    </DisclosureRow>
+    <div style={last ? cardBlockRow : { ...cardBlockRow, ...rowDivider }}>
+      <ImageBlock
+        t={t}
+        image={image}
+        defaultImage={defaultImage}
+        locale={locale}
+        actions={
+          <>
+            {pull
+              ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={pullPending}
+                  onClick={() => onPull(image.imageId)}
+                >
+                  {pullPending ? t("busy") : t("pullImage")}
+                </Button>
+              )
+              : null}
+            {build
+              ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={rebuildPending}
+                  onClick={() => onRebuild(image.imageId)}
+                >
+                  {rebuildPending ? t("busy") : t("build")}
+                </Button>
+              )
+              : null}
+            {rebuild
+              ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={rebuildPending}
+                  onClick={() => onRebuild(image.imageId)}
+                >
+                  {rebuildPending ? t("busy") : t("rebuildImage")}
+                </Button>
+              )
+              : null}
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={image.imageId === defaultImage}
+              onClick={() => onSetDefault(image.imageId)}
+            >
+              {t("setDefaultImage")}
+            </Button>
+          </>
+        }
+      />
+    </div>
   );
 }
 
@@ -296,24 +361,27 @@ export function ImageBuildModal(props: {
           gap: "12px",
         }}
       >
-        <Field label={t("imageId")} htmlFor={imageIdLabel}>
+        <Field label={t("imageName")} htmlFor={imageIdLabel}>
           <Input
             id={imageIdLabel}
             value={imageId}
-            onChange={(event) => onImageId(sanitizeImageId(event.target.value))}
+            onChange={(event) => onImageId(event.target.value)}
           />
           {imageId !== "" && !imageIdPattern.test(imageId)
-            ? <p style={{ ...hint, margin: 0 }}>{t("invalidImageId")}</p>
+            ? (
+              <p style={{ ...hint, margin: 0 }} role="alert">
+                {t("invalidImageId")}
+              </p>
+            )
             : null}
         </Field>
-        <Field label={t("parent")} htmlFor={parentLabel}>
+        <Field label={t("parentImage")} htmlFor={parentLabel}>
           <select
             id={parentLabel}
             style={imageSelect}
             value={parent}
             onChange={(event) => onParent(event.target.value)}
           >
-            <option value="">{t("selectImage")}</option>
             {baseImages.map((image) => (
               <option key={image.imageId} value={image.imageId}>
                 {image.imageId}
@@ -332,6 +400,7 @@ export function ImageBuildModal(props: {
             t={t}
             value={packages}
             onChange={onPackages}
+            chipsBelow
           />
         </Field>
       </div>

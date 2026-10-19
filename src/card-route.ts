@@ -32,8 +32,14 @@ import {
   defaultMountMode,
   mountKindToProto,
   mountModeToProto,
+  normalizeMountKind,
+  normalizeMountMode,
 } from "./mount-enums.js";
-import { mountInputToProto, validateMountInput } from "./mount-input.js";
+import {
+  mountInputToProto,
+  projectMountMirror,
+  validateMountInput,
+} from "./mount-input.js";
 import { unaryGuest } from "./guest-rpc.js";
 import { type WorkspaceResolver, workspaceSlug } from "./workspace-binding.js";
 import { GIT_COMMIT, VERSION } from "./generated/version.js";
@@ -110,7 +116,13 @@ function cacheCleanModeToProto(mode: string): string {
 // containerMountView and imageView rebuild the snapshot's nested objects from
 // an explicit allow-list, so a field added to the proto later cannot reach the
 // browser just because it exists on the wire (see AGENTS.md "Security").
-function containerMountView(mount: any): {
+//
+// The mount kind and mode are normalised here, at the host boundary, so every
+// snapshot carries the card's own short spelling no matter which enum spelling
+// the decode produced. A project mount's destination is implicit on the wire:
+// it is always the project path mirrored under the projects root, so the view
+// computes it rather than showing an empty field.
+export function containerMountView(mount: any, projectsRoot: string): {
   projectName: string;
   destination: string;
   kind: string;
@@ -118,11 +130,16 @@ function containerMountView(mount: any): {
   volume: string;
   secret: string;
 } {
+  const projectName = stringField(mount?.projectName);
+  const kind = normalizeMountKind(mount?.kind);
+  const destination = stringField(mount?.destination);
   return {
-    projectName: stringField(mount?.projectName),
-    destination: stringField(mount?.destination),
-    kind: stringField(mount?.kind),
-    mode: stringField(mount?.mode),
+    projectName,
+    destination: destination === "" && kind === "project" && projectName !== ""
+      ? projectMountMirror(projectsRoot, projectName)
+      : destination,
+    kind,
+    mode: normalizeMountMode(mount?.mode),
     volume: stringField(mount?.volume),
     secret: stringField(mount?.secret),
   };
@@ -306,7 +323,9 @@ export async function cardSnapshot(
         imageId: container.imageId ?? "",
         status: container.status ?? "",
         createdAt: container.createdAt ?? "",
-        mounts: (container.mounts ?? []).map(containerMountView),
+        mounts: (container.mounts ?? []).map((mount) =>
+          containerMountView(mount, resolver.getConfig().projectsRoot)
+        ),
         paths: container.paths ?? [],
         env: container.env ?? {},
         secretEnv: container.secretEnv ?? {},

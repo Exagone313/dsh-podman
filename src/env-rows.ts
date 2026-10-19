@@ -2,90 +2,106 @@
 //
 // SPDX-License-Identifier: MIT
 
-// The env editor's record transformations, kept out of the component so the
-// rules stay testable: which keys are accepted, and how an edit preserves row
-// order. A draft is the row a caller is still typing; it never reaches the
-// parent record until its key is non-empty and unused.
+// The environment and secret environment editors' row model, kept out of the
+// components so the rules stay testable: a row owns the draft, so a key that is
+// retyped — emptied, or renamed onto a name already used — keeps its place in
+// the list until the user removes it, and the parent record is derived from the
+// rows whose key is non-empty.
 
-export interface EnvDraft {
+// The order a container block lists an environment map in: by variable name,
+// case-insensitively and ascending, so a reload of the snapshot never shuffles
+// the rows. The create dialogs seed their draft in it too, so a seeded default
+// reads where the block lists it. It is display-only: an edit keeps the row
+// order the draft is given, so a staged row never moves.
+export function orderedEnvEntries(
+  env: Record<string, string>,
+): [string, string][] {
+  return Object.entries(env).sort(([left], [right]) => {
+    const a = left.toLowerCase();
+    const b = right.toLowerCase();
+    if (a !== b) return a < b ? -1 : 1;
+    // Two names that differ only by case still read in one fixed order.
+    return left < right ? -1 : left > right ? 1 : 0;
+  });
+}
+
+// orderedEnvRecord is the same order as a fresh record, so a seeded draft lists
+// its rows exactly as the container block shows them.
+export function orderedEnvRecord(
+  env: Record<string, string>,
+): Record<string, string> {
+  return Object.fromEntries(orderedEnvEntries(env));
+}
+
+// One editable variable row: the variable name and its value — the attached
+// secret's name for a secret environment variable — plus an id that keeps the
+// row's React key stable while its name is retyped, so an input is never
+// remounted mid-keystroke.
+export interface EnvEditRow {
+  id: number;
   key: string;
   value: string;
 }
 
-// One rendered row: the committed entries in order, then the pending draft.
-export interface EnvRow extends EnvDraft {
-  pending: boolean;
-}
+let nextEnvRowId = 0;
 
-export function emptyEnvDraft(): EnvDraft {
-  return { key: "", value: "" };
-}
-
-export function envRows(
-  env: Record<string, string>,
-  draft: EnvDraft | undefined,
-): EnvRow[] {
-  const rows: EnvRow[] = Object.entries(env).map(([key, value]) => ({
+// envEditRows wraps a record's entries for editing, in the order a container
+// block lists them — by variable name, case-insensitively and ascending — each
+// with its own id. This is the one place an editor builds its rows, so the
+// dialog opens in the order the block shows and no later change re-sorts them.
+export function envEditRows(env: Record<string, string>): EnvEditRow[] {
+  return orderedEnvEntries(env).map(([key, value]) => ({
+    id: nextEnvRowId++,
     key,
     value,
-    pending: false,
   }));
-  if (draft !== undefined) rows.push({ ...draft, pending: true });
-  return rows;
 }
 
-// Whether a draft's key can become a variable: non-empty and not already used.
-export function envKeyAvailable(
-  env: Record<string, string>,
-  key: string,
-): boolean {
-  return key !== "" && !Object.prototype.hasOwnProperty.call(env, key);
+// emptyEnvRow is the row an editor appends: unnamed and empty, waiting for the
+// name that makes it a variable.
+export function emptyEnvRow(): EnvEditRow {
+  return { id: nextEnvRowId++, key: "", value: "" };
 }
 
-// commitEnvDraft appends the draft to the record once its key is usable, or
-// returns undefined so the caller keeps the row open instead of inventing a
-// placeholder variable name.
-export function commitEnvDraft(
-  env: Record<string, string>,
-  draft: EnvDraft,
-): Record<string, string> | undefined {
-  if (!envKeyAvailable(env, draft.key)) return undefined;
-  return { ...env, [draft.key]: draft.value };
-}
-
-// Every mutation rebuilds the record in order, so a renamed key stays in place
-// instead of jumping to the end.
-export function renameEnvKey(
-  env: Record<string, string>,
-  index: number,
-  key: string,
+// envRecordFromRows derives the variables an editor commits from its rows: a
+// row is committed only while its key is non-empty, so a row left unnamed is
+// never applied, and a name two rows repeat commits the last of them while the
+// duplicate check refuses the apply in the meantime.
+export function envRecordFromRows(
+  rows: readonly EnvEditRow[],
 ): Record<string, string> {
-  const next: Record<string, string> = {};
-  Object.entries(env).forEach(([current, value], at) => {
-    next[at === index ? key : current] = value;
-  });
-  return next;
+  return Object.fromEntries(
+    rows.filter((row) => row.key !== "").map((row) => [row.key, row.value]),
+  );
 }
 
-export function setEnvValue(
-  env: Record<string, string>,
-  index: number,
-  value: string,
-): Record<string, string> {
-  const next: Record<string, string> = {};
-  Object.entries(env).forEach(([key, current], at) => {
-    next[key] = at === index ? value : current;
-  });
-  return next;
+// Every name a container's environment will hold, across both the environment
+// variables and the secret environment variables, each editor contributing its
+// rows as they are typed. A name is a conflict when it is empty or when it is
+// listed more than once; both end up refused by the dialog's action, so both
+// groups check the same list.
+export function conflictingEnvNames(names: readonly string[]): Set<string> {
+  const seen = new Set<string>();
+  const conflicts = new Set<string>();
+  for (const name of names) {
+    if (name === "") conflicts.add(name);
+    else if (seen.has(name)) conflicts.add(name);
+    else seen.add(name);
+  }
+  return conflicts;
 }
 
-export function removeEnvRow(
-  env: Record<string, string>,
-  index: number,
-): Record<string, string> {
-  const next: Record<string, string> = {};
-  Object.entries(env).forEach(([key, value], at) => {
-    if (at !== index) next[key] = value;
-  });
-  return next;
+// The first name the list repeats, in the order given, or undefined when every
+// name is distinct. An empty name is left to the required-name message, so the
+// duplicate message always names a real variable.
+export function firstDuplicateEnvName(
+  names: readonly string[],
+): string | undefined {
+  const seen = new Set<string>();
+  for (const name of names) {
+    if (name === "") continue;
+    if (seen.has(name)) return name;
+    seen.add(name);
+  }
+  return undefined;
 }

@@ -7,6 +7,7 @@ import type {
   DirectoryListing,
 } from "@deepseek-ai/dsh-api-workspace-controller/types";
 import { type DirectoryPickerFace } from "./directory-picker.js";
+import { COMPACT_DIALOG_CLASS } from "./container-card-dialog-styles.js";
 import { DIRECTORY_CLASS } from "./container-card-directory-styles.js";
 import { confineToRoot, crumbLabel, rootCrumbs } from "../project-path.js";
 import type { Translate } from "./locales.js";
@@ -30,12 +31,12 @@ interface Level {
 const SLOW_SCAN_DELAY_MS = 300;
 
 // The directory browser a project mount path is chosen with. Its layout mirrors
-// dsh's own directory browser — a 680x500 dialog with two Miller columns,
-// chevron breadcrumbs and 28px folder rows — and it lists through the harness's
-// own host-side picker, never a container or the orchestrator. It is confined
-// to the projects root: the breadcrumb trail starts there, the browser never
-// navigates above it, and so it can only ever produce a path a project mount
-// accepts.
+// dsh's own directory browser — two Miller columns, chevron breadcrumbs and 28px
+// folder rows — under the small dialogs' shared compact cap, and it lists through
+// the harness's own host-side picker, never a container or the orchestrator. It
+// is confined to the projects root: the breadcrumb trail starts there, the
+// browser never navigates above it, and so it can only ever produce a path a
+// project mount accepts.
 export function DirectoryPickerModal(props: {
   t: Translate;
   open: boolean;
@@ -163,7 +164,7 @@ export function DirectoryPickerModal(props: {
       open={open}
       onClose={onClose}
       title={t("browseTitle")}
-      className={DIRECTORY_CLASS}
+      className={`${DIRECTORY_CLASS} ${COMPACT_DIALOG_CLASS}`}
       headless
     >
       <div className="dsh-podman-directory-scope">

@@ -163,7 +163,7 @@ guest agent 之后，请自行重建容器：
   image**；
 - 或使用 `container_recreate`，作用于命名容器或默认容器。
 
-若要重建整个工作区，可在其行上使用 **Remove pod**（或 `RemoveWorkspace`）：pod
+若要重建整个工作区，可在其行上使用 **移除容器**（或 `RemoveWorkspace`）：pod
 及其所有容器都会被移除，下次接入时会重新创建 pod
 与默认容器。重启这两个服务绝不会触及工作区容器，上述两种操作也都不会删除卷、机密或项目数据。
 

@@ -75,10 +75,10 @@ model reads the artifact back with the container file tools instead of a host
 path the container cannot reach.
 
 A workspace's pod is torn down when its last container is removed, or directly
-through `RemoveWorkspace` (the Podman page's **Remove pod** action), which stops
-the containers' daemons, removes the pod and its containers, cleans their socket
-directories, and drops the stored workspace. Volumes, secrets, and project data
-are left untouched.
+through `RemoveWorkspace` (the Podman page's **Remove containers** action),
+which stops the containers' daemons, removes the pod and its containers, cleans
+their socket directories, and drops the stored workspace. Volumes, secrets, and
+project data are left untouched.
 
 Beyond project mounts, a container can mount named volumes (prefixed
 `DSH_PODMAN_VOLUME_PREFIX`, default `dsh-podman-`, and auto-created by podman on

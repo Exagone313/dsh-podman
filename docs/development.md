@@ -173,7 +173,7 @@ containers yourself:
   image**;
 - with `container_recreate`, for a named container or the default one.
 
-To rebuild a whole workspace instead, use **Remove pod** on its row (or
+To rebuild a whole workspace instead, use **Remove containers** on its row (or
 `RemoveWorkspace`): the pod and all its containers are removed, and the next
 attach creates the pod and its default container again. Restarting the two
 services never touches workspace containers, and neither action removes volumes,
@@ -208,8 +208,9 @@ sourcing anything:
 
 Set the commit identity once on the Podman page (sidebar **Plugins** panel →
 **Installed** → **dsh-podman**) under
-[Default environment](configuration.md#default-environment) → **Git identity**,
-so containers get `GIT_AUTHOR_*`/`GIT_COMMITTER_*` without a `~/.gitconfig`.
+[Default environment variables](configuration.md#default-environment-variables)
+→ **Git identity**, so containers get `GIT_AUTHOR_*`/`GIT_COMMITTER_*` without a
+`~/.gitconfig`.
 
 The prompt applies all of this from inside dsh and can be pasted again to repair
 a workspace. Podman stores managed volumes with `DSH_PODMAN_VOLUME_PREFIX`

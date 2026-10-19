@@ -8,19 +8,54 @@ import {
   type MountInput,
   type WorkspaceView,
 } from "./container-card-controller.js";
-import { EnvEditor, MountsEditor } from "./container-card-editors.js";
+import { configsEqual, type ContainerConfig } from "./container-card-config.js";
+import { ContainerDialog } from "./container-card-dialog.js";
+import { ContainerForm } from "./container-card-form.js";
 import { type DirectoryPickerFace } from "./directory-picker.js";
-import { type PathEntry, PathsList } from "./container-card-paths.js";
-import { Field, namePattern, sanitizeName } from "./container-card-shared.js";
-import {
-  greyId,
-  hint,
-  imageSelect,
-  sectionTitle,
-} from "./container-card-styles.js";
-import type { Translate } from "./locales.js";
-import { Button, Input, Modal } from "@deepseek-ai/dsh-client-ui-primitives";
-import { type ReactNode, useEffect, useId, useState } from "react";
+import { DiscardChangesModal, namePattern } from "./container-card-shared.js";
+import { mergeDefaultEnv } from "../container-env.js";
+import { orderedEnvRecord } from "../env-rows.js";
+import { type Translate, type Translation } from "./locales.js";
+import { Button } from "@deepseek-ai/dsh-client-ui-primitives";
+import { type ReactNode, useEffect, useRef, useState } from "react";
+
+// The one name the orchestrator reserves for a workspace's default container.
+const DEFAULT_CONTAINER_NAME = "default";
+
+// The project mount every new container starts with; it is the pristine mount
+// the draft is compared against for its dirty state.
+function initialMounts(workspace: WorkspaceView): MountInput[] {
+  return [
+    {
+      kind: "project",
+      project: workspace.projectName,
+      destination: "",
+      mode: "read_write",
+      volume: "",
+      secret: "",
+    },
+  ];
+}
+
+// The draft an Add/Create dialog opens on: the workspace's image (or the
+// configured default), its own project mount, and the workspace's default
+// environment. The defaults are seeded so the values a new container inherits
+// are visible: a value left alone keeps the default, and an edited one is sent
+// as that container's own.
+function initialConfig(
+  workspace: WorkspaceView,
+  defaultImage: string,
+  defaultEnv: Record<string, string>,
+): ContainerConfig {
+  return {
+    image: workspace.imageId || defaultImage,
+    env: orderedEnvRecord(mergeDefaultEnv(defaultEnv, undefined)),
+    mounts: initialMounts(workspace),
+    paths: [],
+    secretEnv: {},
+    ports: [],
+  };
+}
 
 export function CreateContainerModal(props: {
   t: Translate;
@@ -29,13 +64,22 @@ export function CreateContainerModal(props: {
   volumes: readonly { name: string }[];
   secrets: readonly { name: string }[];
   busy: boolean;
+  writable: boolean;
   defaultImage: string;
+  // The workspace's default environment variables, seeded into the draft so the
+  // values a new container inherits are visible and editable.
+  defaultEnv: Record<string, string>;
   projectsRoot: string;
   directoryPicker?: DirectoryPickerFace;
   named: boolean;
   existing: readonly string[];
+  // Whether the snapshot knows the port-publishing gateway is missing or
+  // incompatible, so the Published ports group says so instead of staging a
+  // port that cannot be published.
+  gatewayUnavailable: boolean;
   open: boolean;
   onClose: () => void;
+  onCreateSecret: (name: string, length?: number, charset?: string) => void;
   onCreate: (container: string, config: ContainerCreateConfig) => void;
 }): ReactNode {
   const {
@@ -45,256 +89,176 @@ export function CreateContainerModal(props: {
     volumes,
     secrets,
     busy,
+    writable,
     defaultImage,
+    defaultEnv,
     projectsRoot,
     directoryPicker,
     named,
     existing,
+    gatewayUnavailable,
     open,
     onClose,
+    onCreateSecret,
     onCreate,
   } = props;
-  const [image, setImage] = useState(workspace.imageId || defaultImage);
+  const [draft, setDraft] = useState<ContainerConfig>(() =>
+    initialConfig(workspace, defaultImage, defaultEnv)
+  );
   const [name, setName] = useState("");
-  const [env, setEnv] = useState<Record<string, string>>({});
-  const [mounts, setMounts] = useState<MountInput[]>(() => [
-    {
-      kind: "project",
-      project: workspace.projectName,
-      destination: "",
-      mode: "read_write",
-      volume: "",
-      secret: "",
-    },
-  ]);
-  const [secretEnv, setSecretEnv] = useState<Record<string, string>>({});
-  const [paths, setPaths] = useState<PathEntry[]>([]);
-  const [attachSecret, setAttachSecret] = useState("");
-  const [attachVar, setAttachVar] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const imageLabel = useId();
-  const nameLabel = useId();
+  const [confirmClose, setConfirmClose] = useState(false);
+  // A row the editors flagged as conflicting — unnamed or named twice — refuses
+  // the create; the footer says why until it is fixed or removed.
+  const [blockingError, setBlockingError] = useState<Translation | undefined>(
+    undefined,
+  );
+  // The dialog owns one draft for as long as it stays open. A snapshot refresh
+  // (a command settling, a secret created on top of this dialog) hands down new
+  // workspace and image objects, and adopting them then would drop every field
+  // the user has already typed; the draft is reset when the dialog opens, and
+  // only then.
+  const initialized = useRef(false);
   useEffect(() => {
-    if (!open) return;
-    setImage(workspace.imageId || defaultImage);
+    if (!open) {
+      initialized.current = false;
+      return;
+    }
+    if (initialized.current) return;
+    initialized.current = true;
+    setDraft(initialConfig(workspace, defaultImage, defaultEnv));
     setName("");
-    setEnv({});
-    setMounts([
-      {
-        kind: "project",
-        project: workspace.projectName,
-        destination: "",
-        mode: "read_write",
-        volume: "",
-        secret: "",
-      },
-    ]);
-    setSecretEnv({});
-    setPaths([]);
-    setAttachSecret("");
-    setAttachVar("");
     setSubmitting(false);
-  }, [open, workspace, defaultImage]);
-  const baseImages = images.filter((image) => image.isBase);
-  const customImages = images.filter((image) => !image.isBase);
-  const candidates = [
-    ...baseImages.map((image) => image.imageId),
-    ...customImages.map((image) => image.imageId),
-  ];
+    setConfirmClose(false);
+  }, [open, workspace, defaultImage, defaultEnv]);
+  const pristine = initialConfig(workspace, defaultImage, defaultEnv);
+  const reservedName = name === DEFAULT_CONTAINER_NAME;
   const nameTaken = existing.includes(name);
-  const validName = namePattern.test(name) && name !== "default" && !nameTaken;
-  const canCreate = !named || validName;
+  const namePatternOk = namePattern.test(name);
+  const nameValid = namePatternOk && !reservedName && !nameTaken;
+  // The name it already refuses: reserved, taken, or outside the allowed
+  // character set. Naming the rule is what lets the user fix it in place.
+  const nameError = name === ""
+    ? ""
+    : reservedName
+    ? t("containerNameReserved")
+    : nameTaken
+    ? t("containerNameTaken")
+    : namePatternOk
+    ? ""
+    : t("invalidContainerName");
+  const canCreate = !named || nameValid;
+  // Anything typed or picked since the dialog opened makes closing lose the
+  // draft, so the close is routed through the discard confirmation.
+  const dirty = name !== "" || !configsEqual(draft, pristine);
+  const requestClose = (): void => {
+    if (dirty) setConfirmClose(true);
+    else onClose();
+  };
+  const discardAndClose = (): void => {
+    setConfirmClose(false);
+    onClose();
+  };
   const submit = (): void => {
     if (!canCreate || submitting) return;
     setSubmitting(true);
     onCreate(named ? name : "", {
-      image,
-      env,
-      mounts,
-      paths: paths.map((entry) => entry.path).filter((path) => path !== ""),
-      secretEnv,
+      image: draft.image,
+      env: draft.env,
+      mounts: [...draft.mounts],
+      paths: draft.paths.map((path) => path.trim()).filter((path) =>
+        path !== ""
+      ),
+      secretEnv: draft.secretEnv,
+      ports: [...draft.ports],
     });
   };
-  const attach = (): void => {
-    const envVar = attachVar.trim();
-    if (envVar === "" || attachSecret === "") return;
-    setSecretEnv({ ...secretEnv, [envVar]: attachSecret });
-    setAttachVar("");
-  };
   return (
-    <Modal
-      open={open}
-      onClose={onClose}
-      title={named ? t("addContainer") : t("createContainer")}
-      closeLabel={t("cancel")}
-      footer={
-        <>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={onClose}
-          >
-            {t("cancel")}
-          </Button>
-          <Button
-            variant="primary"
-            size="sm"
-            disabled={!canCreate || submitting}
-            onClick={submit}
-          >
-            {named ? t("addContainer") : t("createContainer")}
-          </Button>
-        </>
-      }
-    >
-      <div
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          gap: "12px",
-        }}
+    <>
+      <ContainerDialog
+        t={t}
+        open={open}
+        title={named ? t("addContainer") : t("createContainer")}
+        onClose={requestClose}
+        marker={blockingError === undefined
+          ? undefined
+          : t(blockingError.key, blockingError.params)}
+        markerError={blockingError !== undefined}
+        actions={
+          <>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={requestClose}
+            >
+              {t("cancel")}
+            </Button>
+            <Button
+              variant="primary"
+              size="sm"
+              disabled={!canCreate || submitting || blockingError !== undefined}
+              onClick={submit}
+            >
+              {named ? t("addContainer") : t("createContainer")}
+            </Button>
+          </>
+        }
       >
-        <Field label={t("image")} htmlFor={imageLabel}>
-          <select
-            id={imageLabel}
-            style={imageSelect}
-            value={image}
-            disabled={busy}
-            onChange={(event) => setImage(event.target.value)}
-          >
-            {candidates.length === 0
-              ? <option value="">{t("none")}</option>
-              : null}
-            {candidates.map((imageId) => (
-              <option key={imageId} value={imageId}>
-                {imageId}
-              </option>
-            ))}
-          </select>
-        </Field>
-        {named
-          ? (
-            <Field label={t("containerName")} htmlFor={nameLabel}>
-              <Input
-                id={nameLabel}
-                value={name}
-                disabled={busy}
-                onChange={(event) => setName(sanitizeName(event.target.value))}
-              />
-              {name !== "" && !validName
-                ? (
-                  <p style={{ ...hint, margin: 0 }}>
-                    {nameTaken
-                      ? t("containerNameTaken")
-                      : t("invalidContainerName")}
-                  </p>
-                )
-                : null}
-            </Field>
-          )
-          : null}
-        <div style={sectionTitle}>{t("envTitle")}</div>
-        <EnvEditor t={t} env={env} busy={busy} onChange={setEnv} />
-        <div style={sectionTitle}>{t("mountsTitle")}</div>
-        <MountsEditor
+        <ContainerForm
           t={t}
-          mounts={mounts}
+          image={draft.image}
+          env={draft.env}
+          mounts={draft.mounts}
+          paths={draft.paths}
+          secretEnv={draft.secretEnv}
+          ports={draft.ports}
+          images={images}
           volumes={volumes}
           secrets={secrets}
           busy={busy}
           enabled={!busy}
+          canPublish={!busy && !gatewayUnavailable}
+          gatewayUnavailable={gatewayUnavailable}
+          writable={writable}
           projectsRoot={projectsRoot}
           directoryPicker={directoryPicker}
-          modeControl="select"
-          onAdd={(mount) => setMounts([...mounts, mount])}
-          onRemove={(mount) =>
-            setMounts(mounts.filter((item) => item !== mount))}
-          onUpdate={(updated, index) =>
-            setMounts(
-              mounts.map((item, at) => (at === index ? updated : item)),
-            )}
+          mainProject={workspace.projectName}
+          // The workspace's default container always keeps its main project
+          // mount, so Create greys out its Remove; a named container (Add) keeps
+          // the mounts it was given, the seeded project one included.
+          primaryProject={named ? "" : workspace.projectName}
+          onCreateSecret={onCreateSecret}
+          onChangeImage={(image) => setDraft({ ...draft, image })}
+          onChangeEnv={(env) => setDraft({ ...draft, env })}
+          onChangeMounts={(mounts) => setDraft({ ...draft, mounts })}
+          onChangePaths={(paths) => setDraft({ ...draft, paths })}
+          onChangeSecretEnv={(secretEnv) => setDraft({ ...draft, secretEnv })}
+          onChangePorts={(ports) => setDraft({ ...draft, ports })}
+          onBlockingError={setBlockingError}
+          name={named
+            ? {
+              value: name,
+              error: nameError,
+              readOnly: false,
+              disabled: busy,
+              onChange: setName,
+            }
+            : {
+              /* The workspace's default container is created under its one
+                 reserved name, so the group states it instead of offering it. */
+              value: DEFAULT_CONTAINER_NAME,
+              error: "",
+              readOnly: true,
+              disabled: false,
+            }}
         />
-        <div style={sectionTitle}>{t("pathsTitle")}</div>
-        <PathsList t={t} entries={paths} busy={busy} onChange={setPaths} />
-        <div style={sectionTitle}>{t("containerSecretsTitle")}</div>
-        {Object.entries(secretEnv).map(([envVar, secretName]) => (
-          <div
-            key={envVar}
-            style={{
-              display: "flex",
-              flexWrap: "wrap",
-              alignItems: "center",
-              gap: "8px",
-            }}
-          >
-            <code
-              style={{
-                ...greyId,
-                flex: 1,
-                fontSize: "13px",
-                color: "var(--dsw-alias-label-primary)",
-              }}
-            >
-              {envVar}={secretName}
-            </code>
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={busy}
-              onClick={() => {
-                const next = { ...secretEnv };
-                delete next[envVar];
-                setSecretEnv(next);
-              }}
-            >
-              {t("remove")}
-            </Button>
-          </div>
-        ))}
-        <div
-          style={{
-            display: "flex",
-            flexWrap: "wrap",
-            alignItems: "center",
-            gap: "8px",
-          }}
-        >
-          <select
-            style={imageSelect}
-            value={attachSecret}
-            disabled={busy}
-            onChange={(event) => setAttachSecret(event.target.value)}
-            aria-label={t("attachSecret")}
-          >
-            {secrets.length === 0
-              ? <option value="">{t("none")}</option>
-              : null}
-            {secrets.map((secret) => (
-              <option key={secret.name} value={secret.name}>
-                {secret.name}
-              </option>
-            ))}
-          </select>
-          <Input
-            value={attachVar}
-            disabled={busy}
-            placeholder={t("secretEnvName")}
-            onChange={(event) => setAttachVar(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === "Enter") attach();
-            }}
-            style={{ width: "200px" }}
-          />
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={busy || attachVar.trim() === "" || attachSecret === ""}
-            onClick={attach}
-          >
-            {t("attachSecret")}
-          </Button>
-        </div>
-      </div>
-    </Modal>
+      </ContainerDialog>
+      <DiscardChangesModal
+        t={t}
+        open={confirmClose}
+        onCancel={() => setConfirmClose(false)}
+        onDiscard={discardAndClose}
+      />
+    </>
   );
 }

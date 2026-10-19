@@ -47,6 +47,55 @@ export type CommandOp =
   | "default_env_sync"
   | "cache_clean";
 
+// The stable identity of one in-flight command: its operation plus the
+// identifiers it acts on, e.g. "remove:team:default" or "volume_create:data".
+// The controller keys its in-flight set with these builders and every control
+// looks its own command up in CardState.pendingActions, so both halves must
+// derive the key the same way. Identifiers never contain ":" (container and
+// volume names, workspace slugs, cache modes), while an image id may, which is
+// why keys are only ever compared whole.
+export function containerActionKey(
+  op: CommandOp,
+  workspace: string,
+  container: string,
+): string {
+  return `${op}:${workspace}:${container}`;
+}
+
+export function scopedActionKey(op: CommandOp, scope: string): string {
+  return `${op}:${scope}`;
+}
+
+export function bareActionKey(op: CommandOp): string {
+  return op;
+}
+
+// The operations keyed by containerActionKey(op, workspace, container), so a
+// container row can tell whether any command on its own container is in flight.
+const CONTAINER_OPS: readonly CommandOp[] = [
+  "remove",
+  "recreate",
+  "create",
+  "container_mount_add",
+  "container_mount_remove",
+  "container_mount_update",
+  "container_path_set",
+  "container_secret_add",
+  "container_secret_remove",
+  "container_publish_port",
+  "container_unpublish_port",
+];
+
+export function containerActionPending(
+  pendingActions: readonly string[],
+  workspace: string,
+  container: string,
+): boolean {
+  return CONTAINER_OPS.some((op) =>
+    pendingActions.includes(containerActionKey(op, workspace, container))
+  );
+}
+
 export interface CommandRequest {
   op: CommandOp;
   workspace: string;
@@ -65,15 +114,15 @@ export interface CommandRequest {
   secretEnv: Record<string, string>;
   cacheMode: string;
   mount: MountInput | null;
-  // The pod port a publish/unpublish command names, its transport, and the host
+  // The container port a publish/unpublish command names, its transport, and the host
   // port to prefer (0 asks the gateway to choose a free one).
   port: number;
   protocol: string;
   suggestedHostPort: number;
 }
 
-// A published pod port as the card renders it: the endpoint the gateway chose
-// plus the parts it was built from.
+// A published container port as the card renders it: the endpoint the gateway
+// chose plus the parts it was built from.
 export interface PublishedPortView {
   protocol: string;
   port: number;

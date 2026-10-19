@@ -3,140 +3,136 @@
 // SPDX-License-Identifier: MIT
 
 import {
-  ConfirmButton,
+  DiscardChangesModal,
   emptyMount,
-  Field,
-  mountLabel,
+  EnvRow,
+  MountRow,
+  orderedMounts,
 } from "./container-card-shared.js";
-import { greyId, imageSelect } from "./container-card-styles.js";
+import { imageSelect } from "./container-card-styles.js";
+import { ROW_LIST_CLASS } from "./container-card-table-styles.js";
+import { mountInputsEqual, recordsEqual } from "./container-card-config.js";
 import { type MountInput } from "./container-card-controller.js";
 import { DirectoryPickerModal } from "./container-card-directory.js";
 import { type DirectoryPickerFace } from "./directory-picker.js";
-import { forcedMountMode } from "../mount-enums.js";
 import {
-  commitEnvDraft,
-  emptyEnvDraft,
-  type EnvDraft,
-  envRows,
-  removeEnvRow,
-  renameEnvKey,
-  setEnvValue,
+  conflictingEnvNames,
+  emptyEnvRow,
+  type EnvEditRow,
+  envEditRows,
+  envRecordFromRows,
+  firstDuplicateEnvName,
 } from "../env-rows.js";
 import {
   hostPathForProjectName,
   projectNameFromHostPath,
 } from "../project-path.js";
-import type { Translate } from "./locales.js";
-import { Button, Input, Modal } from "@deepseek-ai/dsh-client-ui-primitives";
-import { type ReactNode, useId, useRef, useState } from "react";
-
-// One stable key per env row, so renaming a variable does not remount the row
-// and drop focus mid-keystroke. The parent keeps env as a record; rows are
-// positional, so the id list is aligned by index.
-let nextEnvId = 0;
+import type { Translate, Translation } from "./locales.js";
+import { Button, Modal } from "@deepseek-ai/dsh-client-ui-primitives";
+import { type ReactNode, useEffect, useMemo, useState } from "react";
 
 export function EnvEditor(props: {
   t: Translate;
   env: Record<string, string>;
   busy: boolean;
   onChange: (env: Record<string, string>) => void;
+  // Reports the message a conflicting row raises — a key that has gone empty, or
+  // a name used twice — or undefined once none blocks it, so the dialog's footer
+  // can refuse to apply it and say why.
+  onBlockingError?: (error: Translation | undefined) => void;
+  // The other group's variable names, the secret environment variables including
+  // the row that editor is still typing, so a name used in both groups counts as
+  // a duplicate here too.
+  otherNames?: readonly string[];
+  // Reports the variable names this editor holds — every named row and the
+  // unnamed row it is still typing — so the other group's editor catches a name
+  // used in both groups before either row is applied.
+  onNames?: (names: readonly string[]) => void;
 }): ReactNode {
-  const { t, env, busy, onChange } = props;
-  // The row being typed: it becomes a record entry only once its key is a real,
-  // unused variable name, so an abandoned Add cannot apply a placeholder.
-  const [draft, setDraft] = useState<EnvDraft | undefined>(undefined);
-  const rows = envRows(env, draft);
-  const idsRef = useRef<number[]>([]);
-  if (idsRef.current.length !== rows.length) {
-    const ids = idsRef.current.slice(0, rows.length);
-    while (ids.length < rows.length) ids.push(nextEnvId++);
-    idsRef.current = ids;
+  const { t, env, busy, onChange, onBlockingError, otherNames, onNames } =
+    props;
+  // The rows are the editor's own: a row keeps its place while its key is
+  // retyped, so clearing a key never drops the row — it stays, red, until its
+  // own Remove — and renaming one onto a name another row already holds keeps
+  // both rows. The parent's record is derived from the named rows alone, so an
+  // unnamed row is never applied.
+  const [rows, setRows] = useState<EnvEditRow[]>(() => envEditRows(env));
+  // A parent record that no longer matches what these rows derive is an outside
+  // change — the snapshot resynced after an apply — so the rows are rebuilt
+  // from it instead of echoing the ones it replaced.
+  if (!recordsEqual(env, envRecordFromRows(rows))) {
+    setRows(envEditRows(env));
   }
-  const commitDraft = (): void => {
-    if (draft === undefined) return;
-    if (draft.key === "") {
-      // An untouched row is dropped rather than kept as an empty entry.
-      setDraft(undefined);
-      return;
-    }
-    const committed = commitEnvDraft(env, draft);
-    // A duplicate key keeps the row open so the caller can fix it.
-    if (committed === undefined) return;
-    setDraft(undefined);
-    onChange(committed);
+  // Every name this group holds — the rows as they are typed — then the other
+  // group's. A name that is empty or listed twice is a conflict, recomputed
+  // from the current rows on every change, so emptying a key or repeating one
+  // blocks the apply again immediately.
+  const names = useMemo(() => rows.map((row) => row.key), [rows]);
+  const conflicts = conflictingEnvNames([...names, ...(otherNames ?? [])]);
+  const duplicate = firstDuplicateEnvName([...names, ...(otherNames ?? [])]);
+  const keyMissing = names.includes("");
+  useEffect(() => {
+    onBlockingError?.(
+      keyMissing
+        ? { key: "envNameRequired" }
+        : duplicate === undefined
+        ? undefined
+        : { key: "envNameDuplicate", params: { key: duplicate } },
+    );
+  }, [keyMissing, duplicate, onBlockingError]);
+  useEffect(() => {
+    onNames?.(names);
+  }, [names, onNames]);
+  // The row the user appended, which focuses itself as it opens.
+  const [focusId, setFocusId] = useState<number | undefined>(undefined);
+  const update = (next: EnvEditRow[]): void => {
+    setRows(next);
+    onChange(envRecordFromRows(next));
   };
-  const updateKey = (index: number, key: string): void => {
-    const row = rows[index];
-    if (row.pending) {
-      setDraft({ key, value: row.value });
-      return;
-    }
-    onChange(renameEnvKey(env, index, key));
+  const updateKey = (id: number, key: string): void => {
+    update(rows.map((row) => (row.id === id ? { ...row, key } : row)));
   };
-  const updateValue = (index: number, value: string): void => {
-    const row = rows[index];
-    if (row.pending) {
-      setDraft({ key: row.key, value });
-      return;
-    }
-    onChange(setEnvValue(env, index, value));
+  const updateValue = (id: number, value: string): void => {
+    update(rows.map((row) => (row.id === id ? { ...row, value } : row)));
   };
-  const remove = (index: number): void => {
-    if (rows[index]?.pending === true) {
-      setDraft(undefined);
-      return;
-    }
-    onChange(removeEnvRow(env, index));
+  const remove = (id: number): void => {
+    if (id === focusId) setFocusId(undefined);
+    update(rows.filter((row) => row.id !== id));
   };
   const add = (): void => {
-    setDraft((current) => current ?? emptyEnvDraft());
+    const row = emptyEnvRow();
+    setFocusId(row.id);
+    update([...rows, row]);
   };
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-      {rows.map((row, index) => (
-        <div
-          key={idsRef.current[index]}
-          style={{
-            display: "flex",
-            flexWrap: "wrap",
-            alignItems: "center",
-            gap: "8px",
-          }}
-        >
-          <Input
-            value={row.key}
-            disabled={busy}
-            placeholder={t("envKey")}
-            aria-label={t("envKey")}
-            autoFocus={row.pending}
-            onChange={(event) => updateKey(index, event.target.value)}
-            onBlur={row.pending ? commitDraft : undefined}
-            onKeyDown={row.pending
-              ? (event) => {
-                if (event.key === "Enter") commitDraft();
-              }
-              : undefined}
-            style={{ width: "160px" }}
-          />
-          <Input
+    <div
+      className={ROW_LIST_CLASS}
+      style={{ display: "flex", flexDirection: "column", gap: "12px" }}
+    >
+      {rows.map((row) => {
+        // The row's Remove is named after the variable it removes, so a screen
+        // reader (and a row that has wrapped) never has to guess which row it
+        // belongs to; a still-unnamed row falls back to the plain wording.
+        const removeLabel = row.key === ""
+          ? t("removeEnv")
+          : t("removeVariable", { key: row.key });
+        return (
+          <EnvRow
+            key={row.id}
+            t={t}
+            mode="edit"
+            name={row.key}
             value={row.value}
             disabled={busy}
-            placeholder={t("envValue")}
-            aria-label={t("envValue")}
-            onChange={(event) => updateValue(index, event.target.value)}
-            onBlur={row.pending ? commitDraft : undefined}
-            style={{ width: "200px" }}
+            autoFocus={row.id === focusId}
+            keyInvalid={conflicts.has(row.key)}
+            onChangeName={(key) => updateKey(row.id, key)}
+            onChangeValue={(value) => updateValue(row.id, value)}
+            onRemove={() => remove(row.id)}
+            removeLabel={removeLabel}
           />
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={busy}
-            onClick={() => remove(index)}
-          >
-            {t("removeEnv")}
-          </Button>
-        </div>
-      ))}
+        );
+      })}
       <div>
         <Button
           variant="outline"
@@ -149,6 +145,15 @@ export function EnvEditor(props: {
       </div>
     </div>
   );
+}
+
+// The destination a mount row shows for a mount: a project mount's derived
+// mirror under the projects root, or the destination the other kinds carry.
+function mountDestination(mount: MountInput, projectsRoot: string): string {
+  if (mount.kind !== "project") return mount.destination;
+  return mount.project.trim() === ""
+    ? ""
+    : hostPathForProjectName(projectsRoot, mount.project);
 }
 
 export function MountsEditor(props: {
@@ -165,13 +170,12 @@ export function MountsEditor(props: {
   // none, which hides the browse affordance.
   directoryPicker?: DirectoryPickerFace;
   confirmRemove?: boolean;
-  // How each mount's mode is presented: the live-container remount control
-  // (with its confirmation), or an inline dropdown with no confirmation, used
-  // where the container does not exist yet (the create/add-container modal).
-  modeControl?: "remount" | "select";
-  // The default container's primary project mount: it cannot be removed, so it
-  // offers only the remount control.
+  // The default container's primary project mount: it cannot be removed, so
+  // its Remove is greyed out and disabled in place of the action.
   primaryProject?: string;
+  // The workspace's own project mount, listed first in the editor and by the
+  // project it carries.
+  mainProject?: string;
   onAdd: (mount: MountInput) => void;
   onRemove: (mount: MountInput) => void;
   onUpdate?: (mount: MountInput, index: number) => void;
@@ -186,8 +190,8 @@ export function MountsEditor(props: {
     projectsRoot,
     directoryPicker,
     confirmRemove,
-    modeControl = "remount",
     primaryProject = "",
+    mainProject = "",
     onAdd,
     onRemove,
     onUpdate,
@@ -195,15 +199,21 @@ export function MountsEditor(props: {
   const [adding, setAdding] = useState(false);
   const [browsing, setBrowsing] = useState(false);
   const [browseError, setBrowseError] = useState("");
+  const [confirmClose, setConfirmClose] = useState(false);
   const [draft, setDraft] = useState<MountInput>(emptyMount());
-  const mountKindId = useId();
-  const mountProjectId = useId();
-  const mountDestinationId = useId();
-  const mountModeId = useId();
-  const mountVolumeId = useId();
-  const mountSecretId = useId();
   const updateDraft = (patch: Partial<MountInput>): void => {
     setDraft((prev) => ({ ...prev, ...patch }));
+  };
+  // Picking a kind is not an edit; anything typed into the pristine kind's
+  // fields is, and closing then would lose it.
+  const dirty = !mountInputsEqual(draft, emptyMount(draft.kind));
+  const requestClose = (): void => {
+    if (dirty) setConfirmClose(true);
+    else setAdding(false);
+  };
+  const discardAndClose = (): void => {
+    setConfirmClose(false);
+    setAdding(false);
   };
   const canAdd = draft.kind === "project"
     ? draft.project.trim() !== ""
@@ -215,6 +225,7 @@ export function MountsEditor(props: {
   const openAdd = (): void => {
     setDraft(emptyMount());
     setBrowseError("");
+    setConfirmClose(false);
     setAdding(true);
   };
   const submit = (): void => {
@@ -222,247 +233,43 @@ export function MountsEditor(props: {
     onAdd(draft);
     setAdding(false);
   };
-  const kindField = draft.kind === "tmpfs"
-    ? (
-      <Field label={t("mountDestination")} htmlFor={mountDestinationId}>
-        <Input
-          id={mountDestinationId}
-          value={draft.destination}
-          disabled={busy}
-          onChange={(event) => updateDraft({ destination: event.target.value })}
-        />
-      </Field>
-    )
-    : draft.kind === "volume"
-    ? (
-      <>
-        <Field label={t("mountVolume")} htmlFor={mountVolumeId}>
-          <select
-            id={mountVolumeId}
-            style={imageSelect}
-            value={draft.volume}
-            disabled={busy}
-            onChange={(event) => updateDraft({ volume: event.target.value })}
-          >
-            {volumes.length === 0
-              ? <option value="">{t("none")}</option>
-              : null}
-            {volumes.map((volume) => (
-              <option key={volume.name} value={volume.name}>
-                {volume.name}
-              </option>
-            ))}
-          </select>
-        </Field>
-        <Field label={t("mountDestination")} htmlFor={mountDestinationId}>
-          <Input
-            id={mountDestinationId}
-            value={draft.destination}
-            disabled={busy}
-            onChange={(event) =>
-              updateDraft({ destination: event.target.value })}
-          />
-        </Field>
-        <Field label={t("mountMode")} htmlFor={mountModeId}>
-          <select
-            id={mountModeId}
-            style={imageSelect}
-            value={draft.mode}
-            disabled={busy}
-            onChange={(event) => updateDraft({ mode: event.target.value })}
-          >
-            <option value="read_only">{t("readOnly")}</option>
-            <option value="read_write">{t("readWrite")}</option>
-          </select>
-        </Field>
-      </>
-    )
-    : draft.kind === "secret"
-    ? (
-      <>
-        <Field label={t("mountSecret")} htmlFor={mountSecretId}>
-          <select
-            id={mountSecretId}
-            style={imageSelect}
-            value={draft.secret}
-            disabled={busy}
-            onChange={(event) => updateDraft({ secret: event.target.value })}
-          >
-            {secrets.length === 0
-              ? <option value="">{t("none")}</option>
-              : null}
-            {secrets.map((secret) => (
-              <option key={secret.name} value={secret.name}>
-                {secret.name}
-              </option>
-            ))}
-          </select>
-        </Field>
-        <Field label={t("mountDestination")} htmlFor={mountDestinationId}>
-          <Input
-            id={mountDestinationId}
-            value={draft.destination}
-            disabled={busy}
-            onChange={(event) =>
-              updateDraft({ destination: event.target.value })}
-          />
-        </Field>
-      </>
-    )
-    : (
-      <>
-        <Field label={t("mountProjectPath")} htmlFor={mountProjectId}>
-          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-            <Input
-              id={mountProjectId}
-              value={draft.project}
-              disabled={busy}
-              onChange={(event) => updateDraft({ project: event.target.value })}
-            />
-            {directoryPicker !== undefined
-              ? (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={busy}
-                  onClick={() => {
-                    setBrowseError("");
-                    setBrowsing(true);
-                  }}
-                >
-                  {t("browse")}
-                </Button>
-              )
-              : null}
-          </div>
-        </Field>
-        {browseError === ""
-          ? null
-          : (
-            <p style={{ margin: 0, fontSize: "13px" }} role="alert">
-              {browseError}
-            </p>
-          )}
-        <Field label={t("mountMode")} htmlFor={mountModeId}>
-          <select
-            id={mountModeId}
-            style={imageSelect}
-            value={draft.mode}
-            disabled={busy}
-            onChange={(event) => updateDraft({ mode: event.target.value })}
-          >
-            <option value="read_only">{t("readOnly")}</option>
-            <option value="read_write">{t("readWrite")}</option>
-          </select>
-        </Field>
-      </>
-    );
+  // The destination a project mount lands at: its project path mirrored under
+  // the projects root, which the host computes and the editor previews. The
+  // field stays read-only, since a project mount never takes a destination.
+  const projectDestination = draft.project.trim() === ""
+    ? ""
+    : hostPathForProjectName(projectsRoot, draft.project);
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-      {mounts.map((mount, index) => {
-        const nextMode = mount.mode === "read_write"
-          ? "read_only"
-          : "read_write";
-        const forced = forcedMountMode(mount.kind);
-        const editable = mount.kind === "project" || mount.kind === "volume";
+    <div
+      className={ROW_LIST_CLASS}
+      style={{ display: "flex", flexDirection: "column", gap: "8px" }}
+    >
+      {orderedMounts(mounts, mainProject).map(({ mount, index }) => {
         const removable = mount.kind !== "project" ||
           primaryProject === "" ||
           mount.project !== primaryProject;
+        const update = (patch: Partial<MountInput>): void => {
+          onUpdate?.({ ...mount, ...patch }, index);
+        };
         return (
-          <div
-            // Mounts carry no id and duplicates are legal (two identical
-            // project mounts, empty tmpfs destinations), so the positional
-            // index is the only collision-free key here.
+          <MountRow
+            // A mount keeps the index it has in the draft as its key, so a
+            // category change reorders the list without remounting the row.
             key={index}
-            style={{
-              display: "flex",
-              flexWrap: "wrap",
-              alignItems: "center",
-              gap: "8px",
-            }}
-          >
-            <code
-              style={{
-                ...greyId,
-                flex: 1,
-                fontSize: "13px",
-                color: "var(--dsw-alias-label-primary)",
-              }}
-            >
-              {mountLabel(t, mount, modeControl !== "select")}
-            </code>
-            {modeControl === "select" && (editable || forced !== undefined)
-              ? (
-                <select
-                  style={imageSelect}
-                  value={forced ?? mount.mode}
-                  disabled={!enabled || forced !== undefined}
-                  aria-label={t("mountMode")}
-                  onChange={(event) =>
-                    onUpdate?.({ ...mount, mode: event.target.value }, index)}
-                >
-                  {forced !== undefined
-                    ? (
-                      <option value={forced}>
-                        {forced === "read_write"
-                          ? t("readWrite")
-                          : t("readOnly")}
-                      </option>
-                    )
-                    : (
-                      <>
-                        <option value="read_only">{t("readOnly")}</option>
-                        <option value="read_write">{t("readWrite")}</option>
-                      </>
-                    )}
-                </select>
-              )
-              : null}
-            {modeControl === "remount" && editable && onUpdate !== undefined &&
-              (
-                <ConfirmButton
-                  t={t}
-                  label={nextMode === "read_only"
-                    ? t("remountReadOnly")
-                    : t("remountReadWrite")}
-                  title={t("confirmTitle")}
-                  description={nextMode === "read_only"
-                    ? t("confirmRemountReadOnly", {
-                      mount: mountLabel(t, mount, false),
-                    })
-                    : t("confirmRemountReadWrite", {
-                      mount: mountLabel(t, mount, false),
-                    })}
-                  disabled={!enabled}
-                  onConfirm={() =>
-                    onUpdate({ ...mount, mode: nextMode }, index)}
-                />
-              )}
-            {removable &&
-              (confirmRemove
-                ? (
-                  <ConfirmButton
-                    t={t}
-                    label={t("remove")}
-                    title={t("confirmTitle")}
-                    description={t("confirmRemoveMount", {
-                      mount: mountLabel(t, mount, false),
-                    })}
-                    disabled={!enabled}
-                    onConfirm={() => onRemove(mount)}
-                  />
-                )
-                : (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={!enabled}
-                    onClick={() => onRemove(mount)}
-                  >
-                    {t("remove")}
-                  </Button>
-                ))}
-          </div>
+            t={t}
+            mode="edit"
+            mount={mount}
+            destination={mountDestination(mount, projectsRoot)}
+            disabled={!enabled}
+            volumes={volumes}
+            secrets={secrets}
+            onUpdate={update}
+            onRemove={removable ? () => onRemove(mount) : undefined}
+            confirmRemove={confirmRemove}
+            removeDisabledReason={removable
+              ? undefined
+              : t("defaultMountNotRemovable")}
+          />
         );
       })}
       <div>
@@ -477,7 +284,7 @@ export function MountsEditor(props: {
       </div>
       <Modal
         open={adding}
-        onClose={() => setAdding(false)}
+        onClose={requestClose}
         title={t("addMount")}
         closeLabel={t("cancel")}
         footer={
@@ -485,7 +292,7 @@ export function MountsEditor(props: {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => setAdding(false)}
+              onClick={requestClose}
             >
               {t("cancel")}
             </Button>
@@ -500,19 +307,19 @@ export function MountsEditor(props: {
           </>
         }
       >
-        <div
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            gap: "12px",
-          }}
-        >
-          <Field label={t("mountKind")} htmlFor={mountKindId}>
+        <MountRow
+          t={t}
+          mode="edit"
+          mount={draft}
+          destination={draft.kind === "project"
+            ? projectDestination
+            : draft.destination}
+          kindValue={
             <select
-              id={mountKindId}
               style={imageSelect}
               value={draft.kind}
               disabled={busy}
+              aria-label={t("mountKind")}
               onChange={(event) => setDraft(emptyMount(event.target.value))}
             >
               <option value="project">{t("mountProject")}</option>
@@ -520,10 +327,24 @@ export function MountsEditor(props: {
               <option value="volume">{t("mountVolume")}</option>
               <option value="secret">{t("mountSecret")}</option>
             </select>
-          </Field>
-          {kindField}
-        </div>
+          }
+          disabled={busy}
+          volumes={volumes}
+          secrets={secrets}
+          onUpdate={updateDraft}
+          onBrowse={directoryPicker === undefined ? undefined : () => {
+            setBrowseError("");
+            setBrowsing(true);
+          }}
+          browseError={browseError}
+        />
       </Modal>
+      <DiscardChangesModal
+        t={t}
+        open={confirmClose}
+        onCancel={() => setConfirmClose(false)}
+        onDiscard={discardAndClose}
+      />
       {directoryPicker === undefined ? null : (
         <DirectoryPickerModal
           t={t}

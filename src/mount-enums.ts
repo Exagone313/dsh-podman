@@ -21,6 +21,35 @@ const KIND_FROM_PROTO: Record<string, string> = {
   MOUNT_KIND_SECRET: "secret",
 };
 
+// The logical names and the proto enum numbers a mount kind can decode to. A
+// value reaches a layer in one of several spellings — the enum name with or
+// without its MOUNT_KIND_ prefix, the short name, or the number a decoder that
+// renders enums as integers produces — so normalisation is table-driven rather
+// than inferred from which source field happens to be filled.
+const MOUNT_KIND_NAMES: Record<string, string> = {
+  project: "project",
+  tmpfs: "tmpfs",
+  volume: "volume",
+  secret: "secret",
+};
+
+const MOUNT_KIND_NUMBERS: Record<number, string> = {
+  1: "project",
+  2: "tmpfs",
+  3: "volume",
+  4: "secret",
+};
+
+const MOUNT_MODE_NAMES: Record<string, string> = {
+  read_only: "read_only",
+  read_write: "read_write",
+};
+
+const MOUNT_MODE_NUMBERS: Record<number, string> = {
+  1: "read_only",
+  2: "read_write",
+};
+
 const MODE_FROM_PROTO: Record<string, string> = {
   MOUNT_MODE_READ_ONLY: "read_only",
   MOUNT_MODE_READ_WRITE: "read_write",
@@ -86,4 +115,57 @@ export function mountModeFromProto(
   return Object.prototype.hasOwnProperty.call(MODE_FROM_PROTO, proto)
     ? MODE_FROM_PROTO[proto]
     : undefined;
+}
+
+// lookupNormalized resolves a value against one short-name table and one enum
+// number table, accepting either a string (short or prefixed enum name, or a
+// numeric string) or a number. Anything unrecognised uses the fallback, so an
+// unknown enum number can never be read as a different kind by accident.
+function lookupNormalized(
+  value: unknown,
+  names: Record<string, string>,
+  numbers: Record<number, string>,
+  prefix: string,
+  fallback: string,
+): string {
+  if (typeof value === "number") return numbers[value] ?? fallback;
+  if (typeof value !== "string") return fallback;
+  const short = value.startsWith(prefix)
+    ? value.slice(prefix.length).toLowerCase()
+    : value.toLowerCase();
+  if (Object.prototype.hasOwnProperty.call(names, short)) return names[short];
+  const numeric = Number(value);
+  if (value !== "" && Number.isInteger(numeric)) {
+    return numbers[numeric] ?? fallback;
+  }
+  return fallback;
+}
+
+/**
+ * The logical mount kind for any spelling a decode can produce: the short name,
+ * the enum name with or without its MOUNT_KIND_ prefix, its numeric string, or
+ * the enum number. An unspecified or unknown kind reads as a project mount.
+ */
+export function normalizeMountKind(kind: unknown): string {
+  return lookupNormalized(
+    kind,
+    MOUNT_KIND_NAMES,
+    MOUNT_KIND_NUMBERS,
+    "MOUNT_KIND_",
+    "project",
+  );
+}
+
+/**
+ * The logical mount mode for any spelling a decode can produce, mirroring
+ * normalizeMountKind. An unspecified or unknown mode reads as read-write.
+ */
+export function normalizeMountMode(mode: unknown): string {
+  return lookupNormalized(
+    mode,
+    MOUNT_MODE_NAMES,
+    MOUNT_MODE_NUMBERS,
+    "MOUNT_MODE_",
+    "read_write",
+  );
 }

@@ -147,11 +147,10 @@ guest-agent wiring.
 
 New containers are also seeded with the plugin's **default environment** (the
 `containerEnv` setting), so a git identity can be configured once instead of per
-project — see [Default environment](configuration.md#default-environment). The
-Podman page's **Git identity** popup fills the four
-`GIT_AUTHOR_*`/`GIT_COMMITTER_*` variables from one name and one email, and
-**Apply default environment variables** adds them to the running containers that
-lack them.
+project — see
+[Default environment variables](configuration.md#default-environment-variables).
+The Podman page's **Git identity** popup fills the four
+`GIT_AUTHOR_*`/`GIT_COMMITTER_*` variables from one name and one email.
 
 `container_bash` and `container_exec` run with the same command-visible
 environment as the built-in `bash`: the harness's managed `DSH_*` facts
@@ -401,46 +400,197 @@ feature keeps working.
 ## Container management UI
 
 The plugin ships a browser half that registers its card on the **dsh-podman**
-page (sidebar **Plugins** panel → **Installed**). The page lists the
-orchestrator-created guest containers and the built images. A workspace with no
-container gets a **Create container** button that opens a configuration modal —
-image, environment, mounts (project, tmpfs, volume, and secret), PATH additions,
-and secret environment variables — and workspaces that already have containers
-offer an **Add container** button for additional, named containers through the
-same modal, which is titled after the button that opened it. In that modal each
-mount's mode is a dropdown (read-only/read-write), so the workspace project
-mount can be created read-only in one step; tmpfs and secret mounts are fixed
-(read-write and read-only respectively) and show a disabled dropdown. Container
-rows show their environment and secret-environment variables and their mounts,
-let you edit environment variables and add/remove mounts (each removal is
-confirmed), and attach/detach named secrets to a container's environment
-variables; each row also offers **Remove**, **Recreate** (same image), and
-**Recreate with image**. A row's **Ports** section lists the pod ports exposed
-on the host and publishes another: give the pod port and, optionally, the host
-port to prefer (the gateway chooses a free one otherwise, and the notice names
-the endpoint it bound), and unpublish with a confirmation; publishing is
-disabled with a hint while the gateway is not running or the container is
-stopped. Every workspace row also offers **Remove pod**, which removes the
-workspace's pod, all of its containers, and the orchestrator's record for it
-(volumes, secrets, and project data are kept); removing a workspace's last
-container removes its pod as well, so an empty pod is never left behind. The
-page re-reads the live state whenever the Plugins panel opens it, and its footer
-has a **Reload this view** button. The images section can rebuild a single image
-or **rebuild all** in dependency order; **Build image** opens a popup with an
-image-id/base-image form and a chip input for the package list (type a name and
-press space/comma, or paste a list, to add removable chips). Volumes and secrets
-are listed as individual expandable rows, each with its own actions, and
+page (open the sidebar's **Plugins** panel and pick **Installed**). The page is
+a tab set — **Workspaces**, **Images**, **Storage**, **Defaults** and **Status**
+— under a status strip that counts the workspaces holding a container and the
+running containers, followed by ready or not-ready chips for the orchestrator
+and the gateway. The page re-reads the live state whenever the Plugins panel
+opens it, and a **Reload this view** button sits below the tabs, so the reload
+stays reachable from every tab. Card actions are direct control calls and are
+not approval-gated.
+
+### Workspaces
+
+The **Workspaces** tab lists the orchestrator-created guest containers. Each
+workspace card states in one phrase how many of its containers run and how many
+are stopped (the stopped half greyed).
+
+It also shows the workspace's readable name as the card title with a discreet
+**Copy workspace ID** button beside it for its UUID, and lists each container as
+a stacked block.
+
+A workspace with no container gets a **Create container** button; a workspace
+that already has containers gets an **Add container** button for additional,
+named containers. Every workspace row also offers **Remove containers**, which
+removes that workspace's dsh-podman containers and its pod, and the
+orchestrator's record for it (volumes, secrets, and project data are kept, and
+the dsh workspace itself is untouched); removing a workspace's last container
+removes its pod as well, so an empty pod is never left behind.
+
+#### Containers
+
+The block's identity line carries the container name, its state chip and its
+created time (relative, with the exact instant as a tooltip).
+
+Its **Edit**, **Recreate** and **Remove** actions sit at the right end of that
+line, right-aligned while the block has room and below the name once it does
+not: **Recreate** rebuilds the container as it is once the confirmation naming
+it is accepted.
+
+The fields follow in the canonical order the dialogs share, each a read-only
+field with its own copy control: environment and secret environment variables as
+Key/Value field pairs, PATH additions as a list of directory fields, and mounts
+and ports as per-entry fields, with every value shown in full and wrapping over
+as many lines as it needs.
+
+#### The container dialog
+
+**Add container** and **Create container** open the same dialog as **Edit** —
+the same width, the same viewport-capped height, the same group order and the
+same footer layout — which is titled after the action that opened it and opens
+on a **Name** group: editable in **Add container**, and read-only in the default
+container's **Create container** and in **Edit**. **Edit** opens it holding
+everything — the read-only name, image, environment variables, mounts, PATH
+variable additions, secret environment variables and published ports.
+
+The groups that follow **Name** are **Image**, **Environment variables**,
+**Mounts**, **PATH variable additions**, **Secret environment variables** and
+**Published ports**. Every row of an editor is the same labelled field row the
+container block renders, with an editable control where the block has a
+read-only field and its copy control.
+
+The dialog caps itself to the viewport, keeping its header and its footer in
+place while the body scrolls; **Discard** drops the draft, and the dialog's one
+primary action applies it once the confirmation naming the container is
+accepted: **Recreate container**, in the destructive tone, when the change
+rebuilds the container, and **Update container**, in the neutral one, when the
+running container takes the change.
+
+A marker beside it names the staged changes.
+
+The apply is refused while a variable name is empty or used twice across the
+environment variables and the secret environment variables: the footer names the
+conflict in red and the offending key carries a red border, and the rows it
+names stay in place until their own **Remove**, while an unnamed row is never
+applied.
+
+#### Mounts
+
+The mount rows label the kind with a short chip — **Project**, **tmpfs**,
+**Volume** or **Secret**. In the dialog mounts are added and removed, and
+removing one from a live container is confirmed.
+
+Adding one selects its kind, and for a project mount the project itself, from
+which the destination path is derived: the project's path mirrored under the
+projects root, previewed in a read-only field, since a project mount never takes
+a destination of its own.
+
+When a container is being created or added, each project or volume mount's mode
+is a dropdown (read-only/read-write), so the workspace project mount can be
+created read-only in one step, while secret and tmpfs mounts carry no mode
+control at all.
+
+The default container's main project mount keeps its **Remove** greyed out and
+disabled, with that fact as its tooltip, since it cannot be removed.
+
+#### Environment variables
+
+Environment variables are edited in Key/Value rows, each carrying its own
+visible labels and a **Remove** named after the variable.
+
+**Add container** and **Create container** open their **Environment variables**
+group on the workspace's default environment variables, so the values a new
+container inherits are visible; a value left alone keeps the default and an
+edited one becomes that container's own.
+
+Secret environment variables are attached by adding a row and picking a named
+secret, with the variable name editable in place like an environment variable's
+key, switched to another secret in place, or removed from that row's own
+**Remove**. A workspace without secrets offers **Create secret** in place of the
+secret picker, opening the secret form on top of the dialog.
+
+A variable name is required and must be unique across the environment variables
+and the secret environment variables.
+
+#### PATH additions and ports
+
+PATH variable additions are edited from an **Edit PATH additions** button, whose
+dialog lists one **Path** field per entry and prepends another with **Add
+entry**; the UI calls them **PATH variable additions**, where the tool section
+below calls them PATH additions.
+
+The dialog's **Published ports** group lists the ports exposed on the host, and
+a **Publish port** button opens a popup for the container port, the protocol
+(only tcp is implemented today) and, optionally, the host port to prefer;
+confirming the popup stages the addition — the gateway chooses a free host port
+when none is given, and the notice names the endpoint it bound.
+
+A port the gateway has not bound yet keeps the host port it was asked for with
+**(pending)** appended. Publishing is disabled with a hint while the gateway is
+not running or the container is stopped, and a port already exposed to the host
+is unpublished again from its own **Unpublish** action once the confirmation
+naming it is accepted.
+
+### Images
+
+The **Images** tab lists the built images, on a **Base images** card and a
+**Custom images** card. It can rebuild a single image or **Rebuild all images**
+in dependency order.
+
+Each image row is a block whose first line is the image name, its status and its
+**Rebuild**/**Set default** actions (right-aligned while the block has room,
+below the name once it does not), followed by labelled lines for its build time
+(only when the image was built; relative, with the exact instant as a tooltip),
+its parent image and its packages (chips on their own line).
+
+A custom image carries a destructive **Remove** in that same action group rather
+than on a line of its own.
+
+**Build custom image**, on the **Custom images** card, opens a popup with an
+image-name form and a parent-image select preselected to the default image, plus
+a chip input for the package list (type a name and press space/comma, or paste a
+list, to add removable chips, which appear below the input).
+
+### Storage
+
+Volumes and secrets are listed as individual expandable rows, each with its own
+actions.
+
 **Create volume** / **Create secret** open popup forms (the secret form takes an
-optional length; a secret's value can be overwritten, never read). Card actions
-are direct control calls and are not approval-gated.
+optional length).
+
+A secret row carries **Edit** and then **Remove**: **Edit** opens the same form,
+whose **New value** field can be set or overwritten but never read back, and
+**Remove** drops the secret.
 
 A **Package caches** section reports the size of every configured build cache
 (`DSH_PODMAN_HOST_PACMAN_CACHE`, `DSH_PODMAN_HOST_APT_CACHE`,
 `DSH_PODMAN_HOST_APK_CACHE`) and offers two cleanup actions: **Keep latest
 versions** removes every cached package file except the newest of each package
-(and the signature it carried), and **Remove all** empties the caches. Both are
-safe — a cached package is only ever re-downloaded — and neither runs while an
-image build is in progress.
+(and the signature it carried), and **Remove all** empties the caches.
+
+Both are safe — a cached package is only ever re-downloaded — and neither runs
+while an image build is in progress.
+
+### Defaults
+
+The **Defaults** tab shows the effective default image in a labelled select —
+the configured one, or the first base image, marked as such — and its **Default
+environment variables**.
+
+A **Git identity** button opens a popup for a name and an email, filling the
+four `GIT_AUTHOR_*`/`GIT_COMMITTER_*` variables in the draft.
+
+An **Add missing variables to containers** action opens a dialog that applies
+the default environment variables to every container or to one workspace's
+containers, listing the variables it would add.
+
+### Status
+
+The **Status** tab lists the harness, this plugin and the two daemons in a
+component table with their runtime state, version and commit.
+
+A version divergence is named beside the state it qualifies.
 
 ## Podman terminal
 

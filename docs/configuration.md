@@ -32,32 +32,33 @@ cordis, then the environment variables below, then built-in defaults.
 ## Plugin (dsh client) — UI settings
 
 Editable on the **dsh-podman** page (sidebar **Plugins** panel → **Installed**;
-the images' Set-default popup and the **Default environment** section):
+the images' **Set default** action and the **Default environment variables**
+section):
 
-| Setting        | Default     | Description                                                                                                                                                                     |
-| -------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `defaultImage` | `archlinux` | Image **short name** used for new workspaces; chosen from base and custom images via the Set-default popup                                                                      |
-| `uiLocale`     | `""`        | Plugin-managed active locale, written by the browser client so the host can render approval text in the session language (see [Approval](usage.md#approval)); not user-editable |
-| `containerEnv` | `{}`        | Default environment seeded into a container when it is created; see [Default environment](#default-environment)                                                                 |
+| Setting        | Default     | Description                                                                                                                                                                                                                       |
+| -------------- | ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `defaultImage` | `archlinux` | Image **short name** used for new workspaces; chosen from base and custom images via the images card's **Set default** action. When it is unset, the card names the effective default instead (the first base image, `archlinux`) |
+| `uiLocale`     | `""`        | Plugin-managed active locale, written by the browser client so the host can render approval text in the session language (see [Approval](usage.md#approval)); not user-editable                                                   |
+| `containerEnv` | `{}`        | Default environment used for containers created from now on; see [Default environment variables](#default-environment-variables)                                                                                                  |
 
-### Default environment
+### Default environment variables
 
-`containerEnv` is one map of variables seeded into a container when it is
-created: the default container of a new workspace and every named container. A
-container's own `env` wins per key, and a recreate stores exactly the
-environment it is given, so removing a value from a container's environment and
-recreating it removes that value for good.
+`containerEnv` is one map of variables used for containers created from now on:
+the default container of a new workspace and every named container. Existing
+containers keep their own environment; a container's own `env` wins per key, and
+a recreate stores exactly the environment it is given, so edit it in the
+workspace and recreate to change or remove a value. The **Add container** and
+**Create container** dialogs open their **Environment variables** group on these
+defaults, so the values a new container inherits are visible; a value left alone
+keeps the default and an edited one becomes part of that container's own
+environment.
 
-The Podman page's **Default environment** section edits it with the same
-key/value rows a container uses: add or remove variables, then **Save** (or
+The Podman page's **Default environment variables** section edits it with the
+same key/value rows a container uses: add or remove variables, then **Save** (or
 **Discard**). **Git identity** fills `GIT_AUTHOR_NAME`, `GIT_AUTHOR_EMAIL`,
-`GIT_COMMITTER_NAME` and `GIT_COMMITTER_EMAIL` from one name and one email, and
-**Apply default environment variables** adds the missing values to the running
-containers that lack them, recreating only those and never overwriting an
-existing value; stopped containers are left for their next start. Every
-workspace row offers the same action for its own containers. Reserved
-`DSH_PODMAN*` keys are ignored, and the values are not secret — use `secretEnv`
-for secrets (see [Secrets](usage.md#secrets)).
+`GIT_COMMITTER_NAME` and `GIT_COMMITTER_EMAIL` from one name and one email.
+Reserved `DSH_PODMAN*` keys are ignored, and the values are not secret — use
+`secretEnv` for secrets (see [Secrets](usage.md#secrets)).
 
 ## Orchestrator (`dsh-podman-orchestrator`)
 

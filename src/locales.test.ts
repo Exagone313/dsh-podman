@@ -11,20 +11,17 @@ import { en, zh } from "./client/locales.js";
 // A confirmation that acts on one object must name it. Each call site passes the
 // placeholder listed here, so dropping a subject from either language fails.
 const SUBJECTS: readonly (readonly [keyof typeof en, string])[] = [
-  ["confirmRemovePod", "workspace"],
+  ["confirmRemoveWorkspace", "workspace"],
   ["confirmRemoveContainer", "workspace"],
   ["confirmRemoveContainer", "container"],
   ["confirmRecreate", "workspace"],
   ["confirmRecreate", "container"],
-  ["confirmDetachSecret", "env"],
-  ["confirmDetachSecret", "secret"],
+  ["confirmUpdate", "workspace"],
+  ["confirmUpdate", "container"],
   ["confirmRebuildImage", "image"],
   ["confirmRemoveImage", "image"],
   ["confirmRemoveVolume", "volume"],
-  ["confirmSetSecret", "secret"],
   ["confirmRemoveSecret", "secret"],
-  ["confirmRemountReadOnly", "mount"],
-  ["confirmRemountReadWrite", "mount"],
   ["confirmRemoveMount", "mount"],
   ["confirmUnpublishPort", "port"],
 ];

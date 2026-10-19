@@ -512,7 +512,7 @@ test("create command reports an unknown mount mode as a notice", async () => {
   );
 });
 
-test("listContainers container mounts carry the raw proto fields", async () => {
+test("listContainers container mounts carry the normalised fields", async () => {
   const scope = fakeScope(baseValue());
   const resolver: any = {
     getConfig: () => ({}),
@@ -544,8 +544,8 @@ test("listContainers container mounts carry the raw proto fields", async () => {
   assert.deepEqual((scope.value.containers as any[])[0].mounts[0], {
     projectName: "team/src",
     destination: "/x",
-    kind: "MOUNT_KIND_PROJECT",
-    mode: "MOUNT_MODE_READ_WRITE",
+    kind: "project",
+    mode: "read_write",
     volume: "",
     secret: "",
   });

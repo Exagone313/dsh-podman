@@ -160,7 +160,7 @@ function argSummary(
   for (const key of keys) {
     const value = args[key];
     if (typeof value === "string" && value !== "") return firstLine(value);
-    // Numeric operands (a pod port) are JSON numbers, not strings.
+    // Numeric operands (a container port) are JSON numbers, not strings.
     if (typeof value === "number") return String(value);
     if (Array.isArray(value) && value.length > 0) {
       return firstLine(value.map((item) => String(item)).join(" "));

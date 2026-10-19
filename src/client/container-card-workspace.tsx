@@ -2,24 +2,89 @@
 //
 // SPDX-License-Identifier: MIT
 
+// One workspace card in the Workspaces tab: the workspace's name, its one
+// running/stopped status phrase, a copy button for its ID, its own actions, and
+// its containers as stacked blocks. A workspace with no container still offers
+// the one action that creates its default container, reads muted, and states the
+// greyed zero it holds.
+
 import { ContainerRow, CreateContainerModal } from "./container-card-row.js";
-import { ConfirmButton, containerStateDot } from "./container-card-shared.js";
-import { greyId, hint, wsBody } from "./container-card-styles.js";
+import { countLabel } from "./container-card-shared.js";
+import { scopedActionKey } from "./card-protocol.js";
 import {
+  TABLE_CARD_CLASS,
+  TABLE_CARD_CONTENT_CLASS,
+} from "./container-card-table-styles.js";
+import {
+  actionRow,
+  card,
+  cardContent,
+  cardList,
+  cardTitle,
+  destructiveAction,
+  headerRule,
+  rowActions,
+  rowMain,
+  rowName,
+  statusMuted,
+  workspaceStatus,
+} from "./container-card-styles.js";
+import {
+  type ContainerConfig,
   type ContainerCreateConfig,
   type ContainerView,
   type ImageView,
-  type MountInput,
   type WorkspaceView,
 } from "./container-card-controller.js";
 import { type DirectoryPickerFace } from "./directory-picker.js";
 import type { Translate } from "./locales.js";
 import {
   Button,
-  DisclosureRow,
-  StateDot,
+  IconCheckOutlineRegular,
+  IconCopyOutlineRegular,
+  RiskConfirmation,
+  Tooltip,
+  writeClipboard,
 } from "@deepseek-ai/dsh-client-ui-primitives";
-import { type ReactNode, useState } from "react";
+import { type ReactNode, useEffect, useId, useRef, useState } from "react";
+
+// The workspace's ID, copied on demand instead of printed as a bare UUID: a
+// discreet icon button whose tooltip names the action and whose check confirms
+// the write.
+function CopyWorkspaceId(props: { t: Translate; id: string }): ReactNode {
+  const { t, id } = props;
+  const [copied, setCopied] = useState(false);
+  const resetTimer = useRef<ReturnType<typeof setTimeout>>();
+  const copy = (): void => {
+    void writeClipboard(id).then((ok) => {
+      if (!ok) return;
+      setCopied(true);
+      if (resetTimer.current !== undefined) clearTimeout(resetTimer.current);
+      resetTimer.current = setTimeout(() => setCopied(false), 1500);
+    });
+  };
+  // The reset timer is cancelled on unmount, so it cannot fire against an
+  // unmounted component.
+  useEffect(
+    () => () => {
+      if (resetTimer.current !== undefined) clearTimeout(resetTimer.current);
+    },
+    [],
+  );
+  const label = copied ? t("copied") : t("copyWorkspaceId");
+  return (
+    <Tooltip label={label}>
+      <Button
+        variant="ghost"
+        size="sm"
+        icon={copied ? <IconCheckOutlineRegular /> : <IconCopyOutlineRegular />}
+        aria-label={label}
+        disabled={id === ""}
+        onClick={copy}
+      />
+    </Tooltip>
+  );
+}
 
 export function WorkspaceSection(props: {
   t: Translate;
@@ -29,73 +94,35 @@ export function WorkspaceSection(props: {
   volumes: readonly { name: string }[];
   secrets: readonly { name: string }[];
   busy: boolean;
+  writable: boolean;
+  locale: string;
+  pendingActions: readonly string[];
   defaultImage: string;
+  // The workspace's default environment variables, seeded into a new
+  // container's draft.
+  defaultEnv: Record<string, string>;
   projectsRoot: string;
   directoryPicker?: DirectoryPickerFace;
   onRemove: (workspace: string, container: string) => void;
+  // Recreate one container as it is, from the row's own action.
+  onRecreate: (workspace: string, container: string, image: string) => void;
   onRemoveWorkspace: (workspace: string) => void;
-  onRecreate: (
-    workspace: string,
-    container: string,
-    image: string,
-    env?: Record<string, string>,
-  ) => void;
   onCreate: (workspace: WorkspaceView, config?: ContainerCreateConfig) => void;
+  onCreateSecret: (name: string, length?: number, charset?: string) => void;
   onStartContainer: (
     workspace: WorkspaceView,
     container: string,
     config?: ContainerCreateConfig,
   ) => void;
-  onAddContainerMount: (
+  onApplyContainerConfig: (
     workspace: string,
     container: string,
-    mount: MountInput,
-  ) => void;
-  onRemoveContainerMount: (
-    workspace: string,
-    container: string,
-    mount: MountInput,
-  ) => void;
-  onUpdateContainerMount: (
-    workspace: string,
-    container: string,
-    mount: MountInput,
-  ) => void;
-  onSetContainerPaths: (
-    workspace: string,
-    container: string,
-    paths: readonly string[],
-  ) => void;
-  onAddContainerSecret: (
-    workspace: string,
-    container: string,
-    envVar: string,
-    secret: string,
-  ) => void;
-  onRemoveContainerSecret: (
-    workspace: string,
-    container: string,
-    envVar: string,
-  ) => void;
-  onPublishContainerPort: (
-    workspace: string,
-    container: string,
-    port: number,
-    suggestedHostPort?: number,
-  ) => void;
-  onUnpublishContainerPort: (
-    workspace: string,
-    container: string,
-    port: number,
-    protocol: string,
+    base: ContainerConfig,
+    next: ContainerConfig,
   ) => void;
   // Whether the port-publishing gateway is known to be missing, forwarded to
   // each row.
   gatewayUnavailable: boolean;
-  // Adds the default container environment to this workspace's containers.
-  onSyncDefaults: (workspace: string) => void;
-  // How many default variables exist; the sync action is pointless without any.
-  defaultEnvCount: number;
 }): ReactNode {
   const {
     t,
@@ -105,64 +132,134 @@ export function WorkspaceSection(props: {
     volumes,
     secrets,
     busy,
+    writable,
+    locale,
+    pendingActions,
     defaultImage,
+    defaultEnv,
     projectsRoot,
     directoryPicker,
     onRemove,
-    onRemoveWorkspace,
     onRecreate,
+    onRemoveWorkspace,
     onCreate,
+    onCreateSecret,
     onStartContainer,
-    onAddContainerMount,
-    onRemoveContainerMount,
-    onUpdateContainerMount,
-    onSetContainerPaths,
-    onAddContainerSecret,
-    onRemoveContainerSecret,
-    onPublishContainerPort,
-    onUnpublishContainerPort,
+    onApplyContainerConfig,
     gatewayUnavailable,
-    onSyncDefaults,
-    defaultEnvCount,
   } = props;
-  const [open, setOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState<"default" | "named" | null>(
     null,
   );
+  const [removeWorkspaceOpen, setRemoveWorkspaceOpen] = useState(false);
+  const [removeWorkspaceAcknowledged, setRemoveWorkspaceAcknowledged] =
+    useState(false);
+  const headingId = useId();
+  const removeWorkspacePending = pendingActions.includes(
+    scopedActionKey("workspace_remove", workspace.workspaceSlug),
+  );
   const hasContainer = containers.length > 0;
+  // The header states one phrase: how many containers run and how many are
+  // stopped, with the stopped half greyed, or the greyed zero when the
+  // workspace holds nothing yet.
+  const running = containers.filter(
+    (container) => container.status === "running",
+  ).length;
+  const stopped = containers.length - running;
   return (
-    <DisclosureRow
-      icon={hasContainer
-        ? <StateDot state={containerStateDot(containers[0]?.status ?? "")} />
-        : <span />}
-      title={workspace.projectName}
-      open={open}
-      expandable
-      onToggle={() => setOpen(!open)}
+    <section
+      style={card}
+      className={TABLE_CARD_CLASS}
+      aria-labelledby={headingId}
     >
-      <div style={wsBody}>
-        <code style={greyId}>{workspace.workspaceSlug}</code>
-        {!hasContainer
-          ? (
-            <div
-              style={{ display: "flex", flexDirection: "column", gap: "8px" }}
-            >
-              <p style={{ ...hint, margin: 0 }}>{t("noContainers")}</p>
-              <div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={busy}
-                  onClick={() => setCreateOpen("default")}
-                >
-                  {t("createContainer")}
-                </Button>
-              </div>
-            </div>
-          )
-          : (
-            <>
-              {containers.map((container) => (
+      <div style={hasContainer ? { ...actionRow, ...headerRule } : actionRow}>
+        <div style={rowMain}>
+          <h3
+            id={headingId}
+            style={hasContainer ? { ...cardTitle, ...rowName } : {
+              ...cardTitle,
+              ...rowName,
+              color: "var(--dsw-alias-label-tertiary)",
+            }}
+          >
+            {workspace.projectName}
+          </h3>
+          <CopyWorkspaceId t={t} id={workspace.workspaceSlug} />
+          <span
+            style={hasContainer ? workspaceStatus : {
+              ...workspaceStatus,
+              ...statusMuted,
+            }}
+          >
+            {running > 0
+              ? countLabel(
+                t,
+                running,
+                "countRunningContainerOne",
+                "countRunningContainerMany",
+              )
+              : null}
+            {running > 0 && stopped > 0 ? " · " : null}
+            {stopped > 0
+              ? (
+                <span style={statusMuted}>
+                  {countLabel(
+                    t,
+                    stopped,
+                    "countStoppedContainerOne",
+                    "countStoppedContainerMany",
+                  )}
+                </span>
+              )
+              : null}
+            {hasContainer ? null : (
+              <span style={statusMuted}>
+                {countLabel(
+                  t,
+                  0,
+                  "countContainerOne",
+                  "countContainerMany",
+                )}
+              </span>
+            )}
+          </span>
+        </div>
+        <div style={rowActions}>
+          <Button
+            variant="primary"
+            size="sm"
+            disabled={busy}
+            onClick={() => setCreateOpen(hasContainer ? "named" : "default")}
+          >
+            {hasContainer ? t("addContainer") : t("createContainer")}
+          </Button>
+          {
+            /* A workspace that holds no container has nothing to remove, so
+              the action is hidden rather than offered as a no-op. */
+          }
+          {hasContainer
+            ? (
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={removeWorkspacePending}
+                style={destructiveAction}
+                onClick={() => {
+                  setRemoveWorkspaceAcknowledged(false);
+                  setRemoveWorkspaceOpen(true);
+                }}
+              >
+                {removeWorkspacePending ? t("busy") : t("removeWorkspace")}
+              </Button>
+            )
+            : null}
+        </div>
+      </div>
+      {hasContainer
+        ? (
+          <div className={TABLE_CARD_CONTENT_CLASS} style={cardContent}>
+            <div style={cardList}>
+              {containers.map((container, index) => (
                 <ContainerRow
                   key={container.containerName}
                   t={t}
@@ -170,56 +267,52 @@ export function WorkspaceSection(props: {
                   images={images}
                   volumes={volumes}
                   secrets={secrets}
-                  busy={busy}
+                  pendingActions={pendingActions}
+                  locale={locale}
+                  last={index === containers.length - 1}
+                  writable={writable}
                   onRemove={onRemove}
                   onRecreate={onRecreate}
-                  onAddContainerMount={onAddContainerMount}
-                  onRemoveContainerMount={onRemoveContainerMount}
-                  onUpdateContainerMount={onUpdateContainerMount}
-                  onSetContainerPaths={onSetContainerPaths}
+                  onCreateSecret={onCreateSecret}
+                  onApplyContainerConfig={onApplyContainerConfig}
                   projectName={workspace.projectName}
                   projectsRoot={projectsRoot}
                   directoryPicker={directoryPicker}
-                  onAddContainerSecret={onAddContainerSecret}
-                  onRemoveContainerSecret={onRemoveContainerSecret}
-                  onPublishContainerPort={onPublishContainerPort}
-                  onUnpublishContainerPort={onUnpublishContainerPort}
                   gatewayUnavailable={gatewayUnavailable}
                 />
               ))}
-              <div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={busy}
-                  onClick={() => setCreateOpen("named")}
-                >
-                  {t("addContainer")}
-                </Button>
-              </div>
-            </>
-          )}
-        <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
-          <ConfirmButton
-            t={t}
-            label={t("applyDefaults")}
-            title={t("confirmTitle")}
-            description={t("confirmApplyDefaults")}
-            disabled={busy || defaultEnvCount === 0}
-            onConfirm={() => onSyncDefaults(workspace.workspaceSlug)}
-          />
-          <ConfirmButton
-            t={t}
-            label={t("removePod")}
-            title={t("confirmTitle")}
-            description={t("confirmRemovePod", {
-              workspace: workspace.projectName,
-            })}
-            disabled={busy}
-            onConfirm={() => onRemoveWorkspace(workspace.workspaceSlug)}
-          />
-        </div>
-      </div>
+            </div>
+          </div>
+        )
+        : null}
+      {
+        /* Removing the workspace's containers is irreversible and takes the
+          whole pod with it, so it is gated behind an explicit acknowledgement.
+          The action is only offered when the workspace actually has one. */
+      }
+      <RiskConfirmation
+        open={removeWorkspaceOpen}
+        title={t("removeWorkspace")}
+        description={t("confirmRemoveWorkspace", {
+          workspace: workspace.projectName,
+        })}
+        acknowledgeLabel={t("acknowledgeRemoveWorkspace")}
+        cancelLabel={t("cancel")}
+        closeLabel={t("cancel")}
+        confirmLabel={t("removeWorkspace")}
+        acknowledged={removeWorkspaceAcknowledged}
+        disabled={removeWorkspacePending}
+        onAcknowledgedChange={setRemoveWorkspaceAcknowledged}
+        onCancel={() => {
+          setRemoveWorkspaceAcknowledged(false);
+          setRemoveWorkspaceOpen(false);
+        }}
+        onConfirm={() => {
+          setRemoveWorkspaceAcknowledged(false);
+          setRemoveWorkspaceOpen(false);
+          onRemoveWorkspace(workspace.workspaceSlug);
+        }}
+      />
       <CreateContainerModal
         t={t}
         workspace={workspace}
@@ -227,13 +320,17 @@ export function WorkspaceSection(props: {
         volumes={volumes}
         secrets={secrets}
         busy={busy}
+        writable={writable}
         defaultImage={defaultImage}
+        defaultEnv={defaultEnv}
         projectsRoot={projectsRoot}
         directoryPicker={directoryPicker}
         named={createOpen === "named"}
         existing={containers.map((container) => container.containerName)}
+        gatewayUnavailable={gatewayUnavailable}
         open={createOpen !== null}
         onClose={() => setCreateOpen(null)}
+        onCreateSecret={onCreateSecret}
         onCreate={(container, config) => {
           if (createOpen === "named") {
             onStartContainer(workspace, container, config);
@@ -243,6 +340,6 @@ export function WorkspaceSection(props: {
           setCreateOpen(null);
         }}
       />
-    </DisclosureRow>
+    </section>
   );
 }

@@ -154,21 +154,22 @@ which requires online access.
 
 ## Verification
 
-- Open the sidebar's **Plugins** panel → **Installed** → **dsh-podman**: the
-  page should list the base images and, for a workspace, offer to create its
-  default container.
-- In a dsh session, run a shell command. It should execute inside a Podman
-  container for the current workspace (the plugin auto-creates the workspace's
-  default container on first use).
+1. Open the sidebar's **Plugins** panel.
+2. In the **Installed** section, click on **dsh-podman**.
+3. Open the **Status** tab.
+4. Check that **dsh-podman**, **dsh-podman-orchestrator** and
+   **dsh-podman-gateway** are **ready** and the versions match.
 
 ## Set Git identity (recommended)
 
-- Open settings from the sidebar's **Plugins** panel → **Installed** →
-  **dsh-podman**
-- Scroll down to **Default environment**
-- Click on **Git identity**
-- Enter the name and email to use for Git and click on **Apply**
-- Click on **Apply default environment variables** and then **Confirm**
+1. Open the sidebar's **Plugins** panel.
+2. In the **Installed** section, click on **dsh-podman**.
+3. Open the **Defaults** tab.
+4. Next to **Default environment variables**, click on **Git identity**.
+5. Enter the name, the email and click on **Apply**.
+6. Click on **Save**.
+7. Click on **Add missing variables to containers**.
+8. Choose **All containers** and click on **Apply**.
 
 ## Updating dsh & dsh-podman
 

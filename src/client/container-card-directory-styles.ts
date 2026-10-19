@@ -5,15 +5,15 @@
 import type { Context as ClientContext } from "@deepseek-ai/cordis";
 
 // The class passed to Modal for the project directory browser. The layout,
-// typography and tokens mirror dsh's own directory browser (680x500 dialog,
-// two Miller columns, chevron breadcrumbs, 28px rows with folder icons), so the
-// plugin's picker reads like the harness's workspace directory selection. The
-// dialog is clamped to the projects root, so its breadcrumb trail starts there.
+// typography and tokens mirror dsh's own directory browser (two Miller columns,
+// chevron breadcrumbs, 28px rows with folder icons), so the plugin's picker
+// reads like the harness's workspace directory selection; its width comes from
+// the small dialogs' shared compact cap. The dialog is clamped to the projects
+// root, so its breadcrumb trail starts there.
 export const DIRECTORY_CLASS = "dsh-podman-directory";
 
 export const DIRECTORY_STYLES = `
 .dsh-podman-directory.dsh-podman-directory {
-  width: min(680px, 100%);
   height: min(500px, calc(100dvh - 32px));
   padding: 0;
   gap: 0;

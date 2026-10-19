@@ -5,7 +5,7 @@
 import { test } from "node:test";
 import { strict as assert } from "node:assert";
 import { CARD_PATH } from "./client/card-protocol.js";
-import { registerCardRoute } from "./card-route.js";
+import { containerMountView, registerCardRoute } from "./card-route.js";
 
 function fakeResolver(): { resolver: any; calls: Array<[string, unknown]> } {
   const calls: Array<[string, unknown]> = [];
@@ -266,4 +266,94 @@ test("the card route reports a failed command as an error", async () => {
   assert.deepEqual(await response.json(), {
     error: "control plane unavailable",
   });
+});
+
+test("containerMountView pins every mount's kind, source and destination", () => {
+  const projectsRoot = "/projects";
+  // The spellings a decode can produce: proto-loader's enum name, the short
+  // string the card works in, and the enum number (as a number or a numeric
+  // string) a decoder that keeps integers would hand over.
+  const kindSpellings: Record<string, unknown[]> = {
+    project: ["MOUNT_KIND_PROJECT", "project", 1, "1"],
+    tmpfs: ["MOUNT_KIND_TMPFS", "tmpfs", 2, "2"],
+    volume: ["MOUNT_KIND_VOLUME", "volume", 3, "3"],
+    secret: ["MOUNT_KIND_SECRET", "secret", 4, "4"],
+  };
+  const cases: {
+    kind: string;
+    mount: Record<string, unknown>;
+    source: string;
+    destination: string;
+  }[] = [
+    {
+      kind: "project",
+      mount: { projectName: "team/src", mode: "MOUNT_MODE_READ_WRITE" },
+      source: "team/src",
+      // A project mount's destination is implicit on the wire; the view derives
+      // it from the projects root.
+      destination: "/projects/team/src",
+    },
+    {
+      kind: "tmpfs",
+      mount: { destination: "/scratch", mode: "MOUNT_MODE_READ_WRITE" },
+      source: "",
+      destination: "/scratch",
+    },
+    {
+      kind: "volume",
+      mount: {
+        destination: "/data",
+        mode: "MOUNT_MODE_READ_ONLY",
+        volume: "data",
+      },
+      source: "data",
+      destination: "/data",
+    },
+    {
+      kind: "secret",
+      mount: {
+        destination: "/run/secrets/tls",
+        mode: "MOUNT_MODE_READ_ONLY",
+        secret: "tls",
+      },
+      source: "tls",
+      destination: "/run/secrets/tls",
+    },
+  ];
+  for (const entry of cases) {
+    for (const spelling of kindSpellings[entry.kind]!) {
+      const view = containerMountView(
+        { ...entry.mount, kind: spelling },
+        projectsRoot,
+      );
+      const at = `${entry.kind} from ${String(spelling)}`;
+      assert.equal(view.kind, entry.kind, at);
+      assert.equal(
+        view.projectName || view.volume || view.secret,
+        entry.source,
+        `${at} source`,
+      );
+      assert.notEqual(view.destination, "", `${at} has a destination`);
+      assert.equal(view.destination, entry.destination, `${at} destination`);
+    }
+  }
+  // The mode normalises the same way, so no layer has to know which enum
+  // spelling a decode produced.
+  const modes: readonly (readonly [unknown, string])[] = [
+    ["MOUNT_MODE_READ_ONLY", "read_only"],
+    ["read_only", "read_only"],
+    [1, "read_only"],
+    ["1", "read_only"],
+    ["MOUNT_MODE_READ_WRITE", "read_write"],
+    ["read_write", "read_write"],
+    [2, "read_write"],
+    ["2", "read_write"],
+  ];
+  for (const [spelling, mode] of modes) {
+    const view = containerMountView(
+      { kind: "MOUNT_KIND_VOLUME", volume: "data", mode: spelling },
+      projectsRoot,
+    );
+    assert.equal(view.mode, mode, `mode from ${String(spelling)}`);
+  }
 });

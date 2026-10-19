@@ -8,61 +8,124 @@ export const NS = "podman";
 
 export type ContainerPluginKey =
   | "cardTitle"
-  | "cardDescription"
+  | "loading"
   | "versionMismatchMajor"
   | "versionMismatchMinor"
+  | "versionIncompatible"
+  | "versionCompatibleDifferent"
+  | "stateReady"
+  | "stateNotReady"
+  | "stateUnknown"
+  | "stateAbsent"
+  | "valueMissing"
+  | "columnComponent"
+  | "columnState"
+  | "columnVersion"
+  | "columnCommit"
   | "versionsTitle"
   | "orchestrator"
   | "gateway"
   | "gatewayNotRunning"
   | "gatewayIncompatible"
-  | "versionUnknown"
   | "dsh"
   | "copyVersions"
   | "copied"
   | "copyFailed"
+  | "copyWorkspaceId"
   | "reload"
   | "notice"
   | "defaultImage"
-  | "defaultImageHint"
+  | "noDefaultImage"
   | "defaultEnvironment"
-  | "defaultEnvironmentHint"
+  | "addMissingVars"
+  | "applyTo"
+  | "allContainers"
+  | "variablesToAdd"
+  | "addMissingVarsApply"
   | "gitIdentity"
   | "gitName"
   | "gitEmail"
-  | "gitIdentityHint"
-  | "applyDefaults"
-  | "confirmApplyDefaults"
-  | "clear"
   | "save"
   | "discard"
-  | "workspacesTitle"
-  | "noContainers"
+  | "unsavedChanges"
+  | "stagedChanges"
+  | "recreateContainer"
+  | "updateContainer"
+  | "confirmUpdate"
+  | "discardChanges"
+  | "discardChangesTitle"
+  | "confirmDiscardChanges"
+  | "containerNameReserved"
+  | "invalidSecretLength"
+  | "secretLengthHint"
+  | "portPendingSuffix"
+  | "portDuplicate"
+  | "groupDefaultsTitle"
+  | "groupStatusTitle"
+  | "tabWorkspaces"
+  | "tabImages"
+  | "tabStorage"
+  | "tabDefaults"
+  | "tabStatus"
+  | "settingsTabs"
+  | "statusOverview"
+  | "gatewayReady"
+  | "gatewayNotReady"
+  | "gatewayUnknown"
+  | "edit"
+  | "editContainerTitle"
+  | "done"
+  | "countImageOne"
+  | "countImageMany"
+  | "countVolumeOne"
+  | "countVolumeMany"
+  | "countSecretOne"
+  | "countSecretMany"
+  | "countCacheOne"
+  | "countCacheMany"
+  | "statusRunning"
+  | "statusStopped"
+  | "statusMissing"
+  | "statusPulled"
+  | "statusBuilt"
+  | "countWorkspaceOne"
+  | "countWorkspaceMany"
+  | "countContainerOne"
+  | "countContainerMany"
+  | "countRunningContainerOne"
+  | "countRunningContainerMany"
+  | "countStoppedContainerOne"
+  | "countStoppedContainerMany"
+  | "countVersionOne"
+  | "countVersionMany"
+  | "orchestratorReady"
+  | "orchestratorUnavailable"
+  | "orchestratorNotReady"
+  | "orchestratorUnknown"
+  | "noWorkspaces"
   | "createContainer"
   | "containerName"
   | "image"
-  | "status"
-  | "created"
-  | "projects"
+  | "copyImage"
+  | "copyCreated"
   | "remove"
-  | "removePod"
-  | "confirmRemovePod"
+  | "removeWorkspace"
+  | "confirmRemoveWorkspace"
   | "recreate"
-  | "recreateWithImage"
-  | "imagesTitle"
-  | "imageId"
-  | "imageTag"
-  | "builtAt"
+  | "imageName"
+  | "built"
   | "packages"
+  | "noPackages"
   | "volumesTitle"
+  | "noVolumes"
   | "createVolume"
   | "removeVolume"
   | "volumeName"
   | "secretsTitle"
+  | "noSecrets"
   | "createSecret"
   | "secretName"
   | "secretCharset"
-  | "selectImage"
   | "setSecret"
   | "removeSecret"
   | "removeImage"
@@ -73,31 +136,37 @@ export type ContainerPluginKey =
   | "buildImageTitle"
   | "pullImage"
   | "setDefaultImage"
-  | "setDefaultImageTitle"
   | "baseImagesTitle"
+  | "noBaseImages"
   | "customImagesTitle"
-  | "primitive"
-  | "packageManager"
-  | "parent"
+  | "noCustomImages"
+  | "parentImage"
   | "cancel"
   | "removeTag"
-  | "env"
-  | "secretEnv"
   | "envTitle"
   | "envKey"
+  | "copyEnvKey"
   | "envValue"
+  | "copyEnvValue"
   | "addEnv"
   | "removeEnv"
+  | "removeVariable"
+  | "envNameRequired"
+  | "envNameDuplicate"
   | "secretLength"
   | "containerSecretsTitle"
-  | "attachSecret"
+  | "addSecretEnv"
   | "secretEnvName"
-  | "detachSecret"
   | "portsTitle"
   | "publishPort"
   | "unpublishPort"
-  | "podPort"
+  | "containerPort"
+  | "copyContainerPort"
+  | "hostPort"
   | "hostPortOptional"
+  | "copyHostPort"
+  | "protocol"
+  | "copyProtocol"
   | "invalidPort"
   | "invalidHostPort"
   | "publishNeedsGateway"
@@ -106,22 +175,19 @@ export type ContainerPluginKey =
   | "none"
   | "unavailable"
   | "busy"
-  | "confirmTitle"
-  | "confirm"
   | "confirmRemoveContainer"
   | "confirmRecreate"
   | "confirmRemoveImage"
   | "confirmRebuildImage"
   | "confirmRebuildAllImages"
   | "confirmRemoveVolume"
-  | "confirmSetSecret"
   | "confirmRemoveSecret"
-  | "confirmDetachSecret"
   | "mountsTitle"
   | "addMount"
   | "mountKind"
   | "mountProject"
-  | "mountProjectPath"
+  | "mountProjectShort"
+  | "mountPath"
   | "browse"
   | "browseTitle"
   | "browseSelect"
@@ -133,10 +199,11 @@ export type ContainerPluginKey =
   | "browseOutsideRoot"
   | "mountDestination"
   | "pathsTitle"
+  | "path"
+  | "copyPathEntry"
   | "noPaths"
   | "editPaths"
-  | "addPath"
-  | "add"
+  | "addPathEntry"
   | "moveUp"
   | "moveDown"
   | "apply"
@@ -149,15 +216,25 @@ export type ContainerPluginKey =
   | "mountTmpfs"
   | "mountAt"
   | "mountMode"
+  | "copyMountPath"
+  | "copyMountName"
+  | "copyMountMode"
   | "readOnly"
   | "readWrite"
   | "mountReadOnlySuffix"
   | "mountReadWriteSuffix"
-  | "remountReadOnly"
-  | "remountReadWrite"
-  | "confirmRemountReadOnly"
-  | "confirmRemountReadWrite"
   | "confirmRemoveMount"
+  | "removeContainerTitle"
+  | "removeVolumeTitle"
+  | "removeImageTitle"
+  | "removeSecretTitle"
+  | "removeMountTitle"
+  | "defaultMountNotRemovable"
+  | "rebuildImageTitle"
+  | "rebuildAllImagesTitle"
+  | "setSecretTitle"
+  | "acknowledgeRemoveWorkspace"
+  | "acknowledgeRebuildAllImages"
   | "cachesTitle"
   | "noCaches"
   | "cacheUsage"
@@ -247,104 +324,181 @@ export type Translate = (
   params?: Record<string, string>,
 ) => string;
 
+/**
+ * One dictionary key with the placeholders its copy interpolates, so a
+ * component can hand a message up to the footer that renders it without
+ * translating it itself.
+ */
+export interface Translation {
+  key: ContainerPluginKey;
+  params?: Record<string, string>;
+}
+
 export const en: Record<ContainerPluginKey, string> = {
   cardTitle: "dsh-podman",
-  cardDescription: "Manage the guest containers and their images.",
   versionMismatchMajor:
-    "This plugin's major version differs from the orchestrator's; update the dsh image or the orchestrator image so both match.",
+    "Image versions are incompatible. Update all three images (dsh, orchestrator, gateway) so they match.",
   versionMismatchMinor:
-    "This plugin and the orchestrator have compatible but different versions; consider updating both images.",
-  versionsTitle: "Versions",
+    "Some images are on different versions. Update the dsh, orchestrator and gateway images together.",
+  versionIncompatible: "incompatible",
+  versionCompatibleDifferent: "different versions",
+  stateReady: "ready",
+  stateNotReady: "not ready",
+  stateUnknown: "unknown",
+  stateAbsent: "absent",
+  valueMissing: "—",
+  columnComponent: "Component",
+  columnState: "State",
+  columnVersion: "Version",
+  columnCommit: "Commit",
+  versionsTitle: "Components",
   orchestrator: "dsh-podman-orchestrator",
   gateway: "dsh-podman-gateway",
   gatewayNotRunning: "not running",
   gatewayIncompatible: "incompatible",
-  versionUnknown: "unknown",
   dsh: "dsh",
   copyVersions: "Copy versions",
   copied: "Copied",
   copyFailed: "Copy failed",
+  copyWorkspaceId: "Copy workspace ID",
   reload: "Reload this view",
   notice: "Notice",
   defaultImage: "Default image",
-  defaultImageHint: "Image used when a workspace has no image of its own.",
-  defaultEnvironment: "Default environment",
-  defaultEnvironmentHint:
-    "Seeded into a container when it is created. Edit a container's own environment and recreate it to change or remove a value for that container.",
+  noDefaultImage: "No default image set",
+  defaultEnvironment: "Default environment variables",
+  addMissingVars: "Add missing variables to containers",
+  applyTo: "Apply to",
+  allContainers: "All containers",
+  variablesToAdd: "Variables to add",
+  addMissingVarsApply: "Add to {containers}",
   gitIdentity: "Git identity",
   gitName: "Name",
   gitEmail: "Email",
-  gitIdentityHint:
-    "Fills GIT_AUTHOR_NAME/EMAIL and GIT_COMMITTER_NAME/EMAIL for new containers, so commits made inside them are attributed to you.",
-  applyDefaults: "Apply default environment variables",
-  confirmApplyDefaults:
-    "Add the default environment variables to the containers that are missing them? Matching running containers are recreated (their processes and daemons stop); existing values are kept and stopped containers are left alone.",
-  clear: "Clear",
   save: "Save",
   discard: "Discard",
-  workspacesTitle: "Workspaces",
-  noContainers: "This workspace has no containers yet.",
+  unsavedChanges: "Unsaved changes",
+  stagedChanges: "Changes to apply: {fields}",
+  recreateContainer: "Recreate container",
+  updateContainer: "Update container",
+  confirmUpdate:
+    "Apply these changes to container “{container}” in workspace “{workspace}”?",
+  discardChanges: "Discard changes",
+  discardChangesTitle: "Discard changes?",
+  confirmDiscardChanges: "Close this dialog and discard your unsaved edits?",
+  containerNameReserved:
+    '"default" is reserved for the workspace\'s default container.',
+  invalidSecretLength: "Length must be between 1 and 1024.",
+  secretLengthHint: "Between 1 and 1024; empty uses 32.",
+  portPendingSuffix: "(pending)",
+  portDuplicate: "That port is already listed.",
+  groupDefaultsTitle: "Defaults",
+  groupStatusTitle: "Status",
+  tabWorkspaces: "Workspaces",
+  tabImages: "Images",
+  tabStorage: "Storage",
+  tabDefaults: "Defaults",
+  tabStatus: "Status",
+  settingsTabs: "Podman settings tabs",
+  statusOverview: "Container status",
+  gatewayReady: "gateway ready",
+  gatewayNotReady: "gateway not ready",
+  gatewayUnknown: "gateway unknown",
+  edit: "Edit",
+  editContainerTitle: "Edit container",
+  done: "Done",
+  countImageOne: "1 image",
+  countImageMany: "{n} images",
+  countVolumeOne: "1 volume",
+  countVolumeMany: "{n} volumes",
+  countSecretOne: "1 secret",
+  countSecretMany: "{n} secrets",
+  countCacheOne: "1 cache",
+  countCacheMany: "{n} caches",
+  statusRunning: "Running",
+  statusStopped: "Stopped",
+  statusMissing: "Missing",
+  statusPulled: "Pulled",
+  statusBuilt: "Built",
+  countWorkspaceOne: "1 workspace",
+  countWorkspaceMany: "{n} workspaces",
+  countContainerOne: "1 container",
+  countContainerMany: "{n} containers",
+  countRunningContainerOne: "1 running container",
+  countRunningContainerMany: "{n} running containers",
+  countStoppedContainerOne: "1 stopped container",
+  countStoppedContainerMany: "{n} stopped containers",
+  countVersionOne: "1 version",
+  countVersionMany: "{n} versions",
+  orchestratorReady: "orchestrator ready",
+  orchestratorUnavailable: "orchestrator unavailable",
+  orchestratorNotReady: "orchestrator not ready",
+  orchestratorUnknown: "orchestrator unknown",
+  noWorkspaces: "No workspaces.",
   createContainer: "Create container",
-  containerName: "Container",
+  containerName: "Name",
   image: "Image",
-  status: "Status",
-  created: "Created",
-  projects: "Projects",
+  copyImage: "Copy image ID",
+  copyCreated: "Copy creation time",
   remove: "Remove",
-  removePod: "Remove pod",
-  confirmRemovePod:
-    "Remove the pod of workspace “{workspace}” and all its containers? Volume and project data is kept.",
+  removeWorkspace: "Remove containers",
+  confirmRemoveWorkspace:
+    "Remove the dsh-podman containers of workspace “{workspace}” (its pod)? The dsh workspace itself is untouched.",
   recreate: "Recreate",
-  recreateWithImage: "Recreate with image",
-  imagesTitle: "Images",
-  imageId: "Image ID",
-  imageTag: "Tag",
-  builtAt: "Built at",
+  imageName: "Image name",
+  built: "Built",
   packages: "Packages",
+  noPackages: "No packages.",
   volumesTitle: "Volumes",
+  noVolumes: "No volumes.",
   createVolume: "Create volume",
   removeVolume: "Remove",
   volumeName: "Volume name",
   secretsTitle: "Secrets",
+  noSecrets: "No secrets.",
   createSecret: "Create secret",
   secretName: "Secret name",
   secretCharset: "Charset",
-  setSecret: "Set value",
+  setSecret: "New value",
   removeSecret: "Remove",
   removeImage: "Remove",
   rebuildImage: "Rebuild",
-  rebuildAllImages: "Rebuild all",
-  buildImage: "Build image",
+  rebuildAllImages: "Rebuild all images",
+  buildImage: "Build custom image",
   build: "Build",
   buildImageTitle: "Build an image",
   pullImage: "Pull",
   setDefaultImage: "Set default",
-  setDefaultImageTitle: "Set default image",
   baseImagesTitle: "Base images",
+  noBaseImages: "No base images.",
   customImagesTitle: "Custom images",
-  primitive: "Primitive",
-  packageManager: "Package manager",
-  parent: "Parent",
-  selectImage: "Select an image",
+  noCustomImages: "No custom images.",
+  parentImage: "Parent image",
   cancel: "Cancel",
   removeTag: "Remove",
-  env: "Env",
-  secretEnv: "Secret env",
   envTitle: "Environment variables",
   envKey: "Key",
+  copyEnvKey: "Copy key {key}",
   envValue: "Value",
-  addEnv: "Add",
+  copyEnvValue: "Copy the value of {key}",
+  addEnv: "Add environment variable",
   removeEnv: "Remove",
+  removeVariable: "Remove variable {key}",
+  envNameRequired: "An environment variable name is required.",
+  envNameDuplicate: "Variable name “{key}” is used twice.",
   secretLength: "Length",
-  containerSecretsTitle: "Secret env vars",
-  attachSecret: "Attach",
-  secretEnvName: "Env var",
-  detachSecret: "Detach",
-  portsTitle: "Ports",
-  publishPort: "Publish",
+  containerSecretsTitle: "Secret environment variables",
+  addSecretEnv: "Add secret environment variable",
+  secretEnvName: "Variable name",
+  portsTitle: "Published ports",
+  publishPort: "Publish port",
   unpublishPort: "Unpublish",
-  podPort: "Pod port",
+  containerPort: "Container port",
+  copyContainerPort: "Copy container port {port}",
+  hostPort: "Host port",
   hostPortOptional: "Host port (optional)",
+  copyHostPort: "Copy host port {port}",
+  protocol: "Protocol",
+  copyProtocol: "Copy protocol {protocol}",
   invalidPort: "Port must be between 1 and 65535",
   invalidHostPort: "Host port must be between 1024 and 65535",
   publishNeedsGateway:
@@ -356,8 +510,7 @@ export const en: Record<ContainerPluginKey, string> = {
   none: "None",
   unavailable: "The container plugin is not available.",
   busy: "Working…",
-  confirmTitle: "Confirm action",
-  confirm: "Confirm",
+  loading: "Loading the container plugin…",
   confirmRemoveContainer:
     "Remove container “{container}” from workspace “{workspace}”?",
   confirmRecreate:
@@ -368,16 +521,14 @@ export const en: Record<ContainerPluginKey, string> = {
   confirmRebuildAllImages:
     "Rebuild every image in dependency order (base first)?",
   confirmRemoveVolume: "Remove volume “{volume}” and its data?",
-  confirmSetSecret: "Overwrite the value of secret “{secret}”?",
   confirmRemoveSecret:
     "Remove secret “{secret}”? Containers using it must drop it first.",
-  confirmDetachSecret:
-    "Detach secret “{secret}” from environment variable {env}?",
   mountsTitle: "Mounts",
   addMount: "Add mount",
   mountKind: "Kind",
-  mountProject: "Project",
-  mountProjectPath: "Project path",
+  mountProject: "Project mount",
+  mountProjectShort: "Project",
+  mountPath: "Project path",
   browse: "Browse…",
   browseTitle: "Select a project directory",
   browseSelect: "Select this directory",
@@ -388,11 +539,12 @@ export const en: Record<ContainerPluginKey, string> = {
   browseTruncated: "Too many folders to list; only the beginning is shown.",
   browseOutsideRoot: "Choose a directory inside the projects root.",
   mountDestination: "Destination",
-  pathsTitle: "PATH additions",
+  pathsTitle: "PATH variable additions",
+  path: "Path",
+  copyPathEntry: "Copy PATH addition {path}",
   noPaths: "No PATH additions.",
   editPaths: "Edit PATH additions",
-  addPath: "Path to add",
-  add: "Add",
+  addPathEntry: "Add entry",
   moveUp: "Move up",
   moveDown: "Move down",
   apply: "Apply",
@@ -405,20 +557,31 @@ export const en: Record<ContainerPluginKey, string> = {
   mountTmpfs: "tmpfs",
   mountAt: "at",
   mountMode: "Mode",
+  copyMountPath: "Copy mount path {path}",
+  copyMountName: "Copy mount name {name}",
+  copyMountMode: "Copy mount mode {mode}",
   readOnly: "Read-only",
   readWrite: "Read-write",
   mountReadOnlySuffix: "(ro)",
   mountReadWriteSuffix: "(rw)",
-  remountReadOnly: "Remount as read-only",
-  remountReadWrite: "Remount as read-write",
-  confirmRemountReadOnly:
-    "Remount {mount} as read-only and recreate the container?",
-  confirmRemountReadWrite:
-    "Remount {mount} as read-write and recreate the container?",
   confirmRemoveMount:
     "Remove mount {mount} from the container and recreate it?",
+  removeContainerTitle: "Remove container",
+  removeVolumeTitle: "Remove volume",
+  removeImageTitle: "Remove image",
+  removeSecretTitle: "Remove secret",
+  removeMountTitle: "Remove mount",
+  defaultMountNotRemovable:
+    "The default container's main project mount cannot be removed.",
+  rebuildImageTitle: "Rebuild image",
+  rebuildAllImagesTitle: "Rebuild all images",
+  setSecretTitle: "Set secret value",
+  acknowledgeRemoveWorkspace:
+    "I understand every container of this workspace is removed.",
+  acknowledgeRebuildAllImages:
+    "I understand every image is rebuilt, which can take a long time.",
   cachesTitle: "Package caches",
-  noCaches: "No package cache is configured.",
+  noCaches: "No package caches.",
   cacheUsage: "{size} · {n} files",
   cacheKeepLatest: "Keep latest versions",
   confirmCacheKeepLatest:
@@ -427,7 +590,8 @@ export const en: Record<ContainerPluginKey, string> = {
   confirmCacheRemoveAll:
     "Remove every cached package? The next build re-downloads what it needs.",
   addContainer: "Add container",
-  invalidContainerName: "Invalid container name",
+  invalidContainerName:
+    "Invalid container name. Start with a letter or digit; only letters, digits, '.', '_', '-' (max 64).",
   containerNameTaken: "Container name already exists",
   invalidName:
     "Start with a letter or digit; only letters, digits, '.', '_', '-' (max 64).",
@@ -504,102 +668,167 @@ export const en: Record<ContainerPluginKey, string> = {
 
 export const zh: Record<ContainerPluginKey, string> = {
   cardTitle: "dsh-podman",
-  cardDescription: "管理工作区容器及其镜像。",
   versionMismatchMajor:
-    "此插件与 orchestrator 的主版本不同；请更新 dsh 镜像或 orchestrator 镜像，使两者一致。",
+    "镜像版本不兼容。请更新全部三个镜像（dsh、orchestrator、gateway），使其一致。",
   versionMismatchMinor:
-    "此插件与 orchestrator 的版本不同但兼容；建议同时更新两个镜像。",
-  versionsTitle: "版本",
+    "部分镜像版本不同。请同时更新 dsh、orchestrator 与 gateway 镜像。",
+  versionIncompatible: "不兼容",
+  versionCompatibleDifferent: "版本不同",
+  stateReady: "就绪",
+  stateNotReady: "未就绪",
+  stateUnknown: "未知",
+  stateAbsent: "不存在",
+  valueMissing: "—",
+  columnComponent: "组件",
+  columnState: "状态",
+  columnVersion: "版本",
+  columnCommit: "提交",
+  versionsTitle: "组件",
   orchestrator: "dsh-podman-orchestrator",
   gateway: "dsh-podman-gateway",
   gatewayNotRunning: "未运行",
   gatewayIncompatible: "版本不兼容",
-  versionUnknown: "未知",
   dsh: "dsh",
   copyVersions: "复制版本",
   copied: "已复制",
   copyFailed: "复制失败",
+  copyWorkspaceId: "复制工作区 ID",
   reload: "刷新此视图",
   notice: "提示",
   defaultImage: "默认镜像",
-  defaultImageHint: "工作区没有自带镜像时使用的镜像。",
+  noDefaultImage: "未设置默认镜像",
   defaultEnvironment: "默认环境变量",
-  defaultEnvironmentHint:
-    "容器创建时注入的环境变量。编辑容器自身的环境变量后重建该容器，即可修改或移除其中的某一项。",
+  addMissingVars: "为容器补上缺失的变量",
+  applyTo: "应用到",
+  allContainers: "所有容器",
+  variablesToAdd: "将添加的变量",
+  addMissingVarsApply: "添加到 {containers}",
   gitIdentity: "Git 身份",
   gitName: "姓名",
   gitEmail: "邮箱",
-  gitIdentityHint:
-    "为新容器填入 GIT_AUTHOR_NAME/EMAIL 与 GIT_COMMITTER_NAME/EMAIL，使容器内提交的提交者信息正确。",
-  applyDefaults: "应用默认环境变量",
-  confirmApplyDefaults:
-    "为缺少默认环境变量的容器补上这些变量？匹配的运行中容器会被重建（其进程与守护进程会停止）；已有值保持不变，已停止的容器不会被处理。",
-  clear: "清除",
   save: "保存",
   discard: "放弃",
-  workspacesTitle: "工作区",
-  noContainers: "该工作区还没有容器。",
+  unsavedChanges: "有未保存的更改",
+  stagedChanges: "将应用的更改：{fields}",
+  recreateContainer: "重建容器",
+  updateContainer: "更新容器",
+  confirmUpdate: "将更改应用到工作区“{workspace}”中的容器“{container}”？",
+  discardChanges: "放弃更改",
+  discardChangesTitle: "放弃更改？",
+  confirmDiscardChanges: "关闭此对话框并放弃未保存的编辑？",
+  containerNameReserved: "“default”是工作区默认容器的保留名称。",
+  invalidSecretLength: "长度必须在 1 到 1024 之间。",
+  secretLengthHint: "1 到 1024；留空使用 32。",
+  portPendingSuffix: "（待发布）",
+  portDuplicate: "该端口已在列表中。",
+  groupDefaultsTitle: "默认设置",
+  groupStatusTitle: "状态",
+  tabWorkspaces: "工作区",
+  tabImages: "镜像",
+  tabStorage: "存储",
+  tabDefaults: "默认设置",
+  tabStatus: "状态",
+  settingsTabs: "Podman 设置标签页",
+  statusOverview: "容器状态",
+  gatewayReady: "gateway 就绪",
+  gatewayNotReady: "gateway 未就绪",
+  gatewayUnknown: "gateway 状态未知",
+  edit: "编辑",
+  editContainerTitle: "编辑容器",
+  done: "完成",
+  countImageOne: "1 个镜像",
+  countImageMany: "{n} 个镜像",
+  countVolumeOne: "1 个卷",
+  countVolumeMany: "{n} 个卷",
+  countSecretOne: "1 个机密",
+  countSecretMany: "{n} 个机密",
+  countCacheOne: "1 个缓存",
+  countCacheMany: "{n} 个缓存",
+  statusRunning: "运行中",
+  statusStopped: "已停止",
+  statusMissing: "缺失",
+  statusPulled: "已拉取",
+  statusBuilt: "已构建",
+  countWorkspaceOne: "1 个工作区",
+  countWorkspaceMany: "{n} 个工作区",
+  countContainerOne: "1 个容器",
+  countContainerMany: "{n} 个容器",
+  countRunningContainerOne: "1 个运行中容器",
+  countRunningContainerMany: "{n} 个运行中容器",
+  countStoppedContainerOne: "1 个已停止容器",
+  countStoppedContainerMany: "{n} 个已停止容器",
+  countVersionOne: "1 个版本",
+  countVersionMany: "{n} 个版本",
+  orchestratorReady: "orchestrator 就绪",
+  orchestratorUnavailable: "orchestrator 不可用",
+  orchestratorNotReady: "orchestrator 未就绪",
+  orchestratorUnknown: "orchestrator 状态未知",
+  noWorkspaces: "无工作区。",
   createContainer: "创建容器",
-  containerName: "容器",
+  containerName: "名称",
   image: "镜像",
-  status: "状态",
-  created: "创建时间",
-  projects: "项目",
+  copyImage: "复制镜像 ID",
+  copyCreated: "复制创建时间",
   remove: "移除",
-  removePod: "移除 Pod",
-  confirmRemovePod:
-    "移除工作区“{workspace}”的 Pod 及其所有容器？卷和项目数据会保留。",
+  removeWorkspace: "移除容器",
+  confirmRemoveWorkspace:
+    "移除工作区“{workspace}”的 dsh-podman 容器（其 pod）？dsh 工作区本身不受影响。",
   recreate: "重建",
-  recreateWithImage: "使用镜像重建",
-  imagesTitle: "镜像",
-  imageId: "镜像 ID",
-  imageTag: "标签",
-  builtAt: "构建时间",
+  imageName: "镜像名称",
+  built: "构建",
   packages: "软件包",
+  noPackages: "无软件包。",
   volumesTitle: "卷",
+  noVolumes: "无卷。",
   createVolume: "创建卷",
   removeVolume: "移除",
   volumeName: "卷名称",
   secretsTitle: "机密",
+  noSecrets: "无机密。",
   createSecret: "创建机密",
   secretName: "机密名称",
   secretCharset: "字符集",
-  setSecret: "设置值",
+  setSecret: "新值",
   removeSecret: "移除",
   removeImage: "移除",
   rebuildImage: "重建",
-  rebuildAllImages: "重建全部",
-  buildImage: "构建镜像",
+  rebuildAllImages: "重建全部镜像",
+  buildImage: "构建自定义镜像",
   build: "构建",
   buildImageTitle: "构建镜像",
   pullImage: "拉取",
   setDefaultImage: "设为默认",
-  setDefaultImageTitle: "设置默认镜像",
   baseImagesTitle: "基础镜像",
+  noBaseImages: "无基础镜像。",
   customImagesTitle: "自定义镜像",
-  primitive: "源镜像",
-  packageManager: "包管理器",
-  parent: "父镜像",
-  selectImage: "选择镜像",
+  noCustomImages: "无自定义镜像。",
+  parentImage: "父镜像",
   cancel: "取消",
   removeTag: "移除",
-  env: "环境变量",
-  secretEnv: "机密环境变量",
   envTitle: "环境变量",
   envKey: "键",
+  copyEnvKey: "复制键 {key}",
   envValue: "值",
-  addEnv: "添加",
+  copyEnvValue: "复制 {key} 的值",
+  addEnv: "添加环境变量",
   removeEnv: "移除",
+  removeVariable: "移除变量 {key}",
+  envNameRequired: "环境变量名称为必填项。",
+  envNameDuplicate: "变量名称“{key}”使用了两次。",
   secretLength: "长度",
   containerSecretsTitle: "机密环境变量",
-  attachSecret: "注入",
+  addSecretEnv: "添加机密环境变量",
   secretEnvName: "变量名",
-  detachSecret: "移除",
-  portsTitle: "端口",
-  publishPort: "发布",
+  portsTitle: "已发布端口",
+  publishPort: "发布端口",
   unpublishPort: "取消发布",
-  podPort: "pod 端口",
+  containerPort: "容器端口",
+  copyContainerPort: "复制容器端口 {port}",
+  hostPort: "主机端口",
   hostPortOptional: "主机端口（可选）",
+  copyHostPort: "复制主机端口 {port}",
+  protocol: "协议",
+  copyProtocol: "复制协议 {protocol}",
   invalidPort: "端口必须在 1 到 65535 之间",
   invalidHostPort: "主机端口必须在 1024 到 65535 之间",
   publishNeedsGateway:
@@ -609,8 +838,7 @@ export const zh: Record<ContainerPluginKey, string> = {
   none: "无",
   unavailable: "容器插件不可用。",
   busy: "处理中…",
-  confirmTitle: "确认操作",
-  confirm: "确认",
+  loading: "正在加载容器插件…",
   confirmRemoveContainer: "移除工作区“{workspace}”中的容器“{container}”？",
   confirmRecreate:
     "重建工作区“{workspace}”中的容器“{container}”？其临时状态将丢失。",
@@ -618,14 +846,13 @@ export const zh: Record<ContainerPluginKey, string> = {
   confirmRebuildImage: "就地重建镜像“{image}”？",
   confirmRebuildAllImages: "按依赖顺序重建全部镜像（先基础镜像）？",
   confirmRemoveVolume: "移除卷“{volume}”及其数据？",
-  confirmSetSecret: "覆盖机密“{secret}”的值？",
   confirmRemoveSecret: "移除机密“{secret}”？使用它的容器需先移除注入。",
-  confirmDetachSecret: "从环境变量 {env} 上移除机密“{secret}”？",
   mountsTitle: "挂载",
   addMount: "添加挂载",
   mountKind: "类型",
-  mountProject: "项目",
-  mountProjectPath: "项目路径",
+  mountProject: "项目挂载",
+  mountProjectShort: "项目",
+  mountPath: "项目路径",
   browse: "浏览…",
   browseTitle: "选择项目目录",
   browseSelect: "选择此目录",
@@ -636,11 +863,12 @@ export const zh: Record<ContainerPluginKey, string> = {
   browseTruncated: "文件夹过多，仅显示开头部分。",
   browseOutsideRoot: "请选择项目根目录内的目录。",
   mountDestination: "目标路径",
-  pathsTitle: "PATH 附加项",
-  noPaths: "没有 PATH 附加项。",
+  pathsTitle: "PATH 变量附加项",
+  path: "路径",
+  copyPathEntry: "复制 PATH 变量附加项 {path}",
+  noPaths: "无 PATH 附加项。",
   editPaths: "编辑 PATH 附加项",
-  addPath: "要添加的路径",
-  add: "添加",
+  addPathEntry: "添加条目",
   moveUp: "上移",
   moveDown: "下移",
   apply: "应用",
@@ -653,24 +881,35 @@ export const zh: Record<ContainerPluginKey, string> = {
   mountTmpfs: "tmpfs",
   mountAt: "位于",
   mountMode: "模式",
+  copyMountPath: "复制挂载路径 {path}",
+  copyMountName: "复制挂载名称 {name}",
+  copyMountMode: "复制挂载模式 {mode}",
   readOnly: "只读",
   readWrite: "读写",
   mountReadOnlySuffix: "(只读)",
   mountReadWriteSuffix: "(读写)",
-  remountReadOnly: "重新挂载为只读",
-  remountReadWrite: "重新挂载为读写",
-  confirmRemountReadOnly: "将 {mount} 重新挂载为只读并重建容器？",
-  confirmRemountReadWrite: "将 {mount} 重新挂载为读写并重建容器？",
   confirmRemoveMount: "从容器中移除挂载 {mount} 并重建容器？",
+  removeContainerTitle: "移除容器",
+  removeVolumeTitle: "移除卷",
+  removeImageTitle: "移除镜像",
+  removeSecretTitle: "移除机密",
+  removeMountTitle: "移除挂载",
+  defaultMountNotRemovable: "默认容器的主项目挂载无法移除。",
+  rebuildImageTitle: "重建镜像",
+  rebuildAllImagesTitle: "重建全部镜像",
+  setSecretTitle: "设置机密值",
+  acknowledgeRemoveWorkspace: "我明白这会移除该工作区的所有容器。",
+  acknowledgeRebuildAllImages: "我明白这会重建全部镜像，可能需要较长时间。",
   cachesTitle: "软件包缓存",
-  noCaches: "未配置软件包缓存。",
+  noCaches: "无软件包缓存。",
   cacheUsage: "{size} · {n} 个文件",
   cacheKeepLatest: "保留最新版本",
   confirmCacheKeepLatest: "移除较旧的缓存软件包版本？当前版本会保留。",
   cacheRemoveAll: "全部移除",
   confirmCacheRemoveAll: "移除所有缓存的软件包？下次构建会重新下载所需内容。",
   addContainer: "添加容器",
-  invalidContainerName: "容器名称无效",
+  invalidContainerName:
+    "容器名称无效。以字母或数字开头，仅可使用字母、数字、'.'、'_'、'-'（最长 64 个字符）。",
   containerNameTaken: "容器名称已存在",
   invalidName:
     "以字母或数字开头，仅可使用字母、数字、'.'、'_'、'-'（最长 64 个字符）。",

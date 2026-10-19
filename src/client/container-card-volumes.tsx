@@ -4,18 +4,23 @@
 
 import {
   ConfirmButton,
+  countLabel,
   Field,
   namePattern,
-  sanitizeName,
 } from "./container-card-shared.js";
-import { hint, sectionTitle, wsBody } from "./container-card-styles.js";
-import type { Translate } from "./locales.js";
+import { CardGroup } from "./container-card-group.js";
+import { scopedActionKey } from "./card-protocol.js";
 import {
-  Button,
-  DisclosureRow,
-  Input,
-  Modal,
-} from "@deepseek-ai/dsh-client-ui-primitives";
+  cardList,
+  cardRow,
+  containerNameHeading,
+  hint,
+  rowActions,
+  rowDivider,
+  rowMain,
+} from "./container-card-styles.js";
+import type { Translate } from "./locales.js";
+import { Button, Input, Modal } from "@deepseek-ai/dsh-client-ui-primitives";
 import { type ReactNode, useId, useState } from "react";
 
 export function VolumesSection(props: {
@@ -23,12 +28,13 @@ export function VolumesSection(props: {
   volumes: readonly { name: string }[];
   busy: boolean;
   writable: boolean;
+  pendingActions: readonly string[];
   onCreate: (name: string) => void;
   onRemove: (name: string) => void;
 }): ReactNode {
-  const { t, volumes, busy, writable, onCreate, onRemove } = props;
+  const { t, volumes, busy, writable, pendingActions, onCreate, onRemove } =
+    props;
   const [open, setOpen] = useState(false);
-  const [openVolume, setOpenVolume] = useState<string | null>(null);
   const [name, setName] = useState("");
   const volumeId = useId();
   const canCreate = namePattern.test(name);
@@ -39,60 +45,60 @@ export function VolumesSection(props: {
     setOpen(false);
   };
   return (
-    <section>
-      <div
-        style={{
-          display: "flex",
-          flexWrap: "wrap",
-          alignItems: "center",
-          gap: "8px",
-        }}
-      >
-        <div style={{ ...sectionTitle, flex: 1 }}>{t("volumesTitle")}</div>
+    <CardGroup
+      title={t("volumesTitle")}
+      summary={countLabel(
+        t,
+        volumes.length,
+        "countVolumeOne",
+        "countVolumeMany",
+      )}
+      hasContent={volumes.length > 0}
+      action={
         <Button
-          variant="outline"
+          variant="primary"
           size="sm"
           disabled={!writable || busy}
           onClick={() => setOpen(true)}
         >
           {t("createVolume")}
         </Button>
-      </div>
-      {volumes.length === 0 ? <p style={hint}>{t("none")}</p> : (
-        volumes.map((volume) => (
-          <DisclosureRow
-            key={volume.name}
-            icon={<span />}
-            title={volume.name}
-            open={openVolume === volume.name}
-            expandable
-            onToggle={() =>
-              setOpenVolume(openVolume === volume.name ? null : volume.name)}
-          >
-            <div style={wsBody}>
+      }
+    >
+      {volumes.length === 0
+        ? <p style={{ ...hint, margin: 0 }}>{t("noVolumes")}</p>
+        : (
+          <div style={cardList}>
+            {volumes.map((volume, index) => (
               <div
-                style={{
-                  display: "flex",
-                  flexWrap: "wrap",
-                  alignItems: "center",
-                  gap: "8px",
-                }}
+                key={volume.name}
+                style={index === volumes.length - 1
+                  ? cardRow
+                  : { ...cardRow, ...rowDivider }}
               >
-                <ConfirmButton
-                  t={t}
-                  label={t("removeVolume")}
-                  title={t("confirmTitle")}
-                  description={t("confirmRemoveVolume", {
-                    volume: volume.name,
-                  })}
-                  disabled={busy}
-                  onConfirm={() => onRemove(volume.name)}
-                />
+                <div style={rowMain}>
+                  <span style={containerNameHeading}>{volume.name}</span>
+                </div>
+                <div style={rowActions}>
+                  <ConfirmButton
+                    t={t}
+                    destructive
+                    label={t("removeVolume")}
+                    title={t("removeVolumeTitle")}
+                    description={t("confirmRemoveVolume", {
+                      volume: volume.name,
+                    })}
+                    confirmLabel={t("removeVolumeTitle")}
+                    pending={pendingActions.includes(
+                      scopedActionKey("volume_remove", volume.name),
+                    )}
+                    onConfirm={() => onRemove(volume.name)}
+                  />
+                </div>
               </div>
-            </div>
-          </DisclosureRow>
-        ))
-      )}
+            ))}
+          </div>
+        )}
       <Modal
         open={open}
         onClose={() => setOpen(false)}
@@ -124,16 +130,20 @@ export function VolumesSection(props: {
             value={name}
             disabled={!writable || busy}
             autoFocus
-            onChange={(event) => setName(sanitizeName(event.target.value))}
+            onChange={(event) => setName(event.target.value)}
             onKeyDown={(event) => {
               if (event.key === "Enter") submit();
             }}
           />
           {name !== "" && !namePattern.test(name)
-            ? <p style={{ ...hint, margin: 0 }}>{t("invalidName")}</p>
+            ? (
+              <p style={{ ...hint, margin: 0 }} role="alert">
+                {t("invalidName")}
+              </p>
+            )
             : null}
         </Field>
       </Modal>
-    </section>
+    </CardGroup>
   );
 }

@@ -17,6 +17,7 @@ import { PluginArtworkTerminal } from "@deepseek-ai/dsh-client-ui-primitives";
 import type {} from "./slot-contract.js";
 import { buildDirectoryPicker } from "./directory-picker.js";
 import { ContainerCard } from "./ContainerCard.js";
+import { ContainerCardToast } from "./container-card-toast.js";
 import { PodmanTerminal } from "./podman-terminal.js";
 import { PodmanTerminalGuide } from "./podman-terminal-guide.js";
 import { PodmanTerminalTitle } from "./podman-terminal-title.js";
@@ -33,6 +34,10 @@ import {
 import { PodmanToolRow, TOOL_VIEW_KEYS } from "./tool-views.js";
 import { installTerminalStyles } from "./terminal-styles.js";
 import { installDirectoryStyles } from "./container-card-directory-styles.js";
+import { installDialogStyles } from "./container-card-dialog-styles.js";
+import { installFieldStyles } from "./container-card-field-styles.js";
+import { installTableStyles } from "./container-card-table-styles.js";
+import { installTabsStyles } from "./container-card-tabs-styles.js";
 import {
   CONTAINER_NS,
   ContainerCardController,
@@ -61,6 +66,10 @@ export const inject = [
 export function apply(ctx: ClientContext): void {
   installTerminalStyles(ctx);
   installDirectoryStyles(ctx);
+  installDialogStyles(ctx);
+  installFieldStyles(ctx);
+  installTableStyles(ctx);
+  installTabsStyles(ctx);
   ctx.effect(
     () => ctx.locale.register(NS, { en, zh }),
     "podman: dictionaries",
@@ -71,22 +80,24 @@ export function apply(ctx: ClientContext): void {
   // host serves its volatile preferences under.
   const scope = ctx.configForms.get<ContainerSettings>(CONTAINER_NS);
 
+  const controller = new ContainerCardController(scope);
+
   // Record the active locale (including the browser default, which the host
-  // cannot observe) so approval text renders in the session language. The
-  // namespace may still be loading when this plugin mounts, so the write also
-  // runs on every scope change; the value check keeps it a one-time write.
+  // cannot observe) so approval text renders in the session language, and hand
+  // it to the card so every dated row is formatted in it. The namespace may
+  // still be loading when this plugin mounts, so the write also runs on every
+  // scope change; the value check keeps it a one-time write.
   const syncLocale = (): void => {
+    const active = ctx.locale.getSnapshot().active;
+    controller.setLocale(active);
     const snapshot = scope.getSnapshot();
     if (snapshot.status !== "ready" || !snapshot.writable) return;
-    const active = ctx.locale.getSnapshot().active;
     if (snapshot.value?.uiLocale === active) return;
     void scope.set("uiLocale", active);
   };
   syncLocale();
   scope.subscribe(syncLocale);
   ctx.effect(() => ctx.on("locale/change", syncLocale), "podman: locale sync");
-
-  const controller = new ContainerCardController(scope);
 
   // The harness's own directory picker backs the project-mount browse dialog:
   // it lists directories on the dsh host, so a chosen project path is a host
@@ -125,6 +136,23 @@ export function apply(ctx: ClientContext): void {
             )),
       ),
     "podman: settings page",
+  );
+
+  // The card's command feedback lives in the frame-wide overlay layer, so a
+  // report raised on the settings page is still visible after the user
+  // navigates away. It renders nothing while no report is pending.
+  ctx.effect(
+    () =>
+      ctx.slots.inject("shell.overlay", () =>
+        ctx.slots.register(
+          {
+            name: "shell.overlay",
+            id: "podman.card-toast",
+            inject: () => controller.inject(),
+          },
+          ContainerCardToast,
+        )),
+    "podman: card toast",
   );
 
   // Own the row rendering of every podman tool (instead of the generic

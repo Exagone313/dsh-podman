@@ -4,135 +4,114 @@
 
 import {
   type ContainerView,
-  type MountInput,
+  type ImageView,
 } from "./container-card-controller.js";
-import { EnvEditor, MountsEditor } from "./container-card-editors.js";
+import { containerActionKey, containerActionPending } from "./card-protocol.js";
+import {
+  configChangedKeys,
+  configGroupLabels,
+  configRebuildsContainer,
+  configsEqual,
+  type ContainerConfig,
+  containerConfigFrom,
+} from "./container-card-config.js";
+import { ContainerEditModal } from "./container-card-edit-modal.js";
 import { type DirectoryPickerFace } from "./directory-picker.js";
-import { PathsEditor } from "./container-card-paths.js";
-import { PortsEditor } from "./container-card-ports.js";
 import {
   ConfirmButton,
-  mountKindShort,
+  containerStatusLabel,
+  containerStatusTone,
+  CopyButton,
+  EnvRow,
+  ImageRow,
+  MountRow,
   mountViewToInput,
+  orderedMounts,
+  PathRow,
+  PortRow,
+  SecretEnvRow,
+  StatusChip,
 } from "./container-card-shared.js";
 import {
-  actions,
-  containerHeader,
-  containerRow,
-  greyId,
-  imageSelect,
-  tableStyle,
-  tdStyle,
-  thStyle,
-  wsBody,
+  actionRow,
+  blockFields,
+  blockWrapper,
+  cardBlockRow,
+  cardTitle,
+  fieldGroup,
+  fieldGroupLabel,
+  missingValue,
+  rowActions,
+  rowDivider,
+  rowMain,
+  rowMeta,
 } from "./container-card-styles.js";
-import { type ContainerPluginKey, type Translate } from "./locales.js";
-import {
-  Button,
-  DisclosureRow,
-  Input,
-  Pill,
-} from "@deepseek-ai/dsh-client-ui-primitives";
-import { type ReactNode, useEffect, useState } from "react";
+import { ROW_LIST_CLASS } from "./container-card-table-styles.js";
+import { orderedEnvEntries } from "../env-rows.js";
+import { relativeTimeLabel } from "./relative-time.js";
+import { type Translate, type Translation } from "./locales.js";
+import { Button } from "@deepseek-ai/dsh-client-ui-primitives";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 
-// The order the summary table lists mount kinds in.
-const MOUNT_ROWS: readonly { key: ContainerPluginKey; kind: string }[] = [
-  { key: "projects", kind: "project" },
-  { key: "volumesTitle", kind: "volume" },
-  { key: "mountTmpfs", kind: "tmpfs" },
-  { key: "secretsTitle", kind: "secret" },
-];
-
-// One summary row per mount kind present on a container, so a volume, tmpfs or
-// secret never contributes an empty project name to the Projects line. A mount
-// whose identifying field is empty is skipped, and a kind with no mount left
-// gets no row at all.
-export function mountSummaries(
-  mounts: readonly ContainerView["mounts"][number][],
-): { key: ContainerPluginKey; values: string[] }[] {
-  const buckets = new Map<string, string[]>(
-    MOUNT_ROWS.map(({ kind }) => [kind, []]),
-  );
-  for (const mount of mounts) {
-    const kind = mountKindShort(mount.kind);
-    const values = buckets.get(kind);
-    if (values === undefined) continue;
-    const identifier = kind === "project"
-      ? mount.projectName
-      : kind === "volume"
-      ? mount.volume
-      : kind === "secret"
-      ? mount.secret
-      : mount.destination;
-    if (identifier === "") continue;
-    values.push(
-      kind === "tmpfs" || mount.destination === ""
-        ? identifier
-        : `${identifier} → ${mount.destination}`,
-    );
+// One labelled group of a container block: the group's own label above the rows
+// it holds, so a long list only makes the block taller. A group with no rows at
+// all renders nothing, so its label and gap never reserve empty height. It
+// carries the shared list marker, so the narrow query separates its consecutive
+// rows the way it does in the editor that changes the same list.
+function FieldGroup(props: {
+  label: string;
+  children: ReactNode;
+}): ReactNode {
+  const { label, children } = props;
+  if (children === null || children === undefined || children === false) {
+    return null;
   }
-  return MOUNT_ROWS.flatMap(({ key, kind }) => {
-    const values = buckets.get(kind) ?? [];
-    return values.length === 0 ? [] : [{ key, values }];
-  });
+  return (
+    <div className={ROW_LIST_CLASS} style={fieldGroup}>
+      <span style={fieldGroupLabel}>{label}</span>
+      {children}
+    </div>
+  );
 }
 
+// The placeholder one empty list of a container block reads with.
+function NoEntries(props: { t: Translate }): ReactNode {
+  return <span style={missingValue}>{props.t("valueMissing")}</span>;
+}
+
+// One container of a workspace: a stacked block whose identity line is the
+// name, its state chip, its age and its own Edit/Recreate/Remove actions,
+// followed by one group per field in the canonical order — image, environment
+// variables, mounts, PATH variable additions, secret environment variables and
+// published ports, each entry with its own copyable fields. A long list only
+// makes the block taller. Edit opens the dialog holding every editor; its one
+// primary action applies the draft (rebuilding the container when the change
+// reaches what it runs, updating it in place otherwise) and Discard drops it.
+// Recreate rebuilds the container as it is, without touching the draft.
 export function ContainerRow(props: {
   t: Translate;
   container: ContainerView;
-  images: readonly { imageId: string }[];
+  images: readonly ImageView[];
   volumes: readonly { name: string }[];
   secrets: readonly { name: string }[];
-  busy: boolean;
+  pendingActions: readonly string[];
+  // The plugin's active locale, for the row's relative creation time.
+  locale: string;
+  // Whether this is the last block of its card, which omits the hairline.
+  last: boolean;
+  // Whether the container's secrets may be administered (the create-secret
+  // affordance inside the edit dialog).
+  writable: boolean;
   onRemove: (workspace: string, container: string) => void;
-  onRecreate: (
+  // Recreate the container exactly as it is: the row's own action, with the
+  // confirmation the staged apply already uses.
+  onRecreate: (workspace: string, container: string, image: string) => void;
+  onCreateSecret: (name: string, length?: number, charset?: string) => void;
+  onApplyContainerConfig: (
     workspace: string,
     container: string,
-    image: string,
-    env?: Record<string, string>,
-  ) => void;
-  onAddContainerMount: (
-    workspace: string,
-    container: string,
-    mount: MountInput,
-  ) => void;
-  onRemoveContainerMount: (
-    workspace: string,
-    container: string,
-    mount: MountInput,
-  ) => void;
-  onUpdateContainerMount: (
-    workspace: string,
-    container: string,
-    mount: MountInput,
-  ) => void;
-  onSetContainerPaths: (
-    workspace: string,
-    container: string,
-    paths: readonly string[],
-  ) => void;
-  onAddContainerSecret: (
-    workspace: string,
-    container: string,
-    envVar: string,
-    secret: string,
-  ) => void;
-  onRemoveContainerSecret: (
-    workspace: string,
-    container: string,
-    envVar: string,
-  ) => void;
-  onPublishContainerPort: (
-    workspace: string,
-    container: string,
-    port: number,
-    suggestedHostPort?: number,
-  ) => void;
-  onUnpublishContainerPort: (
-    workspace: string,
-    container: string,
-    port: number,
-    protocol: string,
+    base: ContainerConfig,
+    next: ContainerConfig,
   ) => void;
   // Whether the snapshot knows the port-publishing gateway is missing or
   // incompatible, so the editor can say so instead of failing on a dial.
@@ -147,389 +126,305 @@ export function ContainerRow(props: {
     images,
     volumes,
     secrets,
-    busy,
+    pendingActions,
+    locale,
+    last,
+    writable,
     onRemove,
     onRecreate,
-    onAddContainerMount,
-    onRemoveContainerMount,
-    onUpdateContainerMount,
-    onSetContainerPaths,
-    onAddContainerSecret,
-    onRemoveContainerSecret,
-    onPublishContainerPort,
-    onUnpublishContainerPort,
+    onCreateSecret,
+    onApplyContainerConfig,
     gatewayUnavailable,
     projectName,
     projectsRoot,
     directoryPicker,
   } = props;
-  const [selected, setSelected] = useState(container.imageId);
-  const [env, setEnv] = useState<Record<string, string>>(container.env);
-  // The row is keyed by container name, so it survives a snapshot refresh.
-  // Re-sync the image draft when the live image changes, or the select would
-  // keep offering and re-sending the previous one.
+  // The row edits one draft of the container's whole configuration and applies
+  // it with the dialog's one primary action. The draft starts from the snapshot
+  // and resyncs only while the user has nothing local, so a refresh never
+  // clobbers an edit or a change being applied.
+  const server = containerConfigFrom(container);
+  const serverKey = JSON.stringify(server);
+  const [draft, setDraft] = useState<ContainerConfig>(server);
+  const [staged, setStaged] = useState<ContainerConfig>(server);
+  const draftRef = useRef(draft);
+  draftRef.current = draft;
+  const stagedRef = useRef(staged);
+  stagedRef.current = staged;
+  const prevServerRef = useRef(server);
   useEffect(() => {
-    setSelected(container.imageId);
-  }, [container.imageId]);
-  // Env is a fresh object on every snapshot; key the resync on its content so
-  // an unchanged refresh does not clobber an in-progress edit.
-  const serverEnv = JSON.stringify(container.env);
-  useEffect(() => {
-    setEnv(container.env);
-  }, [serverEnv]);
-  const [envOpen, setEnvOpen] = useState(false);
-  const [mountOpen, setMountOpen] = useState(false);
-  const [pathOpen, setPathOpen] = useState(false);
-  const [secretOpen, setSecretOpen] = useState(false);
-  const [portOpen, setPortOpen] = useState(false);
-  const [attachSecret, setAttachSecret] = useState("");
-  const [attachVar, setAttachVar] = useState("");
-  const enabled = container.workspaceSlug !== "" && !busy;
+    const previous = prevServerRef.current;
+    prevServerRef.current = server;
+    const current = draftRef.current;
+    const saved = stagedRef.current;
+    // Adopt the snapshot when nothing is local, or when the staged copy is
+    // exactly what just arrived (the apply succeeded); keep both otherwise.
+    if (
+      configsEqual(current, saved) &&
+      (configsEqual(saved, previous) || configsEqual(saved, server))
+    ) {
+      setDraft(server);
+      setStaged(server);
+    }
+  }, [serverKey]);
+  const dirty = !configsEqual(draft, staged);
+  const pending = !configsEqual(server, staged);
+  // The draft's own changes, named by the dialog's staged marker and used to
+  // tell whether applying it rebuilds the container or updates it in place.
+  const changedKeys = configChangedKeys(server, draft);
+  const stagedMarker = changedKeys.length === 0
+    ? undefined
+    : t("stagedChanges", {
+      fields: changedKeys.map((id) => t(configGroupLabels[id])).join(", "),
+    });
+  // A row the editors flagged as conflicting — unnamed or named twice — refuses
+  // the apply; the dialog's footer says why instead of naming the staged fields.
+  const [blockingError, setBlockingError] = useState<Translation | undefined>(
+    undefined,
+  );
+  const markerError = blockingError !== undefined;
+  const marker = blockingError === undefined
+    ? stagedMarker
+    : t(blockingError.key, blockingError.params);
+  const rebuilds = configRebuildsContainer(server, draft);
+  const [open, setOpen] = useState(false);
+  // The editors share the container-scoped commands, so any of them in flight
+  // gates the whole row; the staged commands run from the apply action.
+  const containerBusy = containerActionPending(
+    pendingActions,
+    container.workspaceSlug,
+    container.containerName,
+  );
+  const usable = container.workspaceSlug !== "";
+  const enabled = usable && !containerBusy;
+  const removePending = pendingActions.includes(
+    containerActionKey(
+      "remove",
+      container.workspaceSlug,
+      container.containerName,
+    ),
+  );
+  const recreatePending = pendingActions.includes(
+    containerActionKey(
+      "recreate",
+      container.workspaceSlug,
+      container.containerName,
+    ),
+  );
   // Publishing needs a live guest agent to create the forwarding socket, and a
   // running gateway to bind the host port; the editor reflects both.
   const canPublish = enabled && container.status === "running" &&
     !gatewayUnavailable;
-  const mountRows = mountSummaries(container.mounts);
-  const envEntries = Object.entries(container.env);
-  const secretEntries = Object.entries(container.secretEnv);
-  const attach = (): void => {
-    const envVar = attachVar.trim();
-    if (envVar === "" || attachSecret === "") return;
-    onAddContainerSecret(
+  // What the row shows about the container: every value is its own read-only
+  // field with its own copy control, never a merged string; a long list only
+  // adds rows. The environment maps read in a fixed name order and the mounts in
+  // the one shared order the editors use too.
+  const envEntries = orderedEnvEntries(container.env);
+  const secretEnvEntries = orderedEnvEntries(container.secretEnv);
+  const mounts = orderedMounts(
+    container.mounts.map(mountViewToInput),
+    projectName,
+  );
+  // The dialog's one primary action stages the draft and applies it.
+  const apply = (): void => {
+    setStaged(draft);
+    onApplyContainerConfig(
       container.workspaceSlug,
       container.containerName,
-      envVar,
-      attachSecret,
+      server,
+      draft,
     );
-    setAttachVar("");
+  };
+  const discard = (): void => {
+    if (dirty) setDraft(staged);
+    else if (pending) {
+      setDraft(server);
+      setStaged(server);
+    }
   };
   return (
-    <div style={containerRow}>
-      <div style={containerHeader}>
-        <strong style={{ color: "var(--dsw-alias-label-primary)" }}>
-          {container.containerName}
-        </strong>
-        <Pill>{container.status}</Pill>
-      </div>
-      <table style={tableStyle}>
-        <tbody>
-          <tr>
-            <th style={thStyle} scope="row">{t("image")}</th>
-            <td style={tdStyle}>{container.imageId}</td>
-          </tr>
-          <tr>
-            <th style={thStyle} scope="row">{t("created")}</th>
-            <td style={tdStyle}>{container.createdAt}</td>
-          </tr>
-          {mountRows.map(({ key, values }) => (
-            <tr key={key}>
-              <th style={thStyle} scope="row">{t(key)}</th>
-              <td style={tdStyle}>{values.join(", ")}</td>
-            </tr>
-          ))}
-          {envEntries.length > 0
-            ? (
-              <tr>
-                <th style={thStyle} scope="row">{t("env")}</th>
-                <td style={tdStyle}>
-                  {envEntries.map(([key]) => key).join(", ")}
-                </td>
-              </tr>
-            )
-            : null}
-          {secretEntries.length > 0
-            ? (
-              <tr>
-                <th style={thStyle} scope="row">{t("secretEnv")}</th>
-                <td style={tdStyle}>
-                  {secretEntries
-                    .map(([envVar, secretName]) => `${envVar}=${secretName}`)
-                    .join(", ")}
-                </td>
-              </tr>
-            )
-            : null}
-          {container.publishedPorts.length > 0
-            ? (
-              <tr>
-                <th style={thStyle} scope="row">{t("portsTitle")}</th>
-                <td style={tdStyle}>
-                  {container.publishedPorts
-                    .map((published) =>
-                      `${published.port}/${published.protocol} → ${published.endpoint}`
-                    )
-                    .join(", ")}
-                </td>
-              </tr>
-            )
-            : null}
-        </tbody>
-      </table>
-      <div style={actions}>
-        <ConfirmButton
-          t={t}
-          label={t("remove")}
-          title={t("confirmTitle")}
-          description={t("confirmRemoveContainer", {
-            workspace: projectName,
-            container: container.containerName,
-          })}
-          disabled={!enabled}
-          onConfirm={() =>
-            onRemove(container.workspaceSlug, container.containerName)}
-        />
-        <ConfirmButton
-          t={t}
-          label={t("recreate")}
-          title={t("confirmTitle")}
-          description={t("confirmRecreate", {
-            workspace: projectName,
-            container: container.containerName,
-          })}
-          disabled={!enabled}
-          onConfirm={() =>
-            onRecreate(
-              container.workspaceSlug,
-              container.containerName,
-              "",
-              env,
-            )}
-        />
-        <select
-          style={imageSelect}
-          value={selected}
-          disabled={!enabled}
-          onChange={(event) => setSelected(event.target.value)}
-          aria-label={t("recreateWithImage")}
-        >
-          {container.imageId === ""
-            ? <option value="">{t("none")}</option>
-            : null}
-          {images.map((image) => (
-            <option key={image.imageId} value={image.imageId}>
-              {image.imageId}
-            </option>
-          ))}
-        </select>
-        <ConfirmButton
-          t={t}
-          label={t("recreateWithImage")}
-          title={t("confirmTitle")}
-          description={t("confirmRecreate", {
-            workspace: projectName,
-            container: container.containerName,
-          })}
-          disabled={!enabled || selected === ""}
-          onConfirm={() =>
-            onRecreate(
-              container.workspaceSlug,
-              container.containerName,
-              selected,
-              env,
-            )}
-        />
-      </div>
-      <DisclosureRow
-        icon={<span />}
-        title={t("envTitle")}
-        open={envOpen}
-        expandable
-        onToggle={() => setEnvOpen(!envOpen)}
-      >
-        <div style={wsBody}>
-          <EnvEditor t={t} env={env} busy={busy} onChange={setEnv} />
-        </div>
-      </DisclosureRow>
-      <DisclosureRow
-        icon={<span />}
-        title={t("mountsTitle")}
-        open={mountOpen}
-        expandable
-        onToggle={() => setMountOpen(!mountOpen)}
-      >
-        <div style={wsBody}>
-          <MountsEditor
-            t={t}
-            mounts={container.mounts.map(mountViewToInput)}
-            volumes={volumes}
-            secrets={secrets}
-            busy={busy}
-            enabled={enabled}
-            projectsRoot={projectsRoot}
-            directoryPicker={directoryPicker}
-            confirmRemove
-            primaryProject={container.containerName === "default"
-              ? projectName
-              : ""}
-            onUpdate={(mount) =>
-              onUpdateContainerMount(
-                container.workspaceSlug,
-                container.containerName,
-                mount,
-              )}
-            onRemove={(mount) =>
-              onRemoveContainerMount(
-                container.workspaceSlug,
-                container.containerName,
-                mount,
-              )}
-            onAdd={(mount) =>
-              onAddContainerMount(
-                container.workspaceSlug,
-                container.containerName,
-                mount,
-              )}
-          />
-        </div>
-      </DisclosureRow>
-      <DisclosureRow
-        icon={<span />}
-        title={t("pathsTitle")}
-        open={pathOpen}
-        expandable
-        onToggle={() => setPathOpen(!pathOpen)}
-      >
-        <div style={wsBody}>
-          <PathsEditor
-            t={t}
-            paths={container.paths}
-            busy={busy}
-            enabled={enabled}
-            onApply={(paths) =>
-              onSetContainerPaths(
-                container.workspaceSlug,
-                container.containerName,
-                paths,
-              )}
-          />
-        </div>
-      </DisclosureRow>
-      <DisclosureRow
-        icon={<span />}
-        title={t("containerSecretsTitle")}
-        open={secretOpen}
-        expandable
-        onToggle={() => setSecretOpen(!secretOpen)}
-      >
-        <div style={wsBody}>
-          {secretEntries.map(([envVar, secretName]) => (
-            <div
-              key={envVar}
-              style={{
-                display: "flex",
-                flexWrap: "wrap",
-                alignItems: "center",
-                gap: "8px",
-              }}
-            >
-              <code
-                style={{
-                  ...greyId,
-                  flex: 1,
-                  fontSize: "13px",
-                  color: "var(--dsw-alias-label-primary)",
-                }}
+    <>
+      <div style={last ? cardBlockRow : { ...cardBlockRow, ...rowDivider }}>
+        <div style={blockWrapper}>
+          {
+            /* The identity line carries the name, the state, the age and the
+              row's own actions: the fields below all read after it. The name
+              wraps rather than truncating, so a long identifier only makes the
+              line taller. */
+          }
+          <div style={actionRow}>
+            <div style={rowMain}>
+              <h4 style={{ ...cardTitle, overflowWrap: "anywhere" }}>
+                {container.containerName}
+              </h4>
+              <StatusChip
+                tone={containerStatusTone(container.status)}
+                label={containerStatusLabel(t, container.status)}
+              />
+              <span style={rowMeta} title={container.createdAt}>
+                {relativeTimeLabel(container.createdAt, locale)}
+              </span>
+              <CopyButton
+                t={t}
+                value={container.createdAt}
+                label={t("copyCreated")}
+              />
+            </div>
+            {
+              /* Edit, Recreate and Remove share the name's line, at its right
+                end while the block has room and below the name once it does
+                not. */
+            }
+            <div style={rowActions}>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={!usable}
+                onClick={() => setOpen(true)}
               >
-                {envVar}={secretName}
-              </code>
+                {t("edit")}
+              </Button>
               <ConfirmButton
                 t={t}
-                label={t("detachSecret")}
-                title={t("confirmTitle")}
-                description={t("confirmDetachSecret", {
-                  env: envVar,
-                  secret: secretName,
+                emphasis="business"
+                label={t("recreate")}
+                title={t("recreate")}
+                description={t("confirmRecreate", {
+                  workspace: projectName,
+                  container: container.containerName,
                 })}
-                disabled={busy}
+                confirmLabel={t("recreate")}
+                disabled={!usable || containerBusy}
+                pending={recreatePending}
                 onConfirm={() =>
-                  onRemoveContainerSecret(
+                  onRecreate(
                     container.workspaceSlug,
                     container.containerName,
-                    envVar,
+                    container.imageId,
+                  )}
+              />
+              <ConfirmButton
+                t={t}
+                destructive
+                label={t("remove")}
+                title={t("removeContainerTitle")}
+                description={t("confirmRemoveContainer", {
+                  workspace: projectName,
+                  container: container.containerName,
+                })}
+                confirmLabel={t("removeContainerTitle")}
+                disabled={!usable}
+                pending={removePending}
+                onConfirm={() =>
+                  onRemove(
+                    container.workspaceSlug,
+                    container.containerName,
                   )}
               />
             </div>
-          ))}
-          <div
-            style={{
-              display: "flex",
-              flexWrap: "wrap",
-              alignItems: "center",
-              gap: "8px",
-              paddingTop: "8px",
-            }}
-          >
-            <select
-              style={imageSelect}
-              value={attachSecret}
-              disabled={!enabled}
-              onChange={(event) => setAttachSecret(event.target.value)}
-              aria-label={t("attachSecret")}
-            >
-              {secrets.length === 0
-                ? <option value="">{t("none")}</option>
-                : null}
-              {secrets.map((secret) => (
-                <option key={secret.name} value={secret.name}>
-                  {secret.name}
-                </option>
-              ))}
-            </select>
-            <Input
-              value={attachVar}
-              disabled={!enabled}
-              placeholder={t("secretEnvName")}
-              onChange={(event) => setAttachVar(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter") attach();
-              }}
-              style={{ width: "200px" }}
-            />
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={!enabled || attachVar.trim() === "" ||
-                attachSecret === ""}
-              onClick={attach}
-            >
-              {t("attachSecret")}
-            </Button>
+          </div>
+          <div style={blockFields}>
+            <ImageRow t={t} mode="view" image={container.imageId} />
+            <FieldGroup label={t("envTitle")}>
+              {envEntries.length === 0
+                ? <NoEntries t={t} />
+                : envEntries.map(([name, value]) => (
+                  <EnvRow
+                    key={name}
+                    t={t}
+                    mode="view"
+                    name={name}
+                    value={value}
+                  />
+                ))}
+            </FieldGroup>
+            <FieldGroup label={t("mountsTitle")}>
+              {mounts.length === 0
+                ? <NoEntries t={t} />
+                : mounts.map(({ mount, index }) => (
+                  // Mounts carry no id and duplicates are legal, so the
+                  // positional index is the only collision-free key here. The
+                  // index also names the snapshot view the row reads its
+                  // destination from.
+                  <MountRow
+                    key={index}
+                    t={t}
+                    mode="view"
+                    mount={mount}
+                    destination={container.mounts[index]?.destination ?? ""}
+                  />
+                ))}
+            </FieldGroup>
+            <FieldGroup label={t("pathsTitle")}>
+              {container.paths.length === 0
+                ? <NoEntries t={t} />
+                : container.paths.map((path, index) => (
+                  // A PATH list carries no id and duplicates are legal, so the
+                  // positional index is the only collision-free key here.
+                  <PathRow key={index} t={t} mode="view" path={path} />
+                ))}
+            </FieldGroup>
+            <FieldGroup label={t("containerSecretsTitle")}>
+              {secretEnvEntries.length === 0
+                ? <NoEntries t={t} />
+                : secretEnvEntries.map(([name, value]) => (
+                  <SecretEnvRow
+                    key={name}
+                    t={t}
+                    mode="view"
+                    name={name}
+                    secret={value}
+                  />
+                ))}
+            </FieldGroup>
+            <FieldGroup label={t("portsTitle")}>
+              {container.publishedPorts.length === 0
+                ? <NoEntries t={t} />
+                : container.publishedPorts.map((port) => (
+                  <PortRow
+                    key={`${port.protocol}/${port.port}`}
+                    t={t}
+                    mode="view"
+                    port={port.port}
+                    protocol={port.protocol}
+                    hostPort={port.hostPort}
+                  />
+                ))}
+            </FieldGroup>
           </div>
         </div>
-      </DisclosureRow>
-      <DisclosureRow
-        icon={<span />}
-        title={t("portsTitle")}
-        open={portOpen}
-        expandable
-        onToggle={() => setPortOpen(!portOpen)}
-      >
-        <div style={wsBody}>
-          <PortsEditor
-            t={t}
-            ports={container.publishedPorts}
-            busy={busy}
-            enabled={enabled}
-            canPublish={canPublish}
-            gatewayUnavailable={gatewayUnavailable}
-            onPublish={(port, suggestedHostPort) =>
-              onPublishContainerPort(
-                container.workspaceSlug,
-                container.containerName,
-                port,
-                suggestedHostPort,
-              )}
-            onUnpublish={(port, protocol) =>
-              onUnpublishContainerPort(
-                container.workspaceSlug,
-                container.containerName,
-                port,
-                protocol,
-              )}
-          />
-        </div>
-      </DisclosureRow>
-    </div>
+      </div>
+      <ContainerEditModal
+        t={t}
+        open={open}
+        container={container}
+        images={images}
+        volumes={volumes}
+        secrets={secrets}
+        busy={containerBusy}
+        enabled={enabled}
+        usable={usable}
+        canPublish={canPublish}
+        gatewayUnavailable={gatewayUnavailable}
+        projectName={projectName}
+        projectsRoot={projectsRoot}
+        directoryPicker={directoryPicker}
+        writable={writable}
+        draft={draft}
+        dirty={dirty}
+        pending={pending}
+        marker={marker}
+        markerError={markerError}
+        onBlockingError={setBlockingError}
+        rebuilds={rebuilds}
+        recreatePending={recreatePending}
+        onCreateSecret={onCreateSecret}
+        onChange={setDraft}
+        onDiscard={discard}
+        onApply={apply}
+        onClose={() => setOpen(false)}
+      />
+    </>
   );
 }
 

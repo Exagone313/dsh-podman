@@ -83,11 +83,12 @@ Podman
 
 ## Guest agent（`dsh-podman-guest-agent`）
 
-| 变量                       | 默认值      | 说明                                                                |
-| -------------------------- | ----------- | ------------------------------------------------------------------- |
-| `DSH_PODMAN_GUEST_SOCKET`  | required    | guest agent 提供服务的 Unix 套接字；orchestrator 在启动容器时设置它 |
-| `DSH_PODMAN_GUEST_TOKEN`   | —           | 每次 gRPC 调用所需的 Bearer 令牌；见[变量详解](#变量详解)           |
-| `DSH_PODMAN_PROJECTS_ROOT` | `/projects` | 工作区的项目被挂载到的根目录                                        |
+| 变量                        | 默认值      | 说明                                                                                                                                               |
+| --------------------------- | ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `DSH_PODMAN_GUEST_PTC_MODE` | —           | 当设置为 `true` 时，agent 在专用 PTC 容器上以受限模式运行：仅通过控制通道提供 exec，并拒绝文件系统、守护进程操作、挂载、端口、终端、机密和目录浏览 |
+| `DSH_PODMAN_GUEST_SOCKET`   | required    | guest agent 提供服务的 Unix 套接字；orchestrator 在启动容器时设置它                                                                                |
+| `DSH_PODMAN_GUEST_TOKEN`    | —           | 每次 gRPC 调用所需的 Bearer 令牌；见[变量详解](#变量详解)                                                                                          |
+| `DSH_PODMAN_PROJECTS_ROOT`  | `/projects` | 工作区的项目被挂载到的根目录                                                                                                                       |
 
 ## Gateway（`dsh-podman-gateway`）
 

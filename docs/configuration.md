@@ -88,11 +88,12 @@ Reserved `DSH_PODMAN*` keys are ignored, and the values are not secret — use
 
 ## Guest agent (`dsh-podman-guest-agent`)
 
-| Variable                   | Default     | Description                                                                                 |
-| -------------------------- | ----------- | ------------------------------------------------------------------------------------------- |
-| `DSH_PODMAN_GUEST_SOCKET`  | required    | Unix socket the guest agent serves on; the orchestrator sets it when starting the container |
-| `DSH_PODMAN_GUEST_TOKEN`   | —           | Bearer token required on every gRPC call; see [Variable details](#variable-details)         |
-| `DSH_PODMAN_PROJECTS_ROOT` | `/projects` | Root where the workspace's project(s) are mounted                                           |
+| Variable                    | Default     | Description                                                                                                                                                                                                              |
+| --------------------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `DSH_PODMAN_GUEST_PTC_MODE` | —           | When set to `true`, the agent runs in restricted mode on the dedicated PTC container: exec with a control channel only, refusing filesystem, daemon operations, mounts, ports, terminals, secrets and directory browsing |
+| `DSH_PODMAN_GUEST_SOCKET`   | required    | Unix socket the guest agent serves on; the orchestrator sets it when starting the container                                                                                                                              |
+| `DSH_PODMAN_GUEST_TOKEN`    | —           | Bearer token required on every gRPC call; see [Variable details](#variable-details)                                                                                                                                      |
+| `DSH_PODMAN_PROJECTS_ROOT`  | `/projects` | Root where the workspace's project(s) are mounted                                                                                                                                                                        |
 
 ## Gateway (`dsh-podman-gateway`)
 

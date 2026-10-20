@@ -5,7 +5,7 @@
 // A relative creation time in the reader's own language. The exact instant
 // stays available beside it — a container field copies it, a build time keeps
 // it as a title tooltip — so this never has to be precise: it names the moment
-// the way a person would ("5 minutes ago", "today", "yesterday").
+// the way a person would ("5 seconds ago", "5 minutes ago", "yesterday").
 
 const MINUTE = 60_000;
 const HOUR = 60 * MINUTE;
@@ -40,8 +40,8 @@ function formatter(locale: string): Intl.RelativeTimeFormat | undefined {
 }
 
 /**
- * The relative creation time of a container, e.g. "5 minutes ago", "today" or
- * "yesterday". A stamp the browser cannot read, and a runtime without
+ * The relative creation time of a container, e.g. "1 second ago", "5 minutes
+ * ago" or "yesterday". A stamp the browser cannot read, and a runtime without
  * {@link Intl.RelativeTimeFormat}, both fall back to the raw value.
  *
  * @param createdAt - the container's timestamp, as the snapshot reported it.
@@ -59,9 +59,11 @@ export function relativeTimeLabel(
   if (format === undefined) return createdAt;
   // A clock ahead of this browser must not read as a future creation.
   const elapsed = Math.max(0, now - at);
-  // A moment ago is named as today: that is how a creation time reads, and the
-  // exact instant still sits beside it.
-  if (elapsed < MINUTE) return format.format(0, "day");
+  // A moment ago is counted in seconds, so a fresh creation reads "1 second
+  // ago" rather than "today"; the exact instant still sits beside it.
+  if (elapsed < MINUTE) {
+    return format.format(-Math.max(1, Math.floor(elapsed / 1000)), "second");
+  }
   if (elapsed < HOUR) {
     return format.format(-Math.floor(elapsed / MINUTE), "minute");
   }

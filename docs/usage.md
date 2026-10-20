@@ -413,7 +413,8 @@ not approval-gated.
 
 The **Workspaces** tab lists the orchestrator-created guest containers. Each
 workspace card states in one phrase how many of its containers run and how many
-are stopped (the stopped half greyed).
+are stopped (the stopped half greyed). The one shared PTC container belongs to
+no workspace, so it never appears here: its card lives on the **Status** tab.
 
 It also shows the workspace's readable name as the card title with a discreet
 **Copy workspace ID** button beside it for its UUID, and lists each container as
@@ -436,6 +437,26 @@ Its **Edit**, **Recreate** and **Remove** actions sit at the right end of that
 line, right-aligned while the block has room and below the name once it does
 not: **Recreate** rebuilds the container as it is once the confirmation naming
 it is accepted.
+
+One container is reserved: `ptc`, the container that serves workflows and PTC
+runs. It belongs to no workspace, so it never appears inside one: its card sits
+on the **Status** tab, directly below the component rows, and is marked by a
+violet **PTC** chip after its state chip. A PTC container that does not exist
+yet reads as **Missing** in grey rather than as an error: it is created lazily
+on its first use. The PTC program it runs has no filesystem or network access
+and calls tools host-side, so the container carries no mounts, environment
+variables, secrets or published ports; the orchestrator creates it without any.
+Its image is a single `ptc` image built on demand: it is rebuilt when the
+harness version it carries changes, and reused across workspaces otherwise.
+
+It is not visible to the agent's tools — `container_list`, `container_read` and
+the rest never return it — and its card offers **Recreate** and **Remove**, with
+no **Edit**, so its name and every field stay fixed. **Recreate** removes the
+shared container through the orchestrator's workspace-less removal and then
+ensures it again from the current PTC image; **Remove** retires it, and the
+container is recreated on the next PTC run. Upgrading the harness rebuilds that
+single PTC image and recreates the container on its next use; an agent that has
+not been upgraded keeps reporting the same PTC error as before.
 
 The fields follow in the canonical order the dialogs share, each a read-only
 field with its own copy control: environment and secret environment variables as
@@ -546,6 +567,17 @@ its parent image and its packages (chips on their own line).
 A custom image carries a destructive **Remove** in that same action group rather
 than on a line of its own.
 
+The reserved `ptc` image is the last row of the **Base images** card, after
+every base image: its name, its **Built**/**Missing** status and the violet
+**PTC** chip, a parent line naming the `node:26-slim` primitive it builds from,
+and a **Build**/**Rebuild** button: **Build** creates the PTC container and its
+image when the image is absent, **Rebuild** only rebuilds the image, and
+**Rebuild all images** rebuilds every image including this one, building it if
+missing, for the harness version the plugin targets. Its **Set default** button
+stays disabled, with a tooltip saying the image is reserved to PTC (Programmatic
+Tool Calling), and it has no **Remove**: the orchestrator owns it and keeps it
+out of the editable image set.
+
 **Build custom image**, on the **Custom images** card, opens a popup with an
 image-name form and a parent-image select preselected to the default image, plus
 a chip input for the package list (type a name and press space/comma, or paste a
@@ -591,6 +623,10 @@ The **Status** tab lists the harness, this plugin and the two daemons in a
 component table with their runtime state, version and commit.
 
 A version divergence is named beside the state it qualifies.
+
+Directly below that table sits the shared PTC container's card: its identity,
+its state and **PTC** chips, its relative creation time, its read-only image and
+its **Recreate**/**Remove** actions.
 
 ## Podman terminal
 

@@ -5,7 +5,12 @@
 import { test } from "node:test";
 import { strict as assert } from "node:assert";
 import { CARD_PATH } from "./client/card-protocol.js";
-import { containerMountView, registerCardRoute } from "./card-route.js";
+import {
+  containerMountView,
+  ptcView,
+  registerCardRoute,
+} from "./card-route.js";
+import { pinnedDshVersion } from "./dsh-version.js";
 
 function fakeResolver(): { resolver: any; calls: Array<[string, unknown]> } {
   const calls: Array<[string, unknown]> = [];
@@ -27,7 +32,23 @@ function fakeResolver(): { resolver: any; calls: Array<[string, unknown]> } {
         };
       }
       if (method === "listContainers") {
-        return { containers: [{ containerName: "c1" }] };
+        return {
+          containers: [
+            {
+              containerName: "c1",
+              workspaceSlug: "w1",
+              kind: "CONTAINER_KIND_GUEST",
+            },
+            {
+              containerName: "ptc",
+              workspaceSlug: "",
+              kind: "CONTAINER_KIND_PTC",
+              imageId: "ptc",
+              status: "running",
+              createdAt: "2026-01-02T00:00:00Z",
+            },
+          ],
+        };
       }
       if (method === "listImages") return { images: [{ imageId: "img1" }] };
       if (method === "listWorkspaces") return { workspaces: [] };
@@ -99,7 +120,20 @@ test("the card route serves the live snapshot on GET", async () => {
   assert.equal(response.status, 200);
   const snapshot = (await response.json()) as any;
   assert.equal(snapshot.projectsRoot, "/projects");
-  assert.equal(snapshot.containers.length, 1);
+  // The shared PTC container has its own snapshot entry and never appears among
+  // a workspace's containers.
+  assert.deepEqual(
+    snapshot.containers.map((container: any) => container.containerName),
+    ["c1"],
+  );
+  assert.equal(snapshot.containers[0].kind, undefined);
+  assert.deepEqual(snapshot.ptc, {
+    containerName: "ptc",
+    kind: "ptc",
+    state: "running",
+    imageId: "ptc",
+    createdAt: "2026-01-02T00:00:00Z",
+  });
   assert.equal(snapshot.images.length, 1);
   assert.deepEqual(snapshot.volumes, [{ name: "data" }]);
   assert.deepEqual(snapshot.secrets, [{ name: "s1" }]);
@@ -129,6 +163,51 @@ test("the card route serves the live snapshot on GET", async () => {
   assert.equal(snapshot.gatewayVersion, "9.9.9");
   assert.equal(snapshot.gatewayCommit, "def");
   assert.equal(snapshot.gatewayVersionState, "ok");
+});
+
+test("a snapshot without a PTC row reports the shared container as absent", async () => {
+  const { resolver } = fakeResolver();
+  resolver.control = async (method: string) => {
+    if (method === "getVersion") return { version: "9.9.9", commit: "abc" };
+    if (method === "getGatewayStatus") return {};
+    // No PTC record exists yet: the container is created lazily on first use.
+    if (method === "listContainers") {
+      return {
+        containers: [{
+          containerName: "c1",
+          workspaceSlug: "w1",
+          kind: "CONTAINER_KIND_GUEST",
+        }],
+      };
+    }
+    return {};
+  };
+  const { ctx, routes } = fakeRouteContext();
+  registerCardRoute(ctx, resolver);
+  const snapshot = (await (await routes[0].fetch(cardRequest())).json()) as any;
+  assert.deepEqual(snapshot.ptc, {
+    containerName: "ptc",
+    kind: "ptc",
+    state: "absent",
+    // The container is not created yet, but the card still names its image.
+    imageId: "ptc",
+    createdAt: "",
+  });
+  assert.deepEqual(
+    snapshot.containers.map((container: any) => container.containerName),
+    ["c1"],
+  );
+});
+
+test("an absent PTC row still reports the image it would use", () => {
+  // A row that predates the image field must not leave the card's image empty.
+  assert.deepEqual(ptcView({ status: "absent" }), {
+    containerName: "ptc",
+    kind: "ptc",
+    state: "absent",
+    imageId: "ptc",
+    createdAt: "",
+  });
 });
 
 test("a refused control call reports the version mismatch instead of an empty snapshot", async () => {
@@ -180,6 +259,48 @@ test("the card route runs one command per POST and returns its notice", async ()
     container: "foo",
   });
 
+  // The shared PTC container belongs to no workspace: its remove names the
+  // reserved container and no workspace, which is the orchestrator's explicit
+  // workspace-less request.
+  const removePtc = await routes[0].fetch(cardRequest({
+    method: "POST",
+    body: JSON.stringify({ command: { op: "ptc_remove" } }),
+  }));
+  assert.equal(removePtc.status, 200);
+  const ptcRemove = calls.filter(([method]) => method === "removeContainer")
+    .at(-1)?.[1];
+  assert.deepEqual(ptcRemove, { container: "ptc" });
+  assert.equal(
+    Object.prototype.hasOwnProperty.call(ptcRemove, "workspaceSlug"),
+    false,
+    "the request carries no workspace slug, so the orchestrator sees an empty one",
+  );
+
+  // The PTC recreate is that same remove followed by the orchestrator's own
+  // ensure, which names the reserved container and the harness release its
+  // image is built for.
+  const beforeRecreatePtc = calls.length;
+  const recreatePtc = await routes[0].fetch(cardRequest({
+    method: "POST",
+    body: JSON.stringify({ command: { op: "ptc_recreate" } }),
+  }));
+  assert.equal(recreatePtc.status, 200);
+  const ptcCalls = calls.slice(beforeRecreatePtc);
+  assert.deepEqual(ptcCalls.map(([method]) => method), [
+    "removeContainer",
+    "ensureContainer",
+  ]);
+  assert.deepEqual(ptcCalls[0]?.[1], { container: "ptc" });
+  const ensurePtc = ptcCalls[1]?.[1] as any;
+  assert.equal(ensurePtc.container, "ptc");
+  assert.equal(typeof ensurePtc.dshVersion, "string");
+  assert.notEqual(ensurePtc.dshVersion, "");
+  assert.equal(
+    Object.prototype.hasOwnProperty.call(ensurePtc, "workspaceSlug"),
+    false,
+    "the shared PTC container has no workspace",
+  );
+
   const recreate = await routes[0].fetch(cardRequest({
     method: "POST",
     body: JSON.stringify({
@@ -224,6 +345,58 @@ test("the card route runs one command per POST and returns its notice", async ()
   }));
   assert.equal(clean.status, 200);
   assert.deepEqual(await clean.json(), { notice: "removed 2 cached files" });
+});
+
+test("the PTC row builds, rebuilds and rebuilds-all without the ensure on rebuild", async () => {
+  const { resolver, calls } = fakeResolver();
+  const { ctx, routes } = fakeRouteContext();
+  registerCardRoute(ctx, resolver);
+
+  const post = (command: Record<string, unknown>) =>
+    routes[0].fetch(cardRequest({
+      method: "POST",
+      body: JSON.stringify({ command }),
+    }));
+
+  // The row's Build case (the image is absent) still goes through the PTC
+  // ensure, because the container has to be created with the image.
+  let before = calls.length;
+  assert.equal((await post({ op: "ptc_build" })).status, 200);
+  assert.deepEqual(calls.slice(before), [
+    [
+      "ensureContainer",
+      { container: "ptc", dshVersion: pinnedDshVersion() },
+    ],
+  ]);
+
+  // The row's Rebuild case only rebuilds the image for the pinned release: no
+  // ensure, no remove, no container record touched.
+  before = calls.length;
+  assert.equal(
+    (await post({ op: "image_rebuild", workspace: "ptc" })).status,
+    200,
+  );
+  assert.deepEqual(calls.slice(before), [
+    ["rebuildImage", { imageId: "ptc", dshVersion: pinnedDshVersion() }],
+  ]);
+
+  // An ordinary image keeps its stored-description rebuild and carries no
+  // release: the orchestrator reads it as it always did.
+  before = calls.length;
+  assert.equal(
+    (await post({ op: "image_rebuild", workspace: "img1" })).status,
+    200,
+  );
+  assert.deepEqual(calls.slice(before), [
+    ["rebuildImage", { imageId: "img1" }],
+  ]);
+
+  // Rebuilding all images includes the PTC image for the pinned release.
+  before = calls.length;
+  assert.equal((await post({ op: "image_rebuild_all" })).status, 200);
+  assert.deepEqual(calls.slice(before), [
+    ["rebuildAllImages", { dshVersion: pinnedDshVersion() }],
+  ]);
 });
 
 test("the card route rejects a missing or unknown command", async () => {

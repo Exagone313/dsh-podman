@@ -387,6 +387,7 @@ export function ContainerCard(props: ContainerCardProps): ReactNode {
           onPullBaseImage={props.pullBaseImage}
           onRemoveImage={props.removeImage}
           onRebuildImage={props.rebuildImage}
+          onBuildPtcImage={props.buildPtcImage}
           onSetDefaultImage={props.setDefaultImage}
         />
       </div>
@@ -455,6 +456,11 @@ export function ContainerCard(props: ContainerCardProps): ReactNode {
           gatewayVersion={state.gatewayVersion}
           gatewayCommit={state.gatewayCommit}
           gatewayVersionState={state.gatewayVersionState}
+          ptc={state.ptc}
+          locale={state.locale}
+          pendingActions={state.pendingActions}
+          onRecreatePtc={props.recreatePtc}
+          onRemovePtc={props.removePtc}
         />
       </div>
       {

@@ -11,6 +11,7 @@ import type {
   ConfigFormSnapshot,
 } from "@deepseek-ai/dsh-client-ui-settings/client";
 import {
+  absentPtcView,
   bareActionKey,
   type CacheView,
   type CardSnapshot,
@@ -20,6 +21,7 @@ import {
   type ContainerView,
   type ImageView,
   type MountInput,
+  type PtcView,
   type PublishedPortView,
   scopedActionKey,
   type SecretView,
@@ -146,6 +148,9 @@ export interface CardState {
   // value that arrives after the first render would otherwise never appear.
   directoryPicker?: DirectoryPickerFace;
   workspaces: readonly WorkspaceView[];
+  // The shared, workspace-less PTC container, always present (absent when the
+  // orchestrator holds no record for it).
+  ptc: PtcView;
   containers: readonly ContainerView[];
   images: readonly ImageView[];
   volumes: readonly VolumeView[];
@@ -161,6 +166,15 @@ export interface ContainerCardFace {
   // Unmount the current toast once its hold ends (or the user dismisses it).
   dismissToast: () => void;
   remove: (workspace: string, container: string) => void;
+  // Remove the one shared PTC container; it belongs to no workspace, so no
+  // workspace is named.
+  removePtc: () => void;
+  // Recreate the shared PTC container: the workspace-less remove followed by
+  // the ensure that brings it back.
+  recreatePtc: () => void;
+  // Build the missing PTC image through the container's ensure, which also
+  // creates the container: an image without a container has nothing to run yet.
+  buildPtcImage: () => void;
   cleanCaches: (mode: string) => void;
   removeWorkspace: (workspace: string) => void;
   recreate: (
@@ -264,6 +278,7 @@ const EMPTY_SNAPSHOT: CardSnapshot = {
   gatewayVersionState: "ok",
   projectsRoot: "",
   workspaces: [],
+  ptc: absentPtcView(),
   containers: [],
   images: [],
   volumes: [],
@@ -320,6 +335,12 @@ function commandKey(request: CommandRequest): string {
     case "cache_clean":
       return scopedActionKey(request.op, request.cacheMode);
     case "image_rebuild_all":
+      return bareActionKey(request.op);
+    case "ptc_remove":
+    case "ptc_recreate":
+    case "ptc_build":
+      // The shared PTC container is a singleton, so each of its commands has
+      // one key.
       return bareActionKey(request.op);
     case "default_env_sync":
       // A sync names the workspace it targets, and an empty workspace means
@@ -435,6 +456,7 @@ export class ContainerCardController {
         ? {}
         : { directoryPicker: this.directoryPicker }),
       workspaces: this.snapshot.workspaces,
+      ptc: this.snapshot.ptc,
       containers: this.snapshot.containers,
       images: this.snapshot.images,
       volumes: this.snapshot.volumes,
@@ -750,6 +772,9 @@ export class ContainerCardController {
       },
       remove: (workspace, container) =>
         this.command("remove", workspace, "", { container }),
+      removePtc: () => this.command("ptc_remove", "", ""),
+      recreatePtc: () => this.command("ptc_recreate", "", ""),
+      buildPtcImage: () => this.command("ptc_build", "", ""),
       cleanCaches: (mode) =>
         this.command("cache_clean", "", "", { cacheMode: mode }),
       removeWorkspace: (workspace) =>

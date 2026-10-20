@@ -9,7 +9,7 @@ import loader from "@grpc/proto-loader";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 import { tmpdir } from "node:os";
-import { existsSync, mkdirSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync } from "node:fs";
 import { controlClient, guestClient } from "./grpc/runtime-client.js";
 import {
   containerNotFound,
@@ -135,6 +135,7 @@ async function startControlServer(
   versions: Array<string | undefined>;
   createRequests: any[];
   recreateRequests: any[];
+  ensureRequests: any[];
   stop: () => void;
 }> {
   const protoPath = resolve(
@@ -176,6 +177,7 @@ async function startControlServer(
   const versions: Array<string | undefined> = [];
   const createRequests: any[] = [];
   const recreateRequests: any[] = [];
+  const ensureRequests: any[] = [];
   server.addService(loaded.dshctl.v1.OrchestratorControl.service, {
     listWorkspaces: (call: any, callback: any) => {
       received.push(call.metadata.get("authorization")[0]);
@@ -186,6 +188,7 @@ async function startControlServer(
       callback({ code: grpc.status.NOT_FOUND, details: "workspace not found" });
     },
     ensureContainer: (call: any, callback: any) => {
+      ensureRequests.push(call.request);
       const agentToken = options.staleToken === true && ensureCalls++ === 0
         ? "stale"
         : "tok";
@@ -266,6 +269,7 @@ async function startControlServer(
     versions,
     createRequests,
     recreateRequests,
+    ensureRequests,
     stop: () => {
       server.forceShutdown();
       // gRPC unlinks its sockets on shutdown; drop the root too so repeated
@@ -482,6 +486,81 @@ test("containerBinding exposes the session directory only when a project mount c
     assert.equal(binding.defaultCwd, undefined);
   } finally {
     unmounted.stop();
+  }
+});
+
+test("ptcBinding resolves and caches the shared PTC container without a cwd", async () => {
+  const rows: any[] = [{
+    workspaceSlug: "",
+    containerName: "ptc",
+    kind: "CONTAINER_KIND_PTC",
+    agentSocketPath: "/run/x.sock",
+    agentToken: "tok",
+    mounts: [],
+  }];
+  const control = await startControlServer(rows);
+  try {
+    const resolver = new WorkspaceResolver(
+      {
+        socketsRoot: control.socketsRoot,
+        defaultImage: "arch",
+        projectsRoot: "/projects",
+        controlToken: "",
+      },
+      {
+        // The shared PTC binding must not resolve any workspace from a cwd.
+        resolveByPath: () => {
+          throw new Error("the PTC binding must not resolve a workspace");
+        },
+      } as any,
+    );
+    const first = await resolver.ptcBinding();
+    assert.equal(first.token, "tok");
+    // The PTC container has no project mount, so the session directory is never
+    // offered as its cwd.
+    assert.equal(first.defaultCwd, undefined);
+    const second = await resolver.ptcBinding();
+    assert.equal(second, first, "the binding is cached under one global key");
+    assert.deepEqual(
+      control.ensureRequests.map((request) => request.container),
+      ["ptc"],
+      "the cached binding does not re-ensure on every use",
+    );
+    // The request names no workspace: the shared container belongs to none.
+    assert.equal(control.ensureRequests[0].workspaceSlug, "");
+    // The request carries the harness release the PTC image is built for, and
+    // that release is the one Containerfile.dsh pins.
+    const containerfile = readFileSync(
+      new URL("../Containerfile.dsh", import.meta.url),
+      "utf8",
+    );
+    const expected = /^ARG\s+DSH_VERSION=(\S+)/m.exec(containerfile)?.[1];
+    assert.ok(expected, "Containerfile.dsh must declare ARG DSH_VERSION");
+    assert.equal(control.ensureRequests[0].dshVersion, expected);
+  } finally {
+    control.stop();
+  }
+});
+
+test("ptcBinding reports a missing shared PTC container", async () => {
+  const control = await startControlServer();
+  try {
+    const resolver = new WorkspaceResolver(
+      {
+        socketsRoot: control.socketsRoot,
+        defaultImage: "arch",
+        projectsRoot: "/projects",
+        controlToken: "",
+      },
+      { resolveByPath: () => ({ id: SLUG, path: "/projects/team" }) } as any,
+    );
+    await assert.rejects(
+      () => resolver.ptcBinding(),
+      /container "ptc" not found$/,
+    );
+    assert.equal(control.recreateRequests.length, 0);
+  } finally {
+    control.stop();
   }
 });
 

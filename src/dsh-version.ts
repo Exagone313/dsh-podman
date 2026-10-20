@@ -45,6 +45,46 @@ export function versionFromPackages(
   return typeof version === "string" && version !== "" ? version : undefined;
 }
 
+// PINNED_PACKAGE is one of the harness packages the plugin pins. Every
+// @deepseek-ai/dsh-* specifier carries the same release (package-deps.test.ts
+// enforces it), so any of them is a single source of truth for the release the
+// plugin targets.
+const PINNED_PACKAGE = "@deepseek-ai/dsh-subprocess";
+
+// harnessVersionFromManifest reads the pinned harness release from package
+// metadata. "" when the manifest does not pin it.
+export function harnessVersionFromManifest(manifest: unknown): string {
+  const dependencies = (manifest as {
+    peerDependencies?: Record<string, unknown>;
+  } | undefined)?.peerDependencies;
+  const version = dependencies?.[PINNED_PACKAGE];
+  return typeof version === "string" ? version : "";
+}
+
+let cachedPinned: string | undefined;
+
+// pinnedDshVersion returns the harness release this plugin targets, read from
+// its own package metadata rather than duplicated in code. The orchestrator
+// builds the PTC image for it, so it must be the release the plugin's
+// @deepseek-ai/dsh-* dependencies were built against. "" when it cannot be
+// resolved.
+export function pinnedDshVersion(): string {
+  if (cachedPinned !== undefined) return cachedPinned;
+  let resolved = "";
+  try {
+    resolved = harnessVersionFromManifest(
+      JSON.parse(
+        readFileSync(new URL("../package.json", import.meta.url), "utf8"),
+      ),
+    );
+  } catch {
+    // An unreadable manifest leaves the pinned version unknown.
+  }
+  // Only a resolved version is cached, like dshVersion above.
+  if (resolved !== "") cachedPinned = resolved;
+  return resolved;
+}
+
 // resolveDshVersion walks the physical module search paths, for an install
 // whose app package is a real node_modules entry (a source checkout).
 function resolveDshVersion(): string | undefined {

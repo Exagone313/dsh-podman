@@ -169,6 +169,34 @@ test("default_env_sync honors a workspace filter", async () => {
   ]);
 });
 
+test("default_env_sync skips the shared PTC container", async () => {
+  // The PTC container is orchestrator-owned and user-addressed mutations on it
+  // are refused, so a sync must never try to recreate it.
+  const containers = [
+    {
+      workspaceSlug: "w1",
+      containerName: "default",
+      status: "running",
+      env: {},
+    },
+    {
+      workspaceSlug: "",
+      containerName: "ptc",
+      kind: "CONTAINER_KIND_PTC",
+      status: "running",
+      env: {},
+    },
+  ];
+  const { scope, calls, resolver } = driver(DEFAULTS, containers);
+  await installCardCommandDriver(fakeContext(scope), resolver);
+  await scope.update({ command: { op: "default_env_sync", workspace: "" } });
+  await settle();
+  const recreates = calls.filter(([method]) => method === "recreateContainer");
+  assert.deepEqual(recreates.map(([, request]) => request), [
+    { workspaceSlug: "w1", container: "default", env: DEFAULTS },
+  ]);
+});
+
 test("default_env_sync reports nothing to do when the defaults are absent", async () => {
   const { scope, calls, resolver } = driver(undefined, [
     {

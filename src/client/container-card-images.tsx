@@ -12,7 +12,8 @@ import {
   StatusChip,
   TagInput,
 } from "./container-card-shared.js";
-import { scopedActionKey } from "./card-protocol.js";
+import { bareActionKey, scopedActionKey } from "./card-protocol.js";
+import { buildParentImages, ptcImageRow } from "./container-card-ptc.js";
 import { FIELD_ROW_CLASS } from "./container-card-table-styles.js";
 import {
   actionRow,
@@ -296,6 +297,94 @@ export function BaseImageRow(props: {
   );
 }
 
+// The one reserved PTC image row: the image's name, its status chip and the
+// violet PTC marker, its build date and parent line, then its Build/Rebuild
+// action beside the disabled Set default. The PTC image is never a workspace's
+// default, so that button stays disabled and its tooltip says why; the row has
+// no Remove and is not a parent candidate, because the orchestrator owns its
+// single image.
+export function PtcImageRow(props: {
+  t: Translate;
+  image: ImageView;
+  // The plugin's active locale, for the build time's relative wording.
+  locale: string;
+  last: boolean;
+  pendingActions: readonly string[];
+  onRebuild: (imageId: string) => void;
+  // Building a missing image also creates the container, so it goes through
+  // the ensure rather than the image-only rebuild.
+  onBuild: () => void;
+}): ReactNode {
+  const {
+    t,
+    image,
+    locale,
+    last,
+    pendingActions,
+    onRebuild,
+    onBuild,
+  } = props;
+  const row = ptcImageRow(t, image);
+  const built = image.status === "built";
+  const pending = pendingActions.includes(
+    built
+      ? scopedActionKey("image_rebuild", image.imageId)
+      : bareActionKey("ptc_build"),
+  );
+  return (
+    <div style={last ? cardBlockRow : { ...cardBlockRow, ...rowDivider }}>
+      <div style={actionRow}>
+        <div style={rowMain}>
+          <span style={containerNameHeading}>{row.imageId}</span>
+          {row.chips.map((chip) => (
+            <StatusChip
+              key={chip.key}
+              tone={chip.tone}
+              label={chip.label}
+              title={chip.title}
+            />
+          ))}
+        </div>
+        <div style={rowActions}>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={pending}
+            onClick={() => (built ? onRebuild(image.imageId) : onBuild())}
+          >
+            {pending ? t("busy") : row.build.label}
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={row.setDefault.disabled}
+            title={row.setDefault.tooltip}
+          >
+            {row.setDefault.label}
+          </Button>
+        </div>
+      </div>
+      <div style={imageFields}>
+        {
+          /* A missing image was never built, so the line is absent there just
+            as it is on every other row; the exact instant stays available as
+            the tooltip. */
+        }
+        {row.builtAt === "" ? null : (
+          <ImageField label={t("built")}>
+            <span title={row.builtAt}>
+              {relativeTimeLabel(row.builtAt, locale)}
+            </span>
+          </ImageField>
+        )}
+        {row.parent === ""
+          ? null
+          : <ImageField label={t("parentImage")}>{row.parent}</ImageField>}
+      </div>
+    </div>
+  );
+}
+
 export function ImageBuildModal(props: {
   t: Translate;
   images: readonly { imageId: string; isBase: boolean }[];
@@ -326,8 +415,12 @@ export function ImageBuildModal(props: {
   const imageIdLabel = useId();
   const parentLabel = useId();
   const packagesLabel = useId();
-  const baseImages = images.filter((image) => image.isBase);
-  const customImages = images.filter((image) => !image.isBase);
+  // The parent choices exclude the reserved PTC image even if the caller hands
+  // in the whole snapshot: the PTC image is listed in the base card but built
+  // only by the orchestrator, never as a custom image's parent.
+  const parentImages = buildParentImages(images);
+  const baseImages = parentImages.filter((image) => image.isBase);
+  const customImages = parentImages.filter((image) => !image.isBase);
   return (
     <Modal
       open={open}

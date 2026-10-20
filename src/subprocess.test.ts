@@ -347,6 +347,170 @@ test("subprocess provider forwards env tombstones and spills", async () => {
   assert.equal(fake.deletes[0].path, start.spillStdout.path);
 });
 
+const controlSpawnSpec = () =>
+  spawnSpec({
+    stdio: {
+      stdin: "ignore",
+      stdout: "pipe",
+      stderr: "pipe",
+      control: "pipe",
+    },
+  });
+
+test("subprocess provider opens the requested control channel", async () => {
+  const fake = spawnGuest({ emitExit: false });
+  const provider = createSubprocessProvider(fake.resolver as any);
+  const handle = provider.spawn(controlSpawnSpec());
+  await new Promise((resolve) => setImmediate(resolve));
+
+  // The exec asks the PTC guest for fd 7 and stamps the marker the PTC child
+  // consumes before opening it.
+  const start = fake.ptcStarts[0].start;
+  assert.equal(start.control, true);
+  assert.equal(start.env.DSH_SUBPROCESS_CONTROL, "pipe");
+  assert.equal(fake.ptcCapabilityCalls(), 1);
+  assert.equal(fake.capabilityCalls(), 0);
+
+  // The control call opens after the process id and names the exec first.
+  const call = fake.ptcControlCalls[0];
+  assert.deepEqual(call.messages, [{ execId: "7" }]);
+
+  const received: string[] = [];
+  handle.control.on(
+    "data",
+    (chunk: Buffer) => received.push(chunk.toString("utf8")),
+  );
+  const ended = new Promise<void>((resolve) =>
+    handle.control.once("end", resolve)
+  );
+  call.emitData(Buffer.from("from-guest"));
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.deepEqual(received, ["from-guest"]);
+
+  handle.control.write(Buffer.from("from-caller"));
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.deepEqual(call.messages[1], { data: Buffer.from("from-caller") });
+
+  // The guest closing its half ends the caller's readable side.
+  call.emitEnd();
+  await ended;
+
+  fake.ptcStreams[0].emitData({ exit: { exitCode: 0, signaled: false } });
+  assert.deepEqual(await handle.done, { exitCode: 0, signal: null });
+});
+
+test("subprocess provider runs a control spawn in the PTC container", async () => {
+  const fake = spawnGuest();
+  const provider = createSubprocessProvider(fake.resolver as any);
+  const handle = provider.spawn(controlSpawnSpec());
+  assert.deepEqual(await handle.done, { exitCode: 0, signal: null });
+
+  // The child ran in the PTC container, never in the workspace container, and
+  // started from the PTC container's scratch /tmp because the caller's cwd is a
+  // workspace path that does not exist there.
+  assert.equal(fake.ptcBindingCalls(), 1);
+  assert.equal(fake.ptcStarts.length, 1);
+  assert.equal(fake.starts.length, 0);
+  assert.equal(fake.ptcStarts[0].start.cwd, "/tmp");
+  // The child runs as its own numeric uid/gid from the bounded pool, with no
+  // supplementary groups inherited from the agent.
+  assert.deepEqual(fake.ptcStarts[0].start.uid, { value: 1001 });
+  assert.deepEqual(fake.ptcStarts[0].start.gid, { value: 1001 });
+  assert.equal(fake.ptcStarts[0].start.groups, undefined);
+});
+
+test("subprocess provider gives concurrent control spawns distinct identities and releases them", async () => {
+  const fake = spawnGuest({ emitExit: false });
+  const provider = createSubprocessProvider(fake.resolver as any);
+  const first = provider.spawn(controlSpawnSpec());
+  const second = provider.spawn(controlSpawnSpec());
+  await new Promise((resolve) => setImmediate(resolve));
+
+  const firstUid = fake.ptcStarts[0].start.uid.value;
+  const secondUid = fake.ptcStarts[1].start.uid.value;
+  assert.equal(firstUid, 1001);
+  assert.equal(secondUid, 1002);
+  assert.notEqual(firstUid, secondUid);
+
+  // The first child exiting frees its id, and the next spawn reuses the lowest
+  // free one instead of consuming a fresh id.
+  fake.ptcStreams[0].emitData({ exit: { exitCode: 0, signaled: false } });
+  assert.deepEqual(await first.done, { exitCode: 0, signal: null });
+  const third = provider.spawn(controlSpawnSpec());
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(fake.ptcStarts[2].start.uid.value, firstUid);
+
+  fake.ptcStreams[1].emitData({ exit: { exitCode: 0, signaled: false } });
+  fake.ptcStreams[2].emitData({ exit: { exitCode: 0, signaled: false } });
+  assert.deepEqual(await second.done, { exitCode: 0, signal: null });
+  assert.deepEqual(await third.done, { exitCode: 0, signal: null });
+});
+
+test("subprocess provider fails a control spawn without the PTC container", async () => {
+  let workspaceCalls = 0;
+  const provider = createSubprocessProvider({
+    resolve: async () => {
+      workspaceCalls++;
+      return { guest: {}, token: "t" };
+    },
+    ptcBinding: async () => {
+      throw new Error("no PTC container in this workspace");
+    },
+  } as any);
+  const handle = provider.spawn(controlSpawnSpec());
+  await assert.rejects(
+    handle.done,
+    /PTC container "ptc".*no PTC container in this workspace/,
+  );
+  assert.equal(
+    workspaceCalls,
+    0,
+    "must not fall back to the workspace container",
+  );
+});
+
+test("subprocess provider runs a control spawn without control capability in the PTC container", async () => {
+  const fake = spawnGuest({ control: false });
+  const provider = createSubprocessProvider(fake.resolver as any);
+  const handle = provider.spawn(controlSpawnSpec());
+  assert.deepEqual(await handle.done, { exitCode: 0, signal: null });
+
+  // The exec is exactly the pre-control spawn: no fd 7 requested, no marker,
+  // no control stream, and the handle reports no channel. It still runs in the
+  // PTC container rather than falling back to the workspace container.
+  assert.equal(handle.control, undefined);
+  assert.equal(fake.ptcStarts[0].start.control, undefined);
+  assert.equal(fake.ptcStarts[0].start.env.DSH_SUBPROCESS_CONTROL, undefined);
+  assert.equal(fake.ptcControlCalls.length, 0);
+  assert.equal(fake.starts.length, 0);
+});
+
+test("subprocess provider keeps a control spawn in the PTC container when the capability probe is unimplemented", async () => {
+  const fake = spawnGuest({ capabilityError: true });
+  const provider = createSubprocessProvider(fake.resolver as any);
+  const handle = provider.spawn(controlSpawnSpec());
+  assert.deepEqual(await handle.done, { exitCode: 0, signal: null });
+  assert.equal(handle.control, undefined);
+  assert.equal(fake.ptcStarts[0].start.control, undefined);
+  assert.equal(fake.starts.length, 0);
+});
+
+test("subprocess provider leaves ordinary spawns without a control channel", async () => {
+  const fake = spawnGuest();
+  const provider = createSubprocessProvider(fake.resolver as any);
+  const handle = provider.spawn(spawnSpec());
+  assert.deepEqual(await handle.done, { exitCode: 0, signal: null });
+  assert.equal(handle.control, undefined);
+  assert.equal(fake.capabilityCalls(), 0);
+  assert.equal(fake.starts[0].start.control, undefined);
+  // A non-control spawn keeps its caller identity: no uid/gid is sent.
+  assert.equal(fake.starts[0].start.uid, undefined);
+  assert.equal(fake.starts[0].start.gid, undefined);
+  // An ordinary spawn never touches the PTC container.
+  assert.equal(fake.ptcBindingCalls(), 0);
+  assert.equal(fake.ptcStarts.length, 0);
+});
+
 test("subprocess provider keeps a spill that holds dropped output", async () => {
   const fake = spawnGuest({
     exit: { stdoutSpillValid: true },

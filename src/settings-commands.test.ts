@@ -12,6 +12,8 @@ import {
   mountCommand,
 } from "./card-test-support.js";
 import { installCardCommandDriver } from "./card-test-support.js";
+import { PTC_CONTAINER_NAME, PTC_IMAGE_ID } from "./client/card-protocol.js";
+import { pinnedDshVersion } from "./dsh-version.js";
 
 test("remove command drives removeContainer and clears the command", async () => {
   const scope = fakeScope(baseValue());
@@ -264,7 +266,71 @@ test("image_rebuild command drives rebuildImage with the imageId", async () => {
   assert.equal(scope.value.command, null);
 });
 
-test("image_rebuild_all command drives rebuildAllImages with an empty payload", async () => {
+test("image_rebuild on the PTC row rebuilds the image without the ensure", async () => {
+  const scope = fakeScope(baseValue());
+  const calls: Array<[string, unknown]> = [];
+  const resolver: any = {
+    getConfig: () => ({}),
+    setConfig: () => {},
+    async control(method: string, request: unknown) {
+      calls.push([method, request]);
+      if (method === "listContainers") return { containers: [] };
+      if (method === "listImages") return { images: [] };
+      if (method === "listWorkspaces") return { workspaces: [] };
+      if (method === "listVolumes") return { volumes: [] };
+      if (method === "listSecrets") return { secrets: [] };
+      return {};
+    },
+  };
+  await installCardCommandDriver(fakeContext(scope), resolver);
+  await scope.update({
+    command: { op: "image_rebuild", workspace: PTC_IMAGE_ID, image: "", at: 9 },
+  });
+  await new Promise((resolve) => setImmediate(resolve));
+  const rebuildCall = calls.find(([method]) => method === "rebuildImage");
+  assert.deepEqual(rebuildCall?.[1], {
+    imageId: PTC_IMAGE_ID,
+    dshVersion: pinnedDshVersion(),
+  });
+  // Rebuild only rebuilds the image: it must not go through the ensure, which
+  // can recreate the PTC container.
+  assert.equal(calls.some(([method]) => method === "ensureContainer"), false);
+  assert.equal(scope.value.command, null);
+});
+
+test("ptc_build on a missing PTC image drives the PTC ensure path", async () => {
+  const scope = fakeScope(baseValue());
+  const calls: Array<[string, unknown]> = [];
+  const resolver: any = {
+    getConfig: () => ({}),
+    setConfig: () => {},
+    async control(method: string, request: unknown) {
+      calls.push([method, request]);
+      if (method === "listContainers") return { containers: [] };
+      if (method === "listImages") return { images: [] };
+      if (method === "listWorkspaces") return { workspaces: [] };
+      if (method === "listVolumes") return { volumes: [] };
+      if (method === "listSecrets") return { secrets: [] };
+      return {};
+    },
+  };
+  await installCardCommandDriver(fakeContext(scope), resolver);
+  await scope.update({
+    command: { op: "ptc_build", workspace: "", image: "", at: 9 },
+  });
+  await new Promise((resolve) => setImmediate(resolve));
+  const ensureCall = calls.find(([method]) => method === "ensureContainer");
+  assert.deepEqual(ensureCall?.[1], {
+    container: PTC_CONTAINER_NAME,
+    dshVersion: pinnedDshVersion(),
+  });
+  // Build creates the container with the image, so it does not rebuild the
+  // image on its own.
+  assert.equal(calls.some(([method]) => method === "rebuildImage"), false);
+  assert.equal(scope.value.command, null);
+});
+
+test("image_rebuild_all command drives rebuildAllImages with the pinned release", async () => {
   const scope = fakeScope(baseValue());
   const calls: Array<[string, unknown]> = [];
   const resolver: any = {
@@ -286,7 +352,7 @@ test("image_rebuild_all command drives rebuildAllImages with an empty payload", 
   });
   await new Promise((resolve) => setImmediate(resolve));
   const rebuildCall = calls.find(([method]) => method === "rebuildAllImages");
-  assert.deepEqual(rebuildCall?.[1], {});
+  assert.deepEqual(rebuildCall?.[1], { dshVersion: pinnedDshVersion() });
   assert.equal(scope.value.command, null);
 });
 

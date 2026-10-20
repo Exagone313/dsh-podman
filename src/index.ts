@@ -255,6 +255,8 @@ export {
 export { Config } from "./settings-schema.js";
 export {
   publicContainer,
+  publicContainerResult,
+  publicContainers,
   publicDaemon,
   publicImage,
   publicMount,

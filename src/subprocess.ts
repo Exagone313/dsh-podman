@@ -10,9 +10,47 @@ import {
 } from "./output-reader.js";
 import { openGuestTerminal } from "./guest-terminal.js";
 import { globCwd, remoteArgv, unaryGuest } from "./guest-rpc.js";
-import { metadata, type WorkspaceResolver } from "./workspace-binding.js";
-import { PassThrough } from "node:stream";
+import {
+  metadata,
+  PTC_CONTAINER,
+  type WorkspaceResolver,
+} from "./workspace-binding.js";
+import { Duplex, PassThrough } from "node:stream";
 import { SubprocessExecutableNotFoundError } from "@deepseek-ai/dsh-subprocess";
+
+// The scratch directory a PTC child runs from. The PTC container has no
+// project mount, so the harness's cwd (a workspace path) does not exist there;
+// its /tmp is the one writable place it can start in.
+const PTC_SCRATCH_CWD = "/tmp";
+
+// The bounded range of numeric uids a PTC child may run as. Each concurrent
+// control spawn gets its own id because the guest creates a per-uid home under
+// /tmp/dsh-podman-home/<uid>; the ids stay outside the container's usual
+// service and dynamic ranges.
+const PTC_UID_MIN = 1001;
+const PTC_UID_MAX = 10000;
+
+// PtcUidPool hands out one numeric identity per running control spawn. It is
+// bounded on purpose: running out is an explicit failure, never a fallback to a
+// shared or privileged identity.
+class PtcUidPool {
+  private readonly inUse = new Set<number>();
+  // allocate returns the lowest free id, so a released one is reused before a
+  // fresh one, which keeps the pool compact under normal churn.
+  allocate(): number {
+    for (let id = PTC_UID_MIN; id <= PTC_UID_MAX; id++) {
+      if (this.inUse.has(id)) continue;
+      this.inUse.add(id);
+      return id;
+    }
+    throw new Error(
+      `cannot start a PTC child: no free uid in ${PTC_UID_MIN}-${PTC_UID_MAX}`,
+    );
+  }
+  release(id: number): void {
+    this.inUse.delete(id);
+  }
+}
 
 export interface SubprocessProvider {
   resolveExecutable(command: string): Promise<string>;
@@ -31,9 +69,34 @@ export function createSubprocessProvider(
   // Live termination handles, so service disposal can stop every process this
   // provider started (the harness's disposal contract).
   const live = new Set<() => void>();
+  // The numeric identities the running control spawns hold, one per child.
+  const ptcUids = new PtcUidPool();
+  // Whether a guest agent implements the ExecControl transport, probed once
+  // per agent. An older agent answers UNIMPLEMENTED (or has no such method),
+  // and the probe then reports no support so spawn falls back to the previous
+  // behaviour.
+  const controlSupport = new Map<string, Promise<boolean>>();
+  const supportsControl = (binding: any): Promise<boolean> => {
+    const key = String(binding.socket ?? binding.token ?? "");
+    let probe = controlSupport.get(key);
+    if (probe === undefined) {
+      probe = unaryGuest({ binding }, "getCapabilities", {}).then(
+        (result: any) => result?.execControl === true,
+        () => {
+          // An older agent does not implement the probe. Do not cache the
+          // failure: a recreated agent may answer next time.
+          controlSupport.delete(key);
+          return false;
+        },
+      );
+      controlSupport.set(key, probe);
+    }
+    return probe;
+  };
   return {
     dispose: () => {
       for (const terminate of Array.from(live)) terminate();
+      controlSupport.clear();
     },
     // The harness's resolveExecutable carries no cwd, and this provider's
     // execution world is per-workspace (each workspace is its own container),
@@ -84,6 +147,27 @@ export function createSubprocessProvider(
       const stderrSpill = spillTargetFor(spec.stdio?.stderr, "stderr");
       const stdoutReader = outputReader(spec.stdio?.stdout, stdoutSpill.spec);
       const stderrReader = outputReader(spec.stdio?.stderr, stderrSpill.spec);
+      // The control duplex is created synchronously because the harness reads
+      // `handle.control` immediately after spawn, while the guest's capability
+      // is only known once the binding resolves. A guest without ExecControl
+      // clears it again before the exec starts, which leaves the runtime with
+      // its normal missing-control error.
+      const wantsControl = spec.stdio?.control === "pipe";
+      // A control spawn is a PTC child, so it is assigned a private numeric
+      // identity for its whole run. A non-control spawn keeps the caller's own
+      // identity and never touches the pool.
+      const ptcUid = wantsControl ? ptcUids.allocate() : undefined;
+      const controlIn = wantsControl ? new PassThrough() : undefined;
+      const controlOut = wantsControl ? new PassThrough() : undefined;
+      let control = controlIn !== undefined && controlOut !== undefined
+        // @types/node omits the documented { writable, readable } overload.
+        ? Duplex.from({ writable: controlOut, readable: controlIn } as any)
+        : undefined;
+      // The provider destroys this duplex on fallback and on exec exit.
+      // Duplexify reports that teardown as an AbortError, which would crash
+      // the host when no caller listener is attached; the caller's own
+      // listeners still observe transport failures.
+      control?.on("error", () => {});
       const state = {
         pid: -1,
         stdin: undefined as any,
@@ -150,11 +234,84 @@ export function createSubprocessProvider(
       // A ripgrep discovery listing runs from its search root, so a pattern
       // containing "/" anchors to the path the harness passed; the workspace
       // binding still resolves from the caller's cwd.
-      const runCwd = globCwd(spec.argv, spec.cwd) ?? spec.cwd;
-      const done = resolver.resolve(spec.cwd).then(
-        (binding) =>
-          new Promise<any>((resolveDone, reject) => {
-            processBinding = binding;
+      //
+      // A control spawn is a PTC child: the harness runs its programmatic
+      // tool-calling runtime there, with the fd-7 channel it requested. The PTC
+      // container is separate from the workspace container and has no project
+      // mount, so the child starts in its scratch /tmp rather than the caller's
+      // workspace cwd. Every other spawn keeps today's binding and cwd.
+      const runCwd = wantsControl
+        ? PTC_SCRATCH_CWD
+        : globCwd(spec.argv, spec.cwd) ?? spec.cwd;
+      const resolved = wantsControl
+        ? resolver.ptcBinding().catch((error: unknown) => {
+          const detail = error instanceof Error ? error.message : String(error);
+          // There is deliberately no fallback to the workspace container: a
+          // PTC child that cannot run in the PTC container must fail instead of
+          // executing with the wrong filesystem, mounts, and credentials.
+          throw new Error(
+            `cannot obtain the shared PTC container ${
+              JSON.stringify(PTC_CONTAINER)
+            } for this control spawn: ${detail}`,
+          );
+        })
+        : resolver.resolve(spec.cwd);
+      const done = resolved.then(
+        async (binding) => {
+          processBinding = binding;
+          const withControl = wantsControl &&
+            await supportsControl(binding);
+          if (wantsControl && !withControl) {
+            control?.destroy();
+            control = undefined;
+          }
+          return new Promise<any>((resolveDone, reject) => {
+            // One control call per exec. It is opened only after the guest
+            // reports the process id, because its first frame names the exec.
+            let controlCall: any;
+            let controlClosed = false;
+            const closeControl = (): void => {
+              if (controlClosed) return;
+              controlClosed = true;
+              try {
+                controlCall?.cancel?.();
+              } catch {
+                // A finished call cannot be cancelled again.
+              }
+            };
+            const openControl = (execId: string): void => {
+              if (!withControl || controlCall !== undefined) return;
+              controlCall = (binding.guest as any).execControl(
+                metadata(binding.token),
+              );
+              controlCall.on("data", (frame: any) => {
+                const data = frame?.data;
+                if (data !== undefined && data.length > 0) {
+                  controlIn?.write(Buffer.from(data));
+                }
+              });
+              controlCall.on("error", (error: unknown) => {
+                // The transport is gone; fail the caller's channel rather than
+                // leaving it open with no way to deliver frames.
+                controlIn?.destroy(
+                  error instanceof Error ? error : new Error(String(error)),
+                );
+              });
+              controlCall.on("end", () => controlIn?.end());
+              controlOut?.on("data", (data: Buffer) => {
+                if (controlClosed) return;
+                try {
+                  controlCall.write({ data });
+                } catch {
+                  closeControl();
+                }
+              });
+              controlOut?.on("end", () => {
+                if (!controlClosed) controlCall.end();
+              });
+              controlOut?.on("close", closeControl);
+              controlCall.write({ execId });
+            };
             const stream = (binding.guest as any).exec(metadata(binding.token));
             // finish settles the handle exactly once and tears it down however
             // the process ends: an exit message, a stream error, or a stream
@@ -178,6 +335,8 @@ export function createSubprocessProvider(
                 pendingDrains = 0;
                 stream.resume?.();
               }
+              control?.destroy();
+              closeControl();
               state.stdout?.end();
               state.stderr?.end();
               discardUnneededSpill(binding, stdoutReader);
@@ -196,6 +355,7 @@ export function createSubprocessProvider(
               }
               if (output.processId) {
                 state.pid = Number(output.processId);
+                openControl(String(output.processId));
                 if (terminated) terminate();
               }
               if (output.stderrChunk) {
@@ -234,6 +394,7 @@ export function createSubprocessProvider(
               finish(new Error("exec stream ended before the process exited"));
             });
             const env = splitEnv(spec.env);
+            if (withControl) env.env.DSH_SUBPROCESS_CONTROL = "pipe";
             stream.write({
               start: {
                 argv: remoteArgv(spec.argv),
@@ -244,6 +405,12 @@ export function createSubprocessProvider(
                 // /dev/null: a pipe would be a non-TTY stdin, and tools like
                 // ripgrep then read stdin instead of the working directory.
                 stdinPipe: spec.stdio?.stdin === "pipe",
+                ...(withControl ? { control: true } : {}),
+                // The PTC child runs as its own numeric uid/gid; it inherits no
+                // supplementary groups from the agent.
+                ...(ptcUid !== undefined
+                  ? { uid: { value: ptcUid }, gid: { value: ptcUid } }
+                  : {}),
                 ...(stdoutSpill.target !== undefined
                   ? { spillStdout: stdoutSpill.target }
                   : {}),
@@ -261,19 +428,29 @@ export function createSubprocessProvider(
               );
               state.stdin.on("end", () => stream.end());
             }
-          }),
+          });
+        },
       );
       if (spec.signal !== undefined) {
         if (spec.signal.aborted) terminate();
         else spec.signal.addEventListener("abort", terminate, { once: true });
       }
       live.add(terminate);
+      void done.catch(() => control?.destroy());
       void done.finally(() => live.delete(terminate)).catch(() => {});
+      // The child's identity is free again once its exec settles, however it
+      // ended (an exit, a stream failure, or a failed binding).
+      if (ptcUid !== undefined) {
+        void done.finally(() => ptcUids.release(ptcUid)).catch(() => {});
+      }
       return {
         ...state,
-        // The harness's SubprocessHandle declares a control channel; this
-        // provider runs every process over gRPC, so none exists.
-        control: undefined,
+        // The control channel is present only when the caller requested it and
+        // the guest implements ExecControl; a guest without the feature clears
+        // it before the exec starts.
+        get control() {
+          return control;
+        },
         collected: {
           ...(stdoutReader === undefined ? {} : { stdout: stdoutReader }),
           ...(stderrReader === undefined ? {} : { stderr: stderrReader }),

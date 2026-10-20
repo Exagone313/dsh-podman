@@ -5,7 +5,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { SECRET_BEARING_CONTAINER } from "./test-support.js";
-import { publicContainer } from "./index.js";
+import {
+  publicContainer,
+  publicContainerResult,
+  publicContainers,
+} from "./index.js";
 
 test("publicContainer rebuilds a safe object from an API row", () => {
   const out = publicContainer(SECRET_BEARING_CONTAINER);
@@ -23,4 +27,28 @@ test("publicContainer rebuilds a safe object from an API row", () => {
     { projectName: "team", mode: "read_write", kind: "project" },
   ]);
   assert.deepEqual(out.env, { PATH: "/bin", DB_PASSWORD: "hunter2" });
+});
+
+test("publicContainers drops the reserved PTC container", () => {
+  const out = publicContainers([
+    { ...SECRET_BEARING_CONTAINER, containerName: "default" },
+    {
+      containerName: "ptc",
+      kind: "CONTAINER_KIND_PTC",
+      status: "running",
+    },
+  ]);
+  assert.deepEqual(out.map((row) => row.containerName), ["default"]);
+});
+
+test("publicContainerResult refuses the reserved PTC container", () => {
+  assert.throws(
+    () =>
+      publicContainerResult({
+        workspaceSlug: "w1",
+        containerName: "ptc",
+        kind: "CONTAINER_KIND_PTC",
+      }),
+    /container "ptc" not found in workspace "w1"/,
+  );
 });

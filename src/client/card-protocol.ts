@@ -11,6 +11,17 @@
 // at registration).
 export const CARD_PATH = "/api/podman/card";
 
+// The reserved logical name of the one shared, orchestrator-owned PTC
+// container. It belongs to no workspace, so it is rendered from its own
+// snapshot entry rather than among a workspace's containers.
+export const PTC_CONTAINER_NAME = "ptc";
+
+// The one image id the orchestrator reserves for the shared PTC image. It is
+// not stored among the images, and the container names it even before it
+// exists: the card reads the expected image from the snapshot rather than
+// guessing it.
+export const PTC_IMAGE_ID = "ptc";
+
 export interface MountInput {
   kind: string;
   project: string;
@@ -22,6 +33,9 @@ export interface MountInput {
 
 export type CommandOp =
   | "remove"
+  | "ptc_remove"
+  | "ptc_recreate"
+  | "ptc_build"
   | "workspace_remove"
   | "recreate"
   | "create"
@@ -155,6 +169,30 @@ export interface ContainerView {
   publishedPorts: readonly PublishedPortView[];
 }
 
+// The one shared PTC container, rendered by the card outside any workspace.
+// Unlike a workspace container it has no slug, and its state says "absent"
+// when the orchestrator holds no record for it: the container is created
+// lazily on first use, so a missing one is a normal state, not an error.
+export interface PtcView {
+  containerName: string;
+  kind: "ptc";
+  state: "running" | "stopped" | "absent";
+  imageId: string;
+  createdAt: string;
+}
+
+export function absentPtcView(): PtcView {
+  return {
+    containerName: PTC_CONTAINER_NAME,
+    kind: "ptc",
+    state: "absent",
+    // The container does not exist yet, but its image does: naming it keeps the
+    // card's image field filled instead of requiring the client to guess.
+    imageId: PTC_IMAGE_ID,
+    createdAt: "",
+  };
+}
+
 export interface ImageView {
   imageId: string;
   parent: string;
@@ -219,6 +257,9 @@ export interface CardSnapshot {
   gatewayVersionState: "ok" | "minor-mismatch" | "major-mismatch";
   projectsRoot: string;
   workspaces: readonly WorkspaceView[];
+  // The shared, workspace-less PTC container, always present (absent when the
+  // orchestrator holds no record for it).
+  ptc: PtcView;
   containers: readonly ContainerView[];
   images: readonly ImageView[];
   volumes: readonly VolumeView[];

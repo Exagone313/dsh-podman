@@ -547,24 +547,68 @@ export class FakeExecStream extends EventEmitter {
   }
 }
 
-// A fake guest for the subprocess provider: exec emits a process id (and
-// optionally an exit), and the unary signal/delete RPCs are recorded.
-export function spawnGuest(
-  options: {
-    emitExit?: boolean;
-    exit?: Record<string, unknown>;
-    stdout?: string;
-  } = {},
-) {
+// The guest ExecControl stream the subprocess provider drives. The provider
+// writes the exec id first and then one frame per caller chunk; emitData plays
+// a guest frame back and emitEnd closes the guest's half.
+export class FakeControlCall extends EventEmitter {
+  readonly messages: any[] = [];
+  ended = false;
+  cancelled = false;
+  write(message: any): void {
+    this.messages.push(message);
+  }
+  end(): void {
+    this.ended = true;
+  }
+  cancel(): void {
+    this.cancelled = true;
+  }
+  emitData(data: Buffer): void {
+    this.emit("data", { data });
+  }
+  emitEnd(): void {
+    this.emit("end");
+  }
+}
+
+// One fake guest agent for the subprocess provider: exec emits a process id
+// (and optionally an exit), ExecControl records the control stream, and the
+// unary signal/delete/capability RPCs are recorded.
+function spawnAgent(options: {
+  emitExit?: boolean;
+  exit?: Record<string, unknown>;
+  stdout?: string;
+  control?: boolean;
+  capabilityError?: boolean;
+}) {
   const signals: Array<{ processId: string; signal: string }> = [];
   const starts: Array<Record<string, any>> = [];
   const deletes: Array<Record<string, unknown>> = [];
   const streams: FakeExecStream[] = [];
+  const controlCalls: FakeControlCall[] = [];
+  let capabilityCalls = 0;
   const guest = {
     exec: () => {
       const stream = new FakeExecStream(starts, options);
       streams.push(stream);
       return stream;
+    },
+    getCapabilities: (
+      _request: unknown,
+      _metadata: unknown,
+      callback: Function,
+    ) => {
+      capabilityCalls++;
+      if (options.capabilityError === true) {
+        callback(new Error("guest agent does not implement ExecControl"));
+      } else {
+        callback(null, { execControl: options.control !== false });
+      }
+    },
+    execControl: () => {
+      const call = new FakeControlCall();
+      controlCalls.push(call);
+      return call;
     },
     signal: (
       request: { processId: string; signal: string },
@@ -588,8 +632,56 @@ export function spawnGuest(
     starts,
     deletes,
     streams,
+    controlCalls,
     guest,
-    resolver: { resolve: async () => ({ guest, token: "t" }) },
+    capabilityCalls: () => capabilityCalls,
+  };
+}
+
+// A fake resolver for the subprocess provider with the workspace container and
+// its reserved PTC container as two distinct agents, so a test can tell which
+// one ran a spawn. `resolve` is the ordinary path; `ptcBinding` is the control
+// child's path, and `ptcError` makes it fail as an unavailable PTC container.
+export function spawnGuest(
+  options: {
+    emitExit?: boolean;
+    exit?: Record<string, unknown>;
+    stdout?: string;
+    // Whether GetCapabilities reports ExecControl support. Defaults to true.
+    control?: boolean;
+    // Whether GetCapabilities fails, as an older agent would.
+    capabilityError?: boolean;
+    // The failure ptcBinding reports instead of a binding.
+    ptcError?: unknown;
+  } = {},
+) {
+  const workspace = spawnAgent(options);
+  const ptc = spawnAgent(options);
+  let ptcBindingCalls = 0;
+  const resolver = {
+    resolve: async () => ({ guest: workspace.guest, token: "t" }),
+    ptcBinding: async () => {
+      ptcBindingCalls++;
+      if (options.ptcError !== undefined) throw options.ptcError;
+      return { guest: ptc.guest, token: "ptc-t", socket: "/run/ptc.sock" };
+    },
+  };
+  return {
+    signals: workspace.signals,
+    starts: workspace.starts,
+    deletes: workspace.deletes,
+    streams: workspace.streams,
+    controlCalls: workspace.controlCalls,
+    guest: workspace.guest,
+    capabilityCalls: workspace.capabilityCalls,
+    ptcSignals: ptc.signals,
+    ptcStarts: ptc.starts,
+    ptcStreams: ptc.streams,
+    ptcControlCalls: ptc.controlCalls,
+    ptcGuest: ptc.guest,
+    ptcCapabilityCalls: ptc.capabilityCalls,
+    ptcBindingCalls: () => ptcBindingCalls,
+    resolver,
   };
 }
 

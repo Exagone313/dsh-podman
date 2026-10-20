@@ -21,8 +21,10 @@ import {
   projectMountDestinationReason,
 } from "./mount-input.js";
 import { mergeDefaultEnv } from "./container-env.js";
+import { isPtcContainer } from "./container-kind.js";
 import {
-  publicContainer,
+  publicContainerResult,
+  publicContainers,
   publicDaemon,
   publicImage,
   publicMount,
@@ -248,12 +250,12 @@ export const toolHandlers: Record<
     const defaultRow = rows.find((row: any) => row.containerName === "default");
     const listed = defaultRow === undefined
       ? [{ containerName: "default", status: "not started" }]
-      : [publicContainer(defaultRow)];
+      : publicContainers([defaultRow]);
     return [
       ...listed,
-      ...rows
-        .filter((row: any) => row.containerName !== "default")
-        .map(publicContainer),
+      ...publicContainers(
+        rows.filter((row: any) => row.containerName !== "default"),
+      ),
     ];
   },
   container_start: async (resolver, input, exec) => {
@@ -272,7 +274,7 @@ export const toolHandlers: Record<
       ...(input.secretEnv !== undefined ? { secretEnv: input.secretEnv } : {}),
       ...(input.paths !== undefined ? { paths: input.paths } : {}),
     });
-    return publicContainer(row);
+    return publicContainerResult(row);
   },
   container_recreate: async (resolver, input, exec) => {
     const mounts = mountsFromInput(
@@ -288,7 +290,7 @@ export const toolHandlers: Record<
       ...(input.secretEnv !== undefined ? { secretEnv: input.secretEnv } : {}),
       ...(input.paths !== undefined ? { paths: input.paths } : {}),
     });
-    return publicContainer(row);
+    return publicContainerResult(row);
   },
   container_remove: async (resolver, input, exec) => {
     await resolver.control("removeContainer", {
@@ -523,7 +525,7 @@ export const toolHandlers: Record<
         candidate.workspaceSlug === slug &&
         candidate.containerName === input.container,
     );
-    if (row === undefined) {
+    if (row === undefined || isPtcContainer(row)) {
       throw containerNotFound(input.container, slug);
     }
     const mounts = row.mounts ?? [];
@@ -564,7 +566,7 @@ export const toolHandlers: Record<
       request.mode = mode;
     }
     const row = await resolver.control("addContainerMount", request);
-    return publicContainer(row);
+    return publicContainerResult(row);
   },
   container_mount_remove: async (resolver, input, exec) => {
     const kind = inferMountKind(input);
@@ -585,7 +587,7 @@ export const toolHandlers: Record<
       request.destination = input.destination;
     }
     const row = await resolver.control("removeContainerMount", request);
-    return publicContainer(row);
+    return publicContainerResult(row);
   },
   container_mount_update: async (resolver, input, exec) => {
     const kind = inferMountKind(input);
@@ -615,7 +617,7 @@ export const toolHandlers: Record<
       }
     }
     const row = await resolver.control("updateContainerMount", request);
-    return publicContainer(row);
+    return publicContainerResult(row);
   },
   container_publish_port: async (resolver, input, exec) => {
     const request: Record<string, unknown> = {
@@ -766,7 +768,7 @@ export const toolHandlers: Record<
       env: input.env,
       secret: input.secret,
     });
-    return publicContainer(row);
+    return publicContainerResult(row);
   },
   container_secret_remove: async (resolver, input, exec) => {
     const row = await resolver.control("removeContainerSecret", {
@@ -774,7 +776,7 @@ export const toolHandlers: Record<
       container: input.container,
       env: input.env,
     });
-    return publicContainer(row);
+    return publicContainerResult(row);
   },
   daemon_start: async (resolver, input, exec) => {
     const sessionCwd = currentCwd(exec);

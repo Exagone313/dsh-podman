@@ -106,6 +106,68 @@ test("container_list returns sanitized container objects with env values", async
   ]);
 });
 
+test("container_list omits the reserved PTC container", async () => {
+  const resolver = {
+    registry: {
+      resolveByPath: async () => ({ id: WORKSPACE_ID }),
+    },
+    control: async () => ({
+      containers: [
+        {
+          workspaceSlug: WORKSPACE_ID,
+          containerName: "default",
+          status: "running",
+          kind: "CONTAINER_KIND_GUEST",
+        },
+        {
+          workspaceSlug: WORKSPACE_ID,
+          containerName: "ptc",
+          status: "running",
+          kind: "CONTAINER_KIND_PTC",
+        },
+        {
+          workspaceSlug: WORKSPACE_ID,
+          containerName: "db",
+          status: "running",
+          kind: "CONTAINER_KIND_GUEST",
+        },
+      ],
+    }),
+  } as never;
+  const exec = { agent: { session: { header: { cwd: "/proj" } } } };
+  const out = (await toolHandlers.container_list(resolver, {}, exec)) as any[];
+  assert.deepEqual(out.map((row) => row.containerName), ["default", "db"]);
+  assert.ok(
+    !JSON.stringify(out).includes("ptc"),
+    "the reserved container never reaches the model",
+  );
+});
+
+test("container responses omit the reserved PTC container", async () => {
+  const resolver = {
+    registry: {
+      resolveByPath: async () => ({ id: WORKSPACE_ID }),
+    },
+    getConfig: () => ({ projectsRoot: "/projects" }),
+    control: async () => ({
+      workspaceSlug: WORKSPACE_ID,
+      containerName: "ptc",
+      kind: "CONTAINER_KIND_PTC",
+      status: "running",
+    }),
+  } as never;
+  const exec = { agent: { session: { header: { cwd: "/projects/team" } } } };
+  await assert.rejects(
+    () =>
+      toolHandlers.container_start(
+        resolver,
+        { container: "ptc", image: "ptc" },
+        exec,
+      ),
+    /container "ptc" not found/,
+  );
+});
+
 test("container_list reports an uncreated default container as not started", async () => {
   const resolver = {
     registry: {

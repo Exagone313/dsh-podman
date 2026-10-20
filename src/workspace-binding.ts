@@ -10,6 +10,7 @@ import {
   unary,
 } from "./grpc/runtime-client.js";
 import { mergeDefaultEnv } from "./container-env.js";
+import { pinnedDshVersion } from "./dsh-version.js";
 import { isAbsolute, join } from "node:path";
 import { VERSION } from "./generated/version.js";
 
@@ -53,11 +54,23 @@ const CONTAINER_MUTATIONS: Record<string, "container" | "workspace"> = {
   removeWorkspace: "workspace",
 };
 
+// PTC_CONTAINER is the reserved logical name of the orchestrator-managed PTC
+// container. Its kind marks it as PTC in every snapshot, and the orchestrator
+// refuses every user-addressed mutation on this name; only the resolver's own
+// binding path may reach it.
+export const PTC_CONTAINER = "ptc";
+
+// PTC_BINDING_KEY is the fixed cache key of the one shared PTC binding. The PTC
+// container belongs to no workspace, so its entry is neither namespaced by a
+// slug nor dropped when a workspace is forgotten.
+const PTC_BINDING_KEY = "ptc:shared";
+
 export class WorkspaceResolver {
   private readonly bindings = new Map<string, Promise<WorkspaceBinding>>();
   // Named containers get their own cache, keyed by "<slug>:<logical name>", so
   // resolving one does not re-run ensureContainer, rebuild a gRPC channel, and
-  // wait for readiness on every tool call.
+  // wait for readiness on every tool call. The shared PTC binding uses its own
+  // fixed key instead.
   private readonly containerBindings = new Map<
     string,
     Promise<{ binding: WorkspaceBinding; mounts: readonly any[] }>
@@ -201,6 +214,34 @@ export class WorkspaceResolver {
       return { ...entry.binding, defaultCwd: session };
     }
     return entry.binding;
+  }
+  // ptcBinding resolves the one shared PTC container. It needs no session
+  // working directory: the container belongs to no workspace, so its binding is
+  // cached under a fixed global key and ensured with an empty workspace slug.
+  // It never offers the session directory as a cwd (the PTC container has no
+  // project mount) and never asks for a user-addressed recreate when its agent
+  // is unreachable: the reserved container is orchestrator-owned, so only
+  // EnsureContainer may create or repair it. A retry therefore re-asks the
+  // orchestrator, which recreates it lazily when its record is unusable.
+  async ptcBinding(signal?: AbortSignal): Promise<WorkspaceBinding> {
+    let entry = await this.resolveContainerBinding(
+      "",
+      PTC_CONTAINER,
+      PTC_BINDING_KEY,
+      signal,
+    );
+    try {
+      return await this.ensureAgentReady(entry.binding);
+    } catch {
+      this.containerBindings.delete(PTC_BINDING_KEY);
+      entry = await this.resolveContainerBinding(
+        "",
+        PTC_CONTAINER,
+        PTC_BINDING_KEY,
+        signal,
+      );
+      return await this.ensureAgentReady(entry.binding);
+    }
   }
   // resolveContainerBinding returns the cached promise for a named container,
   // creating it once. It deliberately stops at an "ensureContainer + build a
@@ -389,20 +430,27 @@ export class WorkspaceResolver {
   // ensureContainer asks the orchestrator for a usable container, recreating it
   // when it is missing, stopped, or runs a guest agent from an outdated image,
   // and returns its row. A container the orchestrator does not know is reported
-  // as the caller's missing container.
+  // as the caller's missing container. The PTC request also carries the harness
+  // release the plugin targets, because its image is built on demand for it.
   private async ensureContainer(
     slug: string,
     container: string,
     signal?: AbortSignal,
   ): Promise<any> {
+    const request: Record<string, unknown> = {
+      workspaceSlug: slug,
+      container,
+    };
+    if (container === PTC_CONTAINER) {
+      request.dshVersion = pinnedDshVersion();
+    }
     try {
-      return await this.control("ensureContainer", {
-        workspaceSlug: slug,
-        container,
-      }, signal);
+      return await this.control("ensureContainer", request, signal);
     } catch (error: any) {
       if (error.code !== grpc.status.NOT_FOUND) throw error;
-      throw containerNotFound(container, slug);
+      // The PTC container has no workspace, so it is reported alone rather
+      // than as missing from an empty workspace.
+      throw containerNotFound(container, slug === "" ? undefined : slug);
     }
   }
   async control<T>(
@@ -434,14 +482,21 @@ export class WorkspaceResolver {
     const slug = typeof fields.workspaceSlug === "string"
       ? fields.workspaceSlug
       : "";
-    if (slug === "") return;
+    const container = typeof fields.container === "string"
+      ? fields.container
+      : "";
+    if (slug === "") {
+      // The explicit workspace-less PTC remove retires the shared container, so
+      // its cached binding must not outlive it.
+      if (method === "removeContainer" && container === PTC_CONTAINER) {
+        this.containerBindings.delete(PTC_BINDING_KEY);
+      }
+      return;
+    }
     if (scope === "workspace") {
       this.forgetWorkspace(slug);
       return;
     }
-    const container = typeof fields.container === "string"
-      ? fields.container
-      : "";
     if (container === "") return;
     this.forgetContainer(slug, container);
   }

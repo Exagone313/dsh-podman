@@ -11,12 +11,14 @@ import {
   BaseImageRow,
   ImageBuildModal,
   ImageItem,
+  PtcImageRow,
 } from "./container-card-images.js";
 import { CachesSection } from "./container-card-caches.js";
 import { SecretsSection } from "./container-card-secrets.js";
 import { VolumesSection } from "./container-card-volumes.js";
 import { CardGroup } from "./container-card-group.js";
 import { countLabel } from "./container-card-shared.js";
+import { buildParentImages, imageCardRows } from "./container-card-ptc.js";
 import { TABLE_CARD_CLASS } from "./container-card-table-styles.js";
 import {
   actionRow,
@@ -52,6 +54,7 @@ export function ImagesSection(props: {
   onPullBaseImage: (name: string) => void;
   onRemoveImage: (imageId: string) => void;
   onRebuildImage: (imageId: string) => void;
+  onBuildPtcImage: () => void;
   onSetDefaultImage: (name: string) => void;
 }): ReactNode {
   const {
@@ -67,6 +70,7 @@ export function ImagesSection(props: {
     onPullBaseImage,
     onRemoveImage,
     onRebuildImage,
+    onBuildPtcImage,
     onSetDefaultImage,
   } = props;
   const [buildOpen, setBuildOpen] = useState(false);
@@ -78,18 +82,25 @@ export function ImagesSection(props: {
   const rebuildAllPending = pendingActions.includes(
     bareActionKey("image_rebuild_all"),
   );
-  const baseImages = images.filter((image) => image.isBase);
-  const customImages = images.filter((image) => !image.isBase);
+  // The reserved PTC image is the base card's last row and never takes part in
+  // the editable image set: it is not a Build parent, a default or a removal
+  // target, though its own row carries the on-demand build action.
+  const {
+    base: baseImages,
+    ptc: ptcImage,
+    custom: customImages,
+    baseCount: baseImageCount,
+    customCount: customImageCount,
+  } = imageCardRows(images);
   // Rebuilding covers every image, so it acts on the image set as a whole and
   // stays on the tab's toolbar; building makes a custom image, so its action
   // lives on that card's own title row instead.
   const openBuild = (): void => {
     // A build always starts from a real image: the configured default when it is
     // still a candidate, and the first listed image otherwise. The parent field
-    // then never opens on an empty choice.
-    const candidates = [...baseImages, ...customImages].map((image) =>
-      image.imageId
-    );
+    // then never opens on an empty choice, and the reserved PTC image is not a
+    // candidate.
+    const candidates = buildParentImages(images).map((image) => image.imageId);
     setImageId("");
     setParent(
       candidates.includes(defaultImage) ? defaultImage : candidates[0] ?? "",
@@ -120,14 +131,14 @@ export function ImagesSection(props: {
         title={t("baseImagesTitle")}
         summary={countLabel(
           t,
-          baseImages.length,
+          baseImageCount,
           "countImageOne",
           "countImageMany",
         )}
-        hasContent={baseImages.length > 0}
+        hasContent={baseImageCount > 0}
         className={TABLE_CARD_CLASS}
       >
-        {baseImages.length === 0
+        {baseImageCount === 0
           ? <p style={{ ...hint, margin: 0 }}>{t("noBaseImages")}</p>
           : (
             <div style={cardList}>
@@ -138,13 +149,25 @@ export function ImagesSection(props: {
                   image={image}
                   defaultImage={defaultImage}
                   locale={locale}
-                  last={index === baseImages.length - 1}
+                  last={index === baseImages.length - 1 &&
+                    ptcImage === undefined}
                   pendingActions={pendingActions}
                   onRebuild={onRebuildBaseImage}
                   onPull={onPullBaseImage}
                   onSetDefault={onSetDefaultImage}
                 />
               ))}
+              {ptcImage === undefined ? null : (
+                <PtcImageRow
+                  t={t}
+                  image={ptcImage}
+                  locale={locale}
+                  last
+                  pendingActions={pendingActions}
+                  onRebuild={onRebuildImage}
+                  onBuild={onBuildPtcImage}
+                />
+              )}
             </div>
           )}
       </CardGroup>
@@ -152,11 +175,11 @@ export function ImagesSection(props: {
         title={t("customImagesTitle")}
         summary={countLabel(
           t,
-          customImages.length,
+          customImageCount,
           "countImageOne",
           "countImageMany",
         )}
-        hasContent={customImages.length > 0}
+        hasContent={customImageCount > 0}
         action={
           <Button
             variant="primary"
@@ -169,7 +192,7 @@ export function ImagesSection(props: {
         }
         className={TABLE_CARD_CLASS}
       >
-        {customImages.length === 0
+        {customImageCount === 0
           ? <p style={{ ...hint, margin: 0 }}>{t("noCustomImages")}</p>
           : (
             <div style={cardList}>

@@ -2,8 +2,10 @@
 //
 // SPDX-License-Identifier: MIT
 
+import { isPtcContainer } from "./container-kind.js";
 import { mountKindFromProto, mountModeFromProto } from "./mount-enums.js";
 import { portProtocolFromProto } from "./publish-port.js";
+import { containerNotFound } from "./workspace-binding.js";
 
 // Rebuild API objects so tool results never expose internal fields (see
 // AGENTS.md "Security"): only allow-listed attributes reach the model.
@@ -44,6 +46,30 @@ export function publicContainer(row: any): Record<string, unknown> {
     secretEnv: row?.secretEnv ?? {},
     publishedPorts: (row?.publishedPorts ?? []).map(publicPublishedPort),
   };
+}
+
+// publicContainers is the listing shape: the orchestrator-owned PTC container
+// is not a container a caller may address, so it never reaches a model-facing
+// list. Filtering lives here, with the other allow-list builders, rather than
+// in the orchestrator snapshot the settings card renders.
+export function publicContainers(
+  rows: readonly any[],
+): Record<string, unknown>[] {
+  return rows.filter((row) => !isPtcContainer(row)).map(publicContainer);
+}
+
+// publicContainerResult is the single-container response shape. A mutation
+// never legitimately answers with the PTC container — the orchestrator refuses
+// every user-addressed mutation on its reserved name — but reporting it as the
+// caller's missing container keeps such a row out of every tool result too.
+export function publicContainerResult(row: any): Record<string, unknown> {
+  if (isPtcContainer(row)) {
+    throw containerNotFound(
+      String(row?.containerName ?? ""),
+      typeof row?.workspaceSlug === "string" ? row.workspaceSlug : undefined,
+    );
+  }
+  return publicContainer(row);
 }
 
 export function publicImage(image: any): Record<string, unknown> {

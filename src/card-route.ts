@@ -8,14 +8,17 @@
 // settings document.
 
 import {
+  absentPtcView,
   CARD_PATH,
   type CardCommandResult,
   type CardSnapshot,
   type CommandOp,
   type CommandRequest,
-  type ContainerView,
   type ImageView,
   type MountInput,
+  PTC_CONTAINER_NAME,
+  PTC_IMAGE_ID,
+  type PtcView,
   type PublishedPortView,
   type WorkspaceView,
 } from "./client/card-protocol.js";
@@ -27,6 +30,7 @@ import {
   resolveReasonLocale,
 } from "./approval-reasons.js";
 import { mergeDefaultEnv, missingDefaultEnv } from "./container-env.js";
+import { isPtcContainer } from "./container-kind.js";
 import { portProtocolFromProto, portProtocolToProto } from "./publish-port.js";
 import {
   defaultMountMode,
@@ -44,7 +48,7 @@ import { unaryGuest } from "./guest-rpc.js";
 import { type WorkspaceResolver, workspaceSlug } from "./workspace-binding.js";
 import { GIT_COMMIT, VERSION } from "./generated/version.js";
 import { versionState as pluginVersionState } from "./version-compat.js";
-import { dshVersion } from "./dsh-version.js";
+import { dshVersion, pinnedDshVersion } from "./dsh-version.js";
 
 // readOrchestratorVersion asks the orchestrator for its version and commit, or
 // returns empty strings when the call fails (an orchestrator predating the
@@ -157,6 +161,28 @@ function publishedPortView(port: any): PublishedPortView {
     address: stringField(port?.address),
     hostPort: Number(port?.hostPort ?? 0),
     endpoint: stringField(port?.endpoint),
+  };
+}
+
+// ptcView projects the one shared PTC container from its listing row, or the
+// absent state when the orchestrator holds no record for it. The row belongs to
+// no workspace, and a missing row is a normal state: the container is created
+// lazily on its first use, not by the card.
+export function ptcView(row: any | undefined): PtcView {
+  if (row === undefined) return absentPtcView();
+  const status = stringField(row.status);
+  const state = status === "running" || status === "stopped"
+    ? status
+    : "absent";
+  return {
+    containerName: stringField(row.containerName) || PTC_CONTAINER_NAME,
+    kind: "ptc",
+    state,
+    // A row the orchestrator still holds may predate the image field: an absent
+    // container names the image it would be built from instead of reading empty.
+    imageId: stringField(row.imageId) ||
+      (state === "absent" ? PTC_IMAGE_ID : ""),
+    createdAt: stringField(row.createdAt),
   };
 }
 
@@ -288,6 +314,7 @@ export async function cardSnapshot(
       gatewayVersionState: "ok",
       projectsRoot: resolver.getConfig().projectsRoot,
       workspaces: [],
+      ptc: absentPtcView(),
       containers: [],
       images: [],
       volumes: [],
@@ -296,6 +323,13 @@ export async function cardSnapshot(
     };
   }
   const [containers, images, workspaces, volumes, secrets, caches] = listings;
+  // The shared PTC container comes from its own row, which carries an empty
+  // workspace slug, and is never mixed into a workspace card. The orchestrator
+  // lists it even when no workspace exists.
+  const containerRows = ((containers as any).containers ?? []) as any[];
+  const ptcRow = containerRows.find((container: any) =>
+    isPtcContainer(container)
+  );
   return {
     version: VERSION,
     commit: GIT_COMMIT,
@@ -316,24 +350,25 @@ export async function cardSnapshot(
       dshWorkspaceViews(workspaceRegistry, resolver.getConfig().projectsRoot),
       orchestratorWorkspaceViews((workspaces as any).workspaces),
     ),
-    containers: (((containers as any).containers ?? []) as ContainerView[]).map(
-      (container) => ({
+    ptc: ptcView(ptcRow),
+    containers: containerRows
+      .filter((container: any) => !isPtcContainer(container))
+      .map((container: any) => ({
         containerName: container.containerName ?? "",
         workspaceSlug: container.workspaceSlug ?? "",
         imageId: container.imageId ?? "",
         status: container.status ?? "",
         createdAt: container.createdAt ?? "",
-        mounts: (container.mounts ?? []).map((mount) =>
+        mounts: (container.mounts ?? []).map((mount: any) =>
           containerMountView(mount, resolver.getConfig().projectsRoot)
         ),
         paths: container.paths ?? [],
         env: container.env ?? {},
         secretEnv: container.secretEnv ?? {},
         publishedPorts: (container.publishedPorts ?? []).map(
-          publishedPortView,
+          (port: any) => publishedPortView(port),
         ),
-      }),
-    ),
+      })),
     images: (((images as any).images ?? []) as any[]).map(imageView),
     volumes: ((volumes as any).volumes ?? []).map((volume: any) => ({
       name: volume.name ?? "",
@@ -533,6 +568,27 @@ export async function runCommand(
         ...(command.container !== "" ? { container: command.container } : {}),
       });
       break;
+    case "ptc_remove":
+      // The shared PTC container belongs to no workspace: the orchestrator's
+      // explicit workspace-less remove is the empty slug with its reserved
+      // name. Every user-addressed mutation on that name stays refused.
+      await resolver.control("removeContainer", {
+        container: PTC_CONTAINER_NAME,
+      });
+      break;
+    case "ptc_recreate":
+      // The container carries no editable field, so a recreate is its
+      // workspace-less remove followed by the orchestrator's own ensure: the
+      // PTC image is built on demand for the harness release the plugin pins,
+      // exactly as the agent's PTC attach path asks for it.
+      await resolver.control("removeContainer", {
+        container: PTC_CONTAINER_NAME,
+      });
+      await resolver.control("ensureContainer", {
+        container: PTC_CONTAINER_NAME,
+        dshVersion: pinnedDshVersion(),
+      });
+      break;
     case "workspace_remove":
       await resolver.control("removeWorkspace", {
         workspaceSlug: command.workspace,
@@ -571,11 +627,36 @@ export async function runCommand(
         value: command.value,
       });
       break;
+    case "ptc_build":
+      // Building a missing PTC image also has to create its container: an
+      // image alone has nothing to run. The ensure builds the image and makes
+      // the shared container usable in one step.
+      await resolver.control("ensureContainer", {
+        container: PTC_CONTAINER_NAME,
+        dshVersion: pinnedDshVersion(),
+      });
+      break;
     case "image_rebuild":
-      await resolver.control("rebuildImage", { imageId: command.workspace });
+      // The PTC image has no stored description: the orchestrator rebuilds its
+      // single image for the harness release the plugin pins, unconditionally
+      // and without touching the container record. Every other row rebuilds
+      // its stored image.
+      if (command.workspace === PTC_IMAGE_ID) {
+        await resolver.control("rebuildImage", {
+          imageId: PTC_IMAGE_ID,
+          dshVersion: pinnedDshVersion(),
+        });
+      } else {
+        await resolver.control("rebuildImage", { imageId: command.workspace });
+      }
       break;
     case "image_rebuild_all":
-      await resolver.control("rebuildAllImages", {});
+      // The pinned release covers the reserved PTC image too, so rebuilding
+      // everything builds it when missing and refreshes it when present,
+      // without touching the PTC container.
+      await resolver.control("rebuildAllImages", {
+        dshVersion: pinnedDshVersion(),
+      });
       break;
     case "container_secret_add":
       await resolver.control("addContainerSecret", {
@@ -619,6 +700,9 @@ export async function runCommand(
       let applied = 0;
       let skipped = 0;
       for (const row of listings.containers ?? []) {
+        // The PTC container is orchestrator-owned and user-addressed mutations
+        // on it are refused, so it never receives the default environment.
+        if (isPtcContainer(row)) continue;
         if (
           command.workspace !== "" && row.workspaceSlug !== command.workspace
         ) {

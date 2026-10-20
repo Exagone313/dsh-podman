@@ -17,7 +17,9 @@ import (
 	"time"
 
 	"github.com/Exagone313/dsh-podman/internal/guestagent/childenv"
+	"github.com/Exagone313/dsh-podman/internal/guestagent/identity"
 	"github.com/Exagone313/dsh-podman/internal/guestagent/proc"
+	"github.com/Exagone313/dsh-podman/internal/guestagent/ptc"
 	"github.com/creack/pty"
 )
 
@@ -210,6 +212,16 @@ func (m *Manager) Start(argv []string, cwd string, env map[string]string, rows, 
 	}
 	cmd := exec.Command(argv[0], argv[1:]...)
 	cmd.Dir = cwd
+	// A PTC child runs as a numeric uid/gid with HOME and the XDG directories
+	// on a writable, owned home; the inherited /root is read-only there.
+	opts, preparedEnv, err := ptc.Attach(identity.Options{}, env)
+	if err != nil {
+		return nil, err
+	}
+	env = preparedEnv
+	if cred := identity.Credential(opts); cred != nil {
+		cmd.SysProcAttr = &syscall.SysProcAttr{Credential: cred}
+	}
 	// Build already withholds the agent's reserved variables; TERM is added so
 	// the child does not inherit a dumb or missing terminal type.
 	cmd.Env = append(childenv.Build(m.paths, env), "TERM=xterm-256color")

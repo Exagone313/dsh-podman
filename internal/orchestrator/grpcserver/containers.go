@@ -28,6 +28,16 @@ func (s *Server) ListContainers(context.Context, *ctl.ListContainersRequest) (*c
 		workspaces, _, _ = s.containerView(workspaces, s.Podman.ContainerExists, s.Podman.ContainerRunning)
 	}
 	containers := containerRows(workspaces)
+	// The shared PTC container is not workspace state, so it is listed from its
+	// own record, with an empty workspace slug, even when no workspace exists.
+	ptc, found, err := s.Store.PTCContainer()
+	if err != nil {
+		s.log().Error("control request failed", "method", "ListContainers", "error", err)
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	if found {
+		containers = append(containers, containerProto(state.Workspace{}, s.ptcContainerView(ptc)))
+	}
 	sort.Slice(containers, func(i, j int) bool {
 		if containers[i].WorkspaceSlug != containers[j].WorkspaceSlug {
 			return containers[i].WorkspaceSlug < containers[j].WorkspaceSlug
@@ -43,7 +53,7 @@ func (s *Server) ListContainers(context.Context, *ctl.ListContainersRequest) (*c
 // Container message, including the container's effective project mounts
 // (its own list when present, else the workspace's default mounts).
 func containerProto(ws state.Workspace, c state.Container) *ctl.Container {
-	row := &ctl.Container{ContainerName: c.Name, PodmanName: c.PodmanName, WorkspaceSlug: ws.WorkspaceSlug, ImageId: c.ImageID, Status: c.Status, CreatedAt: c.CreatedAt, AgentSocketPath: c.AgentSocketPath, AgentToken: c.AgentToken, Env: cloneMap(c.Env), SecretEnv: cloneMap(c.SecretEnv), Paths: append([]string(nil), c.Paths...)}
+	row := &ctl.Container{ContainerName: c.Name, PodmanName: c.PodmanName, WorkspaceSlug: ws.WorkspaceSlug, ImageId: c.ImageID, Status: c.Status, CreatedAt: c.CreatedAt, AgentSocketPath: c.AgentSocketPath, AgentToken: c.AgentToken, Env: cloneMap(c.Env), SecretEnv: cloneMap(c.SecretEnv), Paths: append([]string(nil), c.Paths...), Kind: containerKindProto(c.Kind)}
 	for _, mount := range containerMounts(ws, c) {
 		mode := ctl.MountMode_MOUNT_MODE_READ_ONLY
 		if mount.Mode == "read_write" {
@@ -59,11 +69,16 @@ func containerProto(ws state.Workspace, c state.Container) *ctl.Container {
 
 // containerRows projects stored workspace containers onto the control plane's
 // Container messages. It is state-driven: every stored container is included
-// with its stored status.
+// with its stored status. A PTC-kind record found in workspace state is a
+// leftover from the per-workspace PTC layout and is skipped: the one shared PTC
+// container is listed separately from its singleton record.
 func containerRows(workspaces []state.Workspace) []*ctl.Container {
 	result := make([]*ctl.Container, 0, len(workspaces))
 	for _, ws := range workspaces {
 		for _, container := range ws.Containers {
+			if container.Kind == state.ContainerKindPTC {
+				continue
+			}
 			result = append(result, containerProto(ws, container))
 		}
 	}

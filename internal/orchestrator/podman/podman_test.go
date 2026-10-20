@@ -141,7 +141,7 @@ func TestClassifyMounts(t *testing.T) {
 }
 
 func TestContainerEnv(t *testing.T) {
-	env := containerEnv("/run/dsh-podman", "dsh-podman-proj-default", "/workspaces", "tok", map[string]string{"FOO": "bar", "DSH_PODMAN_X": "should-be-skipped", "DSH_PODMAN_GUEST_TOKEN": "must-not-override"}, nil, nil)
+	env := containerEnv("/run/dsh-podman", "dsh-podman-proj-default", "/workspaces", "tok", map[string]string{"FOO": "bar", "DSH_PODMAN_X": "should-be-skipped", "DSH_PODMAN_GUEST_TOKEN": "must-not-override"}, nil, nil, false)
 	if env["DSH_PODMAN_GUEST_TOKEN"] != "tok" {
 		t.Fatalf("guest token must be the orchestrator value, got %q", env["DSH_PODMAN_GUEST_TOKEN"])
 	}
@@ -240,18 +240,18 @@ func TestContainerEnvGuestMounts(t *testing.T) {
 	env := containerEnv("/run/dsh-podman", "dsh-podman-proj-default", "/workspaces", "tok", nil, []specs.Mount{
 		{Type: "tmpfs", Destination: "/scratch", Options: []string{"rw"}},
 		{Type: "volume", Source: "dsh-podman-data", Destination: "/data", Options: []string{"ro"}},
-	}, nil)
+	}, nil, false)
 	if env["DSH_PODMAN_GUEST_MOUNTS"] != `[{"path":"/scratch","read_only":false},{"path":"/data","read_only":true}]` {
 		t.Fatalf("unexpected guest mounts env: %q", env["DSH_PODMAN_GUEST_MOUNTS"])
 	}
 }
 
 func TestContainerEnvGuestPaths(t *testing.T) {
-	env := containerEnv("/run/dsh-podman", "dsh-podman-proj-default", "/workspaces", "tok", nil, nil, []string{"/opt/bin", "/usr/local/bin"})
+	env := containerEnv("/run/dsh-podman", "dsh-podman-proj-default", "/workspaces", "tok", nil, nil, []string{"/opt/bin", "/usr/local/bin"}, false)
 	if env["DSH_PODMAN_GUEST_PATHS"] != `["/opt/bin","/usr/local/bin"]` {
 		t.Fatalf("unexpected guest paths env: %q", env["DSH_PODMAN_GUEST_PATHS"])
 	}
-	if got := containerEnv("/run/dsh-podman", "x", "/workspaces", "tok", nil, nil, nil); got["DSH_PODMAN_GUEST_PATHS"] != "" {
+	if got := containerEnv("/run/dsh-podman", "x", "/workspaces", "tok", nil, nil, nil, false); got["DSH_PODMAN_GUEST_PATHS"] != "" {
 		t.Fatalf("no additions must omit the variable: %q", got["DSH_PODMAN_GUEST_PATHS"])
 	}
 }

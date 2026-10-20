@@ -6,10 +6,13 @@ package images
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"log/slog"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strings"
 	"sync"
 )
@@ -58,6 +61,109 @@ type BaseImage struct {
 	PostInstall    []string
 }
 
+// PTCBasePrimitive is the Node base the PTC image builds from. The PTC
+// container runs the harness's PTC runtime on the same Node release as the dsh
+// image. It names the tag rather than a digest: a digest names a single-platform
+// manifest, which would break multi-arch builds.
+const PTCBasePrimitive = "docker.io/library/node:26-slim"
+
+// ptcImageID is the single short name of the PTC image. Its harness release
+// and recipe are carried in labels, so an upgrade replaces the one tag instead
+// of leaving an image behind per release.
+const ptcImageID = "ptc"
+
+// PTC image labels record the build inputs, so ensure can decide whether an
+// existing image still matches the requested harness release and recipe.
+const (
+	PTCVersionLabel = "io.github.exagone313.dsh-podman.ptc.dsh-version"
+	PTCRecipeLabel  = "io.github.exagone313.dsh-podman.ptc.containerfile-digest"
+)
+
+// ptcRuntimePackage is the harness's PTC runtime, installed into the PTC image,
+// and ptcRuntimePackageName is its unscoped directory name.
+const (
+	ptcRuntimePackage     = "@deepseek-ai/dsh-ptc-runtime-node"
+	ptcRuntimePackageName = "dsh-ptc-runtime-node"
+)
+
+// dshVersionName matches a harness release: a lowercase npm version with no
+// separator or shell metacharacter that could alter the build instructions.
+var dshVersionName = regexp.MustCompile(`^[0-9a-z]+(?:[._-][0-9a-z]+)*$`)
+
+// PTCImageID returns the short name of the single PTC image. It never carries
+// the harness release: that is a build label, so every release shares the one
+// image and rebuilding replaces its tag.
+func PTCImageID() string {
+	return ptcImageID
+}
+
+// PTCBuildSpec describes the on-demand PTC image for a harness release. It
+// carries only the PTC runtime package at the absolute path the host expects,
+// never the dsh CLI or a patched dsh: the symlink scaffold resolves that path
+// without installing the whole app package. The apt package manager is what
+// makes the build use the managed apt cache. Its labels carry the release and
+// a digest of the rendered Containerfile, so a change to either forces a
+// rebuild of the same tag.
+func PTCBuildSpec(dshVersion string) (BuildSpec, error) {
+	if dshVersion == "" {
+		return BuildSpec{}, fmt.Errorf("dsh version is required")
+	}
+	if len(dshVersion) > 100 || !dshVersionName.MatchString(dshVersion) {
+		return BuildSpec{}, fmt.Errorf("invalid dsh version %q", dshVersion)
+	}
+	spec := BuildSpec{
+		ImageID:        PTCImageID(),
+		From:           PTCBasePrimitive,
+		PackageManager: "apt",
+		PostInstall: []string{
+			"npm install -g " + ptcRuntimePackage + "@" + dshVersion,
+			"mkdir -p /usr/local/lib/node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai && ln -s /usr/local/lib/node_modules/" + ptcRuntimePackage + " /usr/local/lib/node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai/" + ptcRuntimePackageName,
+		},
+	}
+	recipe, err := Containerfile(spec)
+	if err != nil {
+		return BuildSpec{}, err
+	}
+	spec.Labels = map[string]string{
+		PTCVersionLabel: dshVersion,
+		PTCRecipeLabel:  recipeDigest(recipe),
+	}
+	return spec, nil
+}
+
+// PTCImageLabels returns the labels the PTC image for a harness release must
+// carry. A matching image is reused; anything else is rebuilt.
+func PTCImageLabels(dshVersion string) (map[string]string, error) {
+	spec, err := PTCBuildSpec(dshVersion)
+	if err != nil {
+		return nil, err
+	}
+	return spec.Labels, nil
+}
+
+// recipeDigest returns a stable digest of a rendered Containerfile, so the
+// image's recipe label changes whenever the build instructions do.
+func recipeDigest(containerfile string) string {
+	sum := sha256.Sum256([]byte(containerfile))
+	return "sha256:" + hex.EncodeToString(sum[:])
+}
+
+// LabelFingerprint returns a stable digest of an image's build labels. It
+// identifies the exact image a container was created from: the tag is fixed,
+// but the labels change whenever the release or recipe does.
+func LabelFingerprint(labels map[string]string) string {
+	keys := make([]string, 0, len(labels))
+	for key := range labels {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	digest := sha256.New()
+	for _, key := range keys {
+		fmt.Fprintf(digest, "%s=%s\n", key, labels[key])
+	}
+	return "sha256:" + hex.EncodeToString(digest.Sum(nil))
+}
+
 // BaseImages is the fixed registry of base images, in listing order.
 var BaseImages = []BaseImage{
 	{
@@ -96,6 +202,10 @@ type BuildSpec struct {
 	IsBase         bool
 	PostInstall    []string
 	CachePackages  bool
+	// Labels are stamped on the built image, not rendered into the
+	// Containerfile, so a recipe digest label can be computed from that file
+	// without changing it.
+	Labels map[string]string
 }
 
 // Containerfile renders a Containerfile for the given build spec. Every
@@ -230,7 +340,7 @@ func (b *Builder) Build(spec BuildSpec) (string, error) {
 	}
 	logger := b.logger()
 	logger.Info("building workspace image", "image_id", spec.ImageID, "from", spec.From, "package_manager", spec.PackageManager, "is_base", spec.IsBase, "packages", spec.Packages, "tag", tag, "build_volume", cacheVolume, "host_package_cache", hostCache)
-	if err := b.requestBuild(buildRequest{ImageID: spec.ImageID, Tag: tag, Containerfile: contents, CacheVolume: cacheVolume}); err != nil {
+	if err := b.requestBuild(buildRequest{ImageID: spec.ImageID, Tag: tag, Containerfile: contents, CacheVolume: cacheVolume, Labels: spec.Labels}); err != nil {
 		logger.Error("workspace image build failed", "image_id", spec.ImageID, "error", err)
 		return "", err
 	}
@@ -267,4 +377,21 @@ func (b *Builder) tagFor(imageID string, isBase bool) string {
 		return b.baseImagePrefix() + imageID + ":latest"
 	}
 	return b.imagePrefix() + imageID + ":latest"
+}
+
+// PTCImageTag returns the tag of the single PTC image. It is a custom-image
+// tag: the PTC image is built on demand rather than registered as a base image.
+func (b *Builder) PTCImageTag() string {
+	return b.tagFor(PTCImageID(), false)
+}
+
+// BuildPTC builds the PTC image for a harness release and returns its tag. The
+// caller checks the image's labels first: BuildPTC always builds, replacing the
+// single tag, so reusing a matching image is what avoids an unnecessary build.
+func (b *Builder) BuildPTC(dshVersion string) (string, error) {
+	spec, err := PTCBuildSpec(dshVersion)
+	if err != nil {
+		return "", err
+	}
+	return b.Build(spec)
 }

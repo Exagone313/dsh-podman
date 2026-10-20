@@ -140,38 +140,41 @@ func (c *Client) RemovePod(name string) error {
 }
 
 func (c *Client) CreateWorkspace(pod, name, image, token string, mounts []specs.Mount, secrets []specgen.Secret, envSecrets map[string]string, env map[string]string, paths []string) error {
-	c.log().Info("creating guest container", "pod_name", pod, "container_name", name, "image", image, "mount_count", len(mounts))
+	return c.createContainer(pod, name, image, token, mounts, secrets, envSecrets, env, paths, false)
+}
+
+// CreatePTC creates and starts the one shared PTC container. It takes no
+// workspace pod: the shared container does not join a pod, so it can run with
+// no network namespace. It also takes no mounts, secrets, environment, or PATH
+// additions: the PTC container runs the PTC runtime alone, as root, with only
+// the guest agent's socket, the size-capped scratch tmpfs, and the PTC mode
+// marker.
+func (c *Client) CreatePTC(name, image, token string) error {
+	return c.createContainer("", name, image, token, nil, nil, nil, nil, nil, true)
+}
+
+func (c *Client) createContainer(pod, name, image, token string, mounts []specs.Mount, secrets []specgen.Secret, envSecrets map[string]string, env map[string]string, paths []string, ptc bool) error {
+	c.log().Info("creating guest container", "pod_name", pod, "container_name", name, "image", image, "mount_count", len(mounts), "ptc", ptc)
 	socketDir := filepath.Join(c.socketRoot, name)
-	hostSocketDir := filepath.Join(c.hostSocketRoot, name)
 	if err := os.MkdirAll(socketDir, 0700); err != nil {
 		return err
 	}
 	if err := guestAgentSourcesConfigured(c.hostGuestBinary, c.guestAgentImage); err != nil {
 		return err
 	}
-	if err := c.EnsurePod(pod); err != nil {
-		return err
+	// The shared PTC container must not join a pod: a pod would give it the
+	// pod's network namespace, while it runs with network mode none.
+	if !ptc {
+		if err := c.EnsurePod(pod); err != nil {
+			return err
+		}
 	}
-	init := true
-	binaryDest := filepath.Join(c.guestAgentMount, c.guestAgentBin)
-	generator := specgen.NewSpecGenerator(image, false)
-	generator.Name = name
-	generator.Pod = pod
-	generator.Command = []string{binaryDest}
-	containerMounts := append(append(append([]specs.Mount(nil), mounts...), c.skillMounts()...), spillMount())
-	generator.Env = containerEnv(c.socketRoot, name, c.projectRoot, token, env, guestFileMounts(containerMounts), paths)
-	generator.EnvSecrets = envSecrets
-	generator.Secrets = append(generator.Secrets, secrets...)
-	generator.Init = &init
-	applyGuestContainerPolicy(generator)
-	ociMounts, volumes := classifyMounts(containerMounts)
-	for _, volume := range volumes {
+	generator := c.newGuestSpec(pod, name, image, token, mounts, secrets, envSecrets, env, paths, ptc)
+	for _, volume := range generator.Volumes {
 		if err := c.ensureVolume(volume.Name); err != nil {
 			return err
 		}
-		generator.Volumes = append(generator.Volumes, volume)
 	}
-	generator.Mounts = append(ociMounts, guestAgentMounts(hostSocketDir, c.socketRoot, name, c.hostGuestBinary, binaryDest)...)
 	if imageVolume := guestAgentImageVolume(c.guestAgentImage, c.guestAgentMount); imageVolume != nil {
 		if err := c.ensureImage(imageVolume.Source); err != nil {
 			return err
@@ -193,6 +196,65 @@ func (c *Client) CreateWorkspace(pod, name, image, token string, mounts []specs.
 	}
 	c.log().Info("guest container started", "pod_name", pod, "container_name", name)
 	return nil
+}
+
+// newGuestSpec builds the spec for a guest container. It is pure (it never
+// touches the podman API), so the PTC container's shape — root user, no user
+// environment, secrets, volumes, ports or workspace mounts, no pod, no network,
+// only the capabilities the guest agent needs to switch identity and repair a
+// child's home — is unit-testable without a daemon.
+// The caller ensures the named volumes and the guest-agent image exist before
+// handing the spec to podman.
+func (c *Client) newGuestSpec(pod, name, image, token string, mounts []specs.Mount, secrets []specgen.Secret, envSecrets map[string]string, env map[string]string, paths []string, ptc bool) *specgen.SpecGenerator {
+	init := true
+	hostSocketDir := filepath.Join(c.hostSocketRoot, name)
+	binaryDest := filepath.Join(c.guestAgentMount, c.guestAgentBin)
+	generator := specgen.NewSpecGenerator(image, false)
+	generator.Name = name
+	// A pod would share its network namespace, so the pod-less PTC container
+	// keeps an empty Pod and its own network mode.
+	if !ptc {
+		generator.Pod = pod
+	}
+	generator.Command = []string{binaryDest}
+	spill := spillMount()
+	if ptc {
+		spill = ptcSpillMount()
+	}
+	containerMounts := append([]specs.Mount(nil), mounts...)
+	if !ptc {
+		containerMounts = append(containerMounts, c.skillMounts()...)
+	}
+	containerMounts = append(containerMounts, spill)
+	if ptc {
+		containerMounts = append(containerMounts, ptcScratchMounts()...)
+	}
+	generator.Env = containerEnv(c.socketRoot, name, c.projectRoot, token, env, guestFileMounts(containerMounts), paths, ptc)
+	generator.EnvSecrets = envSecrets
+	generator.Secrets = append(generator.Secrets, secrets...)
+	generator.Init = &init
+	applyGuestContainerPolicy(generator)
+	if ptc {
+		// The agent keeps euid 0 so it can switch each PTC child to a numeric
+		// uid; the image user is never inherited.
+		generator.User = "0"
+		// The PTC runtime calls tools host-side and needs no network at all.
+		generator.NetNS = specgen.Namespace{NSMode: specgen.NoNetwork}
+		// Drop every capability, then add back only what the guest agent needs
+		// to start children as another uid/gid (identity.CanSwitchUser) and to
+		// prepare their homes: CHOWN changes a home's owner, DAC_OVERRIDE
+		// traverses and writes an existing target-owned 0700 home, and
+		// SETUID/SETGID perform the identity switch.
+		generator.CapDrop = []string{"ALL"}
+		generator.CapAdd = []string{"CHOWN", "DAC_OVERRIDE", "SETUID", "SETGID"}
+		// no-new-privileges: a setuid binary inside the image still cannot
+		// gain anything the process did not already hold.
+		generator.NoNewPrivileges = boolPtr(true)
+	}
+	ociMounts, volumes := classifyMounts(containerMounts)
+	generator.Volumes = append(generator.Volumes, volumes...)
+	generator.Mounts = append(ociMounts, guestAgentMounts(hostSocketDir, c.socketRoot, name, c.hostGuestBinary, binaryDest)...)
+	return generator
 }
 
 // classifyMounts separates raw OCI mounts (bind, tmpfs) from named-volume
@@ -222,8 +284,33 @@ func spillMount() specs.Mount {
 	return specs.Mount{Type: "tmpfs", Destination: spillRoot, Options: []string{"rw", "mode=1777"}}
 }
 
+// ptcTmpfsSize caps each in-memory scratch filesystem of the PTC container.
+// The PTC runtime needs writable scratch (/tmp, /var/tmp, and the command
+// output spill) but must not be able to exhaust the host's memory through it.
+const ptcTmpfsSize = "64m"
+
+// ptcTmpfsMount is one size-capped, world-writable scratch tmpfs of the PTC
+// container. The explicit mount replaces the uncapped one podman's read-only
+// tmpfs policy would otherwise add.
+func ptcTmpfsMount(destination string) specs.Mount {
+	return specs.Mount{Type: "tmpfs", Destination: destination, Options: []string{"rw", "size=" + ptcTmpfsSize, "mode=1777"}}
+}
+
+// ptcScratchMounts are the PTC container's size-capped /tmp and /var/tmp. /run
+// stays on podman's read-only tmpfs policy.
+func ptcScratchMounts() []specs.Mount {
+	return []specs.Mount{ptcTmpfsMount("/tmp"), ptcTmpfsMount("/var/tmp")}
+}
+
+// ptcSpillMount is the size-capped spill tmpfs of the PTC container.
+func ptcSpillMount() specs.Mount {
+	return ptcTmpfsMount(spillRoot)
+}
+
 // skillMounts returns the read-only bind mount exposing the configured host skill
-// directory to every guest container, or nil when none is configured. Source and
+// directory to every workspace guest container, or nil when none is configured. The
+// PTC container is deliberately excluded: it runs the PTC runtime, not the workspace
+// agent, so no workspace path belongs in its mount namespace. Source and
 // destination are the same path, so a skill's own references to its files resolve
 // inside the container; guestMountsEnv tells the guest file API about it, which is
 // also what keeps writes to it refused. The mount belongs to the container only:
@@ -477,15 +564,24 @@ func (c *Client) RecreateWorkspace(pod, name, image, token string, mounts []spec
 	return c.CreateWorkspace(pod, name, image, token, mounts, secrets, envSecrets, env, paths)
 }
 
+// PTCModeEnv marks a container as the reserved PTC container. The plugin reads
+// it (through the container kind) to route PTC work there instead of a guest
+// container.
+const PTCModeEnv = "DSH_PODMAN_GUEST_PTC_MODE"
+
 // containerEnv builds the guest container environment: the reserved
-// orchestrator agent variables, then every user variable. User keys that
+// orchestrator agent variables, then every user variable. A PTC container
+// carries the PTC mode marker and no user variables at all. User keys that
 // collide with the reserved DSH_PODMAN namespace are skipped defensively (the
 // caller has already validated them).
-func containerEnv(socketRoot, name, projectRoot, token string, user map[string]string, mounts []specs.Mount, paths []string) map[string]string {
+func containerEnv(socketRoot, name, projectRoot, token string, user map[string]string, mounts []specs.Mount, paths []string, ptc bool) map[string]string {
 	env := map[string]string{
 		"DSH_PODMAN_GUEST_TOKEN":   token,
 		"DSH_PODMAN_GUEST_SOCKET":  filepath.Join(socketRoot, name, "guest.sock"),
 		"DSH_PODMAN_PROJECTS_ROOT": projectRoot,
+	}
+	if ptc {
+		env[PTCModeEnv] = "true"
 	}
 	if encoded := guestMountsEnv(mounts, projectRoot); encoded != "" {
 		env["DSH_PODMAN_GUEST_MOUNTS"] = encoded

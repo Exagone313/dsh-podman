@@ -6,6 +6,11 @@ package grpcserver
 
 import (
 	"context"
+	"errors"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -13,6 +18,7 @@ import (
 	imagebuild "github.com/Exagone313/dsh-podman/internal/orchestrator/images"
 	"github.com/Exagone313/dsh-podman/internal/orchestrator/podman"
 	"github.com/Exagone313/dsh-podman/internal/orchestrator/state"
+	"go.podman.io/podman/v6/pkg/bindings"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -93,8 +99,8 @@ func TestListImages(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(response.Images) != 4 {
-		t.Fatalf("expected 4 images (3 bases + 1 custom), got %d", len(response.Images))
+	if len(response.Images) != 5 {
+		t.Fatalf("expected 5 images (3 bases + 1 custom + 1 PTC), got %d", len(response.Images))
 	}
 	bases := response.Images[:3]
 	for i, want := range []string{"archlinux", "ubuntu", "alpine"} {
@@ -127,6 +133,45 @@ func TestListImages(t *testing.T) {
 	if custom.ImageId != "devimg" || custom.Parent != "archlinux" || custom.PackageManager != "pacman" || custom.Status != "built" || custom.IsBase {
 		t.Fatalf("unexpected custom row: %#v", custom)
 	}
+	ptc := response.Images[4]
+	if ptc.ImageId != testPTCImageID || ptc.IsBase || ptc.Status != "missing" || ptc.ImageTag != testPTCImageTag || ptc.PackageManager != "apt" {
+		t.Fatalf("unexpected PTC row: %#v", ptc)
+	}
+}
+
+// TestListImagesReportsThePTCImageStatus pins the shared image's row: present
+// means built, absent means missing.
+func TestListImagesReportsThePTCImageStatus(t *testing.T) {
+	store := newTestStore(t)
+	fake := newFakePodman()
+	fake.images = map[string]bool{}
+	server := &Server{Store: store, Podman: fake, Logger: silentLogger()}
+	response, err := server.ListImages(context.Background(), &ctl.ListImagesRequest{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	index := -1
+	for i, image := range response.Images {
+		if image.ImageId == testPTCImageID {
+			index = i
+		}
+	}
+	if index < 0 {
+		t.Fatalf("the PTC image is not listed: %#v", response.Images)
+	}
+	if got := response.Images[index].Status; got != "missing" {
+		t.Fatalf("expected a missing PTC image, got %q", got)
+	}
+	seedPTCImage(fake, ptcImageLabels(t, testDSHVersion))
+	response, err = server.ListImages(context.Background(), &ctl.ListImagesRequest{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, image := range response.Images {
+		if image.ImageId == testPTCImageID && image.Status != "built" {
+			t.Fatalf("expected a built PTC image, got %q", image.Status)
+		}
+	}
 }
 
 func (f *fakePodman) ImageExists(name string) (bool, error) {
@@ -136,11 +181,15 @@ func (f *fakePodman) ImageExists(name string) (bool, error) {
 	return f.images[name], nil
 }
 
+func (f *fakePodman) ImageLabels(name string) (map[string]string, error) {
+	return f.imageLabels[name], nil
+}
+
 func (f *fakePodman) ImageCreated(string) string { return "" }
 
 func (f *fakePodman) ImagePull(name string) error {
 	f.pulled = append(f.pulled, name)
-	return nil
+	return f.pullErr
 }
 
 func (f *fakePodman) ImageRemove(string) error { return nil }
@@ -240,6 +289,101 @@ func TestBuildImageUnknownParent(t *testing.T) {
 	_, err := server.BuildImage(context.Background(), &ctl.BuildImageRequest{ImageId: "dev", Parent: "missing"})
 	if status.Code(err) != codes.NotFound {
 		t.Fatalf("expected NotFound, got %v", err)
+	}
+}
+
+// buildAPIContext starts a fake Podman API that accepts one build and returns
+// a context connected to it, so a test can drive a real custom image build.
+func buildAPIContext(t *testing.T) context.Context {
+	t.Helper()
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprint(w, `{"stream":"built\n"}`)
+	}))
+	t.Cleanup(server.Close)
+	ctx, err := bindings.NewConnection(context.Background(), "tcp://"+server.Listener.Addr().String())
+	if err != nil {
+		t.Fatal(err)
+	}
+	return ctx
+}
+
+// TestBuildImageRejectsPtcParent pins that the reserved PTC image is refused as
+// a custom image's parent in every spelling a caller can use: the logical id,
+// a short tag, and a fully-qualified tag under the default or a configured
+// image prefix.
+func TestBuildImageRejectsPtcParent(t *testing.T) {
+	server := &Server{
+		Store:        newTestStore(t),
+		ImageBuilder: &imagebuild.Builder{ImagePrefix: "registry.example.com/custom/"},
+		Logger:       silentLogger(),
+	}
+	parents := []string{
+		"ptc",
+		"ptc:latest",
+		"localhost/dsh-podman/ptc",
+		"localhost/dsh-podman/ptc:latest",
+		"registry.example.com/custom/ptc:latest",
+	}
+	for _, parent := range parents {
+		_, err := server.BuildImage(context.Background(), &ctl.BuildImageRequest{ImageId: "dev", Parent: parent})
+		if status.Code(err) != codes.InvalidArgument {
+			t.Errorf("parent %q: expected InvalidArgument, got %v", parent, err)
+			continue
+		}
+		message := status.Convert(err).Message()
+		if !strings.Contains(message, "reserved") || !strings.Contains(message, "ptc") {
+			t.Errorf("parent %q: message must name the reserved PTC image, got %q", parent, message)
+		}
+	}
+	// A different image under the same prefixes is not the reserved one.
+	for _, parent := range []string{"archlinux", "registry.example.com/custom/dev:latest", "localhost/dsh-podman/dev:latest"} {
+		if server.isPtcParent(parent) {
+			t.Errorf("parent %q must not be mistaken for the reserved PTC image", parent)
+		}
+	}
+}
+
+// TestPtcParentIgnoresRegistryPort pins that a colon in the registry host is
+// not read as a tag, so another image under that registry is not confused with
+// the reserved PTC one.
+func TestPtcParentIgnoresRegistryPort(t *testing.T) {
+	server := &Server{
+		ImageBuilder: &imagebuild.Builder{ImagePrefix: "registry.example.com:5000/custom/"},
+		Logger:       silentLogger(),
+	}
+	if server.isPtcParent("registry.example.com:5000/custom/dev:latest") {
+		t.Fatal("a different image under a ported registry must not be the PTC image")
+	}
+	if !server.isPtcParent("registry.example.com:5000/custom/ptc:latest") {
+		t.Fatal("the PTC image under a ported registry must be refused")
+	}
+}
+
+// TestBuildImageAcceptsNormalParent pins that a base image is still a valid
+// parent, so the new refusal does not narrow the normal build path.
+func TestBuildImageAcceptsNormalParent(t *testing.T) {
+	fake := newFakePodman()
+	fake.images = map[string]bool{"localhost/dsh-podman/base/archlinux:latest": true}
+	server := &Server{
+		Store:        newTestStore(t),
+		Podman:       fake,
+		ImageBuilder: &imagebuild.Builder{Context: buildAPIContext(t)},
+		Logger:       silentLogger(),
+	}
+	image, err := server.BuildImage(context.Background(), &ctl.BuildImageRequest{ImageId: "dev", Parent: "archlinux", Packages: []string{"git"}})
+	if err != nil {
+		t.Fatalf("a base image must remain an accepted parent: %v", err)
+	}
+	if image.ImageId != "dev" || image.Parent != "archlinux" || image.Status != "built" || len(image.Packages) != 1 || image.Packages[0] != "git" {
+		t.Fatalf("unexpected built image: %#v", image)
+	}
+	stored, err := server.Store.Images()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(stored) != 1 || stored[0].ImageID != "dev" || stored[0].Parent != "archlinux" {
+		t.Fatalf("unexpected stored images: %#v", stored)
 	}
 }
 
@@ -727,5 +871,264 @@ func TestRebuildPlanCycleSkipped(t *testing.T) {
 	}
 	if !sameStrings(skipped, []string{"cyc-a", "cyc-b"}) {
 		t.Fatalf("expected cycle members skipped, got %#v", skipped)
+	}
+}
+
+// ptcRebuildServer builds a server whose stored-image builds use the real
+// builder (and fail on its unconfigured context, which no PTC test triggers)
+// and whose PTC builds are recorded by the fake. The fake podman starts with no
+// image at all, so a base pass skips every missing base.
+func ptcRebuildServer(t *testing.T) (*Server, *fakePodman, *fakePTCImages) {
+	t.Helper()
+	fake := newFakePodman()
+	fake.images = map[string]bool{}
+	images := &fakePTCImages{}
+	return &Server{Store: newTestStore(t), Podman: fake, ImageBuilder: &imagebuild.Builder{}, PTCImages: images, Logger: silentLogger()}, fake, images
+}
+
+// assertBuiltPTCImage pins the row a PTC build reports: the single tag, the Node
+// primitive it builds from, and the apt package manager.
+func assertBuiltPTCImage(t *testing.T, image *ctl.Image) {
+	t.Helper()
+	if image.ImageId != testPTCImageID || image.IsBase || image.Status != "built" || image.ImageTag != testPTCImageTag || image.Parent != imagebuild.PTCBasePrimitive || image.PackageManager != "apt" {
+		t.Fatalf("unexpected rebuilt PTC image: %#v", image)
+	}
+}
+
+func TestRebuildImageBuildsMissingPTCImage(t *testing.T) {
+	server, fake, images := ptcRebuildServer(t)
+	if exists, _ := fake.ImageExists(testPTCImageTag); exists {
+		t.Fatal("the fixture must start without a PTC image")
+	}
+	image, err := server.RebuildImage(context.Background(), &ctl.RebuildImageRequest{ImageId: testPTCImageID, DshVersion: testDSHVersion})
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertBuiltPTCImage(t, image)
+	if !sameStrings(images.builds, []string{testDSHVersion}) {
+		t.Fatalf("expected one PTC build for %q, got %v", testDSHVersion, images.builds)
+	}
+}
+
+// TestRebuildImagePullsPTCBaseBeforeBuilding pins that a PTC rebuild refreshes
+// the Node primitive first, exactly like a base rebuild, instead of relying on
+// the builder's implicit pull-if-missing: the pull is already recorded when the
+// build starts.
+func TestRebuildImagePullsPTCBaseBeforeBuilding(t *testing.T) {
+	server, fake, images := ptcRebuildServer(t)
+	var pulledAtBuild []string
+	images.onBuild = func() { pulledAtBuild = append([]string(nil), fake.pulled...) }
+	if _, err := server.RebuildImage(context.Background(), &ctl.RebuildImageRequest{ImageId: testPTCImageID, DshVersion: testDSHVersion}); err != nil {
+		t.Fatal(err)
+	}
+	if !sameStrings(fake.pulled, []string{imagebuild.PTCBasePrimitive}) {
+		t.Fatalf("expected the PTC base to be pulled, got %#v", fake.pulled)
+	}
+	if !sameStrings(pulledAtBuild, []string{imagebuild.PTCBasePrimitive}) {
+		t.Fatalf("the pull must happen before the build, got pulled=%#v at build time", pulledAtBuild)
+	}
+}
+
+// TestRebuildImagePTCFailsWhenBasePullFails pins that a failed primitive pull
+// fails the rebuild with that error and never starts a build.
+func TestRebuildImagePTCFailsWhenBasePullFails(t *testing.T) {
+	server, fake, images := ptcRebuildServer(t)
+	fake.pullErr = errors.New("registry unreachable")
+	_, err := server.RebuildImage(context.Background(), &ctl.RebuildImageRequest{ImageId: testPTCImageID, DshVersion: testDSHVersion})
+	if status.Code(err) != codes.Internal {
+		t.Fatalf("expected Internal, got %v", err)
+	}
+	message := status.Convert(err).Message()
+	for _, want := range []string{"cannot pull the PTC base image", imagebuild.PTCBasePrimitive, "registry unreachable"} {
+		if !strings.Contains(message, want) {
+			t.Fatalf("expected the pull error to mention %q, got %q", want, message)
+		}
+	}
+	if !sameStrings(fake.pulled, []string{imagebuild.PTCBasePrimitive}) {
+		t.Fatalf("expected one pull attempt, got %#v", fake.pulled)
+	}
+	if len(images.builds) != 0 {
+		t.Fatalf("a failed pull must not build, got %v", images.builds)
+	}
+}
+
+func TestRebuildImageRebuildsPresentPTCImage(t *testing.T) {
+	server, fake, images := ptcRebuildServer(t)
+	// Seed an image whose labels already match: RebuildImage must still build,
+	// replacing the one tag unconditionally.
+	seedPTCImage(fake, ptcImageLabels(t, testDSHVersion))
+	image, err := server.RebuildImage(context.Background(), &ctl.RebuildImageRequest{ImageId: testPTCImageID, DshVersion: testDSHVersion})
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertBuiltPTCImage(t, image)
+	if !sameStrings(images.builds, []string{testDSHVersion}) {
+		t.Fatalf("a present PTC image must be rebuilt, got builds %v", images.builds)
+	}
+	if !sameStrings(fake.pulled, []string{imagebuild.PTCBasePrimitive}) {
+		t.Fatalf("a present PTC image must still pull its base, got %#v", fake.pulled)
+	}
+}
+
+func TestRebuildImagePTCRejectsMissingOrInvalidVersion(t *testing.T) {
+	server, _, images := ptcRebuildServer(t)
+	for _, version := range []string{"", "Bad Version", "0.2.1;rm", "0.2.1 rc"} {
+		_, err := server.RebuildImage(context.Background(), &ctl.RebuildImageRequest{ImageId: testPTCImageID, DshVersion: version})
+		if status.Code(err) != codes.InvalidArgument {
+			t.Errorf("version %q: expected InvalidArgument, got %v", version, err)
+		}
+	}
+	if len(images.builds) != 0 {
+		t.Fatalf("a refused version must not build, got %v", images.builds)
+	}
+}
+
+func TestRebuildImagePTCNeverTouchesTheContainer(t *testing.T) {
+	server, fake, images := ptcServerWithImages(t)
+	fake.images = map[string]bool{}
+	if _, err := server.EnsureContainer(context.Background(), ptcRequest(testDSHVersion)); err != nil {
+		t.Fatal(err)
+	}
+	before := storedPTC(t, server)
+	creates := len(fake.ptcCreates)
+	// The ensure built the image once; the rebuild must add exactly one build.
+	if len(images.builds) != 1 {
+		t.Fatalf("expected the ensure's build, got %v", images.builds)
+	}
+	if _, err := server.RebuildImage(context.Background(), &ctl.RebuildImageRequest{ImageId: testPTCImageID, DshVersion: testOtherDSHVersion}); err != nil {
+		t.Fatal(err)
+	}
+	if !sameStrings(images.builds, []string{testDSHVersion, testOtherDSHVersion}) {
+		t.Fatalf("expected the rebuild to build for the other release, got %v", images.builds)
+	}
+	if !sameStrings(fake.pulled, []string{imagebuild.PTCBasePrimitive}) {
+		t.Fatalf("the rebuild must pull its base, got %#v", fake.pulled)
+	}
+	after := storedPTC(t, server)
+	if !reflect.DeepEqual(before, after) {
+		t.Fatalf("the container record changed: before %#v, after %#v", before, after)
+	}
+	if len(fake.ptcCreates) != creates {
+		t.Fatalf("the rebuild created a container: %#v", fake.ptcCreates)
+	}
+	if len(fake.removed) != 0 {
+		t.Fatalf("the rebuild removed a container: %#v", fake.removed)
+	}
+}
+
+func TestRebuildAllImagesWithVersionBuildsMissingPTCImage(t *testing.T) {
+	server, fake, images := ptcRebuildServer(t)
+	var pulledAtBuild []string
+	images.onBuild = func() { pulledAtBuild = append([]string(nil), fake.pulled...) }
+	response, err := server.RebuildAllImages(context.Background(), &ctl.RebuildAllImagesRequest{DshVersion: testDSHVersion})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !sameStrings(images.builds, []string{testDSHVersion}) {
+		t.Fatalf("expected one PTC build for %q, got %v", testDSHVersion, images.builds)
+	}
+	if !sameStrings(pulledAtBuild, []string{imagebuild.PTCBasePrimitive}) {
+		t.Fatalf("the pull must happen before the build, got pulled=%#v at build time", pulledAtBuild)
+	}
+	if !sliceContains(response.Rebuilt, testPTCImageID) {
+		t.Fatalf("expected the PTC image in rebuilt, got %#v", response.Rebuilt)
+	}
+}
+
+// TestRebuildAllImagesPTCFailsWhenBasePullFails pins that a failed primitive
+// pull leaves the PTC image in skipped and never starts its build, like any
+// other PTC rebuild failure.
+func TestRebuildAllImagesPTCFailsWhenBasePullFails(t *testing.T) {
+	server, fake, images := ptcRebuildServer(t)
+	fake.pullErr = errors.New("registry unreachable")
+	response, err := server.RebuildAllImages(context.Background(), &ctl.RebuildAllImagesRequest{DshVersion: testDSHVersion})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !sliceContains(response.Skipped, testPTCImageID) {
+		t.Fatalf("expected the PTC image in skipped, got %#v", response.Skipped)
+	}
+	if sliceContains(response.Rebuilt, testPTCImageID) {
+		t.Fatalf("the PTC image must not be rebuilt, got %#v", response.Rebuilt)
+	}
+	if len(images.builds) != 0 {
+		t.Fatalf("a failed pull must not build, got %v", images.builds)
+	}
+	if !sameStrings(fake.pulled, []string{imagebuild.PTCBasePrimitive}) {
+		t.Fatalf("expected one pull attempt, got %#v", fake.pulled)
+	}
+}
+
+func TestRebuildAllImagesWithVersionRebuildsPresentPTCImage(t *testing.T) {
+	server, fake, images := ptcRebuildServer(t)
+	seedPTCImage(fake, ptcImageLabels(t, testDSHVersion))
+	response, err := server.RebuildAllImages(context.Background(), &ctl.RebuildAllImagesRequest{DshVersion: testDSHVersion})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !sameStrings(images.builds, []string{testDSHVersion}) {
+		t.Fatalf("a present PTC image must be rebuilt, got builds %v", images.builds)
+	}
+	if !sameStrings(fake.pulled, []string{imagebuild.PTCBasePrimitive}) {
+		t.Fatalf("a present PTC image must still pull its base, got %#v", fake.pulled)
+	}
+	if !sliceContains(response.Rebuilt, testPTCImageID) {
+		t.Fatalf("expected the PTC image in rebuilt, got %#v", response.Rebuilt)
+	}
+}
+
+func TestRebuildAllImagesWithoutVersionLeavesPTCAlone(t *testing.T) {
+	server, fake, images := ptcRebuildServer(t)
+	seedPTCImage(fake, ptcImageLabels(t, testDSHVersion))
+	response, err := server.RebuildAllImages(context.Background(), &ctl.RebuildAllImagesRequest{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(images.builds) != 0 {
+		t.Fatalf("an empty version must leave the PTC image untouched, got builds %v", images.builds)
+	}
+	if sliceContains(response.Rebuilt, testPTCImageID) || sliceContains(response.Skipped, testPTCImageID) {
+		t.Fatalf("the PTC image must not be reported, got rebuilt=%#v skipped=%#v", response.Rebuilt, response.Skipped)
+	}
+}
+
+func TestRebuildAllImagesPTCNeverTouchesTheContainer(t *testing.T) {
+	server, fake, images := ptcServerWithImages(t)
+	server.ImageBuilder = &imagebuild.Builder{}
+	fake.images = map[string]bool{}
+	if _, err := server.EnsureContainer(context.Background(), ptcRequest(testDSHVersion)); err != nil {
+		t.Fatal(err)
+	}
+	before := storedPTC(t, server)
+	creates := len(fake.ptcCreates)
+	if _, err := server.RebuildAllImages(context.Background(), &ctl.RebuildAllImagesRequest{DshVersion: testOtherDSHVersion}); err != nil {
+		t.Fatal(err)
+	}
+	if !sameStrings(images.builds, []string{testDSHVersion, testOtherDSHVersion}) {
+		t.Fatalf("expected the rebuild to build for the other release, got %v", images.builds)
+	}
+	if !sameStrings(fake.pulled, []string{imagebuild.PTCBasePrimitive}) {
+		t.Fatalf("the rebuild must pull its base, got %#v", fake.pulled)
+	}
+	after := storedPTC(t, server)
+	if !reflect.DeepEqual(before, after) {
+		t.Fatalf("the container record changed: before %#v, after %#v", before, after)
+	}
+	if len(fake.ptcCreates) != creates {
+		t.Fatalf("the rebuild created a container: %#v", fake.ptcCreates)
+	}
+	if len(fake.removed) != 0 {
+		t.Fatalf("the rebuild removed a container: %#v", fake.removed)
+	}
+}
+
+func TestRebuildAllImagesRejectsInvalidPTCVersion(t *testing.T) {
+	server, _, images := ptcRebuildServer(t)
+	_, err := server.RebuildAllImages(context.Background(), &ctl.RebuildAllImagesRequest{DshVersion: "not a version"})
+	if status.Code(err) != codes.InvalidArgument {
+		t.Fatalf("expected InvalidArgument, got %v", err)
+	}
+	if len(images.builds) != 0 {
+		t.Fatalf("a refused version must not build, got %v", images.builds)
 	}
 }

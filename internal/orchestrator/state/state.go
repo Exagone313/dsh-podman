@@ -42,19 +42,29 @@ type PublishedPort struct {
 	HostPort   int    `toml:"host_port"`
 	SocketName string `toml:"socket_name"`
 }
+
+// ContainerKindPTC marks the reserved shared PTC container in a stored
+// container record. An empty kind means an ordinary guest container.
+const ContainerKindPTC = "ptc"
+
 type Container struct {
-	Name            string            `toml:"name"` // "default" or logical name
-	PodmanName      string            `toml:"podman_name"`
-	ImageID         string            `toml:"image_id"`
-	Status          string            `toml:"status"`
-	CreatedAt       string            `toml:"created_at"`
-	AgentSocketPath string            `toml:"agent_socket_path"`
-	AgentToken      string            `toml:"agent_token"`
-	Mounts          []Mount           `toml:"mounts"`
-	Paths           []string          `toml:"paths,omitempty"`
-	Env             map[string]string `toml:"env,omitempty"`
-	SecretEnv       map[string]string `toml:"secret_env,omitempty"`
-	PublishedPorts  []PublishedPort   `toml:"published_ports,omitempty"`
+	Name       string `toml:"name"` // "default" or logical name
+	Kind       string `toml:"kind,omitempty"`
+	PodmanName string `toml:"podman_name"`
+	ImageID    string `toml:"image_id"`
+	// ImageFingerprint identifies the exact image a PTC container was created
+	// from. Its tag is fixed, so the build labels are what change on a rebuild;
+	// a differing fingerprint recreates the container.
+	ImageFingerprint string            `toml:"image_fingerprint,omitempty"`
+	Status           string            `toml:"status"`
+	CreatedAt        string            `toml:"created_at"`
+	AgentSocketPath  string            `toml:"agent_socket_path"`
+	AgentToken       string            `toml:"agent_token"`
+	Mounts           []Mount           `toml:"mounts"`
+	Paths            []string          `toml:"paths,omitempty"`
+	Env              map[string]string `toml:"env,omitempty"`
+	SecretEnv        map[string]string `toml:"secret_env,omitempty"`
+	PublishedPorts   []PublishedPort   `toml:"published_ports,omitempty"`
 }
 type Workspace struct {
 	WorkspaceSlug   string      `toml:"workspace_slug"`
@@ -74,6 +84,18 @@ type imagesFile struct {
 type workspacesFile struct {
 	Workspaces []Workspace `toml:"workspaces"`
 }
+
+// ptcFile is the state of the single shared PTC container. It is a top-level
+// record of its own rather than a workspace container: the PTC container is
+// not bound to a workspace, so it survives a workspace removal and exists even
+// when no workspace does.
+type ptcFile struct {
+	PTC *Container `toml:"ptc,omitempty"`
+}
+
+// ptcStateName is the state file holding the shared PTC record. Keeping it
+// apart from workspaces.toml means a workspace write can never drop it.
+const ptcStateName = "ptc.toml"
 
 type Store struct {
 	dir string
@@ -141,6 +163,63 @@ func (s *Store) SaveWorkspaces(workspaces []Workspace) error {
 }
 func (s *Store) saveWorkspaces(workspaces []Workspace) error {
 	return s.write("workspaces.toml", workspacesFile{Workspaces: workspaces})
+}
+
+// PTCContainer returns the shared PTC container record, if one is stored.
+func (s *Store) PTCContainer() (Container, bool, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.ptcContainer()
+}
+func (s *Store) ptcContainer() (Container, bool, error) {
+	var file ptcFile
+	if err := s.read(ptcStateName, &file); err != nil {
+		return Container{}, false, err
+	}
+	if file.PTC == nil {
+		return Container{}, false, nil
+	}
+	return *file.PTC, true, nil
+}
+
+// SavePTCContainer replaces the shared PTC container record.
+func (s *Store) SavePTCContainer(container Container) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.savePTCContainer(container)
+}
+func (s *Store) savePTCContainer(container Container) error {
+	return s.write(ptcStateName, ptcFile{PTC: &container})
+}
+
+// UpdatePTCContainer applies update to the shared PTC container record while
+// holding the store lock. It is the singleton analog of UpdateWorkspaces, so a
+// caller can merge into the record the store currently holds instead of
+// writing back a stale snapshot.
+func (s *Store) UpdatePTCContainer(update func(current Container, found bool) (Container, error)) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	current, found, err := s.ptcContainer()
+	if err != nil {
+		return err
+	}
+	next, err := update(current, found)
+	if err != nil {
+		return err
+	}
+	return s.savePTCContainer(next)
+}
+
+// RemovePTCContainer forgets the shared PTC container record, tolerating an
+// absent record.
+func (s *Store) RemovePTCContainer() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	err := os.Remove(filepath.Join(s.dir, ptcStateName))
+	if errors.Is(err, os.ErrNotExist) {
+		return nil
+	}
+	return err
 }
 func (s *Store) UpdateImages(update func([]Image) ([]Image, error)) error {
 	s.mu.Lock()

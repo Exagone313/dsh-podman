@@ -81,6 +81,28 @@ func validContainerName(name string) bool {
 	return name != "" && name != "default" && containerLogicalName.MatchString(name)
 }
 
+// ptcContainerLogical is the reserved logical name of the PTC container the
+// orchestrator creates in each workspace. No caller may create, edit, or remove
+// a container under that name: it is owned by the orchestrator.
+const ptcContainerLogical = "ptc"
+
+// validateUserContainerName validates a logical container name a caller may
+// address. An empty name and "default" name the default container; the PTC
+// container's reserved name is refused with a distinct message, and any other
+// unusable shape is refused as invalid.
+func validateUserContainerName(name string) error {
+	if name == "" || name == "default" {
+		return nil
+	}
+	if name == ptcContainerLogical {
+		return status.Error(codes.InvalidArgument, fmt.Sprintf("container name %q is reserved for the PTC container", name))
+	}
+	if !validContainerName(name) {
+		return status.Error(codes.InvalidArgument, fmt.Sprintf("invalid container name %q", name))
+	}
+	return nil
+}
+
 // containerNamePrefix is the prefix of every podman resource the orchestrator
 // creates: a pod is dsh-podman-<slug> and a container dsh-podman-<slug>-<name>.
 const containerNamePrefix = "dsh-podman-"

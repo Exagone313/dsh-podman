@@ -93,6 +93,24 @@ func (c *Client) pull(name string) error {
 	}
 }
 
+// ImageLabels returns the labels stamped on an image. It is how the PTC image's
+// build inputs are read back: the tag never changes, so only the labels can
+// tell whether an existing image already carries the requested release and
+// recipe.
+func (c *Client) ImageLabels(name string) (map[string]string, error) {
+	if err := c.connReady(); err != nil {
+		return nil, err
+	}
+	ctx, cancel := c.lookupContext()
+	defer cancel()
+	report, err := images.GetImage(ctx, name, nil)
+	if err != nil {
+		c.log().Error("workspace image inspect failed", "image", name, "error", err)
+		return nil, err
+	}
+	return report.Labels, nil
+}
+
 // ImageCreated returns the image's creation time as an RFC3339 string, or ""
 // when the image does not exist or its creation time cannot be read.
 func (c *Client) ImageCreated(name string) string {

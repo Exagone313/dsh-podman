@@ -77,10 +77,33 @@ func (s *Server) Exec(stream guest.WorkspaceGuestAgent_ExecServer) error {
 			return status.Error(codes.Internal, err.Error())
 		}
 	}
+	// A control-requesting caller gets the parent end of a socketpair whose
+	// child end is fd 7. ExecControl (a separate RPC) attaches to the same exec
+	// id and relays the caller's bytes; refusing here is explicit because the
+	// caller asked for a transport this agent cannot provide.
+	var control *controlChannel
+	if start.GetControl() {
+		if !controlSupported() {
+			return status.Error(codes.Unimplemented, "guest agent cannot provide a control channel on this platform")
+		}
+		control, err = s.newControlChannel(process.ID)
+		if err != nil {
+			return status.Error(codes.Unavailable, "guest agent cannot provide the requested control channel: "+err.Error())
+		}
+		// The registry entry lives until this exec is gone; the child end is
+		// dropped as soon as Start returns, because keeping it open in the
+		// agent would stop the socket from ever reaching EOF.
+		defer s.Controls.finish(process.ID)
+		defer control.close()
+		process.Command.ExtraFiles = control.extraFiles()
+	}
 	if err := process.Command.Start(); err != nil {
 		return status.Error(codes.InvalidArgument, err.Error())
 	}
 	started = true
+	if control != nil {
+		control.closeChild()
+	}
 	// Publish the started handle so Signal never reads Command.Process while
 	// Start is still writing it.
 	process.SetProcess(process.Command.Process)

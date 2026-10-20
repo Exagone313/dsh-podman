@@ -316,3 +316,54 @@ func TestTmpfsAndVolumeMountsRoundTrip(t *testing.T) {
 		t.Fatalf("volume mount did not survive round trip: %#v", mounts[1])
 	}
 }
+
+// TestPTCContainerIsSingletonOutsideWorkspaces pins the shared PTC record's
+// home: a top-level key of its own, unaffected by workspace writes and absent
+// when none was stored.
+func TestPTCContainerIsSingletonOutsideWorkspaces(t *testing.T) {
+	store, err := New(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, found, err := store.PTCContainer(); err != nil || found {
+		t.Fatalf("a fresh store must hold no PTC record: found=%v err=%v", found, err)
+	}
+	record := Container{Name: "ptc", Kind: ContainerKindPTC, PodmanName: "dsh-podman-ptc", ImageID: "ptc", Status: "running", AgentToken: "tok"}
+	if err := store.SavePTCContainer(record); err != nil {
+		t.Fatal(err)
+	}
+	// Workspace writes must never drop or duplicate the singleton.
+	if err := store.SaveWorkspaces([]Workspace{{WorkspaceSlug: "a"}}); err != nil {
+		t.Fatal(err)
+	}
+	got, found, err := store.PTCContainer()
+	if err != nil || !found {
+		t.Fatalf("PTC record lost: found=%v err=%v", found, err)
+	}
+	if got.PodmanName != "dsh-podman-ptc" || got.Kind != ContainerKindPTC || got.AgentToken != "tok" {
+		t.Fatalf("unexpected PTC record: %#v", got)
+	}
+	if err := store.UpdatePTCContainer(func(current Container, found bool) (Container, error) {
+		if !found {
+			t.Fatal("update did not see the stored record")
+		}
+		current.Status = "stopped"
+		return current, nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	got, _, err = store.PTCContainer()
+	if err != nil || got.Status != "stopped" {
+		t.Fatalf("PTC record was not updated: %#v err=%v", got, err)
+	}
+	if err := store.RemovePTCContainer(); err != nil {
+		t.Fatal(err)
+	}
+	if _, found, err := store.PTCContainer(); err != nil || found {
+		t.Fatalf("removed PTC record survived: found=%v err=%v", found, err)
+	}
+	// Removal is idempotent.
+	if err := store.RemovePTCContainer(); err != nil {
+		t.Fatal(err)
+	}
+}

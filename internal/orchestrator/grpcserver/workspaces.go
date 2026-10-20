@@ -106,7 +106,18 @@ func (s *Server) ListWorkspaces(context.Context, *ctl.ListWorkspacesRequest) (*c
 // written back from the snapshot the caller read: callers mutate a record after
 // a multi-second podman recreate, and writing the whole stale workspace would
 // silently drop a concurrent change to another container.
+//
+// An empty workspace addresses the shared PTC container instead: its record
+// lives outside workspace state, in its own singleton slot.
 func (s *Server) upsertContainer(workspace state.Workspace, record state.Container) (state.Workspace, error) {
+	if workspace.WorkspaceSlug == "" {
+		if err := s.Store.UpdatePTCContainer(func(current state.Container, found bool) (state.Container, error) {
+			return record, nil
+		}); err != nil {
+			return state.Workspace{}, err
+		}
+		return state.Workspace{}, nil
+	}
 	var result state.Workspace
 	if err := s.Store.UpdateWorkspaces(func(all []state.Workspace) ([]state.Workspace, error) {
 		for i := range all {
@@ -352,6 +363,12 @@ func (s *Server) RemoveWorkspace(ctx context.Context, request *ctl.RemoveWorkspa
 		workspace = state.Workspace{WorkspaceSlug: slug}
 	}
 	for i := range workspace.Containers {
+		// The shared PTC container is not workspace state, and a stale
+		// per-workspace PTC record from an older state file must not imply its
+		// teardown: removing a workspace leaves the PTC container alone.
+		if workspace.Containers[i].Kind == state.ContainerKindPTC {
+			continue
+		}
 		s.stopContainerDaemons(ctx, workspace.Containers[i])
 		// The pod is about to go, but the gateway's host ports are not part of
 		// it: release them explicitly so none survives the workspace.
@@ -362,6 +379,9 @@ func (s *Server) RemoveWorkspace(ctx context.Context, request *ctl.RemoveWorkspa
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 	for i := range workspace.Containers {
+		if workspace.Containers[i].Kind == state.ContainerKindPTC {
+			continue
+		}
 		s.removeSocketDir(workspace.Containers[i].PodmanName)
 	}
 	if err := s.Store.UpdateWorkspaces(func(all []state.Workspace) ([]state.Workspace, error) {

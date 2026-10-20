@@ -33,6 +33,9 @@ type Server struct {
 	Publish *publish.Manager
 	// Paths holds the additions prepended to every child's PATH.
 	Paths *childenv.Paths
+	// Controls rendezvouses an exec that requested a control channel with its
+	// ExecControl stream.
+	Controls *controlRegistry
 }
 
 func New() *Server {
@@ -42,6 +45,7 @@ func New() *Server {
 		Daemons:   daemon.NewManager(paths),
 		Terminals: terminal.NewManager(paths),
 		Paths:     paths,
+		Controls:  newControlRegistry(),
 	}
 }
 

@@ -76,6 +76,7 @@ func TestRequestBuildStreamsContext(t *testing.T) {
 		Tag:           "localhost/dsh-podman/dev:latest",
 		Containerfile: "FROM scratch\n",
 		CacheVolume:   "/host/cache:/var/cache/pacman/pkg",
+		Labels:        map[string]string{"io.example.release": "1.2.3"},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -94,6 +95,9 @@ func TestRequestBuildStreamsContext(t *testing.T) {
 	}
 	if got := request.URL.Query().Get("volume"); got != "/host/cache:/var/cache/pacman/pkg" {
 		t.Errorf("volume = %q", got)
+	}
+	if got := request.URL.Query().Get("labels"); got != `{"io.example.release":"1.2.3"}` {
+		t.Errorf("labels = %q", got)
 	}
 	if got := request.Header.Get("Content-Type"); got != "application/x-tar" {
 		t.Errorf("Content-Type = %q", got)

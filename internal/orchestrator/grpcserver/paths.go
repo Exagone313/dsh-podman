@@ -21,6 +21,9 @@ import (
 // part of the container environment on the next create or recreate.
 func (s *Server) SetContainerPaths(_ context.Context, request *ctl.SetContainerPathsRequest) (*ctl.Container, error) {
 	s.log().Info("control request", "method", "SetContainerPaths", "workspace_slug", request.GetWorkspaceSlug(), "container", request.GetContainer(), "path_count", len(request.GetPaths()))
+	if err := validateUserContainerName(request.GetContainer()); err != nil {
+		return nil, err
+	}
 	workspace, err := workspaceBySlug(s.Store, request.GetWorkspaceSlug())
 	if err != nil {
 		return nil, status.Error(codes.NotFound, err.Error())

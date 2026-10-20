@@ -18,6 +18,7 @@ import (
 
 	"github.com/Exagone313/dsh-podman/internal/guestagent/childenv"
 	"github.com/Exagone313/dsh-podman/internal/guestagent/identity"
+	"github.com/Exagone313/dsh-podman/internal/guestagent/ptc"
 )
 
 var (
@@ -98,6 +99,14 @@ func (m *Manager) Start(name string, argv []string, cwd string, env map[string]s
 	if len(argv) == 0 || argv[0] == "" {
 		return "", fmt.Errorf("argv must contain a command")
 	}
+	// A PTC child runs as a numeric uid/gid with HOME and the XDG directories
+	// on a writable, owned home; the inherited /root is read-only there.
+	requested, preparedEnv, err := ptc.Attach(opts.requestedIdentity(), env)
+	if err != nil {
+		return "", err
+	}
+	opts.Uid, opts.Gid, opts.Groups = requested.Uid, requested.Gid, requested.Groups
+	env = preparedEnv
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if !namePattern.MatchString(name) {
@@ -125,7 +134,7 @@ func (m *Manager) Start(name string, argv []string, cwd string, env map[string]s
 		cmd.Env = childenv.Build(m.paths, envCopy)
 	}
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
-	requested := opts.requestedIdentity()
+	requested = opts.requestedIdentity()
 	if cred := identity.Credential(requested); cred != nil {
 		cmd.SysProcAttr.Credential = cred
 	}

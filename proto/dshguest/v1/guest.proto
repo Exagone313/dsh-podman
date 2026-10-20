@@ -31,13 +31,29 @@ service WorkspaceGuestAgent {
   rpc PublishPort(PublishPortRequest) returns (PublishPortResponse);
   rpc UnpublishPort(UnpublishPortRequest) returns (UnpublishPortResponse);
   rpc Terminal(stream TerminalInput) returns (stream TerminalOutput);
+  // GetCapabilities reports the optional features this agent implements, so a
+  // caller can fall back when it talks to an older agent.
+  rpc GetCapabilities(GetCapabilitiesRequest) returns (GetCapabilitiesResponse);
+  // ExecControl attaches the caller's end of an exec's control channel. The
+  // first frame names the exec; later frames carry opaque bytes both ways.
+  rpc ExecControl(stream ExecControlFrame) returns (stream ExecControlFrame);
 }
 message PingRequest {}
 message PingResponse { string version = 1; string commit = 2; }
 message ExecInput { oneof payload { ExecStart start = 1; bytes stdin_chunk = 2; } }
-message ExecStart { repeated string argv = 1; string cwd = 2; map<string, string> env = 3; repeated string unset_env = 4; SpillTarget spill_stdout = 5; SpillTarget spill_stderr = 6; google.protobuf.Int32Value uid = 7; google.protobuf.Int32Value gid = 8; repeated uint32 groups = 9; bool stdin_pipe = 10; }
+message ExecStart { repeated string argv = 1; string cwd = 2; map<string, string> env = 3; repeated string unset_env = 4; SpillTarget spill_stdout = 5; SpillTarget spill_stderr = 6; google.protobuf.Int32Value uid = 7; google.protobuf.Int32Value gid = 8; repeated uint32 groups = 9; bool stdin_pipe = 10; bool control = 11; }
 message ExecOutput { oneof payload { bytes stdout_chunk = 1; bytes stderr_chunk = 2; ExecExit exit = 3; } string process_id = 4; }
 message ExecExit { int32 exit_code = 1; bool signaled = 2; string signal = 3; bool stdout_spill_valid = 4; bool stderr_spill_valid = 5; }
+// ExecControlFrame is one frame of an exec's control channel. The first frame
+// carries the exec id; every later frame carries opaque bytes in either
+// direction, which the agent relays to and from the child's fd 7.
+message ExecControlFrame { oneof payload { string exec_id = 1; bytes data = 2; } }
+// GetCapabilitiesRequest has no fields: the caller asks the agent which
+// optional features it implements.
+message GetCapabilitiesRequest {}
+// GetCapabilitiesResponse reports the optional features this agent implements.
+// exec_control means an exec may request the fd-7 control channel.
+message GetCapabilitiesResponse { bool exec_control = 1; }
 // SpillTarget is a bounded full-stream copy of one output stream, written in
 // the guest's execution world so the caller can read the complete output after
 // an in-memory truncation.

@@ -224,8 +224,22 @@ func (s *Server) EnsureContainer(ctx context.Context, request *ctl.EnsureContain
 		container = "default"
 	}
 	s.log().Info("control request", "method", "EnsureContainer", "workspace_slug", request.GetWorkspaceSlug(), "container", container)
-	if container != "default" && !validContainerName(container) {
-		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("invalid container name %q", container))
+	if container == ptcContainerLogical {
+		// The reserved PTC container is an attach path too, but it is created
+		// and shaped by the orchestrator rather than the caller. The caller
+		// names the harness release its PTC image must carry. It is the one
+		// shared PTC container, so its workspace slug carries no meaning and
+		// may be empty.
+		record, ensureErr := s.ensurePTCContainer(request.GetDshVersion())
+		if ensureErr != nil {
+			s.log().Warn("control request failed", "method", "EnsureContainer", "workspace_slug", request.GetWorkspaceSlug(), "container", container, "error", ensureErr)
+			return nil, ensureErr
+		}
+		s.log().Info("control request completed", "method", "EnsureContainer", "workspace_slug", request.GetWorkspaceSlug(), "container", container, "podman_name", record.PodmanName)
+		return containerProto(state.Workspace{}, record), nil
+	}
+	if err := validateUserContainerName(container); err != nil {
+		return nil, err
 	}
 	workspace, err := workspaceBySlug(s.Store, request.GetWorkspaceSlug())
 	if err != nil {
@@ -339,8 +353,8 @@ func (s *Server) RecreateContainer(ctx context.Context, request *ctl.RecreateCon
 	if container == "" {
 		container = "default"
 	}
-	if container != "default" && !validContainerName(container) {
-		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("invalid container name %q", container))
+	if err := validateUserContainerName(container); err != nil {
+		return nil, err
 	}
 	workspace, err := workspaceBySlug(s.Store, request.GetWorkspaceSlug())
 	if err != nil {
@@ -435,8 +449,8 @@ func (s *Server) StartContainer(ctx context.Context, request *ctl.StartContainer
 	if container == "" {
 		container = "default"
 	}
-	if container != "default" && !validContainerName(container) {
-		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("invalid container name %q", container))
+	if err := validateUserContainerName(container); err != nil {
+		return nil, err
 	}
 	workspace, err := workspaceBySlug(s.Store, request.GetWorkspaceSlug())
 	if err != nil {
@@ -622,8 +636,22 @@ func (s *Server) RemoveContainer(ctx context.Context, request *ctl.RemoveContain
 	if container == "" {
 		container = "default"
 	}
-	if container != "default" && !validContainerName(container) {
-		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("invalid container name %q", container))
+	// An empty workspace slug is the explicit workspace-less remove of the
+	// shared PTC container. Every other removal needs a workspace, and the
+	// reserved name stays refused for a user-addressed removal below.
+	if request.GetWorkspaceSlug() == "" {
+		if container != ptcContainerLogical {
+			return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("workspace slug is required to remove container %q", container))
+		}
+		if err := s.removePTCContainer(ctx); err != nil {
+			s.log().Error("control request failed", "method", "RemoveContainer", "container", container, "error", err)
+			return nil, err
+		}
+		s.log().Info("control request completed", "method", "RemoveContainer", "container", container)
+		return &ctl.RemoveContainerResponse{}, nil
+	}
+	if err := validateUserContainerName(container); err != nil {
+		return nil, err
 	}
 	workspace, err := workspaceBySlug(s.Store, request.GetWorkspaceSlug())
 	if err != nil {

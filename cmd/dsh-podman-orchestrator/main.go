@@ -129,6 +129,10 @@ func main() {
 	}
 	controlServer := &grpcserver.Server{ProjectsRoot: root, HostProjectsRoot: hostProjectsRoot, SocketsRoot: socketsRoot, GuestAgentMount: guestAgentMount, Store: store, Podman: podmanClient, ImageBuilder: imageBuilder, BaseImagePrefix: getenv("DSH_PODMAN_BASE_IMAGE_PREFIX", "localhost/dsh-podman/base/"), VolumePrefix: getenv("DSH_PODMAN_VOLUME_PREFIX", "dsh-podman-"), SecretPrefix: getenv("DSH_PODMAN_SECRET_PREFIX", "dsh-podman-"), Logger: logger, Gateway: &gatewayclient.Client{Socket: filepath.Join(socketsRoot, "gateway.sock"), Token: gatewayToken, Version: version.Version}}
 	ctl.RegisterOrchestratorControlServer(server, controlServer)
+	// A PTC container is recreated lazily on its next use, so startup only
+	// reconciles the stored records with podman: a record whose container is
+	// gone is dropped, and a surviving one has its status refreshed.
+	controlServer.ReconcilePTCContainers()
 	// The gateway is optional: the loop reports it absent when it is not
 	// running, and everything else keeps working.
 	gatewayCtx, cancelGateway := context.WithCancel(context.Background())

@@ -302,8 +302,8 @@ func (s *Server) AddContainerSecret(ctx context.Context, request *ctl.AddContain
 	if container == "" {
 		container = "default"
 	}
-	if container != "default" && !validContainerName(container) {
-		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("invalid container name %q", container))
+	if err := validateUserContainerName(container); err != nil {
+		return nil, err
 	}
 	workspace, err := workspaceBySlug(s.Store, request.GetWorkspaceSlug())
 	if err != nil {
@@ -374,8 +374,8 @@ func (s *Server) RemoveContainerSecret(ctx context.Context, request *ctl.RemoveC
 	if container == "" {
 		container = "default"
 	}
-	if container != "default" && !validContainerName(container) {
-		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("invalid container name %q", container))
+	if err := validateUserContainerName(container); err != nil {
+		return nil, err
 	}
 	workspace, err := workspaceBySlug(s.Store, request.GetWorkspaceSlug())
 	if err != nil {

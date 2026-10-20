@@ -68,6 +68,35 @@ func TestImagePullReportsStreamErrors(t *testing.T) {
 	}
 }
 
+// TestImageLabelsReadsTheInspectReport pins that labels are read back from the
+// inspect endpoint, which is how the PTC image's build inputs are compared.
+func TestImageLabelsReadsTheInspectReport(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// The bindings ping the service before the first call.
+		if strings.HasSuffix(r.URL.Path, "/_ping") {
+			return
+		}
+		if !strings.HasSuffix(r.URL.Path, "/json") {
+			t.Errorf("path = %q, want an inspect suffix", r.URL.Path)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprint(w, `{"Labels":{"io.example.release":"1.2.3"}}`)
+	}))
+	t.Cleanup(server.Close)
+	ctx, err := bindings.NewConnection(context.Background(), "tcp://"+server.Listener.Addr().String())
+	if err != nil {
+		t.Fatal(err)
+	}
+	client := &Client{ctx: ctx, logger: slog.New(slog.NewTextHandler(io.Discard, nil))}
+	labels, err := client.ImageLabels("localhost/dsh-podman/ptc:latest")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if labels["io.example.release"] != "1.2.3" {
+		t.Fatalf("unexpected labels: %#v", labels)
+	}
+}
+
 // TestImagePullObeysTheConnection pins that a client without a Podman
 // connection fails before sending anything.
 func TestImagePullObeysTheConnection(t *testing.T) {

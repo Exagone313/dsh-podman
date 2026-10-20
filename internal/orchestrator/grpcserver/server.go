@@ -26,12 +26,14 @@ type podmanAPI interface {
 	ContainerAgentState(name string) (bool, string, error)
 	ListContainerBindMounts(namePrefix string) (map[string][]specs.Mount, error)
 	CreateWorkspace(pod, name, image, token string, mounts []specs.Mount, secrets []specgen.Secret, envSecrets map[string]string, env map[string]string, paths []string) error
+	CreatePTC(name, image, token string) error
 	RecreateWorkspace(pod, name, image, token string, mounts []specs.Mount, secrets []specgen.Secret, envSecrets map[string]string, env map[string]string, paths []string) error
 	Remove(name string) error
 	RemovePod(name string) error
 	RemoveSocketDir(name string) error
 	Stop(name string) error
 	ImageExists(name string) (bool, error)
+	ImageLabels(name string) (map[string]string, error)
 	ImageCreated(name string) string
 	ImagePull(name string) error
 	ImageRemove(name string) error
@@ -43,6 +45,14 @@ type podmanAPI interface {
 	SecretCreate(name, value string) error
 	SecretList() ([]string, error)
 	SecretRemove(name string) error
+}
+
+// ptcImages is the image-builder operation the reserved PTC container needs:
+// the single PTC tag and a build for a missing or stale image. *imagebuild.Builder
+// satisfies it; tests substitute their own.
+type ptcImages interface {
+	PTCImageTag() string
+	BuildPTC(dshVersion string) (string, error)
 }
 
 type Server struct {
@@ -61,6 +71,11 @@ type Server struct {
 	VolumePrefix    string
 	SecretPrefix    string
 	Logger          *slog.Logger
+
+	// PTCImages, when set, replaces ImageBuilder for the on-demand PTC image.
+	// It is nil in production and set by tests, so the build path can run
+	// without a podman daemon.
+	PTCImages ptcImages
 
 	// Gateway is the optional port-publishing gateway. It is nil when none is
 	// configured, and the port RPCs then report that publishing is unavailable.
@@ -123,6 +138,18 @@ func grpcError(err error) error {
 		return err
 	}
 	return status.Error(codes.Internal, err.Error())
+}
+
+// ptcImageBuilder returns the image builder the PTC container uses, preferring
+// the test substitute when one is set.
+func (s *Server) ptcImageBuilder() (ptcImages, error) {
+	if s.PTCImages != nil {
+		return s.PTCImages, nil
+	}
+	if s.ImageBuilder == nil {
+		return nil, status.Error(codes.FailedPrecondition, "image builder is not configured")
+	}
+	return s.ImageBuilder, nil
 }
 
 // cloneMap returns a shallow copy of a string map, or nil when the source is

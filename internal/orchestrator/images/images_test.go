@@ -10,6 +10,13 @@ import (
 	"testing"
 )
 
+// The harness releases below are deliberately fake: the tests exercise the
+// version they are handed, so a real release bump must never change them.
+const (
+	testDSHVersion      = "0.0.0"
+	testOtherDSHVersion = "0.0.1"
+)
+
 func TestContainerfileInstallsPackagesWithoutInlineCache(t *testing.T) {
 	file, err := Containerfile(BuildSpec{From: "archlinux", PackageManager: "pacman", Packages: []string{"git", "python"}})
 	if err != nil {
@@ -300,7 +307,7 @@ func TestBaseImageByID(t *testing.T) {
 			t.Errorf("expected base image %q, got %#v", id, base)
 		}
 	}
-	for _, id := range []string{"", "arch", "debian", "fedora"} {
+	for _, id := range []string{"", "arch", "debian", "fedora", "ptc"} {
 		if _, ok := BaseImageByID(id); ok {
 			t.Errorf("unexpectedly found base image %q", id)
 		}
@@ -319,5 +326,178 @@ func TestBaseImagesRegistry(t *testing.T) {
 	}
 	if BaseImages[2].ID != "alpine" || BaseImages[2].Primitive != "docker.io/library/alpine:latest" || BaseImages[2].PackageManager != "apk" || BaseImages[2].CachePath != "/etc/apk/cache" {
 		t.Fatalf("unexpected alpine base: %#v", BaseImages[2])
+	}
+}
+
+func TestPTCImageIDDoesNotCarryTheVersion(t *testing.T) {
+	if id := PTCImageID(); id != "ptc" {
+		t.Fatalf("unexpected PTC image id %q", id)
+	}
+	// Every release shares the one name; only the labels differ.
+	for _, version := range []string{testDSHVersion, testOtherDSHVersion} {
+		spec, err := PTCBuildSpec(version)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if strings.Contains(spec.ImageID, version) || spec.ImageID != PTCImageID() {
+			t.Fatalf("the PTC image id %q carries the version %q", spec.ImageID, version)
+		}
+	}
+}
+
+func TestPTCImageLabelsRejectUnsafeVersions(t *testing.T) {
+	for _, version := range []string{
+		"",
+		" ",
+		"0.0.0;rm -rf /",
+		"0.0.0; rm -rf /",
+		"../escape",
+		"0.0.0/../x",
+		"0.0.0\\x",
+		"0.0.0\nRUN true",
+		"0.0.0 rc",
+		"0.0.0@sha256:abc",
+		"UPPER",
+		"1..2",
+		"-1.0.0",
+		"1.0.0/",
+		strings.Repeat("a", 101),
+	} {
+		if _, err := PTCImageLabels(version); err == nil {
+			t.Errorf("accepted invalid dsh version %q", version)
+		}
+	}
+	for _, version := range []string{"1", "0.0.0", "0.0.0-test", "0.0.0-beta.1"} {
+		if _, err := PTCImageLabels(version); err != nil {
+			t.Errorf("rejected valid dsh version %q: %v", version, err)
+		}
+	}
+}
+
+func TestPTCImageTagIsSingleAndDeterministic(t *testing.T) {
+	builder := Builder{ImagePrefix: "localhost/dsh-podman/"}
+	tag := builder.PTCImageTag()
+	if tag != "localhost/dsh-podman/ptc:latest" {
+		t.Fatalf("unexpected PTC tag %q", tag)
+	}
+	// Every workspace and every release resolves to the same image.
+	if same := (&Builder{ImagePrefix: "localhost/dsh-podman/"}).PTCImageTag(); same != tag {
+		t.Fatalf("the PTC tag is not deterministic: %q vs %q", tag, same)
+	}
+	if defaultTag := (&Builder{}).PTCImageTag(); defaultTag != tag {
+		t.Fatalf("unexpected default PTC tag %q", defaultTag)
+	}
+}
+
+func TestPTCContainerfileUsesExactlyTheSuppliedVersion(t *testing.T) {
+	spec, err := PTCBuildSpec(testDSHVersion)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if spec.ImageID != "ptc" || spec.IsBase || spec.PackageManager != "apt" {
+		t.Fatalf("unexpected PTC build spec: %#v", spec)
+	}
+	if spec.Labels[PTCVersionLabel] != testDSHVersion {
+		t.Fatalf("the PTC image must label its release: %#v", spec.Labels)
+	}
+	file, err := Containerfile(spec)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.HasPrefix(file, "FROM "+PTCBasePrimitive+"\n") {
+		t.Fatalf("PTC image must build from its primitive, got:\n%s", file)
+	}
+	if PTCBasePrimitive != "docker.io/library/node:26-slim" {
+		t.Fatalf("the PTC base must build from the node:26-slim tag, got %q", PTCBasePrimitive)
+	}
+	if strings.Contains(PTCBasePrimitive, "@") {
+		t.Fatalf("the PTC base must not pin a single-platform digest, got %q", PTCBasePrimitive)
+	}
+	// The apt build path is what makes the build use the managed apt cache.
+	if !strings.Contains(file, "apt-get update") || !strings.Contains(file, "apt-get install -y --no-install-recommends") {
+		t.Fatalf("PTC image must use the apt build path, got:\n%s", file)
+	}
+	wantInstall := "RUN npm install -g " + ptcRuntimePackage + "@" + testDSHVersion + "\n"
+	if !strings.Contains(file, wantInstall) {
+		t.Fatalf("PTC image must install the supplied PTC runtime version %q, got:\n%s", wantInstall, file)
+	}
+	wantLink := "RUN mkdir -p /usr/local/lib/node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai && ln -s /usr/local/lib/node_modules/" + ptcRuntimePackage + " /usr/local/lib/node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai/" + ptcRuntimePackageName + "\n"
+	if !strings.Contains(file, wantLink) {
+		t.Fatalf("PTC image must scaffold the host's expected path, want %q, got:\n%s", wantLink, file)
+	}
+	// No dsh CLI, no dsh tree, and no patched dsh in the PTC image.
+	for _, forbidden := range []string{"@deepseek-ai/dsh@", "dsh-host-webserver", "patch-wildcard-host"} {
+		if strings.Contains(file, forbidden) {
+			t.Fatalf("PTC image must not carry %q, got:\n%s", forbidden, file)
+		}
+	}
+	// A different version builds a different Containerfile, not the same one.
+	otherSpec, err := PTCBuildSpec(testOtherDSHVersion)
+	if err != nil {
+		t.Fatal(err)
+	}
+	otherFile, err := Containerfile(otherSpec)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(otherFile, testDSHVersion) {
+		t.Fatalf("the Containerfile must use the supplied version, got:\n%s", otherFile)
+	}
+	if !strings.Contains(otherFile, "RUN npm install -g "+ptcRuntimePackage+"@"+testOtherDSHVersion+"\n") {
+		t.Fatalf("unexpected Containerfile for %s:\n%s", testOtherDSHVersion, otherFile)
+	}
+}
+
+func TestPTCImageLabelsCoverTheReleaseAndRecipe(t *testing.T) {
+	spec, err := PTCBuildSpec(testDSHVersion)
+	if err != nil {
+		t.Fatal(err)
+	}
+	file, err := Containerfile(spec)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if spec.Labels[PTCVersionLabel] != testDSHVersion {
+		t.Fatalf("unexpected version label: %#v", spec.Labels)
+	}
+	if spec.Labels[PTCRecipeLabel] != recipeDigest(file) {
+		t.Fatalf("the recipe label must digest the rendered Containerfile: %#v", spec.Labels)
+	}
+	// A changed recipe changes the digest, so the same release rebuilds.
+	changed := spec
+	changed.PostInstall = append(append([]string(nil), spec.PostInstall...), "true")
+	changedFile, err := Containerfile(changed)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if recipeDigest(changedFile) == spec.Labels[PTCRecipeLabel] {
+		t.Fatal("a changed recipe must change the Containerfile digest")
+	}
+	// The same release with the same recipe yields identical labels, so the
+	// image is reused.
+	same, err := PTCImageLabels(testDSHVersion)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if LabelFingerprint(same) != LabelFingerprint(spec.Labels) {
+		t.Fatalf("the same release and recipe must yield the same labels: %#v vs %#v", same, spec.Labels)
+	}
+	other, err := PTCImageLabels(testOtherDSHVersion)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if LabelFingerprint(other) == LabelFingerprint(spec.Labels) {
+		t.Fatal("a different release must yield different labels")
+	}
+}
+
+func TestPTCBuildSpecRejectsUnsafeVersions(t *testing.T) {
+	for _, version := range []string{"", "0.0.0; rm -rf /", "../escape", "0.0.0\nRUN true"} {
+		if _, err := PTCBuildSpec(version); err == nil {
+			t.Errorf("accepted invalid dsh version %q", version)
+		}
+		if _, err := PTCImageLabels(version); err == nil {
+			t.Errorf("accepted invalid dsh version %q for labels", version)
+		}
 	}
 }

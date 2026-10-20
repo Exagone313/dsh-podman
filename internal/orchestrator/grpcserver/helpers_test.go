@@ -72,12 +72,23 @@ type fakePodman struct {
 	recreated         []string
 	createErr         error
 	recreateFails     int
+	// ptcCreates records every CreatePTC call, so a test can assert the
+	// reserved PTC container's image, name, and credential.
+	ptcCreates []ptcCreate
+	// ptcErr, when set, makes CreatePTC fail.
+	ptcErr error
 	// images is the image-presence map ImageExists consults; an unrecorded
 	// name counts as present, keeping callers that do not care about image
 	// availability on the double's old unconditional answer.
 	images map[string]bool
+	// imageLabels serves ImageLabels, keyed by image tag. A tag absent from
+	// the map has no labels, which the PTC image path treats as stale.
+	imageLabels map[string]map[string]string
 	// pulled records every image name ImagePull was asked to pull.
 	pulled []string
+	// pullErr, when set, makes ImagePull fail; the failed name is still
+	// recorded in pulled, so a test can assert the attempt happened.
+	pullErr error
 	// writeMounts and readMounts are the read-write and read-only bind-mount
 	// maps ListContainerBindMounts serves, keyed by podman name. They are
 	// seeded directly by tests that need an existing conflicting mount; creates
@@ -91,7 +102,7 @@ type fakePodman struct {
 }
 
 func newFakePodman() *fakePodman {
-	return &fakePodman{exists: map[string]bool{}, running: map[string]bool{}, agentStale: map[string]bool{}, agentToken: map[string]string{}, secretMissing: map[string]bool{}, writeMounts: map[string][]string{}, readMounts: map[string][]string{}}
+	return &fakePodman{exists: map[string]bool{}, running: map[string]bool{}, agentStale: map[string]bool{}, agentToken: map[string]string{}, secretMissing: map[string]bool{}, writeMounts: map[string][]string{}, readMounts: map[string][]string{}, imageLabels: map[string]map[string]string{}}
 }
 
 const (

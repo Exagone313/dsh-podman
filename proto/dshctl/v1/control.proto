@@ -85,13 +85,21 @@ message Workspace {
 message ListImagesRequest {}
 message ListImagesResponse { repeated Image images = 1; }
 message Image { string image_id = 1; string parent = 2; repeated string packages = 3; string image_tag = 4; string built_at = 5; bool is_base = 6; string status = 7; string primitive = 8; string package_manager = 9; bool base_public = 10; }
-message RebuildImageRequest { string image_id = 1; }
-message RebuildAllImagesRequest {}
+// dsh_version is the harness release the caller targets. It is required when
+// `image_id` names the reserved PTC image, whose single image is built
+// unconditionally for that release; it is ignored for an ordinary image.
+message RebuildImageRequest { string image_id = 1; string dsh_version = 2; }
+// dsh_version is the harness release the caller targets. When set, the call
+// also builds the reserved PTC image for that release after the stored images;
+// when empty, only the stored images are considered, so an older caller keeps
+// its previous behaviour.
+message RebuildAllImagesRequest { string dsh_version = 1; }
 // The images one RebuildAllImages call rebuilt or could not provide. `rebuilt`
-// names the stored custom images that were rebuilt, in dependency order; a base
-// image ensured beforehand is not listed. `skipped` names every image the call
-// could not make available: base short names first, then the custom images
-// whose rebuild failed and the images that depend on them.
+// names the stored custom images that were rebuilt, in dependency order, plus
+// the reserved PTC image when the call built it; a base image ensured beforehand
+// is not listed. `skipped` names every image the call could not make available:
+// base short names first, then the custom images whose rebuild failed and the
+// images that depend on them, plus the PTC image when its build failed.
 message RebuildAllImagesResponse { repeated string rebuilt = 1; repeated string skipped = 2; }
 message RemoveImageRequest { string image_id = 1; }
 message RemoveImageResponse {}
@@ -107,6 +115,15 @@ message CleanCachesRequest { CacheCleanMode mode = 1; }
 message CleanCachesResponse { CacheCleanMode mode = 1; int32 removed_files = 2; int64 removed_bytes = 3; repeated Cache caches = 4; }
 message ListContainersRequest {}
 message ListContainersResponse { repeated Container containers = 1; }
+// ContainerKind distinguishes the containers a workspace holds: an ordinary
+// guest container a caller may drive, and the reserved PTC container the
+// orchestrator creates and owns. The kind lets the plugin recognize the PTC
+// container without relying on its name.
+enum ContainerKind {
+  CONTAINER_KIND_UNSPECIFIED = 0;
+  CONTAINER_KIND_GUEST = 1;
+  CONTAINER_KIND_PTC = 2;
+}
 message Container {
   string container_name = 1;
   string workspace_slug = 2;
@@ -121,10 +138,21 @@ message Container {
   map<string, string> secret_env = 11;
   repeated string paths = 12;
   repeated PublishedPort published_ports = 13;
+  ContainerKind kind = 14;
 }
 message StartContainerRequest { string workspace_slug = 1; string container = 2; string image_id = 3; repeated ProjectMount mounts = 4; map<string, string> env = 5; map<string, string> secret_env = 6; repeated string paths = 7; }
-message EnsureContainerRequest { string workspace_slug = 1; string container = 2; }
+// dsh_version is the harness release the caller targets. It is required when
+// `container` names the reserved PTC container, whose image is built on demand
+// for that release, and ignored otherwise.
+//
+// workspace_slug is required for a guest container and optional for the
+// reserved PTC container: the PTC container is a single shared container, not
+// bound to a workspace, so an empty slug addresses it.
+message EnsureContainerRequest { string workspace_slug = 1; string container = 2; string dsh_version = 3; }
 message RecreateContainerRequest { string workspace_slug = 1; string image_id = 2; string container = 3; repeated ProjectMount mounts = 4; map<string, string> env = 5; repeated string paths = 6; map<string, string> secret_env = 7; }
+// workspace_slug is required for a guest container. An empty slug with
+// `container` naming the reserved PTC container removes the single shared PTC
+// container, which belongs to no workspace.
 message RemoveContainerRequest { string workspace_slug = 1; string container = 2; }
 message RemoveContainerResponse {}
 message AddContainerMountRequest { string workspace_slug = 1; string container = 2; string project = 3; reserved 4; string destination = 5; MountMode mode = 6; MountKind kind = 7; string volume = 8; string secret = 9; }

@@ -23,26 +23,28 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	WorkspaceGuestAgent_Ping_FullMethodName           = "/dshguest.v1.WorkspaceGuestAgent/Ping"
-	WorkspaceGuestAgent_Exec_FullMethodName           = "/dshguest.v1.WorkspaceGuestAgent/Exec"
-	WorkspaceGuestAgent_Signal_FullMethodName         = "/dshguest.v1.WorkspaceGuestAgent/Signal"
-	WorkspaceGuestAgent_ReadFile_FullMethodName       = "/dshguest.v1.WorkspaceGuestAgent/ReadFile"
-	WorkspaceGuestAgent_WriteFile_FullMethodName      = "/dshguest.v1.WorkspaceGuestAgent/WriteFile"
-	WorkspaceGuestAgent_Stat_FullMethodName           = "/dshguest.v1.WorkspaceGuestAgent/Stat"
-	WorkspaceGuestAgent_ReadDir_FullMethodName        = "/dshguest.v1.WorkspaceGuestAgent/ReadDir"
-	WorkspaceGuestAgent_Mkdir_FullMethodName          = "/dshguest.v1.WorkspaceGuestAgent/Mkdir"
-	WorkspaceGuestAgent_Delete_FullMethodName         = "/dshguest.v1.WorkspaceGuestAgent/Delete"
-	WorkspaceGuestAgent_SetPaths_FullMethodName       = "/dshguest.v1.WorkspaceGuestAgent/SetPaths"
-	WorkspaceGuestAgent_GetPaths_FullMethodName       = "/dshguest.v1.WorkspaceGuestAgent/GetPaths"
-	WorkspaceGuestAgent_StartDaemon_FullMethodName    = "/dshguest.v1.WorkspaceGuestAgent/StartDaemon"
-	WorkspaceGuestAgent_ListDaemons_FullMethodName    = "/dshguest.v1.WorkspaceGuestAgent/ListDaemons"
-	WorkspaceGuestAgent_StopDaemon_FullMethodName     = "/dshguest.v1.WorkspaceGuestAgent/StopDaemon"
-	WorkspaceGuestAgent_StopAllDaemons_FullMethodName = "/dshguest.v1.WorkspaceGuestAgent/StopAllDaemons"
-	WorkspaceGuestAgent_RestartDaemon_FullMethodName  = "/dshguest.v1.WorkspaceGuestAgent/RestartDaemon"
-	WorkspaceGuestAgent_DaemonLogs_FullMethodName     = "/dshguest.v1.WorkspaceGuestAgent/DaemonLogs"
-	WorkspaceGuestAgent_PublishPort_FullMethodName    = "/dshguest.v1.WorkspaceGuestAgent/PublishPort"
-	WorkspaceGuestAgent_UnpublishPort_FullMethodName  = "/dshguest.v1.WorkspaceGuestAgent/UnpublishPort"
-	WorkspaceGuestAgent_Terminal_FullMethodName       = "/dshguest.v1.WorkspaceGuestAgent/Terminal"
+	WorkspaceGuestAgent_Ping_FullMethodName            = "/dshguest.v1.WorkspaceGuestAgent/Ping"
+	WorkspaceGuestAgent_Exec_FullMethodName            = "/dshguest.v1.WorkspaceGuestAgent/Exec"
+	WorkspaceGuestAgent_Signal_FullMethodName          = "/dshguest.v1.WorkspaceGuestAgent/Signal"
+	WorkspaceGuestAgent_ReadFile_FullMethodName        = "/dshguest.v1.WorkspaceGuestAgent/ReadFile"
+	WorkspaceGuestAgent_WriteFile_FullMethodName       = "/dshguest.v1.WorkspaceGuestAgent/WriteFile"
+	WorkspaceGuestAgent_Stat_FullMethodName            = "/dshguest.v1.WorkspaceGuestAgent/Stat"
+	WorkspaceGuestAgent_ReadDir_FullMethodName         = "/dshguest.v1.WorkspaceGuestAgent/ReadDir"
+	WorkspaceGuestAgent_Mkdir_FullMethodName           = "/dshguest.v1.WorkspaceGuestAgent/Mkdir"
+	WorkspaceGuestAgent_Delete_FullMethodName          = "/dshguest.v1.WorkspaceGuestAgent/Delete"
+	WorkspaceGuestAgent_SetPaths_FullMethodName        = "/dshguest.v1.WorkspaceGuestAgent/SetPaths"
+	WorkspaceGuestAgent_GetPaths_FullMethodName        = "/dshguest.v1.WorkspaceGuestAgent/GetPaths"
+	WorkspaceGuestAgent_StartDaemon_FullMethodName     = "/dshguest.v1.WorkspaceGuestAgent/StartDaemon"
+	WorkspaceGuestAgent_ListDaemons_FullMethodName     = "/dshguest.v1.WorkspaceGuestAgent/ListDaemons"
+	WorkspaceGuestAgent_StopDaemon_FullMethodName      = "/dshguest.v1.WorkspaceGuestAgent/StopDaemon"
+	WorkspaceGuestAgent_StopAllDaemons_FullMethodName  = "/dshguest.v1.WorkspaceGuestAgent/StopAllDaemons"
+	WorkspaceGuestAgent_RestartDaemon_FullMethodName   = "/dshguest.v1.WorkspaceGuestAgent/RestartDaemon"
+	WorkspaceGuestAgent_DaemonLogs_FullMethodName      = "/dshguest.v1.WorkspaceGuestAgent/DaemonLogs"
+	WorkspaceGuestAgent_PublishPort_FullMethodName     = "/dshguest.v1.WorkspaceGuestAgent/PublishPort"
+	WorkspaceGuestAgent_UnpublishPort_FullMethodName   = "/dshguest.v1.WorkspaceGuestAgent/UnpublishPort"
+	WorkspaceGuestAgent_Terminal_FullMethodName        = "/dshguest.v1.WorkspaceGuestAgent/Terminal"
+	WorkspaceGuestAgent_GetCapabilities_FullMethodName = "/dshguest.v1.WorkspaceGuestAgent/GetCapabilities"
+	WorkspaceGuestAgent_ExecControl_FullMethodName     = "/dshguest.v1.WorkspaceGuestAgent/ExecControl"
 )
 
 // WorkspaceGuestAgentClient is the client API for WorkspaceGuestAgent service.
@@ -71,6 +73,12 @@ type WorkspaceGuestAgentClient interface {
 	PublishPort(ctx context.Context, in *PublishPortRequest, opts ...grpc.CallOption) (*PublishPortResponse, error)
 	UnpublishPort(ctx context.Context, in *UnpublishPortRequest, opts ...grpc.CallOption) (*UnpublishPortResponse, error)
 	Terminal(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[TerminalInput, TerminalOutput], error)
+	// GetCapabilities reports the optional features this agent implements, so a
+	// caller can fall back when it talks to an older agent.
+	GetCapabilities(ctx context.Context, in *GetCapabilitiesRequest, opts ...grpc.CallOption) (*GetCapabilitiesResponse, error)
+	// ExecControl attaches the caller's end of an exec's control channel. The
+	// first frame names the exec; later frames carry opaque bytes both ways.
+	ExecControl(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[ExecControlFrame, ExecControlFrame], error)
 }
 
 type workspaceGuestAgentClient struct {
@@ -299,6 +307,29 @@ func (c *workspaceGuestAgentClient) Terminal(ctx context.Context, opts ...grpc.C
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type WorkspaceGuestAgent_TerminalClient = grpc.BidiStreamingClient[TerminalInput, TerminalOutput]
 
+func (c *workspaceGuestAgentClient) GetCapabilities(ctx context.Context, in *GetCapabilitiesRequest, opts ...grpc.CallOption) (*GetCapabilitiesResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetCapabilitiesResponse)
+	err := c.cc.Invoke(ctx, WorkspaceGuestAgent_GetCapabilities_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *workspaceGuestAgentClient) ExecControl(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[ExecControlFrame, ExecControlFrame], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &WorkspaceGuestAgent_ServiceDesc.Streams[4], WorkspaceGuestAgent_ExecControl_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[ExecControlFrame, ExecControlFrame]{ClientStream: stream}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type WorkspaceGuestAgent_ExecControlClient = grpc.BidiStreamingClient[ExecControlFrame, ExecControlFrame]
+
 // WorkspaceGuestAgentServer is the server API for WorkspaceGuestAgent service.
 // All implementations must embed UnimplementedWorkspaceGuestAgentServer
 // for forward compatibility.
@@ -325,6 +356,12 @@ type WorkspaceGuestAgentServer interface {
 	PublishPort(context.Context, *PublishPortRequest) (*PublishPortResponse, error)
 	UnpublishPort(context.Context, *UnpublishPortRequest) (*UnpublishPortResponse, error)
 	Terminal(grpc.BidiStreamingServer[TerminalInput, TerminalOutput]) error
+	// GetCapabilities reports the optional features this agent implements, so a
+	// caller can fall back when it talks to an older agent.
+	GetCapabilities(context.Context, *GetCapabilitiesRequest) (*GetCapabilitiesResponse, error)
+	// ExecControl attaches the caller's end of an exec's control channel. The
+	// first frame names the exec; later frames carry opaque bytes both ways.
+	ExecControl(grpc.BidiStreamingServer[ExecControlFrame, ExecControlFrame]) error
 	mustEmbedUnimplementedWorkspaceGuestAgentServer()
 }
 
@@ -394,6 +431,12 @@ func (UnimplementedWorkspaceGuestAgentServer) UnpublishPort(context.Context, *Un
 }
 func (UnimplementedWorkspaceGuestAgentServer) Terminal(grpc.BidiStreamingServer[TerminalInput, TerminalOutput]) error {
 	return status.Error(codes.Unimplemented, "method Terminal not implemented")
+}
+func (UnimplementedWorkspaceGuestAgentServer) GetCapabilities(context.Context, *GetCapabilitiesRequest) (*GetCapabilitiesResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetCapabilities not implemented")
+}
+func (UnimplementedWorkspaceGuestAgentServer) ExecControl(grpc.BidiStreamingServer[ExecControlFrame, ExecControlFrame]) error {
+	return status.Error(codes.Unimplemented, "method ExecControl not implemented")
 }
 func (UnimplementedWorkspaceGuestAgentServer) mustEmbedUnimplementedWorkspaceGuestAgentServer() {}
 func (UnimplementedWorkspaceGuestAgentServer) testEmbeddedByValue()                             {}
@@ -736,6 +779,31 @@ func _WorkspaceGuestAgent_Terminal_Handler(srv interface{}, stream grpc.ServerSt
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type WorkspaceGuestAgent_TerminalServer = grpc.BidiStreamingServer[TerminalInput, TerminalOutput]
 
+func _WorkspaceGuestAgent_GetCapabilities_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetCapabilitiesRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(WorkspaceGuestAgentServer).GetCapabilities(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: WorkspaceGuestAgent_GetCapabilities_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(WorkspaceGuestAgentServer).GetCapabilities(ctx, req.(*GetCapabilitiesRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _WorkspaceGuestAgent_ExecControl_Handler(srv interface{}, stream grpc.ServerStream) error {
+	return srv.(WorkspaceGuestAgentServer).ExecControl(&grpc.GenericServerStream[ExecControlFrame, ExecControlFrame]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type WorkspaceGuestAgent_ExecControlServer = grpc.BidiStreamingServer[ExecControlFrame, ExecControlFrame]
+
 // WorkspaceGuestAgent_ServiceDesc is the grpc.ServiceDesc for WorkspaceGuestAgent service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -807,6 +875,10 @@ var WorkspaceGuestAgent_ServiceDesc = grpc.ServiceDesc{
 			MethodName: "UnpublishPort",
 			Handler:    _WorkspaceGuestAgent_UnpublishPort_Handler,
 		},
+		{
+			MethodName: "GetCapabilities",
+			Handler:    _WorkspaceGuestAgent_GetCapabilities_Handler,
+		},
 	},
 	Streams: []grpc.StreamDesc{
 		{
@@ -828,6 +900,12 @@ var WorkspaceGuestAgent_ServiceDesc = grpc.ServiceDesc{
 		{
 			StreamName:    "Terminal",
 			Handler:       _WorkspaceGuestAgent_Terminal_Handler,
+			ServerStreams: true,
+			ClientStreams: true,
+		},
+		{
+			StreamName:    "ExecControl",
+			Handler:       _WorkspaceGuestAgent_ExecControl_Handler,
 			ServerStreams: true,
 			ClientStreams: true,
 		},

@@ -95,6 +95,9 @@ func gatewayError(err error) error {
 // recreate.
 func (s *Server) PublishPort(ctx context.Context, request *ctl.PublishPortRequest) (*ctl.PublishedPort, error) {
 	s.log().Info("control request", "method", "PublishPort", "workspace_slug", request.GetWorkspaceSlug(), "container", request.GetContainer(), "port", request.GetPort(), "protocol", request.GetProtocol())
+	if err := validateUserContainerName(request.GetContainer()); err != nil {
+		return nil, err
+	}
 	if s.Gateway == nil {
 		return nil, errGatewayUnavailable
 	}
@@ -151,6 +154,9 @@ func (s *Server) PublishPort(ctx context.Context, request *ctl.PublishPortReques
 // published is a no-op, so a cleanup can call it blindly.
 func (s *Server) UnpublishPort(ctx context.Context, request *ctl.UnpublishPortRequest) (*ctl.UnpublishPortResponse, error) {
 	s.log().Info("control request", "method", "UnpublishPort", "workspace_slug", request.GetWorkspaceSlug(), "container", request.GetContainer(), "port", request.GetPort(), "protocol", request.GetProtocol())
+	if err := validateUserContainerName(request.GetContainer()); err != nil {
+		return nil, err
+	}
 	protocol, err := protocolName(request.GetProtocol())
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())

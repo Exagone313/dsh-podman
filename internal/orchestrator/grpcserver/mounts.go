@@ -20,6 +20,9 @@ import (
 // takes effect.
 func (s *Server) AddContainerMount(ctx context.Context, request *ctl.AddContainerMountRequest) (*ctl.Container, error) {
 	s.log().Info("control request", "method", "AddContainerMount", "workspace_slug", request.GetWorkspaceSlug(), "container", request.GetContainer(), "project", request.GetProject(), "kind", request.GetKind(), "volume", request.GetVolume())
+	if err := validateUserContainerName(request.GetContainer()); err != nil {
+		return nil, err
+	}
 	workspace, err := workspaceBySlug(s.Store, request.GetWorkspaceSlug())
 	if err != nil {
 		return nil, status.Error(codes.NotFound, err.Error())
@@ -125,6 +128,9 @@ func (s *Server) AddContainerMount(ctx context.Context, request *ctl.AddContaine
 // takes effect.
 func (s *Server) RemoveContainerMount(ctx context.Context, request *ctl.RemoveContainerMountRequest) (*ctl.Container, error) {
 	s.log().Info("control request", "method", "RemoveContainerMount", "workspace_slug", request.GetWorkspaceSlug(), "container", request.GetContainer(), "project", request.GetProject(), "kind", request.GetKind(), "volume", request.GetVolume())
+	if err := validateUserContainerName(request.GetContainer()); err != nil {
+		return nil, err
+	}
 	workspace, err := workspaceBySlug(s.Store, request.GetWorkspaceSlug())
 	if err != nil {
 		return nil, status.Error(codes.NotFound, err.Error())
@@ -210,6 +216,9 @@ func (s *Server) RemoveContainerMount(ctx context.Context, request *ctl.RemoveCo
 // read-only.
 func (s *Server) UpdateContainerMount(ctx context.Context, request *ctl.UpdateContainerMountRequest) (*ctl.Container, error) {
 	s.log().Info("control request", "method", "UpdateContainerMount", "workspace_slug", request.GetWorkspaceSlug(), "container", request.GetContainer(), "project", request.GetProject(), "kind", request.GetKind(), "volume", request.GetVolume())
+	if err := validateUserContainerName(request.GetContainer()); err != nil {
+		return nil, err
+	}
 	workspace, err := workspaceBySlug(s.Store, request.GetWorkspaceSlug())
 	if err != nil {
 		return nil, status.Error(codes.NotFound, err.Error())

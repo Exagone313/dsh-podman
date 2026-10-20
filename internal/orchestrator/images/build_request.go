@@ -29,6 +29,10 @@ type buildRequest struct {
 	Containerfile string
 	// CacheVolume, when set, is the host:container package-cache mount.
 	CacheVolume string
+	// Labels, when set, are stamped on the built image. They are a build
+	// parameter, not Containerfile lines, so the recipe digest they carry can
+	// be computed from the rendered file itself.
+	Labels map[string]string
 }
 
 // buildMessage is the subset of the build stream's JSON messages we act on:
@@ -80,6 +84,13 @@ func (b *Builder) requestBuild(request buildRequest) error {
 	params.Set("dockerfile", containerFileName)
 	if request.CacheVolume != "" {
 		params.Add("volume", request.CacheVolume)
+	}
+	if len(request.Labels) > 0 {
+		labels, err := json.Marshal(request.Labels)
+		if err != nil {
+			return err
+		}
+		params.Set("labels", string(labels))
 	}
 	headers := http.Header{"Content-Type": []string{"application/x-tar"}}
 	response, err := connection.DoRequest(b.Context, body, http.MethodPost, "/build", params, headers)

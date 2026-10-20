@@ -16,6 +16,7 @@ import (
 
 	"github.com/Exagone313/dsh-podman/internal/guestagent/childenv"
 	"github.com/Exagone313/dsh-podman/internal/guestagent/identity"
+	"github.com/Exagone313/dsh-podman/internal/guestagent/ptc"
 )
 
 // cancelGrace bounds how long Wait may wait for a cancelled command's output
@@ -63,6 +64,12 @@ func NewManager(paths *childenv.Paths) *Manager {
 func (m *Manager) Start(ctx context.Context, argv []string, cwd string, env map[string]string, opts identity.Options, unset ...string) (*Process, error) {
 	if len(argv) == 0 || argv[0] == "" {
 		return nil, fmt.Errorf("argv must contain a command")
+	}
+	// A PTC child runs as a numeric uid/gid with HOME and the XDG directories
+	// on a writable, owned home; the inherited /root is read-only there.
+	opts, env, err := ptc.Attach(opts, env)
+	if err != nil {
+		return nil, err
 	}
 	cmd := exec.CommandContext(ctx, argv[0], argv[1:]...)
 	cmd.Dir = cwd

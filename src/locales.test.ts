@@ -14,6 +14,7 @@ const SUBJECTS: readonly (readonly [keyof typeof en, string])[] = [
   ["confirmRemoveWorkspace", "workspace"],
   ["confirmRemoveContainer", "workspace"],
   ["confirmRemoveContainer", "container"],
+  ["confirmRemovePtc", "container"],
   ["confirmRecreate", "workspace"],
   ["confirmRecreate", "container"],
   ["confirmUpdate", "workspace"],

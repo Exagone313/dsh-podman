@@ -251,13 +251,19 @@ const STATUS_TONES: Record<StatusTone, React.CSSProperties> = {
 };
 
 // A state chip: the words state the fact and the tone repeats it in colour, so
-// a failure is visible without relying on colour alone.
+// a failure is visible without relying on colour alone. A chip whose word needs
+// context carries that context as its tooltip, never as a second line of copy.
 export function StatusChip(props: {
   tone: StatusTone;
   label: ReactNode;
+  title?: string;
 }): ReactNode {
-  const { tone, label } = props;
-  return <span style={{ ...statusChip, ...STATUS_TONES[tone] }}>{label}</span>;
+  const { tone, label, title } = props;
+  return (
+    <span style={{ ...statusChip, ...STATUS_TONES[tone] }} title={title}>
+      {label}
+    </span>
+  );
 }
 
 // The short kind chip a mount row leads with. Its tone repeats the kind in

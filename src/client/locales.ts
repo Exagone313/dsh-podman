@@ -56,6 +56,8 @@ export type ContainerPluginKey =
   | "discardChangesTitle"
   | "confirmDiscardChanges"
   | "containerNameReserved"
+  | "containerNamePtcReserved"
+  | "containerKindPtc"
   | "invalidSecretLength"
   | "secretLengthHint"
   | "portPendingSuffix"
@@ -103,6 +105,14 @@ export type ContainerPluginKey =
   | "orchestratorNotReady"
   | "orchestratorUnknown"
   | "noWorkspaces"
+  | "ptcMissing"
+  | "ptcContainerTooltip"
+  | "ptcImageTooltip"
+  | "recreatePtcTitle"
+  | "confirmRecreatePtc"
+  | "ptcImageReserved"
+  | "removePtcTitle"
+  | "confirmRemovePtc"
   | "createContainer"
   | "containerName"
   | "image"
@@ -388,6 +398,9 @@ export const en: Record<ContainerPluginKey, string> = {
   confirmDiscardChanges: "Close this dialog and discard your unsaved edits?",
   containerNameReserved:
     '"default" is reserved for the workspace\'s default container.',
+  containerNamePtcReserved:
+    '"ptc" is reserved for the workspace\'s PTC container.',
+  containerKindPtc: "PTC",
   invalidSecretLength: "Length must be between 1 and 1024.",
   secretLengthHint: "Between 1 and 1024; empty uses 32.",
   portPendingSuffix: "(pending)",
@@ -435,6 +448,18 @@ export const en: Record<ContainerPluginKey, string> = {
   orchestratorNotReady: "orchestrator not ready",
   orchestratorUnknown: "orchestrator unknown",
   noWorkspaces: "No workspaces.",
+  ptcMissing:
+    "The PTC container has not been created yet; it is created on first use.",
+  ptcContainerTooltip: "This container is used for Programmatic Tool Calling",
+  ptcImageTooltip: "This image is used for Programmatic Tool Calling",
+  recreatePtcTitle: "Recreate PTC container",
+  confirmRecreatePtc:
+    "Recreate the shared PTC container “{container}”? It is removed and rebuilt from the current PTC image.",
+  ptcImageReserved:
+    "This image is reserved to PTC (Programmatic Tool Calling).",
+  removePtcTitle: "Remove PTC container",
+  confirmRemovePtc:
+    "Remove the shared PTC container “{container}”? It is recreated on the next PTC run.",
   createContainer: "Create container",
   containerName: "Name",
   image: "Image",
@@ -719,6 +744,8 @@ export const zh: Record<ContainerPluginKey, string> = {
   discardChangesTitle: "放弃更改？",
   confirmDiscardChanges: "关闭此对话框并放弃未保存的编辑？",
   containerNameReserved: "“default”是工作区默认容器的保留名称。",
+  containerNamePtcReserved: "“ptc”是工作区 PTC 容器的保留名称。",
+  containerKindPtc: "PTC",
   invalidSecretLength: "长度必须在 1 到 1024 之间。",
   secretLengthHint: "1 到 1024；留空使用 32。",
   portPendingSuffix: "（待发布）",
@@ -766,6 +793,16 @@ export const zh: Record<ContainerPluginKey, string> = {
   orchestratorNotReady: "orchestrator 未就绪",
   orchestratorUnknown: "orchestrator 状态未知",
   noWorkspaces: "无工作区。",
+  ptcMissing: "PTC 容器尚未创建；它会在首次使用时创建。",
+  ptcContainerTooltip: "此容器用于程序化工具调用",
+  ptcImageTooltip: "此镜像用于程序化工具调用",
+  recreatePtcTitle: "重建 PTC 容器",
+  confirmRecreatePtc:
+    "重建共享的 PTC 容器“{container}”？它将被移除并由当前 PTC 镜像重新构建。",
+  ptcImageReserved: "该镜像专用于 PTC（Programmatic Tool Calling）。",
+  removePtcTitle: "移除 PTC 容器",
+  confirmRemovePtc:
+    "移除共享的 PTC 容器“{container}”？下次运行 PTC 时会重新创建它。",
   createContainer: "创建容器",
   containerName: "名称",
   image: "镜像",

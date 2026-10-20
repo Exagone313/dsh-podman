@@ -8,10 +8,14 @@
 // for a bug report. The State column carries the runtime state and, beside it,
 // the version comparison: a component the plugin runs alongside reads "ready"
 // plus "different versions", one the plugin cannot talk to reads "incompatible".
+// Directly below the component card sits the shared PTC container's own card:
+// it belongs to no workspace, so the Status tab is where its identity, image
+// and actions live.
 // The reload that re-reads the snapshot sits at the bottom of the page, below
 // the tabs, so it stays reachable from every tab.
 
 import { CardGroup } from "./container-card-group.js";
+import { PtcSection } from "./container-card-ptc-section.js";
 import {
   countLabel,
   StatusChip,
@@ -24,6 +28,7 @@ import {
 } from "./container-card-table-styles.js";
 import { missingValue } from "./container-card-styles.js";
 import { type CardState } from "./container-card-controller.js";
+import { type PtcView } from "./card-protocol.js";
 import { type ContainerPluginKey, type Translate } from "./locales.js";
 import { Button, writeClipboard } from "@deepseek-ai/dsh-client-ui-primitives";
 import { type ReactNode, useEffect, useRef, useState } from "react";
@@ -107,6 +112,13 @@ export function StatusSection(props: {
   gatewayVersion: string;
   gatewayCommit: string;
   gatewayVersionState: CardState["gatewayVersionState"];
+  // The shared PTC container and the two commands its card offers.
+  ptc: PtcView;
+  // The plugin's active locale, for the PTC card's relative creation time.
+  locale: string;
+  pendingActions: readonly string[];
+  onRecreatePtc: () => void;
+  onRemovePtc: () => void;
 }): ReactNode {
   const {
     t,
@@ -122,6 +134,11 @@ export function StatusSection(props: {
     gatewayVersion,
     gatewayCommit,
     gatewayVersionState,
+    ptc,
+    locale,
+    pendingActions,
+    onRecreatePtc,
+    onRemovePtc,
   } = props;
   const [copyState, setCopyState] = useState<"idle" | "copied" | "failed">(
     "idle",
@@ -231,82 +248,97 @@ export function StatusSection(props: {
     },
   ];
   return (
-    <CardGroup
-      title={t("groupStatusTitle")}
-      summary={countLabel(
-        t,
-        knownVersions,
-        "countVersionOne",
-        "countVersionMany",
-      )}
-      // The version table is always listed, so the card always has content.
-      hasContent
-      className={TABLE_CARD_CLASS}
-    >
-      <Subsection
-        title={t("versionsTitle")}
-        action={
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => void copyVersions()}
-          >
-            {copyState === "copied"
-              ? t("copied")
-              : copyState === "failed"
-              ? t("copyFailed")
-              : t("copyVersions")}
-          </Button>
-        }
+    <>
+      <CardGroup
+        title={t("groupStatusTitle")}
+        summary={countLabel(
+          t,
+          knownVersions,
+          "countVersionOne",
+          "countVersionMany",
+        )}
+        // The version table is always listed, so the card always has content.
+        hasContent
+        className={TABLE_CARD_CLASS}
       >
-        <table className={TABLE_CLASS} style={versionTable}>
-          <thead>
-            <tr>
-              <th scope="col">{t("columnComponent")}</th>
-              <th scope="col">{t("columnState")}</th>
-              <th scope="col">{t("columnVersion")}</th>
-              <th scope="col">{t("columnCommit")}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {componentRows.map((row) => (
-              <tr key={row.key}>
-                <td data-label={t("columnComponent")} style={versionCell}>
-                  {row.component}
-                </td>
-                <td data-label={t("columnState")} style={versionCell}>
-                  <span style={stateLine}>
-                    {row.state === undefined
-                      ? <span style={missingValue}>{t("valueMissing")}</span>
-                      : (
+        <Subsection
+          title={t("versionsTitle")}
+          action={
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => void copyVersions()}
+            >
+              {copyState === "copied"
+                ? t("copied")
+                : copyState === "failed"
+                ? t("copyFailed")
+                : t("copyVersions")}
+            </Button>
+          }
+        >
+          <table className={TABLE_CLASS} style={versionTable}>
+            <thead>
+              <tr>
+                <th scope="col">{t("columnComponent")}</th>
+                <th scope="col">{t("columnState")}</th>
+                <th scope="col">{t("columnVersion")}</th>
+                <th scope="col">{t("columnCommit")}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {componentRows.map((row) => (
+                <tr key={row.key}>
+                  <td data-label={t("columnComponent")} style={versionCell}>
+                    {row.component}
+                  </td>
+                  <td data-label={t("columnState")} style={versionCell}>
+                    <span style={stateLine}>
+                      {row.state === undefined
+                        ? <span style={missingValue}>{t("valueMissing")}</span>
+                        : (
+                          <StatusChip
+                            tone={row.state.tone}
+                            label={t(row.state.label)}
+                          />
+                        )}
+                      {row.versionNote === undefined ? null : (
                         <StatusChip
-                          tone={row.state.tone}
-                          label={t(row.state.label)}
+                          tone={row.versionNote.tone}
+                          label={t(row.versionNote.label)}
                         />
                       )}
-                    {row.versionNote === undefined ? null : (
-                      <StatusChip
-                        tone={row.versionNote.tone}
-                        label={t(row.versionNote.label)}
-                      />
-                    )}
-                  </span>
-                </td>
-                <td data-label={t("columnVersion")} style={versionCell}>
-                  {row.version === ""
-                    ? <span style={missingValue}>{t("valueMissing")}</span>
-                    : row.version}
-                </td>
-                <td data-label={t("columnCommit")} style={versionCommit}>
-                  {row.commit === ""
-                    ? <span style={missingValue}>{t("valueMissing")}</span>
-                    : row.commit}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </Subsection>
-    </CardGroup>
+                    </span>
+                  </td>
+                  <td data-label={t("columnVersion")} style={versionCell}>
+                    {row.version === ""
+                      ? <span style={missingValue}>{t("valueMissing")}</span>
+                      : row.version}
+                  </td>
+                  <td data-label={t("columnCommit")} style={versionCommit}>
+                    {row.commit === ""
+                      ? <span style={missingValue}>{t("valueMissing")}</span>
+                      : row.commit}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </Subsection>
+      </CardGroup>
+      {
+        /* The shared PTC container belongs to no workspace, so its own card
+          sits here, directly below the component card, rather than above the
+          workspace cards. */
+      }
+      <PtcSection
+        t={t}
+        ptc={ptc}
+        locale={locale}
+        pendingActions={pendingActions}
+        onRecreate={onRecreatePtc}
+        onRemove={onRemovePtc}
+      />
+    </>
   );
 }

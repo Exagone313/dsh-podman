@@ -87,7 +87,8 @@ function NoEntries(props: { t: Translate }): ReactNode {
 // makes the block taller. Edit opens the dialog holding every editor; its one
 // primary action applies the draft (rebuilding the container when the change
 // reaches what it runs, updating it in place otherwise) and Discard drops it.
-// Recreate rebuilds the container as it is, without touching the draft.
+// Recreate rebuilds the container as it is, without touching the draft. The
+// orchestrator-owned PTC container is rendered by its own card, never here.
 export function ContainerRow(props: {
   t: Translate;
   container: ContainerView;
@@ -351,7 +352,8 @@ export function ContainerRow(props: {
                     t={t}
                     mode="view"
                     mount={mount}
-                    destination={container.mounts[index]?.destination ?? ""}
+                    destination={container.mounts[index]?.destination ??
+                      ""}
                   />
                 ))}
             </FieldGroup>

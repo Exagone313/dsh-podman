@@ -13,14 +13,16 @@ import { ContainerDialog } from "./container-card-dialog.js";
 import { ContainerForm } from "./container-card-form.js";
 import { type DirectoryPickerFace } from "./directory-picker.js";
 import { DiscardChangesModal, namePattern } from "./container-card-shared.js";
+import {
+  DEFAULT_CONTAINER_NAME,
+  PTC_CONTAINER_NAME,
+  reservedContainerName,
+} from "./container-card-ptc.js";
 import { mergeDefaultEnv } from "../container-env.js";
 import { orderedEnvRecord } from "../env-rows.js";
 import { type Translate, type Translation } from "./locales.js";
 import { Button } from "@deepseek-ai/dsh-client-ui-primitives";
 import { type ReactNode, useEffect, useRef, useState } from "react";
-
-// The one name the orchestrator reserves for a workspace's default container.
-const DEFAULT_CONTAINER_NAME = "default";
 
 // The project mount every new container starts with; it is the pristine mount
 // the draft is compared against for its dirty state.
@@ -132,16 +134,19 @@ export function CreateContainerModal(props: {
     setConfirmClose(false);
   }, [open, workspace, defaultImage, defaultEnv]);
   const pristine = initialConfig(workspace, defaultImage, defaultEnv);
-  const reservedName = name === DEFAULT_CONTAINER_NAME;
+  const reservedName = reservedContainerName(name);
   const nameTaken = existing.includes(name);
   const namePatternOk = namePattern.test(name);
-  const nameValid = namePatternOk && !reservedName && !nameTaken;
-  // The name it already refuses: reserved, taken, or outside the allowed
-  // character set. Naming the rule is what lets the user fix it in place.
+  const nameValid = namePatternOk && reservedName === undefined && !nameTaken;
+  // The name it already refuses: reserved (the default container's name or the
+  // PTC container's), taken, or outside the allowed character set. Naming the
+  // rule is what lets the user fix it in place.
   const nameError = name === ""
     ? ""
-    : reservedName
+    : reservedName === DEFAULT_CONTAINER_NAME
     ? t("containerNameReserved")
+    : reservedName === PTC_CONTAINER_NAME
+    ? t("containerNamePtcReserved")
     : nameTaken
     ? t("containerNameTaken")
     : namePatternOk

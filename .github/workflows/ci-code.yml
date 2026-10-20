@@ -158,7 +158,7 @@ jobs:
       - name: Scan repository files
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
-          version: v0.75.0
+          version: v0.76.0
           scan-type: fs
           scan-ref: .
           severity: HIGH,CRITICAL
@@ -169,7 +169,7 @@ jobs:
       - name: Scan container misconfigurations
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
-          version: v0.75.0
+          version: v0.76.0
           scan-type: config
           scan-ref: .
           severity: HIGH,CRITICAL

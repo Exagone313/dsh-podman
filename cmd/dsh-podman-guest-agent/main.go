@@ -17,6 +17,7 @@ import (
 	"github.com/Exagone313/dsh-podman/internal/grpcopts"
 	workspacefs "github.com/Exagone313/dsh-podman/internal/guestagent/fs"
 	"github.com/Exagone313/dsh-podman/internal/guestagent/grpcserver"
+	"github.com/Exagone313/dsh-podman/internal/guestagent/ptc"
 	"github.com/Exagone313/dsh-podman/internal/recovery"
 	socketpkg "github.com/Exagone313/dsh-podman/internal/socket"
 	"github.com/Exagone313/dsh-podman/internal/version"
@@ -67,9 +68,19 @@ func main() {
 	// The request logger runs before authentication so a call the agent rejects
 	// is still visible (method and peer, never the token); the orchestrator logs
 	// after auth, but here an unlogged rejection is exactly the blind spot.
+	unary := []grpc.UnaryServerInterceptor{grpclog.Unary(logger), auth.Unary(token), recovery.Unary(logger)}
+	stream := []grpc.StreamServerInterceptor{grpclog.Stream(logger), auth.Stream(token), recovery.Stream(logger)}
+	// Restricted mode is enforced only on the reserved PTC container, which the
+	// orchestrator marks with DSH_PODMAN_GUEST_PTC_MODE. Outside PTC mode the
+	// interceptors are not installed at all, so every method stays available.
+	if ptc.Enabled() {
+		logger.Info("guest agent restricted to the PTC allow-list", "container", "ptc")
+		unary = append(unary, grpcserver.PTCUnary())
+		stream = append(stream, grpcserver.PTCStream())
+	}
 	server := grpc.NewServer(
-		grpc.ChainUnaryInterceptor(grpclog.Unary(logger), auth.Unary(token), recovery.Unary(logger)),
-		grpc.ChainStreamInterceptor(grpclog.Stream(logger), auth.Stream(token), recovery.Stream(logger)),
+		grpc.ChainUnaryInterceptor(unary...),
+		grpc.ChainStreamInterceptor(stream...),
 		grpcopts.KeepalivePolicy(),
 	)
 	agent := grpcserver.New().WithFS(filesystem).WithPublish(filepath.Dir(socket))

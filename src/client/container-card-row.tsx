@@ -361,8 +361,8 @@ export function ContainerRow(props: {
               {container.paths.length === 0
                 ? <NoEntries t={t} />
                 : container.paths.map((path, index) => (
-                  // A PATH list carries no id and duplicates are legal, so the
-                  // positional index is the only collision-free key here.
+                  // A PATH list carries no id and duplicates are legal, so
+                  // the positional index is the only collision-free key here.
                   <PathRow key={index} t={t} mode="view" path={path} />
                 ))}
             </FieldGroup>

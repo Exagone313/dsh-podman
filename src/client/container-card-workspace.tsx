@@ -123,6 +123,10 @@ export function WorkspaceSection(props: {
   // Whether the port-publishing gateway is known to be missing, forwarded to
   // each row.
   gatewayUnavailable: boolean;
+  // An extra control appended to the header's action group. The sidebar panel
+  // uses it for its settings action; the settings card passes nothing, so both
+  // places render the same workspace header.
+  extraAction?: ReactNode;
 }): ReactNode {
   const {
     t,
@@ -147,6 +151,7 @@ export function WorkspaceSection(props: {
     onStartContainer,
     onApplyContainerConfig,
     gatewayUnavailable,
+    extraAction,
   } = props;
   const [createOpen, setCreateOpen] = useState<"default" | "named" | null>(
     null,
@@ -253,6 +258,7 @@ export function WorkspaceSection(props: {
               </Button>
             )
             : null}
+          {extraAction}
         </div>
       </div>
       {hasContainer

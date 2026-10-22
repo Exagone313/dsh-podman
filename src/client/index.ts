@@ -11,13 +11,19 @@ import type {} from "@deepseek-ai/dsh-client-ui-renderer/client";
 import type {} from "@deepseek-ai/dsh-client-ui-settings/client";
 import type {} from "@deepseek-ai/dsh-client-ui-conversation/client";
 import type {} from "@deepseek-ai/dsh-client-locale/client";
+import type {} from "@deepseek-ai/dsh-client-ui-plugin-manager/client";
 import type {} from "@deepseek-ai/dsh-client-ui-sidebar-right/client";
 import type {} from "@deepseek-ai/dsh-api-remotes/client";
-import { PluginArtworkTerminal } from "@deepseek-ai/dsh-client-ui-primitives";
+import {
+  PluginArtworkDefault,
+  PluginArtworkTerminal,
+} from "@deepseek-ai/dsh-client-ui-primitives";
 import type {} from "./slot-contract.js";
 import { buildDirectoryPicker } from "./directory-picker.js";
 import { ContainerCard } from "./ContainerCard.js";
 import { ContainerCardToast } from "./container-card-toast.js";
+import { PodmanContainers } from "./podman-containers.js";
+import { PodmanContainersGuide } from "./podman-containers-guide.js";
 import { PodmanTerminal } from "./podman-terminal.js";
 import { PodmanTerminalGuide } from "./podman-terminal-guide.js";
 import { PodmanTerminalTitle } from "./podman-terminal-title.js";
@@ -25,6 +31,12 @@ import {
   BUILTIN_PROMPT_PREFIX,
   ReadOnlyApprovalPanel,
 } from "./read-only-approval.js";
+import {
+  PODMAN_CONTAINERS_KIND,
+  PODMAN_CONTAINERS_TAB_ID,
+  resolveContainersOpen,
+} from "./containers-tab.js";
+import { PLUGIN_PACKAGE, setPluginNavigation } from "./plugin-navigation.js";
 import {
   PODMAN_TERMINAL_KIND,
   PODMAN_TERMINAL_SHORTCUT_DEFAULTS,
@@ -38,6 +50,7 @@ import { installDialogStyles } from "./container-card-dialog-styles.js";
 import { installFieldStyles } from "./container-card-field-styles.js";
 import { installTableStyles } from "./container-card-table-styles.js";
 import { installTabsStyles } from "./container-card-tabs-styles.js";
+import { installContainersPanelStyles } from "./podman-containers-styles.js";
 import {
   CONTAINER_NS,
   ContainerCardController,
@@ -49,11 +62,6 @@ export type { ContainerCardProps } from "./ContainerCard.js";
 
 export const name = "podman";
 
-// The plugin's installed package name. The Plugins page keys
-// `plugins.bundle.config` by the bundle package name, so it must match
-// package.json's `name`.
-const PLUGIN_PACKAGE = "@exagone313/dsh-podman";
-
 export const inject = [
   "slots",
   "locale",
@@ -63,15 +71,46 @@ export const inject = [
   "shortcuts",
 ];
 
+// A failed optional registration must not take the whole client entry down: the
+// plugin still activates, and the next activation retries the registration. The
+// first failure of each part is reported once, with a prefix naming that part,
+// instead of once per retry.
+const registrationFailures = new Set<string>();
+
+/**
+ * Report one failed registration, once per part.
+ * @param part - short name of the registration that failed.
+ * @param error - the refusal the registry raised.
+ */
+function reportRegistrationFailure(part: string, error: unknown): void {
+  if (registrationFailures.has(part)) return;
+  registrationFailures.add(part);
+  console.error(`podman: ${part} registration failed; continuing:`, error);
+}
+
 export function apply(ctx: ClientContext): void {
+  // Capture the locale service and its translator once, while this plugin's
+  // context is active — the same way the card and terminal seats use the
+  // framework-injected `t`. A thunk, subscriber or event handler can run after
+  // a reload, when reading `ctx.locale` again throws `cannot get required
+  // service "locale" in inactive context`; closing over the captured face and
+  // its bound translator keeps every later call service-lookup-free.
+  const locale = ctx.locale;
+  const t = locale.bind(NS);
+  // Shortcut resolvers run later, outside this apply pass; the right Sidebar's
+  // face is captured here so those handlers never resolve the service through
+  // the context again.
+  const sidebarRight = ctx.sidebarRight;
+
   installTerminalStyles(ctx);
   installDirectoryStyles(ctx);
   installDialogStyles(ctx);
   installFieldStyles(ctx);
   installTableStyles(ctx);
   installTabsStyles(ctx);
+  installContainersPanelStyles(ctx);
   ctx.effect(
-    () => ctx.locale.register(NS, { en, zh }),
+    () => locale.register(NS, { en, zh }),
     "podman: dictionaries",
   );
 
@@ -82,13 +121,28 @@ export function apply(ctx: ClientContext): void {
 
   const controller = new ContainerCardController(scope);
 
+  // The Containers pane's settings action opens this bundle's own page on the
+  // Plugins panel. The service is optional: the plugin-manager client UI
+  // provides it from a lazily mounted slot, so making it a required injection
+  // would deactivate this whole plugin whenever that UI goes away. The sidebar
+  // body is given the card face, not the plugin context, so the apply closure
+  // records the face here; while it is missing the pane hides the action.
+  ctx.inject(["pluginNavigation"], (navCtx: ClientContext) => {
+    navCtx.effect(() => {
+      setPluginNavigation(navCtx.pluginNavigation);
+      return () => setPluginNavigation(undefined);
+    }, "podman: plugin navigation");
+  });
+
   // Record the active locale (including the browser default, which the host
   // cannot observe) so approval text renders in the session language, and hand
   // it to the card so every dated row is formatted in it. The namespace may
   // still be loading when this plugin mounts, so the write also runs on every
-  // scope change; the value check keeps it a one-time write.
+  // scope change; the value check keeps it a one-time write. The service is
+  // captured above: this subscriber can outlive a reload, and must not read
+  // `ctx.locale` then.
   const syncLocale = (): void => {
-    const active = ctx.locale.getSnapshot().active;
+    const active = locale.getSnapshot().active;
     controller.setLocale(active);
     const snapshot = scope.getSnapshot();
     if (snapshot.status !== "ready" || !snapshot.writable) return;
@@ -96,7 +150,12 @@ export function apply(ctx: ClientContext): void {
     void scope.set("uiLocale", active);
   };
   syncLocale();
-  scope.subscribe(syncLocale);
+  // The settings scope's store outlives this plugin's context, so the
+  // subscription is effect-owned: a leaked listener would fire after a reload.
+  ctx.effect(
+    () => scope.subscribe(syncLocale),
+    "podman: settings locale sync",
+  );
   ctx.effect(() => ctx.on("locale/change", syncLocale), "podman: locale sync");
 
   // The harness's own directory picker backs the project-mount browse dialog:
@@ -189,8 +248,8 @@ export function apply(ctx: ClientContext): void {
   // The Podman terminal page: one tab type plus the body/title seats and the
   // guide card that opens it with a verified shell. Closing a tab unmounts the
   // body, whose cleanup aborts the stream while the host keeps the shell
-  // retained, so no close handler is registered.
-  const t = ctx.locale.bind(NS);
+  // retained, so no close handler is registered. Its copy reads the translator
+  // captured at the top of `apply`, like every other registration here.
   ctx.effect(
     () =>
       ctx.sidebarRightTabs.register({
@@ -260,6 +319,109 @@ export function apply(ctx: ClientContext): void {
     "podman: terminal guide",
   );
 
+  // The workspace Containers panel: a second tab type of its own, scoped to the
+  // Session's workspace. Its guide entry sits after the terminal's, so both
+  // appear on the Start panel; its body registers under its own id. Each piece
+  // is guarded so a refused registration (a taken id or kind, a seat that moved)
+  // hides only that piece instead of failing the whole client entry.
+  ctx.effect(
+    () => {
+      try {
+        return ctx.sidebarRightTabs.register({
+          id: PODMAN_CONTAINERS_TAB_ID,
+          kind: PODMAN_CONTAINERS_KIND,
+          multiple: false,
+          keepMounted: true,
+          title: () => t("containersTabTitle"),
+          guide: [{
+            id: "containers",
+            order: 21,
+            title: () => t("containersGuideTitle"),
+            description: () => t("containersGuideDescription"),
+            icon: PluginArtworkDefault,
+          }],
+        });
+      } catch (error) {
+        reportRegistrationFailure("containers tab type", error);
+        return () => {};
+      }
+    },
+    "podman: containers type",
+  );
+
+  ctx.effect(
+    () =>
+      ctx.slots.inject("sidebar.right.pane.tab", () => {
+        try {
+          return ctx.slots.register(
+            {
+              name: "sidebar.right.pane.tab",
+              key: PODMAN_CONTAINERS_TAB_ID,
+              locale: NS,
+              inject: (sessionId) => ({ ...controller.inject(), sessionId }),
+            },
+            PodmanContainers,
+          );
+        } catch (error) {
+          reportRegistrationFailure("containers tab body", error);
+          return () => {};
+        }
+      }),
+    "podman: containers body",
+  );
+
+  ctx.effect(
+    () =>
+      ctx.slots.inject("sidebar.right.tab.guide.entry", () => {
+        try {
+          return ctx.slots.register(
+            {
+              name: "sidebar.right.tab.guide.entry",
+              key: PODMAN_CONTAINERS_TAB_ID,
+              locale: NS,
+            },
+            PodmanContainersGuide,
+          );
+        } catch (error) {
+          reportRegistrationFailure("containers guide", error);
+          return () => {};
+        }
+      }),
+    "podman: containers guide",
+  );
+
+  // The command opens the panel on the session the focused pane belongs to. It
+  // deliberately carries no keyboard binding: the panel is reached from its
+  // Start panel card or from this command. A refused registration is reported
+  // and the rest of the plugin still loads.
+  const containersCommand: Omit<ShortcutCommand, "defaults"> = {
+    id: "podman.containers.open" as ShortcutCommandId,
+    label: () => t("containersCommand"),
+    aliases: ["containers", "workspace containers"],
+    regions: ["page", "editable", "terminal"],
+    modals: [],
+    resolve: ({ target }) => {
+      const resolution = resolveContainersOpen(sidebarRight, target);
+      return resolution.status === "blocked"
+        ? { status: "blocked", reason: t("terminalShortcutNoSession") }
+        : { status: "handled", run: resolution.run };
+    },
+  };
+  ctx.effect(
+    () => {
+      try {
+        return ctx.shortcuts.register({
+          ...containersCommand,
+          defaults: {},
+        });
+      } catch (error) {
+        reportRegistrationFailure("containers command", error);
+        return () => {};
+      }
+    },
+    "podman: containers command",
+  );
+
   // Ctrl+` opens a terminal on the session the focused pane belongs to: the
   // built-in terminal's own binding, freed by disabling that client UI. A
   // refused registration (the built-in enabled again, or another command
@@ -272,13 +434,13 @@ export function apply(ctx: ClientContext): void {
     regions: ["page", "editable", "terminal"],
     modals: [],
     resolve: ({ target }) => {
-      const captured = ctx.sidebarRight.commandTarget(target);
+      const captured = sidebarRight.commandTarget(target);
       return captured === undefined
         ? { status: "blocked", reason: t("terminalShortcutNoSession") }
         : {
           status: "handled",
           run: () => {
-            ctx.sidebarRight.openTabFromTarget(PODMAN_TERMINAL_KIND, captured);
+            sidebarRight.openTabFromTarget(PODMAN_TERMINAL_KIND, captured);
           },
         };
     },

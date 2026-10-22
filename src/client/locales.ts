@@ -324,7 +324,13 @@ export type ContainerPluginKey =
   | "terminalStatusDetached"
   | "terminalNoShells"
   | "terminalShellsFailed"
-  | "terminalLoading";
+  | "terminalLoading"
+  | "containersTabTitle"
+  | "containersCommand"
+  | "containersPanelNoWorkspace"
+  | "containersGuideTitle"
+  | "containersGuideDescription"
+  | "moreSettings";
 
 /**
  * Translate one key, interpolating `{name}` placeholders when given. Components
@@ -691,6 +697,12 @@ export const en: Record<ContainerPluginKey, string> = {
   terminalNoShells: "No shells available",
   terminalShellsFailed: "Could not list shells: {message}",
   terminalLoading: "Loading…",
+  containersTabTitle: "Containers",
+  containersCommand: "Containers",
+  containersPanelNoWorkspace: "This session is not in a known workspace.",
+  containersGuideTitle: "Workspace containers",
+  containersGuideDescription: "Manage the Session workspace's containers",
+  moreSettings: "More settings…",
 };
 
 export const zh: Record<ContainerPluginKey, string> = {
@@ -1022,6 +1034,12 @@ export const zh: Record<ContainerPluginKey, string> = {
   terminalNoShells: "没有可用的 Shell",
   terminalShellsFailed: "读取 Shell 失败：{message}",
   terminalLoading: "正在加载…",
+  containersTabTitle: "容器",
+  containersCommand: "容器",
+  containersPanelNoWorkspace: "此会话不属于任何已知工作区。",
+  containersGuideTitle: "工作区容器",
+  containersGuideDescription: "管理会话工作区中的容器",
+  moreSettings: "更多设置…",
 };
 
 declare module "@deepseek-ai/dsh-client-ui-slots" {

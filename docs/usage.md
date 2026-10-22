@@ -630,23 +630,22 @@ its **Recreate**/**Remove** actions.
 
 ## Podman terminal
 
-The plugin owns a **Podman terminal** right-Sidebar tab, separate from dsh's own
-Terminal tab. Open it from the right Sidebar's new-tab guide — the card is **New
-terminal** — or press
-**Ctrl+`**; the tab is named after the shell it runs
-(`bash`,`sh`, …). The built-in Terminal UI is disabled by the plugin's bundle
-patch, which frees that shortcut (if it is enabled again, the plugin falls back
-to **Ctrl+Shift+`**);
-the agent's `terminal` tool is unaffected. It always runs in the session's own
-workspace — each workspace has its own side panes and terminals — so the start
-form only asks for a container and then a shell, and a shell can run in the
-default container or in a named one. If the session's directory names no known
-workspace the form reports that instead of guessing; the harness's own Terminal
-always uses that workspace's default container. The container and shell you last
-started are remembered in the browser's local storage and preselected while they
-are still available — a container that disappeared falls back to the default,
-and a shell the image no longer ships falls back to the first one the container
-offers.
+The plugin owns a **Podman terminal** right-Sidebar tab. It replaces the
+built-in dsh terminal with its own implementation: the plugin's bundle patch
+disables the stock terminal row and registers this one instead, so the terminal
+shown in the Sidebar is dsh-podman's. Open it from the right Sidebar's new-tab
+guide — the card is **New terminal** — or press **Ctrl+\`**; the tab is named
+after the shell it runs (`bash`, `sh`, …). If the built-in terminal is enabled
+again, the plugin falls back to **Ctrl+Shift+\`**; the agent's `terminal` tool
+is unaffected. It always runs in the session's own workspace — each workspace
+has its own side panes and terminals — so the start form only asks for a
+container and then a shell, and a shell can run in the default container or in a
+named one. If the session's directory names no known workspace the form reports
+that instead of guessing; the harness's own Terminal always uses that
+workspace's default container. The container and shell you last started are
+remembered in the browser's local storage and preselected while they are still
+available — a container that disappeared falls back to the default, and a shell
+the image no longer ships falls back to the first one the container offers.
 
 The shell list is discovered **inside the chosen container**: candidate names
 are looked up on that container's PATH (`command -v`) and merged with
@@ -661,6 +660,28 @@ reloading the page keeps the shell and its scrollback, and reattaching replays
 the screen. Closing the tab leaves the shell retained for a while (until the
 host reaps it); **Reconnect** starts a fresh shell in the current selection.
 Closing or recreating a container drops its terminals, so reconnect afterwards.
+
+## Workspace containers panel
+
+The plugin also owns a **Containers** right-Sidebar tab, separate from the
+Podman terminal. Open it from the right Sidebar's new-tab menu: the **Workspace
+containers** card sits right after **New terminal**, and picking it opens the
+panel in that tab's place. The same panel opens from its **Containers** command.
+
+The panel lists only containers from the current session's workspace: the host
+resolves the workspace from the session once, through the same route the
+terminal uses, and other workspaces, the workspace-less PTC container and rows
+without a workspace never appear. If the session belongs to no known workspace,
+the panel says so instead of listing anything. Its header is the workspace block
+from the settings card — the workspace name, a button copying its UUID, its
+running-container count, and **Add container** / **Remove containers** with the
+same confirmations. Each row carries the container's name, state and age and the
+same labelled fields as the settings card — environment and secret environment
+variables, mounts, PATH additions and published ports — with **Edit**,
+**Recreate** and **Remove**. A **More settings…** button in the header opens
+this plugin's settings card — under **Plugins** → **Installed** — when the
+harness serves the **Plugins** panel; without it the button is hidden. Images,
+storage, defaults and the version status stay on that settings card.
 
 ## Podman operator mode
 

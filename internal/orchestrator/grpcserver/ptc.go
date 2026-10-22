@@ -8,7 +8,6 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
-	"time"
 
 	ctl "github.com/Exagone313/dsh-podman/internal/genproto/dshctl/v1"
 	imagebuild "github.com/Exagone313/dsh-podman/internal/orchestrator/images"
@@ -119,11 +118,9 @@ func (s *Server) ensurePTCContainer(dshVersion string) (state.Container, error) 
 	if err := s.confirmContainerExists(ptcPodmanName); err != nil {
 		return state.Container{}, ptcCreateError(err)
 	}
-	record.ImageID = imageID
 	record.ImageFingerprint = imageFingerprint
 	record.Kind = state.ContainerKindPTC
-	record.Status = "running"
-	record.CreatedAt = time.Now().UTC().Format(time.RFC3339)
+	s.markRecreated(&record, imageID)
 	record.AgentToken = secret
 	record.AgentSocketPath = filepath.Join(s.SocketsRoot, ptcPodmanName, "guest.sock")
 	if _, err := s.upsertContainer(state.Workspace{}, record); err != nil {

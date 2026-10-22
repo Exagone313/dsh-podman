@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/Exagone313/dsh-podman/internal/orchestrator/state"
 )
@@ -34,6 +35,41 @@ func alwaysRunning(string) (bool, error) { return true, nil }
 // tests that validate the slug (CreateWorkspace) or the stored container-name
 // shape (DescribeWorkspace) use it.
 const testWorkspaceSlug = "2c573001-4171-4900-904b-12a5cc02737a"
+
+// staleCreatedAt is a fixed past timestamp stored before an operation that
+// replaces a container, so a test can assert the record was refreshed.
+const staleCreatedAt = "2000-01-01T00:00:00Z"
+
+// podmanCreatedAt is the creation time fakePodman reports for a container, so
+// a test can assert the record stores podman's value rather than the local
+// clock.
+const podmanCreatedAt = "2026-10-22T10:00:00Z"
+
+// requirePodmanCreatedAt fails unless createdAt is exactly the timestamp the
+// fake podman reported.
+func requirePodmanCreatedAt(t *testing.T, createdAt string) {
+	t.Helper()
+	if createdAt != podmanCreatedAt {
+		t.Fatalf("created_at = %q, want podman's %q", createdAt, podmanCreatedAt)
+	}
+}
+
+// requireFreshCreatedAt fails unless createdAt is later than staleCreatedAt,
+// pinning the local-clock fallback used when podman's inspect fails.
+func requireFreshCreatedAt(t *testing.T, createdAt string) {
+	t.Helper()
+	got, err := time.Parse(time.RFC3339, createdAt)
+	if err != nil {
+		t.Fatalf("created_at %q is not RFC 3339: %v", createdAt, err)
+	}
+	stale, err := time.Parse(time.RFC3339, staleCreatedAt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !got.After(stale) {
+		t.Fatalf("created_at was not refreshed after a recreate: %q", createdAt)
+	}
+}
 
 // testDefaultContainer is the default container name derived from
 // testWorkspaceSlug.
@@ -99,6 +135,11 @@ type fakePodman struct {
 	// onStop, when set, runs as Stop is called: it stands in for what the
 	// stopping container's processes did last.
 	onStop func(name string)
+	// creationTime is the timestamp ContainerCreated reports; empty means
+	// podmanCreatedAt. creationErr, when set, makes the inspect fail so the
+	// local-clock fallback can be exercised.
+	creationTime string
+	creationErr  error
 }
 
 func newFakePodman() *fakePodman {

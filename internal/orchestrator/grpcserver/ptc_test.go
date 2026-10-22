@@ -151,6 +151,8 @@ func TestEnsurePTCContainerCreatesLazilyWithoutAWorkspace(t *testing.T) {
 	if row.ContainerName != ptcContainerLogical || row.WorkspaceSlug != "" || row.Kind != ctl.ContainerKind_CONTAINER_KIND_PTC || row.Status != "running" {
 		t.Fatalf("unexpected PTC row: %#v", row)
 	}
+	// The creation date comes from podman's inspect, not the local clock.
+	requirePodmanCreatedAt(t, row.CreatedAt)
 	// The record lives outside workspace state, so no workspace was created.
 	workspaces, err := server.Store.Workspaces()
 	if err != nil {

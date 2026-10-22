@@ -512,6 +512,94 @@ func TestAddContainerSecretRejectsUnknownSecret(t *testing.T) {
 	}
 }
 
+// TestAddContainerSecretRefreshesCreationState pins that binding a secret env
+// var — which recreates the container — republishes the replacement's creation
+// date, status, and image.
+func TestAddContainerSecretRefreshesCreationState(t *testing.T) {
+	store := newTestStore(t)
+	if err := store.SaveImages([]state.Image{{ImageID: "arch", ImageTag: "localhost/dsh-podman/arch:latest"}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.SaveWorkspaces([]state.Workspace{{
+		WorkspaceSlug: "proj",
+		Containers: []state.Container{{
+			Name: "dev", PodmanName: "dsh-podman-proj-dev", ImageID: "arch", Status: "running", CreatedAt: staleCreatedAt,
+		}},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	fake := newFakePodman()
+	fake.exists["dsh-podman-proj-dev"] = true
+	server := &Server{Store: store, Podman: fake, SecretPrefix: "dsh-podman-", Logger: silentLogger()}
+
+	row, err := server.AddContainerSecret(context.Background(), &ctl.AddContainerSecretRequest{
+		WorkspaceSlug: "proj", Container: "dev", Env: "BAR", Secret: "data",
+	})
+	if err != nil {
+		t.Fatalf("add failed: %v", err)
+	}
+	requirePodmanCreatedAt(t, row.GetCreatedAt())
+	if row.GetStatus() != "running" || row.GetImageId() != "arch" {
+		t.Fatalf("row does not describe the recreated container: %#v", row)
+	}
+	stored, err := store.Workspaces()
+	if err != nil {
+		t.Fatal(err)
+	}
+	record, ok := containerByLogical(&stored[0], "dev")
+	if !ok {
+		t.Fatal("the recreated container was not stored")
+	}
+	requirePodmanCreatedAt(t, record.CreatedAt)
+	if record.Status != "running" || record.ImageID != "arch" {
+		t.Fatalf("stored record does not describe the recreated container: %#v", record)
+	}
+}
+
+// TestRemoveContainerSecretRefreshesCreationState pins the same refresh for a
+// secret env var detach, which also replaces the podman container.
+func TestRemoveContainerSecretRefreshesCreationState(t *testing.T) {
+	store := newTestStore(t)
+	if err := store.SaveImages([]state.Image{{ImageID: "arch", ImageTag: "localhost/dsh-podman/arch:latest"}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.SaveWorkspaces([]state.Workspace{{
+		WorkspaceSlug: "proj",
+		Containers: []state.Container{{
+			Name: "dev", PodmanName: "dsh-podman-proj-dev", ImageID: "arch", Status: "running", CreatedAt: staleCreatedAt,
+			SecretEnv: map[string]string{"FOO": "data"},
+		}},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	fake := newFakePodman()
+	fake.exists["dsh-podman-proj-dev"] = true
+	server := &Server{Store: store, Podman: fake, SecretPrefix: "dsh-podman-", Logger: silentLogger()}
+
+	row, err := server.RemoveContainerSecret(context.Background(), &ctl.RemoveContainerSecretRequest{
+		WorkspaceSlug: "proj", Container: "dev", Env: "FOO",
+	})
+	if err != nil {
+		t.Fatalf("remove failed: %v", err)
+	}
+	requirePodmanCreatedAt(t, row.GetCreatedAt())
+	if row.GetStatus() != "running" || row.GetImageId() != "arch" {
+		t.Fatalf("row does not describe the recreated container: %#v", row)
+	}
+	stored, err := store.Workspaces()
+	if err != nil {
+		t.Fatal(err)
+	}
+	record, ok := containerByLogical(&stored[0], "dev")
+	if !ok {
+		t.Fatal("the recreated container was not stored")
+	}
+	requirePodmanCreatedAt(t, record.CreatedAt)
+	if _, still := record.SecretEnv["FOO"]; still {
+		t.Fatalf("the removed secret binding is still stored: %#v", record.SecretEnv)
+	}
+}
+
 func TestRemoveContainerSecret(t *testing.T) {
 	root := tempRoot(t)
 	store := newTestStore(t)

@@ -177,6 +177,11 @@ func TestCreateWorkspaceSetsPathAdditions(t *testing.T) {
 	if !ok || !slices.Equal(record.Paths, []string{"/opt/bin", "/usr/local/bin"}) {
 		t.Fatalf("paths not persisted: %#v", record)
 	}
+	// The creation date of a freshly created container is podman's own value,
+	// so the workspace row (derived from the default container) matches
+	// `podman ps` too.
+	requirePodmanCreatedAt(t, record.CreatedAt)
+	requirePodmanCreatedAt(t, stored[0].CreatedAt)
 }
 
 // TestStartContainerSetsPathAdditions pins that a start request sets the

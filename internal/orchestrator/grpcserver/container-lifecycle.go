@@ -64,10 +64,38 @@ func (s *Server) ensureAgentToken(record *state.Container) (string, error) {
 	return secret, nil
 }
 
+// containerCreatedAt returns the creation time podman reports for the named
+// container, in the record's UTC RFC 3339 format. The caller has just confirmed
+// the container exists; an inspect failure is therefore non-fatal, and the local
+// clock is used with a warning so the snapshot still carries a usable date.
+func (s *Server) containerCreatedAt(name string) string {
+	created, err := s.Podman.ContainerCreated(name)
+	if err == nil && created != "" {
+		return created
+	}
+	if err == nil {
+		err = fmt.Errorf("podman reported an empty creation time")
+	}
+	s.log().Warn("container inspect for creation date failed; using the local clock", "podman_name", name, "error", err)
+	return time.Now().UTC().Format(time.RFC3339)
+}
+
+// markRecreated refreshes the fields a successful podman recreate invalidates:
+// the record now runs imageID and carries the creation time podman reports for
+// the replacement, not the predecessor's or a client-side guess. Callers
+// persist the record afterwards; the refresh happens only on success, so a
+// failed recreate leaves the previous values in place.
+func (s *Server) markRecreated(record *state.Container, imageID string) {
+	record.ImageID = imageID
+	record.Status = "running"
+	record.CreatedAt = s.containerCreatedAt(record.PodmanName)
+}
+
 // recreateContainer gracefully stops the container's daemons, then recreates
 // the podman container with the given image tag and agent token, using the
-// container's effective mounts.
-func (s *Server) recreateContainer(ctx context.Context, workspace state.Workspace, record *state.Container, imageTag, newToken string, env map[string]string) error {
+// container's effective mounts. On success it refreshes the record so the
+// caller persists a snapshot that matches the new container.
+func (s *Server) recreateContainer(ctx context.Context, workspace state.Workspace, record *state.Container, imageID, imageTag, newToken string, env map[string]string) error {
 	podmanMounts, err := s.podmanMounts(containerMounts(workspace, *record))
 	if err != nil {
 		return err
@@ -110,6 +138,12 @@ func (s *Server) recreateContainer(ctx context.Context, workspace state.Workspac
 	if err := s.confirmContainerExists(record.PodmanName); err != nil {
 		return err
 	}
+	// The podman container was just replaced, so the stored record must stop
+	// describing its predecessor: it now runs the requested image and carries
+	// the replacement's own creation time. Every recreate path persists the
+	// record after this returns, so refreshing it here keeps the snapshot (and
+	// the workspace row derived from it) from going stale.
+	s.markRecreated(record, imageID)
 	// The new container's guest agent starts without the forwarding sockets its
 	// predecessor had, so its published ports are restored in the background:
 	// the agent may still be starting, and this path holds the project-mount
@@ -144,8 +178,8 @@ func (s *Server) confirmContainerExists(name string) error {
 // best-effort restores the pre-mutation snapshot so a failed mutation does not
 // leave the container gone. The store is untouched here; callers persist only
 // on success, and the original error is returned either way.
-func (s *Server) recreateOrRestore(ctx context.Context, workspace state.Workspace, record *state.Container, imageTag, token string, snapshot *state.Container) error {
-	err := s.recreateContainer(ctx, workspace, record, imageTag, token, record.Env)
+func (s *Server) recreateOrRestore(ctx context.Context, workspace state.Workspace, record *state.Container, imageID, imageTag, token string, snapshot *state.Container) error {
+	err := s.recreateContainer(ctx, workspace, record, imageID, imageTag, token, record.Env)
 	if err == nil || snapshot == nil {
 		return err
 	}
@@ -175,7 +209,7 @@ func (s *Server) restoreSnapshot(workspace state.Workspace, snapshot *state.Cont
 	}
 	// The restore runs on a fresh context: a recreate usually fails because the
 	// request's context was cancelled, and a rollback must still be attempted.
-	if err := s.recreateContainer(context.Background(), workspace, &restore, restoreTag, token, restore.Env); err != nil {
+	if err := s.recreateContainer(context.Background(), workspace, &restore, restore.ImageID, restoreTag, token, restore.Env); err != nil {
 		s.log().Warn("failed to restore container after failed recreate", "workspace_slug", workspace.WorkspaceSlug, "container", restore.Name, "error", err)
 	}
 }
@@ -427,13 +461,10 @@ func (s *Server) RecreateContainer(ctx context.Context, request *ctl.RecreateCon
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	if err := s.recreateOrRestore(ctx, workspace, record, imageTag, secret, &snapshot); err != nil {
+	if err := s.recreateOrRestore(ctx, workspace, record, imageID, imageTag, secret, &snapshot); err != nil {
 		s.log().Error("control request failed", "method", "RecreateContainer", "workspace_slug", request.GetWorkspaceSlug(), "container", container, "error", err)
 		return nil, grpcError(err)
 	}
-	record.ImageID = imageID
-	record.Status = "running"
-	record.CreatedAt = time.Now().UTC().Format(time.RFC3339)
 	record.AgentToken = secret
 	updated, err := s.upsertContainer(workspace, *record)
 	if err != nil {
@@ -616,8 +647,7 @@ func (s *Server) StartContainer(ctx context.Context, request *ctl.StartContainer
 		s.log().Error("control request failed", "method", "StartContainer", "workspace_slug", request.GetWorkspaceSlug(), "container", request.GetContainer(), "error", lockedErr)
 		return nil, lockedErr
 	}
-	record.Status = "running"
-	record.CreatedAt = time.Now().UTC().Format(time.RFC3339)
+	s.markRecreated(&record, imageID)
 	record.AgentSocketPath = filepath.Join(s.SocketsRoot, record.PodmanName, "guest.sock")
 	updated, err := s.upsertContainer(workspace, record)
 	if err != nil {

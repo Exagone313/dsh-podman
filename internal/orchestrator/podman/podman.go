@@ -416,6 +416,22 @@ func (c *Client) ContainerRunning(name string) (bool, error) {
 	return running, nil
 }
 
+// ContainerCreated returns the creation time podman reports for the named
+// container as a UTC RFC 3339 string. It is the value `podman ps` displays, so
+// a record refreshed from it never drifts from the actual container.
+func (c *Client) ContainerCreated(name string) (string, error) {
+	ctx, cancel := c.lookupContext()
+	defer cancel()
+	inspect, err := containers.Inspect(ctx, name, nil)
+	if err != nil {
+		c.log().Error("guest container inspect failed", "container_name", name, "error", err)
+		return "", err
+	}
+	created := inspect.Created.UTC().Format(time.RFC3339)
+	c.log().Info("guest container inspect completed", "container_name", name, "created_at", created)
+	return created, nil
+}
+
 // ContainerAgentState reports, in one inspect, whether the named container's
 // guest agent is outdated and which credential its agent expects.
 //

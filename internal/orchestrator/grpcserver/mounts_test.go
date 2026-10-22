@@ -821,6 +821,94 @@ func TestAddContainerMountRejectsExistingPrimaryWithDifferentMode(t *testing.T) 
 	}
 }
 
+// TestAddContainerMountRefreshesCreationState pins that a mount add — which
+// recreates the container — republishes the replacement's creation date,
+// status, and image instead of keeping the predecessor's.
+func TestAddContainerMountRefreshesCreationState(t *testing.T) {
+	store := newTestStore(t)
+	if err := store.SaveImages([]state.Image{{ImageID: "arch", ImageTag: "localhost/dsh-podman/arch:latest"}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.SaveWorkspaces([]state.Workspace{{
+		WorkspaceSlug: "proj",
+		Containers: []state.Container{{
+			Name: "dev", PodmanName: "dsh-podman-proj-dev", ImageID: "arch", Status: "running", CreatedAt: staleCreatedAt,
+		}},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	fake := newFakePodman()
+	fake.exists["dsh-podman-proj-dev"] = true
+	server := &Server{Store: store, Podman: fake, Logger: silentLogger()}
+
+	row, err := server.AddContainerMount(context.Background(), &ctl.AddContainerMountRequest{
+		WorkspaceSlug: "proj", Container: "dev", Kind: ctl.MountKind_MOUNT_KIND_TMPFS, Destination: "/mnt/data", Mode: ctl.MountMode_MOUNT_MODE_READ_WRITE,
+	})
+	if err != nil {
+		t.Fatalf("add failed: %v", err)
+	}
+	requirePodmanCreatedAt(t, row.GetCreatedAt())
+	if row.GetStatus() != "running" || row.GetImageId() != "arch" {
+		t.Fatalf("row does not describe the recreated container: %#v", row)
+	}
+	stored, err := store.Workspaces()
+	if err != nil {
+		t.Fatal(err)
+	}
+	record, ok := containerByLogical(&stored[0], "dev")
+	if !ok {
+		t.Fatal("the recreated container was not stored")
+	}
+	requirePodmanCreatedAt(t, record.CreatedAt)
+	if record.Status != "running" || record.ImageID != "arch" {
+		t.Fatalf("stored record does not describe the recreated container: %#v", record)
+	}
+}
+
+// TestRemoveContainerMountRefreshesCreationState pins the same refresh for a
+// mount removal, which also replaces the podman container.
+func TestRemoveContainerMountRefreshesCreationState(t *testing.T) {
+	store := newTestStore(t)
+	if err := store.SaveImages([]state.Image{{ImageID: "arch", ImageTag: "localhost/dsh-podman/arch:latest"}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.SaveWorkspaces([]state.Workspace{{
+		WorkspaceSlug: "proj",
+		Containers: []state.Container{{
+			Name: "dev", PodmanName: "dsh-podman-proj-dev", ImageID: "arch", Status: "running", CreatedAt: staleCreatedAt,
+			Mounts: []state.Mount{{Kind: "tmpfs", Destination: "/scratch", Mode: "read_write"}},
+		}},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	fake := newFakePodman()
+	fake.exists["dsh-podman-proj-dev"] = true
+	server := &Server{Store: store, Podman: fake, Logger: silentLogger()}
+
+	row, err := server.RemoveContainerMount(context.Background(), &ctl.RemoveContainerMountRequest{
+		WorkspaceSlug: "proj", Container: "dev", Kind: ctl.MountKind_MOUNT_KIND_TMPFS, Destination: "/scratch",
+	})
+	if err != nil {
+		t.Fatalf("remove failed: %v", err)
+	}
+	requirePodmanCreatedAt(t, row.GetCreatedAt())
+	if row.GetStatus() != "running" || row.GetImageId() != "arch" {
+		t.Fatalf("row does not describe the recreated container: %#v", row)
+	}
+	stored, err := store.Workspaces()
+	if err != nil {
+		t.Fatal(err)
+	}
+	record, ok := containerByLogical(&stored[0], "dev")
+	if !ok {
+		t.Fatal("the recreated container was not stored")
+	}
+	requirePodmanCreatedAt(t, record.CreatedAt)
+	if len(record.Mounts) != 0 {
+		t.Fatalf("the removed mount is still stored: %#v", record.Mounts)
+	}
+}
+
 // updateMountFixture stores a workspace whose default container carries mounts,
 // returning a server with podman available.
 func updateMountFixture(t *testing.T, root string, mounts []state.Mount) (*Server, *fakePodman, *state.Store) {
@@ -832,9 +920,10 @@ func updateMountFixture(t *testing.T, root string, mounts []state.Mount) (*Serve
 	if err := store.SaveWorkspaces([]state.Workspace{{
 		WorkspaceSlug: "proj",
 		ProjectName:   "team",
+		CreatedAt:     staleCreatedAt,
 		Mounts:        mounts,
 		Containers: []state.Container{{
-			Name: "default", PodmanName: "dsh-podman-proj-default", ImageID: "arch", Status: "running",
+			Name: "default", PodmanName: "dsh-podman-proj-default", ImageID: "arch", Status: "running", CreatedAt: staleCreatedAt,
 			Mounts: mounts,
 		}},
 	}}); err != nil {
@@ -860,6 +949,10 @@ func TestUpdateContainerMountChangesMode(t *testing.T) {
 	if len(container.GetMounts()) != 1 || container.GetMounts()[0].GetMode() != ctl.MountMode_MOUNT_MODE_READ_ONLY {
 		t.Fatalf("the returned container must be read-only, got %v", container.GetMounts())
 	}
+	requirePodmanCreatedAt(t, container.GetCreatedAt())
+	if container.GetStatus() != "running" || container.GetImageId() != "arch" {
+		t.Fatalf("the returned container does not describe the recreated one: %#v", container)
+	}
 	if len(fake.recreated) != 1 {
 		t.Fatalf("expected one recreate, got %v", fake.recreated)
 	}
@@ -870,6 +963,14 @@ func TestUpdateContainerMountChangesMode(t *testing.T) {
 	record, ok := containerByLogical(&stored[0], "default")
 	if !ok || len(record.Mounts) != 1 || record.Mounts[0].Mode != "read_only" {
 		t.Fatalf("the stored default container must be read-only, got %#v", record)
+	}
+	requirePodmanCreatedAt(t, record.CreatedAt)
+	if record.Status != "running" || record.ImageID != "arch" {
+		t.Fatalf("the stored record does not describe the recreated container: %#v", record)
+	}
+	requirePodmanCreatedAt(t, stored[0].CreatedAt)
+	if stored[0].CreatedAt != record.CreatedAt {
+		t.Fatalf("workspace date %q does not follow the container date %q", stored[0].CreatedAt, record.CreatedAt)
 	}
 }
 

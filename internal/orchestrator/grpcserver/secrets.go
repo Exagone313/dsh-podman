@@ -352,11 +352,10 @@ func (s *Server) AddContainerSecret(ctx context.Context, request *ctl.AddContain
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	if err := s.recreateOrRestore(ctx, workspace, record, imageTag, secretToken, &snapshot); err != nil {
+	if err := s.recreateOrRestore(ctx, workspace, record, record.ImageID, imageTag, secretToken, &snapshot); err != nil {
 		s.log().Error("control request failed", "method", "AddContainerSecret", "workspace_slug", request.GetWorkspaceSlug(), "container", container, "error", err)
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	record.Status = "running"
 	record.AgentToken = secretToken
 	updated, err := s.upsertContainer(workspace, *record)
 	if err != nil {
@@ -412,11 +411,10 @@ func (s *Server) RemoveContainerSecret(ctx context.Context, request *ctl.RemoveC
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	if err := s.recreateOrRestore(ctx, workspace, record, imageTag, secretToken, &snapshot); err != nil {
+	if err := s.recreateOrRestore(ctx, workspace, record, record.ImageID, imageTag, secretToken, &snapshot); err != nil {
 		s.log().Error("control request failed", "method", "RemoveContainerSecret", "workspace_slug", request.GetWorkspaceSlug(), "container", container, "error", err)
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	record.Status = "running"
 	record.AgentToken = secretToken
 	updated, err := s.upsertContainer(workspace, *record)
 	if err != nil {

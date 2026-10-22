@@ -144,11 +144,26 @@ func TestEnsureContainerRecreatesARotatedToken(t *testing.T) {
 func TestEnsureContainerRecreatesAStoppedContainer(t *testing.T) {
 	server, fake := ensureContainerServer(t)
 	fake.exists[testDefaultContainer] = true
-	if _, err := server.EnsureContainer(context.Background(), &ctl.EnsureContainerRequest{WorkspaceSlug: testWorkspaceSlug}); err != nil {
+	row, err := server.EnsureContainer(context.Background(), &ctl.EnsureContainerRequest{WorkspaceSlug: testWorkspaceSlug})
+	if err != nil {
 		t.Fatal(err)
 	}
 	if len(fake.recreated) != 1 {
 		t.Fatalf("expected one recreate, got %v", fake.recreated)
+	}
+	// Recreating a stopped container replaces it, so the row must describe the
+	// new one instead of keeping the predecessor's creation date.
+	requirePodmanCreatedAt(t, row.GetCreatedAt())
+	if row.GetStatus() != "running" || row.GetImageId() != "arch" {
+		t.Fatalf("row does not describe the recreated container: %#v", row)
+	}
+	stored, err := server.Store.Workspaces()
+	if err != nil {
+		t.Fatal(err)
+	}
+	requirePodmanCreatedAt(t, stored[0].CreatedAt)
+	if stored[0].CreatedAt != row.GetCreatedAt() {
+		t.Fatalf("workspace date %q does not follow the container date %q", stored[0].CreatedAt, row.GetCreatedAt())
 	}
 }
 
@@ -201,7 +216,8 @@ func ensureContainerServer(t *testing.T) (*Server, *fakePodman) {
 	if err := store.SaveWorkspaces([]state.Workspace{{
 		WorkspaceSlug: testWorkspaceSlug,
 		ContainerName: testDefaultContainer,
-		Containers:    []state.Container{{Name: "default", PodmanName: testDefaultContainer, ImageID: "arch", Status: "running", AgentToken: "tok"}},
+		CreatedAt:     staleCreatedAt,
+		Containers:    []state.Container{{Name: "default", PodmanName: testDefaultContainer, ImageID: "arch", Status: "running", CreatedAt: staleCreatedAt, AgentToken: "tok"}},
 	}}); err != nil {
 		t.Fatal(err)
 	}
@@ -535,6 +551,18 @@ func (f *fakePodman) ContainerAgentState(name string) (bool, string, error) {
 	return f.agentStale[name], f.agentToken[name], nil
 }
 
+// ContainerCreated reports the canned podman creation time, or the configured
+// error so the caller's local-clock fallback can be tested.
+func (f *fakePodman) ContainerCreated(string) (string, error) {
+	if f.creationErr != nil {
+		return "", f.creationErr
+	}
+	if f.creationTime != "" {
+		return f.creationTime, nil
+	}
+	return podmanCreatedAt, nil
+}
+
 func (f *fakePodman) RecreateWorkspace(pod, name, image, token string, mounts []specs.Mount, secrets []specgen.Secret, envSecrets map[string]string, env map[string]string, paths []string) error {
 	f.recreated = append(f.recreated, name)
 	if f.recreateFails > 0 {
@@ -825,6 +853,135 @@ func TestRecreateContainerStopsDaemons(t *testing.T) {
 	_, err = server.RecreateContainer(context.Background(), &ctl.RecreateContainerRequest{WorkspaceSlug: "proj", ImageId: "arch"})
 	if status.Code(err) != codes.FailedPrecondition {
 		t.Fatalf("nil Podman: expected FailedPrecondition, got %v", err)
+	}
+}
+
+// TestRecreateContainerRefreshesCreationState pins that a recreate republishes
+// the fields the replaced container invalidates: the creation date, the status,
+// and the image actually recreated. The workspace row derives its date from the
+// default container, so it must follow too.
+func TestRecreateContainerRefreshesCreationState(t *testing.T) {
+	store := newTestStore(t)
+	if err := store.SaveImages([]state.Image{
+		{ImageID: "arch", ImageTag: "localhost/dsh-podman/arch:latest"},
+		{ImageID: "devimg", ImageTag: "localhost/dsh-podman/devimg:latest"},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.SaveWorkspaces([]state.Workspace{{
+		WorkspaceSlug: "proj",
+		CreatedAt:     staleCreatedAt,
+		Containers: []state.Container{{
+			Name: "default", PodmanName: "dsh-podman-proj-default", ImageID: "arch", Status: "stopped", CreatedAt: staleCreatedAt,
+		}},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	fake := newFakePodman()
+	fake.exists["dsh-podman-proj-default"] = true
+	server := &Server{Store: store, Podman: fake, Logger: silentLogger()}
+
+	row, err := server.RecreateContainer(context.Background(), &ctl.RecreateContainerRequest{
+		WorkspaceSlug: "proj", Container: "default", ImageId: "devimg",
+	})
+	if err != nil {
+		t.Fatalf("recreate failed: %v", err)
+	}
+	requirePodmanCreatedAt(t, row.GetCreatedAt())
+	if row.GetStatus() != "running" || row.GetImageId() != "devimg" {
+		t.Fatalf("row does not describe the recreated container: %#v", row)
+	}
+
+	stored, err := store.Workspaces()
+	if err != nil {
+		t.Fatal(err)
+	}
+	record := stored[0].Containers[0]
+	requirePodmanCreatedAt(t, record.CreatedAt)
+	if record.Status != "running" || record.ImageID != "devimg" {
+		t.Fatalf("stored record does not describe the recreated container: %#v", record)
+	}
+	requirePodmanCreatedAt(t, stored[0].CreatedAt)
+	if stored[0].CreatedAt != record.CreatedAt {
+		t.Fatalf("workspace date %q does not follow the container date %q", stored[0].CreatedAt, record.CreatedAt)
+	}
+}
+
+// TestRecreateContainerFallsBackToLocalClock pins the fallback: when podman's
+// inspect cannot report the creation time, the record still receives a fresh
+// UTC RFC 3339 timestamp and the recreate succeeds.
+func TestRecreateContainerFallsBackToLocalClock(t *testing.T) {
+	store := newTestStore(t)
+	if err := store.SaveImages([]state.Image{{ImageID: "arch", ImageTag: "localhost/dsh-podman/arch:latest"}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.SaveWorkspaces([]state.Workspace{{
+		WorkspaceSlug: "proj",
+		Containers: []state.Container{{
+			Name: "default", PodmanName: "dsh-podman-proj-default", ImageID: "arch", Status: "running", CreatedAt: staleCreatedAt,
+		}},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	fake := newFakePodman()
+	fake.exists["dsh-podman-proj-default"] = true
+	fake.creationErr = errors.New("inspect failed")
+	server := &Server{Store: store, Podman: fake, Logger: silentLogger()}
+
+	row, err := server.RecreateContainer(context.Background(), &ctl.RecreateContainerRequest{
+		WorkspaceSlug: "proj", Container: "default", ImageId: "arch",
+	})
+	if err != nil {
+		t.Fatalf("recreate failed: %v", err)
+	}
+	requireFreshCreatedAt(t, row.GetCreatedAt())
+	if row.GetStatus() != "running" || row.GetImageId() != "arch" {
+		t.Fatalf("row does not describe the recreated container: %#v", row)
+	}
+}
+
+// TestStartContainerRefreshesCreationState covers the create/start path, which
+// also replaces any predecessor: the stored record must carry the new creation
+// date, status, and image.
+func TestStartContainerRefreshesCreationState(t *testing.T) {
+	store := newTestStore(t)
+	if err := store.SaveImages([]state.Image{{ImageID: "arch", ImageTag: "localhost/dsh-podman/arch:latest"}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.SaveWorkspaces([]state.Workspace{{
+		WorkspaceSlug: "proj",
+		Containers: []state.Container{{
+			Name: "dev", PodmanName: "dsh-podman-proj-dev", ImageID: "arch", Status: "stopped", CreatedAt: staleCreatedAt,
+		}},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	fake := newFakePodman()
+	fake.exists["dsh-podman-proj-dev"] = true
+	server := &Server{Store: store, Podman: fake, Logger: silentLogger()}
+
+	row, err := server.StartContainer(context.Background(), &ctl.StartContainerRequest{
+		WorkspaceSlug: "proj", Container: "dev", ImageId: "arch",
+	})
+	if err != nil {
+		t.Fatalf("start failed: %v", err)
+	}
+	requirePodmanCreatedAt(t, row.GetCreatedAt())
+	if row.GetStatus() != "running" || row.GetImageId() != "arch" {
+		t.Fatalf("row does not describe the started container: %#v", row)
+	}
+
+	stored, err := store.Workspaces()
+	if err != nil {
+		t.Fatal(err)
+	}
+	record, ok := containerByLogical(&stored[0], "dev")
+	if !ok {
+		t.Fatal("the started container was not stored")
+	}
+	requirePodmanCreatedAt(t, record.CreatedAt)
+	if record.Status != "running" || record.ImageID != "arch" {
+		t.Fatalf("stored record does not describe the started container: %#v", record)
 	}
 }
 

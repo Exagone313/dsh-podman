@@ -8,7 +8,6 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
-	"time"
 
 	ctl "github.com/Exagone313/dsh-podman/internal/genproto/dshctl/v1"
 	"github.com/Exagone313/dsh-podman/internal/orchestrator/projects"
@@ -70,11 +69,10 @@ func (s *Server) refreshContainer(ctx context.Context, workspace state.Workspace
 	if err != nil {
 		return workspace, status.Error(codes.Internal, err.Error())
 	}
-	if err := s.recreateContainer(ctx, workspace, record, imageTag, token, record.Env); err != nil {
+	if err := s.recreateContainer(ctx, workspace, record, record.ImageID, imageTag, token, record.Env); err != nil {
 		s.log().Error("recreating guest container failed", "workspace_slug", workspace.WorkspaceSlug, "container", record.Name, "error", err)
 		return workspace, grpcError(err)
 	}
-	record.Status = "running"
 	record.AgentToken = token
 	updated, err := s.upsertContainer(workspace, *record)
 	if err != nil {
@@ -320,7 +318,7 @@ func (s *Server) CreateWorkspace(ctx context.Context, request *ctl.CreateWorkspa
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 	agentSocket := filepath.Join(s.SocketsRoot, name, "guest.sock")
-	createdAt := time.Now().UTC().Format(time.RFC3339)
+	createdAt := s.containerCreatedAt(name)
 	workspace := state.Workspace{WorkspaceSlug: request.GetWorkspaceSlug(), ProjectName: projectName, ContainerName: name, ImageID: imageID, Mounts: defaultMounts, Status: "running", AgentSocketPath: agentSocket, AgentToken: secret, CreatedAt: createdAt, Containers: []state.Container{{Name: "default", PodmanName: name, ImageID: imageID, Mounts: defaultMounts, Paths: defaultPaths, Status: "running", CreatedAt: createdAt, AgentSocketPath: agentSocket, AgentToken: secret, Env: userEnv, SecretEnv: userSecretEnv}}}
 	if err := s.Store.UpdateWorkspaces(func(all []state.Workspace) ([]state.Workspace, error) {
 		replaced := false

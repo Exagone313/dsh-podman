@@ -59,6 +59,29 @@ test("filesystem provider rejects unsafe paths", async () => {
   );
 });
 
+test("filesystem provider collapses aliases of one path to one key", async () => {
+  const provider = createFilesystemProvider(stubResolver);
+  const canonical = "/projects/team/app/README.md";
+  const plain = await provider.resolve(canonical, { cwd: "/x" });
+  assert.equal(plain.targetKey, canonical);
+  for (
+    const alias of [
+      "/projects/team//app/README.md",
+      "/projects/team/./app/README.md",
+      "/projects/team/app/README.md/",
+      "/projects//team/app//README.md",
+    ]
+  ) {
+    const target = await provider.resolve(alias, { cwd: "/x" });
+    assert.equal(target.targetKey, canonical, alias);
+    assert.equal(target.displayPath, canonical, alias);
+  }
+  const relative = await provider.resolve("./app/README.md", {
+    cwd: "/projects/team",
+  });
+  assert.equal(relative.targetKey, canonical);
+});
+
 test("filesystem provider maps targets", () => {
   const provider = createFilesystemProvider(stubResolver);
   assert.equal(provider.fileUrl({ targetKey: "/a/b" }), "file:///a/b");
@@ -438,6 +461,106 @@ test("filesystem provider writeText normalizes the diff basis", async () => {
   assert.equal(outcome.before, "a\nb\n");
   assert.equal(outcome.after, "c\nd\n");
   assert.equal(Buffer.concat(binding.writes).toString(), "c\r\nd\r\n");
+});
+
+// A guest double whose writeFile completion the test holds open, so an
+// overlapping mutation's progress can be observed. Every stat and write is
+// recorded; the content is constant, which is all the guards need.
+function heldGuest(content = "hello") {
+  const stats: string[] = [];
+  const writes: Array<() => void> = [];
+  return {
+    stats,
+    writes,
+    token: "t",
+    guest: {
+      stat: (
+        request: Record<string, unknown>,
+        _metadata: unknown,
+        callback: Function,
+      ) => {
+        stats.push(String(request.path));
+        callback(null, {
+          exists: true,
+          isDir: false,
+          isSymlink: false,
+          size: String(content.length),
+          mode: "-rw-r--r--",
+          modifiedAt: "t",
+        });
+      },
+      readFile: () => ({
+        async *[Symbol.asyncIterator]() {
+          yield { data: Buffer.from(content) };
+        },
+      }),
+      writeFile: (
+        _metadata: unknown,
+        _options: unknown,
+        callback: Function,
+      ) => ({
+        write() {},
+        end() {
+          writes.push(() => callback(null, { bytesWritten: 0 }));
+        },
+      }),
+    },
+  };
+}
+
+// One turn of the event loop, enough for the pending mutation microtasks.
+const settle = (): Promise<void> =>
+  new Promise((resolve) => setImmediate(resolve));
+
+const EDIT = { oldString: "hello", newString: "bye", replaceAll: false };
+
+test("filesystem provider serialises overlapping edits of one path", async () => {
+  const fake = heldGuest();
+  const provider = editProvider(fake);
+  const target = await provider.resolve("/a", { cwd: "/x" });
+  const first = provider.editText(target, EDIT);
+  await settle();
+  const second = provider.editText(target, EDIT);
+  await settle();
+  assert.equal(fake.stats.length, 1, "the second edit waits before its stat");
+  assert.equal(
+    fake.writes.length,
+    1,
+    "only the first edit has reached its write",
+  );
+  fake.writes[0]();
+  await first;
+  await settle();
+  await settle();
+  assert.equal(
+    fake.writes.length,
+    2,
+    "the second edit proceeds once the first finished",
+  );
+  fake.writes[1]();
+  await second;
+  assert.deepEqual(fake.stats, ["/a", "/a", "/a", "/a"]);
+});
+
+test("filesystem provider does not serialise edits of different paths", async () => {
+  const fake = heldGuest();
+  const provider = editProvider(fake);
+  const first = await provider.resolve("/a", { cwd: "/x" });
+  const second = await provider.resolve("/b", { cwd: "/x" });
+  const pendingA = provider.editText(first, EDIT);
+  await settle();
+  const pendingB = provider.editText(second, EDIT);
+  await settle();
+  await settle();
+  assert.equal(
+    fake.writes.length,
+    2,
+    "both edits reach their write without waiting",
+  );
+  assert.deepEqual(fake.stats, ["/a", "/b"]);
+  for (const release of fake.writes.splice(0)) release();
+  await Promise.all([pendingA, pendingB]);
+  assert.equal(fake.writes.length, 0, "both writes completed");
 });
 
 test("filesystem provider reports watching as unsupported", async () => {

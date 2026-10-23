@@ -35,6 +35,7 @@ import {
 } from "./host-fs.js";
 import { isProjectSkillPath, isUserSkillPath } from "./skill-roots.js";
 import { guardDecision } from "./fs-guard.js";
+import { normalizeFsKey } from "./fs-key.js";
 import { isAbsolute, join, resolve as resolvePath } from "node:path";
 
 export interface FilesystemProvider {
@@ -92,6 +93,35 @@ export interface FilesystemProviderOptions {
   readonly agentsHome?: string;
 }
 
+// Overlapping mutations of one target must not both observe the same version
+// and then both write: each guarded mutation holds a per-target lock across
+// stat → check → write, so a second one sees the version the first left behind.
+// Different targets never wait on each other. The entry is dropped when its
+// chain settles, so the map does not grow with every path the session touched.
+const targetLocks = new Map<string, Promise<void>>();
+
+async function withTargetLock<T>(
+  key: string,
+  run: () => Promise<T>,
+): Promise<T> {
+  const previous = targetLocks.get(key) ?? Promise.resolve();
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  // Queued, not the gate itself: the next caller awaits a promise that settles
+  // only when this mutation has finished, whatever its outcome.
+  const queued = previous.then(() => gate);
+  targetLocks.set(key, queued);
+  await previous;
+  try {
+    return await run();
+  } finally {
+    release();
+    if (targetLocks.get(key) === queued) targetLocks.delete(key);
+  }
+}
+
 export function createFilesystemProvider(
   resolver: WorkspaceResolver,
   options: FilesystemProviderOptions = {},
@@ -114,7 +144,10 @@ export function createFilesystemProvider(
   return {
     resolve: async (path: string, opts?: any) => {
       throwIfAborted(opts?.signal, "resolve");
-      const resolved = resolveGuestPath(path, opts?.cwd);
+      // Collapse the aliases one path can arrive under (a doubled slash, a "."
+      // segment, a trailing slash) before anything keys on it, so a read
+      // through one spelling satisfies the read-before-write guard for another.
+      const resolved = normalizeFsKey(resolveGuestPath(path, opts?.cwd));
       // An explicit container targets that container's guest; the harness's own
       // tools never pass one and keep the session workspace's default.
       const container = typeof opts?.container === "string"
@@ -235,57 +268,66 @@ export function createFilesystemProvider(
     ) => {
       if (isHostTarget(target)) hostRefuse("write", target);
       throwIfAborted(signal, "write");
-      const current = await guestStatResponse(target, signal);
-      if (current.exists && current.isDir) {
-        throw fsError(
-          "FS_NOT_REGULAR_FILE",
-          `cannot write "${target.displayPath}": not a regular file`,
-        );
-      }
-      const currentVersion = current.exists ? guestVersion(current) : undefined;
-      if (expected?.kind === "replaceIfVersion") {
-        // A file that is gone is a new file: creating it destroys nothing, so
-        // this backend creates it (the decision reports that as missing). (The
-        // harness's fs-local reports FS_STALE_VERSION here; a path the session
-        // read and something else removed must stay writable, so the container
-        // tools create it.)
-        if (guardDecision(expected.version, currentVersion) === "stale") {
+      // The stat, the guard, and the write are one critical section: a second
+      // mutation of this path waits here instead of observing the same version
+      // and overwriting this one. Different paths never share the lock.
+      return await withTargetLock(target.targetKey, async () => {
+        const current = await guestStatResponse(target, signal);
+        if (current.exists && current.isDir) {
           throw fsError(
-            "FS_STALE_VERSION",
-            `cannot write "${target.displayPath}": file changed since it was read`,
+            "FS_NOT_REGULAR_FILE",
+            `cannot write "${target.displayPath}": not a regular file`,
           );
         }
-      } else if (expected?.kind === "createIfAbsent" && current.exists) {
-        throw fsError(
-          "FS_NOT_OBSERVED",
-          `cannot overwrite existing "${target.displayPath}" without reading it first`,
+        const currentVersion = current.exists
+          ? guestVersion(current)
+          : undefined;
+        if (expected?.kind === "replaceIfVersion") {
+          // A file that is gone is a new file: creating it destroys nothing, so
+          // this backend creates it (the decision reports that as missing).
+          // (The harness's fs-local reports FS_STALE_VERSION here; a path the
+          // session read and something else removed must stay writable, so the
+          // container tools create it.)
+          if (guardDecision(expected.version, currentVersion) === "stale") {
+            throw fsError(
+              "FS_STALE_VERSION",
+              `cannot write "${target.displayPath}": file changed since it was read`,
+            );
+          }
+        } else if (expected?.kind === "createIfAbsent" && current.exists) {
+          throw fsError(
+            "FS_NOT_OBSERVED",
+            `cannot overwrite existing "${target.displayPath}" without reading it first`,
+          );
+        }
+        // The basis is gated on both sides: an incoming or existing file at or
+        // above the limit yields `before: null` and the consumer falls back to a
+        // whole-file diff, so writing one byte into a huge file does not read the
+        // whole file back just for presentation. Both sides are LF-normalized so
+        // a CRLF overwrite does not read as every line changed.
+        const rawBasis = current.exists &&
+            Buffer.byteLength(content, "utf8") < DIFF_BASIS_MAX_BYTES &&
+            Number(current.size ?? 0) < DIFF_BASIS_MAX_BYTES
+          ? await readDiffBasis(target, signal)
+          : null;
+        const before = rawBasis === null
+          ? null
+          : normalizeLineEndings(rawBasis);
+        await writeGuestFile(
+          target.binding,
+          target.targetKey,
+          content,
+          { create: true, truncate: true },
+          signal,
         );
-      }
-      // The basis is gated on both sides: an incoming or existing file at or
-      // above the limit yields `before: null` and the consumer falls back to a
-      // whole-file diff, so writing one byte into a huge file does not read the
-      // whole file back just for presentation. Both sides are LF-normalized so
-      // a CRLF overwrite does not read as every line changed.
-      const rawBasis = current.exists &&
-          Buffer.byteLength(content, "utf8") < DIFF_BASIS_MAX_BYTES &&
-          Number(current.size ?? 0) < DIFF_BASIS_MAX_BYTES
-        ? await readDiffBasis(target, signal)
-        : null;
-      const before = rawBasis === null ? null : normalizeLineEndings(rawBasis);
-      await writeGuestFile(
-        target.binding,
-        target.targetKey,
-        content,
-        { create: true, truncate: true },
-        signal,
-      );
-      const after = await guestStatResponse(target, signal);
-      return {
-        operation: current.exists ? "update" : "create",
-        version: guestVersion(after),
-        before,
-        after: normalizeLineEndings(content),
-      };
+        const after = await guestStatResponse(target, signal);
+        return {
+          operation: current.exists ? "update" : "create",
+          version: guestVersion(after),
+          before,
+          after: normalizeLineEndings(content),
+        };
+      });
     },
     stat: (target: any, signal?: AbortSignal) =>
       isHostTarget(target)
@@ -351,71 +393,78 @@ export function createFilesystemProvider(
     ) => {
       if (isHostTarget(target)) hostRefuse("edit", target);
       throwIfAborted(signal, "edit");
-      const current = await guestStatResponse(target, signal);
-      const currentVersion = current.exists ? guestVersion(current) : undefined;
-      const decision = guardDecision(expected?.version, currentVersion);
-      if (decision === "missing") {
-        // A file removed after it was read is gone rather than stale; report
-        // the harness's not-found code, the one its read tool also uses.
-        throw fsError(
-          "FS_NOT_FOUND",
-          `cannot edit "${target.displayPath}": not found`,
+      // stat → check → read → write is one critical section, like writeText:
+      // overlapping edits of this path queue here rather than both matching
+      // against the same version.
+      return await withTargetLock(target.targetKey, async () => {
+        const current = await guestStatResponse(target, signal);
+        const currentVersion = current.exists
+          ? guestVersion(current)
+          : undefined;
+        const decision = guardDecision(expected?.version, currentVersion);
+        if (decision === "missing") {
+          // A file removed after it was read is gone rather than stale; report
+          // the harness's not-found code, the one its read tool also uses.
+          throw fsError(
+            "FS_NOT_FOUND",
+            `cannot edit "${target.displayPath}": not found`,
+          );
+        }
+        if (current.isDir) {
+          throw fsError(
+            "FS_NOT_REGULAR_FILE",
+            `cannot edit "${target.displayPath}": not a regular file`,
+          );
+        }
+        if (decision === "stale") {
+          throw fsError(
+            "FS_STALE_VERSION",
+            `cannot edit "${target.displayPath}": file changed since it was read`,
+          );
+        }
+        const raw = await readGuestText(target, signal);
+        const before = normalizeLineEndings(raw);
+        const lineEndings = detectLineEndings(raw);
+        const oldNorm = normalizeLineEndings(
+          typeof edit.oldString === "string" ? edit.oldString : "",
         );
-      }
-      if (current.isDir) {
-        throw fsError(
-          "FS_NOT_REGULAR_FILE",
-          `cannot edit "${target.displayPath}": not a regular file`,
+        if (oldNorm.length === 0) {
+          throw fsError(
+            "FS_EDIT_NOT_FOUND",
+            "old_string must be a non-empty string",
+          );
+        }
+        const newNorm = normalizeLineEndings(
+          typeof edit.newString === "string" ? edit.newString : "",
         );
-      }
-      if (decision === "stale") {
-        throw fsError(
-          "FS_STALE_VERSION",
-          `cannot edit "${target.displayPath}": file changed since it was read`,
+        const occurrences = before.split(oldNorm).length - 1;
+        if (occurrences === 0) {
+          throw fsError(
+            "FS_EDIT_NOT_FOUND",
+            `old_string was not found in "${target.displayPath}"`,
+          );
+        }
+        if (!edit.replaceAll && occurrences > 1) {
+          throw fsError(
+            "FS_AMBIGUOUS_EDIT",
+            `old_string matched ${occurrences} times in "${target.displayPath}"; provide a more specific old_string or set replace_all to true`,
+          );
+        }
+        const after = before.split(oldNorm).join(newNorm);
+        await writeGuestFile(
+          target.binding,
+          target.targetKey,
+          restoreLineEndings(after, lineEndings),
+          { create: true, truncate: true },
+          signal,
         );
-      }
-      const raw = await readGuestText(target, signal);
-      const before = normalizeLineEndings(raw);
-      const lineEndings = detectLineEndings(raw);
-      const oldNorm = normalizeLineEndings(
-        typeof edit.oldString === "string" ? edit.oldString : "",
-      );
-      if (oldNorm.length === 0) {
-        throw fsError(
-          "FS_EDIT_NOT_FOUND",
-          "old_string must be a non-empty string",
-        );
-      }
-      const newNorm = normalizeLineEndings(
-        typeof edit.newString === "string" ? edit.newString : "",
-      );
-      const occurrences = before.split(oldNorm).length - 1;
-      if (occurrences === 0) {
-        throw fsError(
-          "FS_EDIT_NOT_FOUND",
-          `old_string was not found in "${target.displayPath}"`,
-        );
-      }
-      if (!edit.replaceAll && occurrences > 1) {
-        throw fsError(
-          "FS_AMBIGUOUS_EDIT",
-          `old_string matched ${occurrences} times in "${target.displayPath}"; provide a more specific old_string or set replace_all to true`,
-        );
-      }
-      const after = before.split(oldNorm).join(newNorm);
-      await writeGuestFile(
-        target.binding,
-        target.targetKey,
-        restoreLineEndings(after, lineEndings),
-        { create: true, truncate: true },
-        signal,
-      );
-      const afterInfo = await guestStatResponse(target, signal);
-      return {
-        version: guestVersion(afterInfo),
-        before,
-        after,
-      };
+        const afterInfo = await guestStatResponse(target, signal);
+        return {
+          version: guestVersion(afterInfo),
+          before,
+          after,
+        };
+      });
     },
     // Watching would need a watcher inside each workspace's container (inotify
     // in the guest, or host-side polling of every open tree node), and every

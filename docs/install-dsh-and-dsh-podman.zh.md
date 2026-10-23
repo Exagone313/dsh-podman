@@ -16,6 +16,7 @@ SPDX-License-Identifier: MIT
   Podman 容器中运行
 - dsh 中的 dsh-podman 插件，它取代了宿主的文件系统和 shell 访问
 - dsh-podman 编排器，一个与 Podman 集成的独立 Podman 容器
+- dsh-podman gateway，一个用于在 localhost 上发布容器端口的容器
 
 请注意，如果 `~/.dsh` 中已有安装数据，它将被复用。
 
@@ -40,7 +41,7 @@ SPDX-License-Identifier: MIT
 - **dsh-podman 编排器**：接收来自 dsh-podman 插件连接的守护进程，可访问 Podman
   套接字并管理容器和其他资源；它在容器中运行；下文简称 _orchestrator_
 - **dsh-podman gateway**：运行在主机网络上的容器，把 guest pod
-  端口发布到主机回环地址；下文简称 _gateway_
+  端口发布到主机回环地址（localhost）；下文简称 _gateway_
 - **Podman 套接字**：虽然 Podman
   客户端可以在没有守护进程的情况下使用，但仍然可以通过套接字启用管理，这是编排器以仿佛在主机系统上运行的方式工作所必需的
 - **guest 容器**：由 dsh-podman 编排器创建的容器，与 dsh 工作区相关联

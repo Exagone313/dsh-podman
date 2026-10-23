@@ -17,6 +17,8 @@ The goal of this guide is to install:
 - the dsh-podman plugin in dsh, which replaces host filesystem and shell access
 - the dsh-podman orchestrator, a separate Podman container that integrates with
   Podman
+- the dsh-podman gateway, a container used for publishing container ports on
+  localhost
 
 Note that if there is existing installation data at `~/.dsh`, it will be reused.
 
@@ -50,7 +52,7 @@ could be added in the future.
   dsh-podman plugin, has access to the Podman socket and manages containers and
   other resources; it runs in a container; referred to later as _orchestrator_
 - **dsh-podman gateway**: the host-network container that publishes guest pod
-  ports on the host's loopback; referred to later as _gateway_
+  ports on the host's loopback (localhost); referred to later as _gateway_
 - **Podman socket**: while the Podman client can be used without a daemon, it is
   still possible to enable management through a socket, which is required by the
   orchestrator to work as if it were running on the host system

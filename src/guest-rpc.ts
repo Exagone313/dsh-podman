@@ -2,6 +2,7 @@
 //
 // SPDX-License-Identifier: MIT
 
+import { FsError, type FsErrorCode } from "@deepseek-ai/dsh-fs";
 import {
   metadata,
   type WorkspaceBinding,
@@ -115,10 +116,12 @@ export function restoreLineEndings(
     : normalizeLineEndings(content).split("\n").join("\r\n");
 }
 
-export function fsError(code: string, message: string): Error {
-  const error = new Error(message);
-  (error as { code?: string }).code = code;
-  return error;
+// fsError builds the harness's typed filesystem failure, so the tool layer can
+// route on the code and append its own remedy (`remediateFsError` appends the
+// re-read step to FS_STALE_VERSION). A plain Error carrying a code string would
+// be indistinguishable from a transport failure there.
+export function fsError(code: FsErrorCode, message: string): FsError {
+  return new FsError(message, code);
 }
 
 // The harness's FS_ABORTED: a caller that already cancelled must fail before
@@ -261,8 +264,11 @@ export async function* guestTextChunks(
     const tail = decoder.decode();
     if (tail !== "") yield tail;
   } catch (error) {
-    // A fatal TextDecoder failure is a TypeError; anything else (our own
-    // FS_NOT_TEXT/FS_ABORTED, or a transport error) keeps its identity.
+    // An already-typed failure — our own FS_NOT_TEXT/FS_ABORTED, or one a
+    // caller raised — keeps its identity. A fatal TextDecoder failure is a
+    // TypeError, which is the only thing wrapped here (as FS_NOT_TEXT); any
+    // other transport error passes through unchanged, as before.
+    if (error instanceof FsError) throw error;
     if (error instanceof TypeError) {
       throw fsError(
         "FS_NOT_TEXT",
@@ -291,7 +297,7 @@ export async function readDiffBasis(
   try {
     return await readGuestText(target, signal);
   } catch (error) {
-    if ((error as { code?: string }).code === "FS_NOT_TEXT") return null;
+    if (error instanceof FsError && error.code === "FS_NOT_TEXT") return null;
     throw error;
   }
 }

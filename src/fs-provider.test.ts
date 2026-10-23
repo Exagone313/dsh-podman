@@ -4,6 +4,7 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
+import { FsError } from "@deepseek-ai/dsh-fs";
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
@@ -247,6 +248,54 @@ test("filesystem provider writeText reports the harness error codes", async () =
     (error: unknown) =>
       (error as { code?: string }).code === "FS_NOT_REGULAR_FILE",
   );
+});
+
+test("filesystem provider raises typed FsError failures", async () => {
+  // The harness's tool layer only appends its re-read remedy to a real FsError
+  // (`remediateFsError` checks the class), so the guards must not throw a plain
+  // Error carrying a code string.
+  const existing = editProvider(editGuest({}, Buffer.from("hello")));
+  const target = await existing.resolve("/a", { cwd: "/x" });
+  await assert.rejects(
+    () =>
+      existing.writeText(target, "x", {
+        kind: "replaceIfVersion",
+        version: "other",
+      }),
+    (error: unknown) =>
+      error instanceof FsError && error.code === "FS_STALE_VERSION",
+  );
+  await assert.rejects(
+    () =>
+      existing.editText(
+        target,
+        { oldString: "h", newString: "H", replaceAll: false },
+        { version: "other" },
+      ),
+    (error: unknown) =>
+      error instanceof FsError && error.code === "FS_STALE_VERSION",
+  );
+});
+
+test("filesystem provider reports editing a removed file as not found", async () => {
+  // The unguarded edit path stats before writing, so a file removed since the
+  // read is reported as absent rather than stale.
+  const gone = editProvider(editGuest({ exists: false }));
+  const target = await gone.resolve("/a", { cwd: "/x" });
+  for (const expected of [undefined, { version: "agent:1:5:-rw-r--r--" }]) {
+    await assert.rejects(
+      () =>
+        gone.editText(
+          target,
+          { oldString: "a", newString: "b", replaceAll: false },
+          expected,
+        ),
+      (error: unknown) =>
+        error instanceof FsError &&
+        error.code === "FS_NOT_FOUND" &&
+        error.message === 'cannot edit "/a": not found',
+    );
+  }
 });
 
 test("filesystem provider writeText creates a file that was removed", async () => {

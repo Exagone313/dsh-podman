@@ -34,6 +34,7 @@ import {
   isHostTarget,
 } from "./host-fs.js";
 import { isProjectSkillPath, isUserSkillPath } from "./skill-roots.js";
+import { guardDecision } from "./fs-guard.js";
 import { isAbsolute, join, resolve as resolvePath } from "node:path";
 
 export interface FilesystemProvider {
@@ -244,10 +245,11 @@ export function createFilesystemProvider(
       const currentVersion = current.exists ? guestVersion(current) : undefined;
       if (expected?.kind === "replaceIfVersion") {
         // A file that is gone is a new file: creating it destroys nothing, so
-        // this backend creates it. (The harness's fs-local reports
-        // FS_STALE_VERSION here; a path the session read and something else
-        // removed must stay writable, so the container tools create it.)
-        if (current.exists && currentVersion !== expected.version) {
+        // this backend creates it (the decision reports that as missing). (The
+        // harness's fs-local reports FS_STALE_VERSION here; a path the session
+        // read and something else removed must stay writable, so the container
+        // tools create it.)
+        if (guardDecision(expected.version, currentVersion) === "stale") {
           throw fsError(
             "FS_STALE_VERSION",
             `cannot write "${target.displayPath}": file changed since it was read`,
@@ -350,10 +352,14 @@ export function createFilesystemProvider(
       if (isHostTarget(target)) hostRefuse("edit", target);
       throwIfAborted(signal, "edit");
       const current = await guestStatResponse(target, signal);
-      if (!current.exists) {
+      const currentVersion = current.exists ? guestVersion(current) : undefined;
+      const decision = guardDecision(expected?.version, currentVersion);
+      if (decision === "missing") {
+        // A file removed after it was read is gone rather than stale; report
+        // the harness's not-found code, the one its read tool also uses.
         throw fsError(
-          "FS_STALE_VERSION",
-          `cannot edit "${target.displayPath}": file changed since it was read`,
+          "FS_NOT_FOUND",
+          `cannot edit "${target.displayPath}": not found`,
         );
       }
       if (current.isDir) {
@@ -362,10 +368,7 @@ export function createFilesystemProvider(
           `cannot edit "${target.displayPath}": not a regular file`,
         );
       }
-      if (
-        expected !== undefined &&
-        guestVersion(current) !== expected.version
-      ) {
+      if (decision === "stale") {
         throw fsError(
           "FS_STALE_VERSION",
           `cannot edit "${target.displayPath}": file changed since it was read`,

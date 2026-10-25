@@ -30,7 +30,7 @@ PROTO_SOURCES := $(shell find proto -type f -name '*.proto' -print)
 NODE_MODULES_TSC := node_modules/.bin/tsc
 # Go sources the project owns; third_party/ is an upstream replacement module
 # (the replace directive in go.mod) and is left exactly as published.
-GOFMT_SOURCES := $(shell find cmd internal scripts -type f -name '*.go' -print)
+GOFMT_SOURCES := $(shell find cmd internal -type f -name '*.go' -print)
 # Quoted so dprint expands the globs, not the shell. dprint.json pins the width,
 # the wrapped-prose policy and the plugin versions, which keeps the existing
 # TypeScript and Markdown untouched.
@@ -112,8 +112,8 @@ image-dsh:
 # third-party-licenses.pkg combines the project license with the licenses and notices of
 # every third-party Go module; it is generated, gitignored, and baked into the
 # orchestrator and guest-agent images.
-third-party-licenses.pkg: scripts/download-licenses/main.go go.mod go.sum
-	go run ./scripts/download-licenses
+third-party-licenses.pkg: go.mod go.sum
+	$(GO) tool go-download-licenses -l LICENSE -o $@
 
 download-licenses: third-party-licenses.pkg
 

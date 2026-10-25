@@ -53,9 +53,9 @@ make image          # image-go + the dsh container image
 ```
 
 `make image` depends on `third-party-licenses.pkg`: the `download-licenses`
-target runs the Go collector in `scripts/download-licenses`, which shells out to
-`go-licenses save` and gathers the project's MIT license plus every third-party
-Go license and Apache `NOTICE` into `third-party-licenses.pkg`. That file is
+target runs the `go-download-licenses` tool pinned by the `tool` directive in
+`go.mod`, which gathers the project's MIT license plus every third-party Go
+license and Apache `NOTICE` into `third-party-licenses.pkg`. That file is
 gitignored (never committed) and is baked into the orchestrator and guest-agent
 images at `/usr/share/licenses/dsh-podman/LICENSE`; because workspace containers
 mount the guest-agent image, it also rides along into every workspace container.

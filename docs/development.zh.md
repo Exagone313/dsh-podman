@@ -51,9 +51,9 @@ make image-go       # build the Go container images (orchestrator, guest-agent, 
 make image          # image-go + the dsh container image
 ```
 
-`make image` 依赖 `third-party-licenses.pkg`：`download-licenses` 目标会运行
-`scripts/download-licenses` 中的 Go 收集器，它调用 `go-licenses save` 并将项目的
-MIT 许可证以及所有第三方 Go 许可证和 Apache `NOTICE` 汇总到
+`make image` 依赖 `third-party-licenses.pkg`：`download-licenses` 目标会运行由
+`go.mod` 的 `tool` 指令固定的 `go-download-licenses` 工具，它会将项目的 MIT
+许可证以及所有第三方 Go 许可证和 Apache `NOTICE` 汇总到
 `third-party-licenses.pkg` 中。该文件被 gitignore （从不提交），并被烘焙进
 orchestrator 和 guest-agent 镜像，位于
 `/usr/share/licenses/dsh-podman/LICENSE`；由于工作区容器会挂载 guest-agent

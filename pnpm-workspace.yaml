@@ -21,3 +21,5 @@ minimumReleaseAgeExclude:
 overrides:
 # GHSA-mrhx-c7xc-m3w5
   zod: ^4.6.6
+# GHSA-xjj6-f33q-929c
+  undici: ^8.12.2

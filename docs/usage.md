@@ -506,6 +506,13 @@ which the destination path is derived: the project's path mirrored under the
 projects root, previewed in a read-only field, since a project mount never takes
 a destination of its own.
 
+A project path typed in the Add-mount dialog rather than picked with **Browse…**
+is checked against the projects root on the dsh host when the mount is added: an
+inline error refuses an absolute path, one that climbs out of the root with
+`..`, and one that names no existing directory. In the list a project mount's
+path is fixed, shown with the read-only lock, so it is chosen when the mount is
+added.
+
 When a container is being created or added, each project or volume mount's mode
 is a dropdown (read-only/read-write), so the workspace project mount can be
 created read-only in one step, while secret and tmpfs mounts carry no mode

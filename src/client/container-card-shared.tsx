@@ -29,6 +29,7 @@ import {
 import {
   MOUNT_ACTIONS_CLASS,
   MOUNT_DESTINATION_CLASS,
+  MOUNT_ERROR_CLASS,
   MOUNT_FIELD_CLASS,
   MOUNT_KIND_CLASS,
   MOUNT_KIND_VALUE_CLASS,
@@ -632,15 +633,19 @@ function MountSourceControl(props: {
   volumes: readonly { name: string }[];
   secrets: readonly { name: string }[];
   disabled: boolean;
-  // The reason a project path is stated rather than offered: the mount it
-  // belongs to is the default container's main project mount, which cannot be
-  // removed. Absent on every other mount, whose path stays editable.
-  projectReadOnlyReason?: string;
+  // Whether the project path is fixed to its current value: it renders on the
+  // read-only field's surface, led by the lock glyph, and cannot be typed into.
+  // Only the project branch honours it — a volume or secret picker is never
+  // locked — and it carries no tooltip: the tint and the lock state the fact.
+  // The mounts list rows set it; the Add-mount popup leaves it unset, so a path
+  // is still typed there.
+  projectPathLocked?: boolean;
   onProject: (project: string) => void;
   onVolume: (volume: string) => void;
   onSecret: (secret: string) => void;
 }): ReactNode {
   const { t, id, kind, disabled } = props;
+  const projectLocked = props.projectPathLocked === true;
   const normalized = normalizeMountKind(kind);
   if (normalized === "volume") {
     // A volume the snapshot no longer lists stays selectable rather than being
@@ -693,18 +698,12 @@ function MountSourceControl(props: {
   return (
     <Input
       id={id}
-      className={props.projectReadOnlyReason === undefined
-        ? SLOT_CLASS
-        : `${SLOT_CLASS} ${FIELD_CLASS}`}
-      icon={props.projectReadOnlyReason === undefined
-        ? undefined
-        : <LockGlyph />}
+      className={projectLocked ? `${SLOT_CLASS} ${FIELD_CLASS}` : SLOT_CLASS}
+      icon={projectLocked ? <LockGlyph /> : undefined}
       value={props.project}
-      // The path of a mount that cannot be removed cannot be typed into either:
-      // it stays readable and selectable, on the fixed value's own surface, with
-      // the reason as its tooltip.
-      readOnly={props.projectReadOnlyReason !== undefined}
-      title={props.projectReadOnlyReason}
+      // A locked path stays readable, selectable and copyable: readOnly rather
+      // than disabled, so its text can be selected and copied out.
+      readOnly={projectLocked}
       disabled={disabled}
       onChange={(event) => props.onProject(event.target.value)}
     />
@@ -738,11 +737,15 @@ export function MountRow(props: {
   // The row's own Remove, which an editor passes and the block omits. Removing
   // a mount from a live container is gated behind that confirmation, and a
   // mount that cannot be removed keeps its Remove in place, greyed out and
-  // disabled, with the reason as its tooltip. The same reason states that
-  // mount's project path, which renders read-only.
+  // disabled, with the reason as its tooltip — that button is the only control
+  // that carries the reason.
   onRemove?: () => void;
   confirmRemove?: boolean;
   removeDisabledReason?: string;
+  // Whether the project path is shown as a fixed value. The mounts list rows
+  // set it, so a path is chosen in the Add-mount popup (typed or browsed) and
+  // not retyped in the list; the popup omits it and keeps its field editable.
+  projectPathLocked?: boolean;
 }): ReactNode {
   const {
     t,
@@ -759,6 +762,7 @@ export function MountRow(props: {
     onRemove,
     confirmRemove,
     removeDisabledReason,
+    projectPathLocked,
   } = props;
   const disabledField = disabled === true;
   const update = (patch: Partial<MountInput>): void => onUpdate?.(patch);
@@ -809,7 +813,7 @@ export function MountRow(props: {
           below={browseError === undefined || browseError === ""
             ? undefined
             : (
-              <p style={{ margin: 0, fontSize: "13px" }} role="alert">
+              <p className={MOUNT_ERROR_CLASS} role="alert">
                 {browseError}
               </p>
             )}
@@ -824,7 +828,7 @@ export function MountRow(props: {
             volumes={volumes ?? []}
             secrets={secrets ?? []}
             disabled={disabledField}
-            projectReadOnlyReason={removeDisabledReason}
+            projectPathLocked={projectPathLocked}
             onProject={(project) => update({ project })}
             onVolume={(volume) => update({ volume })}
             onSecret={(secret) => update({ secret })}
@@ -833,12 +837,7 @@ export function MountRow(props: {
             <Button
               variant="outline"
               size="sm"
-              // The path that cannot be typed into cannot be browsed to either:
-              // the Browse stays in place, greyed out and disabled, with the
-              // reason as its tooltip.
-              disabled={disabledField || removeDisabledReason !== undefined}
-              title={removeDisabledReason}
-              aria-label={removeDisabledReason}
+              disabled={disabledField}
               onClick={onBrowse}
             >
               {t("browse")}

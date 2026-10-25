@@ -7,6 +7,7 @@ import assert from "node:assert/strict";
 import {
   confineToRoot,
   crumbLabel,
+  decideProjectPath,
   hostPathForProjectName,
   parentDirectory,
   projectNameFromHostPath,
@@ -47,6 +48,89 @@ test("hostPathForProjectName is the inverse", () => {
   );
   assert.equal(hostPathForProjectName("/projects", ""), "/projects");
   assert.equal(hostPathForProjectName("/projects", "/web"), "/projects/web");
+});
+
+test("decideProjectPath accepts a typed project the host reports", () => {
+  assert.deepEqual(
+    decideProjectPath({
+      origin: "typed",
+      project: "web",
+      directoryExists: true,
+    }),
+    { ok: true, project: "web" },
+  );
+  // A "." inside the root is resolved like the other helpers resolve it.
+  assert.deepEqual(
+    decideProjectPath({
+      origin: "typed",
+      project: "group/../web",
+      directoryExists: true,
+    }),
+    { ok: true, project: "web" },
+  );
+});
+
+test("decideProjectPath refuses a typed project the host does not list", () => {
+  assert.deepEqual(
+    decideProjectPath({
+      origin: "typed",
+      project: "web",
+      directoryExists: false,
+    }),
+    { ok: false, reason: "missing" },
+  );
+});
+
+test("decideProjectPath refuses an absolute typed path", () => {
+  assert.deepEqual(
+    decideProjectPath({
+      origin: "typed",
+      project: "/projects/web",
+      directoryExists: true,
+    }),
+    { ok: false, reason: "absolute" },
+  );
+});
+
+test("decideProjectPath refuses a typed path that escapes the root", () => {
+  assert.deepEqual(
+    decideProjectPath({
+      origin: "typed",
+      project: "../etc",
+      directoryExists: true,
+    }),
+    { ok: false, reason: "escapesRoot" },
+  );
+  assert.deepEqual(
+    decideProjectPath({
+      origin: "typed",
+      project: "a/../../etc",
+      directoryExists: true,
+    }),
+    { ok: false, reason: "escapesRoot" },
+  );
+});
+
+test("decideProjectPath refuses an empty typed path", () => {
+  assert.deepEqual(
+    decideProjectPath({
+      origin: "typed",
+      project: "  ",
+      directoryExists: true,
+    }),
+    { ok: false, reason: "empty" },
+  );
+});
+
+test("decideProjectPath trusts a browsed project and skips the check", () => {
+  assert.deepEqual(
+    decideProjectPath({
+      origin: "browsed",
+      project: "web",
+      directoryExists: false,
+    }),
+    { ok: true, project: "web" },
+  );
 });
 
 test("confineToRoot clamps a directory to the projects root", () => {

@@ -62,6 +62,12 @@ export const MOUNT_DESTINATION_CLASS = "dsh-podman-mount-destination";
 // control beside a field.
 export const MOUNT_ACTIONS_CLASS = "dsh-podman-mount-actions";
 
+// The class on a mount row's error line under its source field: a typed project
+// path the host refused, or a browse outside the projects root. It sets the
+// line's typography and the error state's colour, so a refused path reads as the
+// failure it is in both themes.
+export const MOUNT_ERROR_CLASS = "dsh-podman-mount-error";
+
 // The class on a group that lists shared rows: a container block's field group,
 // and the editor that changes the same list. The marker is what a list needs —
 // its rows already carry the mount row class wherever they render — for the
@@ -129,6 +135,14 @@ export const TABLE_STYLES = `
 }
 .dsh-podman-mount-row {
   container-type: inline-size;
+}
+/* A mount row's error line sits under the value it belongs to, at the value's
+   size, in the error state's colour: the words name the failure and the colour
+   repeats it, so it reads in either theme. */
+.dsh-podman-mount-error {
+  margin: 0;
+  font-size: 13px;
+  color: var(--dsw-alias-state-error-primary);
 }
 /* One labelled field of a mount row shares the line while there is room; the
    container query below gives it a line of its own on a narrow row. */

@@ -18,6 +18,51 @@ export function projectNameFromHostPath(
   return target.slice(root.length + 1);
 }
 
+// ProjectPathOrigin is where a project mount's path came from: typed into the
+// field, or chosen through the dsh host's directory browser. A browsed value is
+// already a directory the browser listed under the projects root, so it needs
+// no further shape or existence check.
+export type ProjectPathOrigin = "typed" | "browsed";
+
+// ProjectPathRejection is why a typed project path is refused: it is empty, it
+// is absolute, a ".." would climb above the projects root, or the host reports
+// no directory there.
+export type ProjectPathRejection =
+  | "empty"
+  | "absolute"
+  | "escapesRoot"
+  | "missing";
+
+// ProjectPathDecision is the outcome of checking a project mount's path: the
+// project to add, or the reason the add is refused.
+export type ProjectPathDecision =
+  | { readonly ok: true; readonly project: string }
+  | { readonly ok: false; readonly reason: ProjectPathRejection };
+
+// decideProjectPath accepts or refuses a project mount path from its origin,
+// its shape and whether the host reports the directory. It is pure: the caller
+// lists hostPathForProjectName(projectsRoot, project) through the dsh host's
+// directory picker and passes that result as `directoryExists`. A typed value
+// is checked for the same shape the other helpers accept — no absolute path,
+// no ".." above the root — and is normalized once accepted, so the project
+// stored is the one the host path names. A browsed value skips every check:
+// the browser can only yield a directory inside the root it listed.
+export function decideProjectPath(check: {
+  origin: ProjectPathOrigin;
+  project: string;
+  directoryExists: boolean;
+}): ProjectPathDecision {
+  const project = String(check.project ?? "");
+  if (check.origin === "browsed") return { ok: true, project };
+  if (project.trim() === "") return { ok: false, reason: "empty" };
+  if (project.startsWith("/")) return { ok: false, reason: "absolute" };
+  const name = normalizeProjectPath(project);
+  if (name === undefined) return { ok: false, reason: "escapesRoot" };
+  if (name === "") return { ok: false, reason: "empty" };
+  if (!check.directoryExists) return { ok: false, reason: "missing" };
+  return { ok: true, project: name };
+}
+
 // hostPathForProjectName is the inverse: the absolute directory a project path
 // names under the projects root, used to open a directory browser where the
 // field's current value lives. A value that climbs above the root with ".."

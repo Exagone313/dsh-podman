@@ -207,6 +207,8 @@ export type ContainerPluginKey =
   | "browseHidden"
   | "browseTruncated"
   | "browseOutsideRoot"
+  | "mountProjectPathInvalid"
+  | "mountProjectPathMissing"
   | "mountDestination"
   | "pathsTitle"
   | "path"
@@ -570,6 +572,9 @@ export const en: Record<ContainerPluginKey, string> = {
   browseHidden: "Show hidden",
   browseTruncated: "Too many folders to list; only the beginning is shown.",
   browseOutsideRoot: "Choose a directory inside the projects root.",
+  mountProjectPathInvalid:
+    "Enter a project path inside the projects root, relative to it.",
+  mountProjectPathMissing: "No project directory exists at this path.",
   mountDestination: "Destination",
   pathsTitle: "PATH variable additions",
   path: "Path",
@@ -913,6 +918,8 @@ export const zh: Record<ContainerPluginKey, string> = {
   browseHidden: "显示隐藏项",
   browseTruncated: "文件夹过多，仅显示开头部分。",
   browseOutsideRoot: "请选择项目根目录内的目录。",
+  mountProjectPathInvalid: "请输入项目根目录内的相对项目路径。",
+  mountProjectPathMissing: "此路径下没有项目目录。",
   mountDestination: "目标路径",
   pathsTitle: "PATH 变量附加项",
   path: "路径",

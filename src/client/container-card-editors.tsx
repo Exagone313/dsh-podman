@@ -24,12 +24,15 @@ import {
   firstDuplicateEnvName,
 } from "../env-rows.js";
 import {
+  decideProjectPath,
   hostPathForProjectName,
   projectNameFromHostPath,
+  type ProjectPathOrigin,
+  type ProjectPathRejection,
 } from "../project-path.js";
 import type { Translate, Translation } from "./locales.js";
 import { Button, Modal } from "@deepseek-ai/dsh-client-ui-primitives";
-import { type ReactNode, useEffect, useMemo, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 
 export function EnvEditor(props: {
   t: Translate;
@@ -156,6 +159,33 @@ function mountDestination(mount: MountInput, projectsRoot: string): string {
     : hostPathForProjectName(projectsRoot, mount.project);
 }
 
+// The inline error a refused typed project path raises. The path's shape and
+// its existence are different mistakes, so they get different wording.
+function projectPathError(t: Translate, reason: ProjectPathRejection): string {
+  return t(
+    reason === "missing"
+      ? "mountProjectPathMissing"
+      : "mountProjectPathInvalid",
+  );
+}
+
+// projectDirectoryExists asks the dsh host's own directory picker whether
+// projectsRoot/<project> is an existing directory. It is the service Browse
+// lists through — host filesystem access, never the container, the pod, the
+// guest agent or the orchestrator.
+async function projectDirectoryExists(
+  picker: DirectoryPickerFace,
+  projectsRoot: string,
+  project: string,
+): Promise<boolean> {
+  try {
+    await picker.list(hostPathForProjectName(projectsRoot, project));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export function MountsEditor(props: {
   t: Translate;
   mounts: readonly MountInput[];
@@ -201,19 +231,37 @@ export function MountsEditor(props: {
   const [browseError, setBrowseError] = useState("");
   const [confirmClose, setConfirmClose] = useState(false);
   const [draft, setDraft] = useState<MountInput>(emptyMount());
+  // Where the draft's project path came from: typing it arms the host check on
+  // submit, while a Browse pick skips it.
+  const [projectOrigin, setProjectOrigin] = useState<ProjectPathOrigin>(
+    "typed",
+  );
+  // Whether the host check a submit started is still running, and a token that
+  // invalidates its result once the popup closes or another submit starts.
+  const [checking, setChecking] = useState(false);
+  const checkToken = useRef(0);
   const updateDraft = (patch: Partial<MountInput>): void => {
+    if (patch.project !== undefined) {
+      setProjectOrigin("typed");
+      setBrowseError("");
+    }
     setDraft((prev) => ({ ...prev, ...patch }));
   };
   // Picking a kind is not an edit; anything typed into the pristine kind's
   // fields is, and closing then would lose it.
   const dirty = !mountInputsEqual(draft, emptyMount(draft.kind));
+  const closeAdd = (): void => {
+    checkToken.current += 1;
+    setChecking(false);
+    setAdding(false);
+  };
   const requestClose = (): void => {
     if (dirty) setConfirmClose(true);
-    else setAdding(false);
+    else closeAdd();
   };
   const discardAndClose = (): void => {
     setConfirmClose(false);
-    setAdding(false);
+    closeAdd();
   };
   const canAdd = draft.kind === "project"
     ? draft.project.trim() !== ""
@@ -223,15 +271,68 @@ export function MountsEditor(props: {
     ? draft.secret !== ""
     : true;
   const openAdd = (): void => {
+    checkToken.current += 1;
     setDraft(emptyMount());
+    setProjectOrigin("typed");
+    setChecking(false);
     setBrowseError("");
     setConfirmClose(false);
     setAdding(true);
   };
-  const submit = (): void => {
-    if (!canAdd) return;
-    onAdd(draft);
-    setAdding(false);
+  // A typed project path is checked against the host on submit: a value chosen
+  // through Browse already names a listed directory and skips the check, and a
+  // deployment without a directory picker cannot check one, so the orchestrator
+  // still enforces it at apply time. The check never reaches the container, the
+  // pod, the guest agent or the orchestrator.
+  const submit = async (): Promise<void> => {
+    if (!canAdd || checking) return;
+    const token = ++checkToken.current;
+    setChecking(true);
+    try {
+      // Only a project mount carries a path to check; the other kinds are
+      // added as they are.
+      let mount = draft;
+      if (draft.kind === "project") {
+        let decision = decideProjectPath({
+          origin: projectOrigin,
+          project: draft.project,
+          directoryExists: true,
+        });
+        if (!decision.ok) {
+          setBrowseError(projectPathError(t, decision.reason));
+          return;
+        }
+        if (projectOrigin === "typed" && directoryPicker !== undefined) {
+          const directoryExists = await projectDirectoryExists(
+            directoryPicker,
+            projectsRoot,
+            draft.project,
+          );
+          // The popup closed or another submit started while the host listed
+          // the directory: this result no longer belongs to the draft on
+          // screen.
+          if (token !== checkToken.current) return;
+          decision = decideProjectPath({
+            origin: projectOrigin,
+            project: draft.project,
+            directoryExists,
+          });
+        }
+        if (!decision.ok) {
+          setBrowseError(projectPathError(t, decision.reason));
+          return;
+        }
+        mount = decision.project === draft.project
+          ? draft
+          : { ...draft, project: decision.project };
+      }
+      setBrowseError("");
+      onAdd(mount);
+      closeAdd();
+    } finally {
+      // A stale submit must not clear the state of the one that replaced it.
+      if (token === checkToken.current) setChecking(false);
+    }
   };
   // The destination a project mount lands at: its project path mirrored under
   // the projects root, which the host computes and the editor previews. The
@@ -269,6 +370,7 @@ export function MountsEditor(props: {
             removeDisabledReason={removable
               ? undefined
               : t("defaultMountNotRemovable")}
+            projectPathLocked
           />
         );
       })}
@@ -299,8 +401,8 @@ export function MountsEditor(props: {
             <Button
               variant="primary"
               size="sm"
-              disabled={busy || !canAdd}
-              onClick={submit}
+              disabled={busy || !canAdd || checking}
+              onClick={() => void submit()}
             >
               {t("addMount")}
             </Button>
@@ -318,9 +420,13 @@ export function MountsEditor(props: {
             <select
               style={imageSelect}
               value={draft.kind}
-              disabled={busy}
+              disabled={busy || checking}
               aria-label={t("mountKind")}
-              onChange={(event) => setDraft(emptyMount(event.target.value))}
+              onChange={(event) => {
+                setDraft(emptyMount(event.target.value));
+                setProjectOrigin("typed");
+                setBrowseError("");
+              }}
             >
               <option value="project">{t("mountProject")}</option>
               <option value="tmpfs">{t("mountTmpfs")}</option>
@@ -328,7 +434,7 @@ export function MountsEditor(props: {
               <option value="secret">{t("mountSecret")}</option>
             </select>
           }
-          disabled={busy}
+          disabled={busy || checking}
           volumes={volumes}
           secrets={secrets}
           onUpdate={updateDraft}
@@ -358,7 +464,8 @@ export function MountsEditor(props: {
               setBrowseError(t("browseOutsideRoot"));
               return;
             }
-            updateDraft({ project });
+            setDraft((previous) => ({ ...previous, project }));
+            setProjectOrigin("browsed");
             setBrowseError("");
             setBrowsing(false);
           }}

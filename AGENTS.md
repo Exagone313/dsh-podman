@@ -43,6 +43,31 @@ it. TypeScript is linted with `oxlint`, configured by `.oxlintrc.json` and
 pinned in `devDependencies`: run `make lint-ts`, which the `js` CI job also
 runs.
 
+## Working with the maintainer
+
+- **End every reply with the rebuild and restart instructions.** State which
+  images to rebuild, whether the plugin needs repacking, and which containers to
+  restart, or say plainly that nothing is needed. Never leave it to be inferred,
+  and never answer "same as before" without restating it.
+- **A plugin change never needs an image rebuild.** The plugin is installed as a
+  packed bundle and loaded from it when dsh starts, so build and pack it,
+  install it, and restart dsh — no image, orchestrator, guest-agent or gateway
+  work.
+- **Never say a report was already given.** If something is worth mentioning
+  twice, write the summary out in full again.
+- **Never push.** The maintainer pushes; commit locally only.
+- **Never rewrite published history.** Amend or rebase only commits that are
+  demonstrably unpublished, checking remote refs rather than assuming.
+- **Never run `npm pack`** outside a throwaway directory the maintainer asked
+  for.
+- **Ground plans in the code.** Read the files before proposing a plan; do not
+  hand one over that has checked nothing.
+- **Do not run two agents against the same files.** Work sequentially when the
+  same repository is involved.
+- **Container, image and browser behaviour is verified by the maintainer.** This
+  environment has no podman and no browser; say what could not be exercised
+  rather than implying it was.
+
 ## Conventions
 
 - Commit after each change, in small focused commits (one per logical change),

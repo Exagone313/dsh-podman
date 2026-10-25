@@ -25,7 +25,13 @@
   "markdown": {
     "textWrap": "always"
   },
-  "includes": ["**/*.md", "src/**/*.ts", "src/**/*.tsx", "scripts/**/*.mjs"],
+  "includes": [
+    "**/*.md",
+    ".agents/**/*.md",
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "scripts/**/*.mjs"
+  ],
   "excludes": ["bin", "dist", "node_modules", "third_party"],
   "plugins": [
     "https://plugins.dprint.dev/typescript-0.96.1.wasm",

@@ -35,7 +35,7 @@ GOFMT_SOURCES := $(shell find cmd internal scripts -type f -name '*.go' -print)
 # the wrapped-prose policy and the plugin versions, which keeps the existing
 # TypeScript and Markdown untouched.
 TS_SOURCES = "src/**/*.ts" "src/**/*.tsx" "scripts/**/*.mjs"
-MD_SOURCES = "**/*.md"
+MD_SOURCES = "**/*.md" ".agents/**/*.md"
 
 .PHONY: all build build-go vet test test-go fmt fmt-go fmt-ts fmt-md fmt-check fmt-check-go fmt-check-ts fmt-check-md lint lint-ts image image-go image-orchestrator image-guestagent image-gateway image-dsh download-licenses pnpm-install pnpm-build pnpm-test pnpm-prune clean proto proto-check
 

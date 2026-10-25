@@ -4,12 +4,6 @@ description: Draft the release notes for an upcoming dsh-podman release — user
 whenToUse: Use when preparing a release, to summarize the user-facing changes since the previous tag, get the summary approved, and create the version bump commit and tag with those notes.
 ---
 
-<!--
-SPDX-FileCopyrightText: 2026 Elouan Martinet <exa@elou.world>
-
-SPDX-License-Identifier: MIT
--->
-
 # Release notes
 
 Write the release notes from the commits since the previous tag, keep the

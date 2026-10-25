@@ -264,21 +264,32 @@ zizmor）、`ci-code.yml`（Go、JS、镜像、Trivy）、`ci-docs.yml`（dprint
    发布以及任何带连字符的标签都属于预发布：只打版本标签。
 3. 将插件发布到 **npm**（`@exagone313/dsh-podman`），附带来源证明； 预发布在
    `next` dist-tag 下发布。
-4. 创建带有自动生成说明的 **GitHub release**，并附上 二进制文件和 npm tarball。
+4. 创建 **GitHub release**。附注标签以其标签信息作为说明；轻量标签则回退到自动
+   生成的说明。不会附加任何文件：二进制文件随镜像发布，插件发布在 npm 上。
 
-标签必须与 `package.json`
-中的版本一致——否则工作流会失败——因此请用版本脚本同时更新两者：
+标签必须与 `package.json` 中的版本一致——否则工作流会失败——因此请先用
+`release-notes` skill 准备发布，再用版本脚本更新两者。该 skill
+（`.agents/skills/release-notes/SKILL.md`）会根据上一个标签以来的提交起草说明——新
+功能、行为变更、用户可见的修复，以及依赖或版本更新——交由维护者批准，随后把批准的
+Markdown 传给版本脚本：
 
 ```sh
-pnpm bump-version x.y.z            # 加上 --dry-run 则仅校验
+# 用 release-notes skill 起草并批准说明后：
+pnpm bump-version x.y.z --notes "<批准的说明>"  # --notes - 从标准输入读取
 git push origin master x.y.z
 ```
+
+标签信息会成为 GitHub release 的说明。省略 `--notes` 会保留原有行为——单行
+`chore: bump version to X` 提交和轻量标签——因此 release
+会回退到自动生成的说明。加上 `--dry-run` 可只校验版本与说明，不做任何改动。
 
 `scripts/bump-version.mjs` 会检查版本是否为递增的 Semver
 正式版或预发布版，将其写入 `package.json`，提交
 `chore: bump version to X`，并创建标签；它不会推送，且要求处于 `master`
-分支且工作区干净。标签同时也是构建出的插件与二进制文件所报告的版本，因为
-`scripts/generate-version.mjs` 从 `git describe --tags`
+分支且工作区干净。使用 `--notes` 时，提交正文和附注标签信息都会带上批准的说明；
+`--notes -`
+从标准输入读取，空正文会被拒绝。标签同时也是构建出的插件与二进制文件所
+报告的版本，因为 `scripts/generate-version.mjs` 从 `git describe --tags`
 推导嵌入的版本。预发布版（`1.0.0-rc.1`）也用同样的方式递增。
 
 也可以在 Actions 页面通过 `workflow_dispatch`

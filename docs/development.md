@@ -288,21 +288,34 @@ pre-releases like `1.0.0-rc.1` also work). The release workflow
    the version tag only.
 3. Publishes the plugin to **npm** (`@exagone313/dsh-podman`) with provenance;
    pre-releases are published under the `next` dist-tag.
-4. Creates a **GitHub release** with auto-generated notes and attaches the
-   binaries and the npm tarball.
+4. Creates a **GitHub release**. An annotated tag supplies its description from
+   the tag message; a lightweight tag falls back to auto-generated notes. No
+   files are attached: the binaries ship in the images, and the plugin on npm.
 
 The tag must match `package.json`'s version — the workflow fails otherwise — so
-bump both with the version script:
+prepare the release with the `release-notes` skill and bump with the version
+script. The skill (`.agents/skills/release-notes/SKILL.md`) drafts the notes
+from the commits since the previous tag — new features, behaviour changes,
+user-visible fixes, and dependency or version updates — has the maintainer
+approve them, and then the approved Markdown is passed to the bump script:
 
 ```sh
-pnpm bump-version x.y.z            # add --dry-run to validate only
+# after the release-notes skill produced an approved list:
+pnpm bump-version x.y.z --notes "<approved notes>"  # --notes - reads stdin
 git push origin master x.y.z
 ```
+
+The tag message becomes the GitHub release description. Omitting `--notes` keeps
+the previous behaviour — a single-line `chore: bump version to X` commit and a
+lightweight tag — so the release falls back to auto-generated notes. Add
+`--dry-run` to validate the version and notes without changing anything.
 
 `scripts/bump-version.mjs` checks that the version is a semver release or
 pre-release that increases the current one, writes it to `package.json`, commits
 `chore: bump version to X`, and creates the tag; it pushes nothing, and it
-requires the `master` branch with a clean working tree. The tag is also what the
+requires the `master` branch with a clean working tree. With `--notes`, the
+commit body and the annotated tag message carry the approved notes; `--notes -`
+reads them from stdin, and an empty body is rejected. The tag is also what the
 built plugin and binaries report, since `scripts/generate-version.mjs` derives
 the embedded version from `git describe --tags`. Pre-releases (`1.0.0-rc.1`) are
 bumped the same way.

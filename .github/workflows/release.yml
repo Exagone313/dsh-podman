@@ -221,7 +221,16 @@ jobs:
             echo "release $VERSION already exists; skipping"
             exit 0
           fi
-          args=(--generate-notes)
+          # An annotated tag carries the release notes drafted and approved
+          # with the release-notes skill; a lightweight tag falls back to
+          # GitHub's generated notes.
+          tag_type="$(git cat-file -t "$VERSION" 2>/dev/null || true)"
+          args=()
+          if [[ "$tag_type" == "tag" ]]; then
+            args+=(--notes-from-tag)
+          else
+            args+=(--generate-notes)
+          fi
           if [[ "$VERSION" == *-* ]]; then args+=(--prerelease); fi
           gh release create "$VERSION" "${args[@]}"
         env:

@@ -5,23 +5,64 @@
 // Bump the npm version in package.json, commit it, and tag it. The version must
 // be a semver release (x.y.z) or prerelease (x.y.z-<prerelease>). The new
 // version must be greater than the current one, except between pre-releases
-// (both the current and new versions carry a pre-release suffix). A real bump
-// requires a clean working tree and the master branch. Pass --dry-run to only
-// validate the version without changing anything. Nothing is pushed.
+// (both the current and new versions carry a pre-release suffix).
+//
+// Pass --notes <text> (or --notes - to read the body from stdin) to attach
+// release notes: the bump commit gains a body and the tag becomes annotated,
+// which is what the release workflow turns into the GitHub release description.
+// Without notes, the commit stays a single line and the tag stays lightweight.
+//
+// A real bump requires a clean working tree and the master branch. Pass
+// --dry-run to only validate the version and notes without changing anything.
+// Nothing is pushed.
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 
 const raw = process.argv.slice(2);
 // npm eats a bare `--dry-run` and forwards only the rest, but sets
 // npm_config_dry_run=true for the script; detect both.
-const dryRun = raw.includes("--dry-run") ||
-  process.env.npm_config_dry_run === "true";
+let dryRun = process.env.npm_config_dry_run === "true";
 const args = raw.filter((arg) => arg !== "--");
-const version = args.find((arg) => !arg.startsWith("-"));
-const extra = args.filter((arg) => !arg.startsWith("-") && arg !== version);
-if (version === undefined || extra.length > 0) {
-  console.error("usage: bump-version.mjs [--dry-run] <version>");
+let notes;
+let version;
+
+function usage(problem) {
+  if (problem !== undefined) console.error(`error: ${problem}`);
+  console.error(
+    "usage: bump-version.mjs [--dry-run] <version> [--notes <text>|-]",
+  );
   process.exit(1);
+}
+
+for (let i = 0; i < args.length; i++) {
+  const arg = args[i];
+  if (arg === "--dry-run") {
+    dryRun = true;
+  } else if (arg === "--notes") {
+    if (notes !== undefined) usage("--notes given more than once");
+    if (i + 1 >= args.length) usage("--notes requires a value");
+    notes = args[++i];
+  } else if (arg.startsWith("--notes=")) {
+    if (notes !== undefined) usage("--notes given more than once");
+    notes = arg.slice("--notes=".length);
+  } else if (arg.startsWith("-")) {
+    usage(`unknown option '${arg}'`);
+  } else if (version === undefined) {
+    version = arg;
+  } else {
+    usage(`unexpected argument '${arg}'`);
+  }
+}
+
+if (version === undefined) usage();
+
+if (notes === "-") notes = readFileSync(0, "utf8");
+if (notes !== undefined) {
+  notes = notes.replace(/\r\n?/g, "\n").trim();
+  if (notes === "") {
+    console.error("error: --notes requires a non-empty body");
+    process.exit(1);
+  }
 }
 
 if (
@@ -79,8 +120,10 @@ if (!(isPre(current) && isPre(version)) && cmp(version, current) <= 0) {
 }
 
 if (dryRun) {
+  const body = notes === undefined ? "without a body" : "with a notes body";
+  const tag = notes === undefined ? "lightweight" : "annotated";
   console.log(
-    `dry-run: would set version to ${version}, commit "chore: bump version to ${version}", and tag ${version}`,
+    `dry-run: would set version to ${version}, commit "chore: bump version to ${version}" ${body}, and create ${tag} tag ${version}`,
   );
   process.exit(0);
 }
@@ -102,8 +145,13 @@ if (git(["status", "--porcelain"]) !== "") {
 
 execFileSync("npm", ["pkg", "set", `version=${version}`], { stdio: "inherit" });
 git(["add", "package.json"]);
-git(["commit", "-m", `chore: bump version to ${version}`]);
-git(["tag", version]);
+if (notes === undefined) {
+  git(["commit", "-m", `chore: bump version to ${version}`]);
+  git(["tag", version]);
+} else {
+  git(["commit", "-m", `chore: bump version to ${version}`, "-m", notes]);
+  git(["tag", "-a", version, "-m", notes]);
+}
 
 console.log(
   `bumped to ${version} (commit ${

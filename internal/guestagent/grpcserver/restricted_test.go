@@ -39,6 +39,7 @@ var restrictedDecisions = map[string]restrictedDecision{
 	guest.WorkspaceGuestAgent_Signal_FullMethodName:         {allow: false},
 	guest.WorkspaceGuestAgent_ReadFile_FullMethodName:       {allow: false},
 	guest.WorkspaceGuestAgent_WriteFile_FullMethodName:      {allow: false},
+	guest.WorkspaceGuestAgent_WriteTemplate_FullMethodName:  {allow: false},
 	guest.WorkspaceGuestAgent_Stat_FullMethodName:           {allow: false},
 	guest.WorkspaceGuestAgent_ReadDir_FullMethodName:        {allow: false},
 	guest.WorkspaceGuestAgent_Mkdir_FullMethodName:          {allow: false},

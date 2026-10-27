@@ -11,6 +11,7 @@ import {
   sliceLines,
   streamLines,
   withGuestAuth,
+  writeGuestTemplate,
 } from "./guest-rpc.js";
 import { grpc } from "./grpc/runtime-client.js";
 
@@ -331,4 +332,27 @@ test("streamLines stops consuming once the window is filled", async () => {
   const out = await streamLines(source(), 1, 2);
   assert.equal(out, "1\n2");
   assert.equal(consumed, 2);
+});
+
+test("writeGuestTemplate sends the project directory, name and content", async () => {
+  let request: any;
+  const binding: any = {
+    guest: {
+      writeTemplate: (value: any, _metadata: any, callback: any) => {
+        request = value;
+        callback(null, { path: "/projects/app/.dsh-podman/web.yml" });
+      },
+    },
+    token: "t",
+  };
+  const path = await writeGuestTemplate(
+    binding,
+    "/projects/app",
+    "web",
+    "version: 1\n",
+  );
+  assert.equal(path, "/projects/app/.dsh-podman/web.yml");
+  assert.equal(request.projectDir, "/projects/app");
+  assert.equal(request.name, "web");
+  assert.equal(Buffer.from(request.content).toString("utf8"), "version: 1\n");
 });

@@ -28,6 +28,7 @@ const (
 	WorkspaceGuestAgent_Signal_FullMethodName          = "/dshguest.v1.WorkspaceGuestAgent/Signal"
 	WorkspaceGuestAgent_ReadFile_FullMethodName        = "/dshguest.v1.WorkspaceGuestAgent/ReadFile"
 	WorkspaceGuestAgent_WriteFile_FullMethodName       = "/dshguest.v1.WorkspaceGuestAgent/WriteFile"
+	WorkspaceGuestAgent_WriteTemplate_FullMethodName   = "/dshguest.v1.WorkspaceGuestAgent/WriteTemplate"
 	WorkspaceGuestAgent_Stat_FullMethodName            = "/dshguest.v1.WorkspaceGuestAgent/Stat"
 	WorkspaceGuestAgent_ReadDir_FullMethodName         = "/dshguest.v1.WorkspaceGuestAgent/ReadDir"
 	WorkspaceGuestAgent_Mkdir_FullMethodName           = "/dshguest.v1.WorkspaceGuestAgent/Mkdir"
@@ -58,6 +59,11 @@ type WorkspaceGuestAgentClient interface {
 	Signal(ctx context.Context, in *SignalRequest, opts ...grpc.CallOption) (*SignalResponse, error)
 	ReadFile(ctx context.Context, in *ReadFileRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ReadFileChunk], error)
 	WriteFile(ctx context.Context, opts ...grpc.CallOption) (grpc.ClientStreamingClient[WriteFileChunk, WriteFileResponse], error)
+	// WriteTemplate writes a container template into the project's .dsh-podman
+	// directory, creating the directory when it is missing. The name must be a
+	// plain basename, and a read-only project mount is reported as a clean
+	// permission failure instead of an I/O error.
+	WriteTemplate(ctx context.Context, in *WriteTemplateRequest, opts ...grpc.CallOption) (*WriteTemplateResponse, error)
 	Stat(ctx context.Context, in *StatRequest, opts ...grpc.CallOption) (*StatResponse, error)
 	ReadDir(ctx context.Context, in *ReadDirRequest, opts ...grpc.CallOption) (*ReadDirResponse, error)
 	Mkdir(ctx context.Context, in *MkdirRequest, opts ...grpc.CallOption) (*MkdirResponse, error)
@@ -153,6 +159,16 @@ func (c *workspaceGuestAgentClient) WriteFile(ctx context.Context, opts ...grpc.
 
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type WorkspaceGuestAgent_WriteFileClient = grpc.ClientStreamingClient[WriteFileChunk, WriteFileResponse]
+
+func (c *workspaceGuestAgentClient) WriteTemplate(ctx context.Context, in *WriteTemplateRequest, opts ...grpc.CallOption) (*WriteTemplateResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(WriteTemplateResponse)
+	err := c.cc.Invoke(ctx, WorkspaceGuestAgent_WriteTemplate_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
 
 func (c *workspaceGuestAgentClient) Stat(ctx context.Context, in *StatRequest, opts ...grpc.CallOption) (*StatResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
@@ -341,6 +357,11 @@ type WorkspaceGuestAgentServer interface {
 	Signal(context.Context, *SignalRequest) (*SignalResponse, error)
 	ReadFile(*ReadFileRequest, grpc.ServerStreamingServer[ReadFileChunk]) error
 	WriteFile(grpc.ClientStreamingServer[WriteFileChunk, WriteFileResponse]) error
+	// WriteTemplate writes a container template into the project's .dsh-podman
+	// directory, creating the directory when it is missing. The name must be a
+	// plain basename, and a read-only project mount is reported as a clean
+	// permission failure instead of an I/O error.
+	WriteTemplate(context.Context, *WriteTemplateRequest) (*WriteTemplateResponse, error)
 	Stat(context.Context, *StatRequest) (*StatResponse, error)
 	ReadDir(context.Context, *ReadDirRequest) (*ReadDirResponse, error)
 	Mkdir(context.Context, *MkdirRequest) (*MkdirResponse, error)
@@ -386,6 +407,9 @@ func (UnimplementedWorkspaceGuestAgentServer) ReadFile(*ReadFileRequest, grpc.Se
 }
 func (UnimplementedWorkspaceGuestAgentServer) WriteFile(grpc.ClientStreamingServer[WriteFileChunk, WriteFileResponse]) error {
 	return status.Error(codes.Unimplemented, "method WriteFile not implemented")
+}
+func (UnimplementedWorkspaceGuestAgentServer) WriteTemplate(context.Context, *WriteTemplateRequest) (*WriteTemplateResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method WriteTemplate not implemented")
 }
 func (UnimplementedWorkspaceGuestAgentServer) Stat(context.Context, *StatRequest) (*StatResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method Stat not implemented")
@@ -519,6 +543,24 @@ func _WorkspaceGuestAgent_WriteFile_Handler(srv interface{}, stream grpc.ServerS
 
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type WorkspaceGuestAgent_WriteFileServer = grpc.ClientStreamingServer[WriteFileChunk, WriteFileResponse]
+
+func _WorkspaceGuestAgent_WriteTemplate_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(WriteTemplateRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(WorkspaceGuestAgentServer).WriteTemplate(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: WorkspaceGuestAgent_WriteTemplate_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(WorkspaceGuestAgentServer).WriteTemplate(ctx, req.(*WriteTemplateRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
 
 func _WorkspaceGuestAgent_Stat_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(StatRequest)
@@ -818,6 +860,10 @@ var WorkspaceGuestAgent_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Signal",
 			Handler:    _WorkspaceGuestAgent_Signal_Handler,
+		},
+		{
+			MethodName: "WriteTemplate",
+			Handler:    _WorkspaceGuestAgent_WriteTemplate_Handler,
 		},
 		{
 			MethodName: "Stat",

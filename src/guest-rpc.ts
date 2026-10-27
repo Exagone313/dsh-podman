@@ -345,6 +345,24 @@ export async function writeGuestFile(
   );
 }
 
+// writeGuestTemplate asks the guest agent to save a template inside the
+// project's .dsh-podman directory. The plugin's own host-side view of the
+// project is read-only, so the write goes through the container's guest, which
+// creates the directory when missing and refuses a traversing name.
+export async function writeGuestTemplate(
+  binding: WorkspaceBinding,
+  projectDir: string,
+  name: string,
+  content: string,
+): Promise<string> {
+  const result = (await unaryGuest({ binding }, "writeTemplate", {
+    projectDir,
+    name,
+    content: Buffer.from(content, "utf8"),
+  })) as { path?: unknown };
+  return typeof result?.path === "string" ? result.path : "";
+}
+
 export async function readGuestFile(
   binding: WorkspaceBinding,
   path: string,

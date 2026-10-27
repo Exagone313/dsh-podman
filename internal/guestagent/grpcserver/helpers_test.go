@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"context"
 	"io"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -19,7 +20,14 @@ import (
 
 func newTestServer(t *testing.T) (*Server, string) {
 	t.Helper()
-	root := t.TempDir()
+	// Canonicalise the temporary root first: the filesystem resolves host
+	// roots through EvalSymlinks, so a TMPDIR that points through a symlink
+	// would otherwise make the paths a handler returns differ from the ones
+	// the tests build from this root.
+	root, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
 	filesystem, err := workspacefs.New([]workspacefs.Mount{{Virtual: "/workspace", Host: root}})
 	if err != nil {
 		t.Fatal(err)

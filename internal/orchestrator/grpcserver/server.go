@@ -34,6 +34,7 @@ type podmanAPI interface {
 	RemoveSocketDir(name string) error
 	Stop(name string) error
 	ImageExists(name string) (bool, error)
+	ImageTags() (map[string]struct{}, error)
 	ImageLabels(name string) (map[string]string, error)
 	ImageCreated(name string) string
 	ImagePull(name string) error

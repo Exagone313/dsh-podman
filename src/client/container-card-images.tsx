@@ -3,27 +3,21 @@
 // SPDX-License-Identifier: MIT
 
 import {
-  Chip,
   ConfirmButton,
   Field,
   imageIdPattern,
-  imageStatusLabel,
-  imageStatusTone,
   StatusChip,
   TagInput,
 } from "./container-card-shared.js";
+import { ImageFacts, ImageField } from "./image-facts.js";
 import { bareActionKey, scopedActionKey } from "./card-protocol.js";
 import { buildParentImages, ptcImageRow } from "./container-card-ptc.js";
-import { FIELD_ROW_CLASS } from "./container-card-table-styles.js";
 import {
   actionRow,
   cardBlockRow,
   containerNameHeading,
   hint,
-  imageFieldLabel,
-  imageFieldOwnLine,
   imageFields,
-  imageFieldValue,
   imageSelect,
   rowActions,
   rowDivider,
@@ -32,50 +26,13 @@ import {
 import { type ImageView } from "./container-card-controller.js";
 import { relativeTimeLabel } from "./relative-time.js";
 import type { Translate } from "./locales.js";
-import {
-  Button,
-  Input,
-  Modal,
-  Pill,
-} from "@deepseek-ai/dsh-client-ui-primitives";
+import { Button, Input, Modal } from "@deepseek-ai/dsh-client-ui-primitives";
 import { type ReactNode, useId } from "react";
 
-// The packages an image was built with, or the fact that none were recorded:
-// chips on their own line under the Packages label.
-function Packages(props: { t: Translate; image: ImageView }): ReactNode {
-  const { t, image } = props;
-  if (image.packages.length === 0) return t("noPackages");
-  return (
-    <>
-      {image.packages.map((pkg) => <Chip key={pkg} t={t} label={pkg} />)}
-    </>
-  );
-}
-
-// One labelled line of an image's block: the field's label, then its value. The
-// class keeps the label beside the value while the card has room and stacks it
-// above once the card is narrow.
-function ImageField(props: {
-  label: string;
-  ownLine?: boolean;
-  children: ReactNode;
-}): ReactNode {
-  const { label, ownLine, children } = props;
-  return (
-    <div className={FIELD_ROW_CLASS}>
-      <span style={imageFieldLabel}>{label}</span>
-      {ownLine === true
-        ? <div style={imageFieldOwnLine}>{children}</div>
-        : <span style={imageFieldValue}>{children}</span>}
-    </div>
-  );
-}
-
-// The image's own block: line one is the name (14/600) with its status chip and
-// the image's own actions at the line's right end, then one labelled line per
-// field. The block's action group drops below the name when it no longer fits
-// beside it; the destructive Remove is part of that same group, so a custom
-// image's three actions read together.
+// The image's own block: the shared facts, then the image's own actions at the
+// line's right end. The block's action group drops below the name when it no
+// longer fits beside it; the destructive Remove is part of that same group, so a
+// custom image's three actions read together.
 function ImageBlock(props: {
   t: Translate;
   image: ImageView;
@@ -90,41 +47,17 @@ function ImageBlock(props: {
   // custom image names its parent; both are the image this one descends from.
   const source = image.parent !== "" ? image.parent : image.primitive;
   return (
-    <div>
-      <div style={actionRow}>
-        <div style={rowMain}>
-          <span style={containerNameHeading}>{image.imageId}</span>
-          {image.imageId === defaultImage
-            ? <Pill>{t("defaultImage")}</Pill>
-            : null}
-          <StatusChip
-            tone={imageStatusTone(image.status)}
-            label={imageStatusLabel(t, image.status)}
-          />
-        </div>
-        <div style={rowActions}>{actions}</div>
-      </div>
-      <div style={imageFields}>
-        {
-          /* An image that was never built has no build moment, so the line is
-            absent rather than a placeholder; the exact instant stays available
-            as the tooltip, the way a container row dates itself. */
-        }
-        {image.builtAt === "" ? null : (
-          <ImageField label={t("built")}>
-            <span title={image.builtAt}>
-              {relativeTimeLabel(image.builtAt, locale)}
-            </span>
-          </ImageField>
-        )}
-        {source === ""
-          ? null
-          : <ImageField label={t("parentImage")}>{source}</ImageField>}
-        <ImageField label={t("packages")} ownLine>
-          <Packages t={t} image={image} />
-        </ImageField>
-      </div>
-    </div>
+    <ImageFacts
+      t={t}
+      locale={locale}
+      imageId={image.imageId}
+      status={image.status}
+      builtAt={image.builtAt}
+      source={source}
+      packages={image.packages}
+      isDefault={image.imageId === defaultImage}
+      actions={actions}
+    />
   );
 }
 

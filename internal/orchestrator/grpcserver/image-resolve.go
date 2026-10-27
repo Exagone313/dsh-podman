@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	imagebuild "github.com/Exagone313/dsh-podman/internal/orchestrator/images"
+	"github.com/Exagone313/dsh-podman/internal/orchestrator/state"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -102,11 +103,36 @@ func (s *Server) ensureBase(short string) (*imagebuild.BaseImage, string, error)
 	return base, tag, nil
 }
 
+// listImageTags fetches the set of locally stored image tags once per request.
+// A nil result means the batch list failed (already logged): resolution then
+// probes each record with ImageExists, so a transient podman error does not
+// blank every status.
+func (s *Server) listImageTags() map[string]struct{} {
+	if s.Podman == nil {
+		return nil
+	}
+	tags, err := s.Podman.ImageTags()
+	if err != nil {
+		s.log().Warn("image tag listing failed", "error", err)
+		return nil
+	}
+	return tags
+}
+
 // resolveImage resolves a short image reference to control-plane-ready
 // information. Base short names synthesize a base row (with its registry
 // package manager and primitive reference); any other short name must match a
 // stored custom image.
 func (s *Server) resolveImage(short string) (resolvedImage, error) {
+	return s.resolveImageWithTags(short, nil)
+}
+
+// resolveImageWithTags resolves like resolveImage. knownTags is the podman tag
+// set a caller already fetched for a whole request (ListImages); nil means the
+// caller did not, so a custom record's own tag is probed directly. The custom
+// branch reports "missing" with no build date when the tag is genuinely gone
+// from podman, and "built" with its recorded date otherwise.
+func (s *Server) resolveImageWithTags(short string, knownTags map[string]struct{}) (resolvedImage, error) {
 	if base, ok := imagebuild.BaseImageByID(short); ok {
 		status := "missing"
 		builtAt := ""
@@ -128,10 +154,36 @@ func (s *Server) resolveImage(short string) (resolvedImage, error) {
 	}
 	for _, image := range images {
 		if image.ImageID == short {
-			return resolvedImage{ImageID: image.ImageID, IsBase: false, PackageManager: image.PackageManager, ImageTag: image.ImageTag, Parent: image.Parent, Packages: image.Packages, BuiltAt: image.BuiltAt, Status: "built"}, nil
+			imageStatus, builtAt := s.customImageStatus(image, knownTags)
+			return resolvedImage{ImageID: image.ImageID, IsBase: false, PackageManager: image.PackageManager, ImageTag: image.ImageTag, Parent: image.Parent, Packages: image.Packages, BuiltAt: builtAt, Status: imageStatus}, nil
 		}
 	}
 	return resolvedImage{}, status.Error(codes.NotFound, fmt.Sprintf("image %q not found", short))
+}
+
+// customImageStatus reports whether a stored custom image's tag is still in
+// local storage. knownTags is a tag set the caller already fetched, nil when
+// none was: the record's own tag is then probed directly. Only a genuine
+// absence marks the image missing; a failed probe keeps the recorded status and
+// build date rather than claiming an absence it did not establish.
+func (s *Server) customImageStatus(image state.Image, knownTags map[string]struct{}) (string, string) {
+	if knownTags != nil {
+		if _, ok := knownTags[image.ImageTag]; !ok {
+			return "missing", ""
+		}
+		return "built", image.BuiltAt
+	}
+	if s.Podman == nil {
+		return "built", image.BuiltAt
+	}
+	exists, err := s.Podman.ImageExists(image.ImageTag)
+	if err != nil {
+		return "built", image.BuiltAt
+	}
+	if !exists {
+		return "missing", ""
+	}
+	return "built", image.BuiltAt
 }
 
 // resolveImageTag returns the fully-qualified tag for a short image

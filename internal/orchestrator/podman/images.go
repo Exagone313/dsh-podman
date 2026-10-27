@@ -11,6 +11,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 
 	"go.podman.io/podman/v6/pkg/bindings"
@@ -31,6 +32,34 @@ func (c *Client) ImageExists(name string) (bool, error) {
 		c.log().Info("workspace image lookup completed", "image", name, "exists", exists)
 	}
 	return exists, err
+}
+
+// ImageTags returns the set of repository tags present in local storage from a
+// single list call. It is how a batch of stored records is checked against
+// podman without one inspect per record. A tag absent from the set is not in
+// local storage; an empty (but non-nil) set means nothing is stored at all.
+func (c *Client) ImageTags() (map[string]struct{}, error) {
+	if err := c.connReady(); err != nil {
+		return nil, err
+	}
+	ctx, cancel := c.lookupContext()
+	defer cancel()
+	summaries, err := images.List(ctx, nil)
+	if err != nil {
+		c.log().Error("workspace image listing failed", "error", err)
+		return nil, err
+	}
+	tags := make(map[string]struct{})
+	for _, summary := range summaries {
+		if summary == nil {
+			continue
+		}
+		for _, tag := range summary.RepoTags {
+			tags[tag] = struct{}{}
+		}
+	}
+	c.log().Info("workspace image listing completed", "tag_count", len(tags))
+	return tags, nil
 }
 
 // pullMessage is the subset of the pull stream's JSON messages we act on. The
@@ -126,18 +155,50 @@ func (c *Client) ImageCreated(name string) string {
 	return report.Created.UTC().Format(time.RFC3339)
 }
 
-// ImageRemove deletes the named image from local storage, tolerating an
-// already-absent image via the force option. Any non-nil errors reported by
-// images.Remove are joined into a single error.
+// ErrImageUnknown is the service's sentinel for a reference it does not store
+// locally. The v6 bindings transport libpod's errors as plain strings
+// ("<reference>: image not known"), so IsImageUnknown matches the exact trailing
+// message rather than the leading reference, which callers control and which
+// must never decide whether a failure is swallowed.
+var ErrImageUnknown = errors.New("image not known")
+
+// imageUnknownMessages are the exact service messages denoting an absent image.
+var imageUnknownMessages = []string{ErrImageUnknown.Error(), "no such image"}
+
+// IsImageUnknown reports whether err is podman's answer for an image reference
+// it does not store locally.
+func IsImageUnknown(err error) bool {
+	if err == nil {
+		return false
+	}
+	if errors.Is(err, ErrImageUnknown) {
+		return true
+	}
+	message := err.Error()
+	for _, unknown := range imageUnknownMessages {
+		if message == unknown || strings.HasSuffix(message, ": "+unknown) {
+			return true
+		}
+	}
+	return false
+}
+
+// ImageRemove deletes the named image from local storage, idempotently: an
+// image already absent is a no-op. Force also removes the containers still
+// using the image; on its own it does not tolerate absence (podman answers
+// "image not known" for an unknown reference), so Ignore makes the service skip
+// it. Any remaining not-known answer is filtered here too, in case the service
+// did not honour ignore. Every other error is joined into one, preserving its
+// cause.
 func (c *Client) ImageRemove(name string) error {
 	if err := c.connReady(); err != nil {
 		return err
 	}
 	c.log().Info("removing image", "image", name)
-	_, errs := images.Remove(c.ctx, []string{name}, &images.RemoveOptions{Force: boolPtr(true)})
+	_, errs := images.Remove(c.ctx, []string{name}, &images.RemoveOptions{Force: boolPtr(true), Ignore: boolPtr(true)})
 	var joined error
 	for _, err := range errs {
-		if err != nil {
+		if err != nil && !IsImageUnknown(err) {
 			joined = errors.Join(joined, err)
 		}
 	}

@@ -230,6 +230,59 @@ test("the build parent choices never include the reserved PTC image", (t) => {
   assert.match(resources, /buildParentImages\(images\)/);
 });
 
+test("the image pickers never offer the reserved PTC image", (t) => {
+  const form = clientSource("container-card-form.tsx");
+  const templates = clientSource("container-card-templates.tsx");
+  const shared = clientSource("container-card-shared.tsx");
+  if (form === undefined || templates === undefined || shared === undefined) {
+    t.skip("not a source checkout");
+    return;
+  }
+  // The container editor filters the snapshot through the existing helper and
+  // only then applies base-first ordering, so the reserved image can never be
+  // picked for a new selection and the other images keep their order.
+  assert.match(form, /const offered = buildParentImages\(images\);/);
+  assert.match(
+    form,
+    /\.\.\.offered\.filter\(\(candidate\) => candidate\.isBase\),/,
+  );
+  assert.match(
+    form,
+    /\.\.\.offered\.filter\(\(candidate\) => !candidate\.isBase\),/,
+  );
+  // The template popup builds its candidates through templateImageCandidates,
+  // which filters through the same helper and then adds the template's own
+  // image; it never starts from the raw snapshot.
+  assert.match(templates, /templateImageCandidates\(/);
+  assert.doesNotMatch(
+    templates,
+    /\.\.\.images\.filter\(\(candidate\) => candidate\.isBase\),/,
+  );
+  // The filtered order is still base images first, custom ones after.
+  const offered = buildParentImages([
+    { imageId: "custom", isBase: false },
+    { imageId: PTC_IMAGE_ID, isBase: true },
+    { imageId: "archlinux", isBase: true },
+  ]);
+  assert.deepEqual(
+    [
+      ...offered.filter((image) => image.isBase),
+      ...offered.filter((image) => !image.isBase),
+    ].map((image) => image.imageId),
+    ["archlinux", "custom"],
+  );
+  // With only the reserved image present there is nothing to offer.
+  assert.deepEqual(
+    buildParentImages([{ imageId: PTC_IMAGE_ID, isBase: false }]),
+    [],
+  );
+  // A container already on the reserved image keeps it as the current value:
+  // ImageRow adds an option for a value outside the candidate list instead of
+  // letting the first candidate replace it.
+  assert.match(shared, /image !== "" && options\.includes\(image\)/);
+  assert.match(shared, /<option value=\{image\}>/);
+});
+
 test("the base card renders the PTC row after its own images", (t) => {
   const resources = clientSource("container-card-resources.tsx");
   if (resources === undefined) {

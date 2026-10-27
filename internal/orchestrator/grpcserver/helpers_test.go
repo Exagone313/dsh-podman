@@ -117,6 +117,14 @@ type fakePodman struct {
 	// name counts as present, keeping callers that do not care about image
 	// availability on the double's old unconditional answer.
 	images map[string]bool
+	// imageTags is the tag set ImageTags serves. When nil the fake cannot
+	// enumerate images and the batch call resolves nothing, so callers fall
+	// back to per-record ImageExists like they would on a transient podman
+	// listing error; imageTagSetErr forces that failure explicitly and
+	// imageTagSetCalls counts the batch reads.
+	imageTags        map[string]struct{}
+	imageTagSetErr   error
+	imageTagSetCalls int
 	// imageLabels serves ImageLabels, keyed by image tag. A tag absent from
 	// the map has no labels, which the PTC image path treats as stale.
 	imageLabels map[string]map[string]string
@@ -125,6 +133,11 @@ type fakePodman struct {
 	// pullErr, when set, makes ImagePull fail; the failed name is still
 	// recorded in pulled, so a test can assert the attempt happened.
 	pullErr error
+	// removedImages records every tag ImageRemove was asked to remove, and
+	// imageRemoveErr, when set, makes ImageRemove fail with it: the tag is
+	// still recorded, so a test can assert the attempt happened.
+	removedImages  []string
+	imageRemoveErr error
 	// writeMounts and readMounts are the read-write and read-only bind-mount
 	// maps ListContainerBindMounts serves, keyed by podman name. They are
 	// seeded directly by tests that need an existing conflicting mount; creates

@@ -12,6 +12,7 @@ import (
 
 	ctl "github.com/Exagone313/dsh-podman/internal/genproto/dshctl/v1"
 	imagebuild "github.com/Exagone313/dsh-podman/internal/orchestrator/images"
+	"github.com/Exagone313/dsh-podman/internal/orchestrator/podman"
 	"github.com/Exagone313/dsh-podman/internal/orchestrator/state"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -20,8 +21,11 @@ import (
 func (s *Server) ListImages(context.Context, *ctl.ListImagesRequest) (*ctl.ListImagesResponse, error) {
 	s.log().Info("control request", "method", "ListImages")
 	result := &ctl.ListImagesResponse{}
+	// One batch read serves every stored record: a custom image whose tag is
+	// gone from podman must not keep reporting "built".
+	tags := s.listImageTags()
 	for _, base := range imagebuild.BaseImages {
-		resolved, err := s.resolveImage(base.ID)
+		resolved, err := s.resolveImageWithTags(base.ID, tags)
 		if err != nil {
 			s.log().Error("control request failed", "method", "ListImages", "base_image", base.ID, "error", err)
 			return nil, err
@@ -34,7 +38,7 @@ func (s *Server) ListImages(context.Context, *ctl.ListImagesRequest) (*ctl.ListI
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 	for _, image := range images {
-		resolved, err := s.resolveImage(image.ImageID)
+		resolved, err := s.resolveImageWithTags(image.ImageID, tags)
 		if err != nil {
 			s.log().Error("control request failed", "method", "ListImages", "image_id", image.ImageID, "error", err)
 			return nil, err
@@ -397,8 +401,14 @@ func (s *Server) RemoveImage(_ context.Context, request *ctl.RemoveImageRequest)
 		return nil, status.Error(codes.FailedPrecondition, "podman is not configured")
 	}
 	if err := s.Podman.ImageRemove(resolved.ImageTag); err != nil {
-		s.log().Error("control request failed", "method", "RemoveImage", "image_id", imageID, "error", err)
-		return nil, status.Error(codes.Internal, err.Error())
+		if !podman.IsImageUnknown(err) {
+			s.log().Error("control request failed", "method", "RemoveImage", "image_id", imageID, "error", err)
+			return nil, imageRemovalError(imageID, err)
+		}
+		// The record is stale: podman no longer stores the tag, so its removal
+		// already happened outside dsh-podman. Dropping the record is the only
+		// remaining work and must succeed, just like an absent container.
+		s.log().Info("image already absent from podman", "method", "RemoveImage", "image_id", imageID, "image_tag", resolved.ImageTag)
 	}
 	if err := s.Store.UpdateImages(func(current []state.Image) ([]state.Image, error) {
 		next := make([]state.Image, 0, len(current))
@@ -414,6 +424,42 @@ func (s *Server) RemoveImage(_ context.Context, request *ctl.RemoveImageRequest)
 	}
 	s.log().Info("control request completed", "method", "RemoveImage", "image_id", imageID)
 	return &ctl.RemoveImageResponse{}, nil
+}
+
+// imageRemovalError maps a genuine podman image-removal failure to a status the
+// client can act on, keeping podman's cause in the message. Returning Internal
+// here would let the sanitizing interceptor replace the whole failure with the
+// generic "internal error", hiding what actually went wrong.
+func imageRemovalError(imageID string, err error) error {
+	// An actionable status produced by a lower layer keeps its code and
+	// message. Internal is the one code that may not pass: the sanitizing
+	// interceptor would replace it with the generic message, so it is
+	// reclassified below like a plain error.
+	if code := status.Code(err); code != codes.Unknown && code != codes.Internal {
+		return err
+	}
+	message := err.Error()
+	switch {
+	case strings.Contains(message, "in use"):
+		return status.Errorf(codes.FailedPrecondition, "image %q is in use: %v", imageID, err)
+	case strings.Contains(message, "permission denied"):
+		return status.Errorf(codes.PermissionDenied, "cannot remove image %q: %v", imageID, err)
+	case podmanUnavailable(message):
+		return status.Errorf(codes.Unavailable, "cannot remove image %q: %v", imageID, err)
+	default:
+		return status.Errorf(codes.FailedPrecondition, "cannot remove image %q: %v", imageID, err)
+	}
+}
+
+// podmanUnavailable reports whether a podman failure looks like the service
+// being unreachable rather than the image being unremovable.
+func podmanUnavailable(message string) bool {
+	for _, fragment := range []string{"cannot connect", "connection refused", "connection reset", "broken pipe", "i/o timeout", "no such file or directory"} {
+		if strings.Contains(message, fragment) {
+			return true
+		}
+	}
+	return false
 }
 
 // resolvedImage is the control-plane-ready projection of an image reference:

@@ -139,8 +139,122 @@ func TestListImages(t *testing.T) {
 	}
 }
 
-// TestListImagesReportsThePTCImageStatus pins the shared image's row: present
-// means built, absent means missing.
+// findListedImage returns the row ListImages reported for imageID.
+func findListedImage(t *testing.T, response *ctl.ListImagesResponse, imageID string) *ctl.Image {
+	t.Helper()
+	for _, image := range response.Images {
+		if image.ImageId == imageID {
+			return image
+		}
+	}
+	t.Fatalf("image %q is not listed: %#v", imageID, response.Images)
+	return nil
+}
+
+// TestListImagesCustomImageStatusFromTagSet pins both sides of the batch
+// presence check: a record whose tag is in podman is built with its build date,
+// and a record whose image was removed behind the orchestrator's back (its tag
+// is absent from the set) is missing with no build date.
+func TestListImagesCustomImageStatusFromTagSet(t *testing.T) {
+	const presentTag = "localhost/dsh-podman/present:latest"
+	const removedTag = "localhost/dsh-podman/removed:latest"
+	const builtAt = "2026-10-01T00:00:00Z"
+	store := newTestStore(t)
+	if err := store.SaveImages([]state.Image{
+		{ImageID: "present", Parent: "archlinux", PackageManager: "pacman", ImageTag: presentTag, BuiltAt: builtAt},
+		{ImageID: "removed", Parent: "archlinux", PackageManager: "pacman", ImageTag: removedTag, BuiltAt: builtAt},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	fake := newFakePodman()
+	fake.imageTags = map[string]struct{}{presentTag: {}}
+	server := &Server{Store: store, Podman: fake, Logger: silentLogger()}
+	response, err := server.ListImages(context.Background(), &ctl.ListImagesRequest{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	present := findListedImage(t, response, "present")
+	if present.Status != "built" || present.BuiltAt != builtAt {
+		t.Fatalf("present image must stay built with its build date, got %#v", present)
+	}
+	removed := findListedImage(t, response, "removed")
+	if removed.Status != "missing" || removed.BuiltAt != "" {
+		t.Fatalf("removed image must be missing with no build date, got %#v", removed)
+	}
+}
+
+// TestListImagesFetchesTheTagSetOnce pins that listing any number of records
+// costs a single podman list call.
+func TestListImagesFetchesTheTagSetOnce(t *testing.T) {
+	store := newTestStore(t)
+	if err := store.SaveImages([]state.Image{
+		{ImageID: "one", ImageTag: "localhost/dsh-podman/one:latest"},
+		{ImageID: "two", ImageTag: "localhost/dsh-podman/two:latest"},
+		{ImageID: "three", ImageTag: "localhost/dsh-podman/three:latest"},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	fake := newFakePodman()
+	fake.imageTags = map[string]struct{}{}
+	server := &Server{Store: store, Podman: fake, Logger: silentLogger()}
+	if _, err := server.ListImages(context.Background(), &ctl.ListImagesRequest{}); err != nil {
+		t.Fatal(err)
+	}
+	if fake.imageTagSetCalls != 1 {
+		t.Fatalf("expected one batch tag read, got %d", fake.imageTagSetCalls)
+	}
+}
+
+// TestListImagesTagSetFailureFallsBackToPerRecordChecks pins the transient
+// failure mode: when the batch list fails, each record is probed with
+// ImageExists, so a genuine absence is still detected and a present image is
+// not reported missing just because the list call failed.
+func TestListImagesTagSetFailureFallsBackToPerRecordChecks(t *testing.T) {
+	const presentTag = "localhost/dsh-podman/present:latest"
+	const removedTag = "localhost/dsh-podman/removed:latest"
+	const builtAt = "2026-10-01T00:00:00Z"
+	store := newTestStore(t)
+	if err := store.SaveImages([]state.Image{
+		{ImageID: "present", ImageTag: presentTag, BuiltAt: builtAt},
+		{ImageID: "removed", ImageTag: removedTag, BuiltAt: builtAt},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	fake := newFakePodman()
+	fake.imageTagSetErr = errors.New("podman list failed")
+	fake.images = map[string]bool{presentTag: true, removedTag: false}
+	server := &Server{Store: store, Podman: fake, Logger: silentLogger()}
+	response, err := server.ListImages(context.Background(), &ctl.ListImagesRequest{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if present := findListedImage(t, response, "present"); present.Status != "built" || present.BuiltAt != builtAt {
+		t.Fatalf("a failed batch list must not hide a present image, got %#v", present)
+	}
+	if removed := findListedImage(t, response, "removed"); removed.Status != "missing" || removed.BuiltAt != "" {
+		t.Fatalf("a failed batch list must still detect a genuine absence, got %#v", removed)
+	}
+}
+
+// TestListImagesBaseStatusIsUnaffectedByTheTagSet pins that base rows keep
+// their own per-tag probe: the batch set only describes custom records.
+func TestListImagesBaseStatusIsUnaffectedByTheTagSet(t *testing.T) {
+	fake := newFakePodman()
+	fake.images = map[string]bool{"localhost/dsh-podman/base/archlinux:latest": true}
+	fake.imageTags = map[string]struct{}{}
+	server := &Server{Store: newTestStore(t), Podman: fake, Logger: silentLogger()}
+	response, err := server.ListImages(context.Background(), &ctl.ListImagesRequest{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if archlinux := findListedImage(t, response, "archlinux"); !archlinux.IsBase || archlinux.Status != "built" {
+		t.Fatalf("a present base must stay built, got %#v", archlinux)
+	}
+	if ubuntu := findListedImage(t, response, "ubuntu"); !ubuntu.IsBase || ubuntu.Status != "missing" {
+		t.Fatalf("an absent base must stay missing, got %#v", ubuntu)
+	}
+}
+
 func TestListImagesReportsThePTCImageStatus(t *testing.T) {
 	store := newTestStore(t)
 	fake := newFakePodman()
@@ -181,6 +295,17 @@ func (f *fakePodman) ImageExists(name string) (bool, error) {
 	return f.images[name], nil
 }
 
+func (f *fakePodman) ImageTags() (map[string]struct{}, error) {
+	f.imageTagSetCalls++
+	if f.imageTagSetErr != nil {
+		return nil, f.imageTagSetErr
+	}
+	// A nil set means the fake was not seeded with one: returning it as-is
+	// makes callers fall back to per-record ImageExists, which preserves the
+	// double's unconditional presence for tests that do not care about tags.
+	return f.imageTags, nil
+}
+
 func (f *fakePodman) ImageLabels(name string) (map[string]string, error) {
 	return f.imageLabels[name], nil
 }
@@ -192,7 +317,14 @@ func (f *fakePodman) ImagePull(name string) error {
 	return f.pullErr
 }
 
-func (f *fakePodman) ImageRemove(string) error { return nil }
+func (f *fakePodman) ImageRemove(name string) error {
+	f.removedImages = append(f.removedImages, name)
+	if f.imageRemoveErr != nil {
+		return f.imageRemoveErr
+	}
+	delete(f.images, name)
+	return nil
+}
 
 func sliceContains(values []string, want string) bool {
 	for _, value := range values {
@@ -244,6 +376,34 @@ func TestGetImage(t *testing.T) {
 	}
 	if image.IsBase || image.Status != "built" {
 		t.Fatalf("unexpected custom image status: %#v", image)
+	}
+}
+
+// TestGetImageCustomImageProbesPodman pins that a single custom-image lookup
+// reports the tag's real presence too, so image_get agrees with the listing.
+func TestGetImageCustomImageProbesPodman(t *testing.T) {
+	const tag = "localhost/dsh-podman/removed:latest"
+	store := newTestStore(t)
+	if err := store.SaveImages([]state.Image{{ImageID: "removed", Parent: "archlinux", PackageManager: "pacman", ImageTag: tag, BuiltAt: "2026-10-01T00:00:00Z"}}); err != nil {
+		t.Fatal(err)
+	}
+	fake := newFakePodman()
+	fake.images = map[string]bool{tag: false}
+	server := &Server{Store: store, Podman: fake, Logger: silentLogger()}
+	image, err := server.GetImage(context.Background(), &ctl.GetImageRequest{ImageId: "removed"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if image.Status != "missing" || image.BuiltAt != "" {
+		t.Fatalf("a removed custom image must be missing with no build date, got %#v", image)
+	}
+	fake.images[tag] = true
+	image, err = server.GetImage(context.Background(), &ctl.GetImageRequest{ImageId: "removed"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if image.Status != "built" || image.BuiltAt != "2026-10-01T00:00:00Z" {
+		t.Fatalf("a present custom image must be built with its build date, got %#v", image)
 	}
 }
 
@@ -450,6 +610,31 @@ func TestRebuildImageByShortName(t *testing.T) {
 	}
 }
 
+// TestRebuildImageToleratesAnAbsentPodmanImage pins the rebuild side of the
+// same concern: a stored image whose podman tag is gone is still rebuildable.
+// The build replaces the tag, so resolution must not turn the missing presence
+// into NotFound; it proceeds to the builder like a present image.
+func TestRebuildImageToleratesAnAbsentPodmanImage(t *testing.T) {
+	const tag = "localhost/dsh-podman/gone:latest"
+	store := newTestStore(t)
+	if err := store.SaveImages([]state.Image{
+		{ImageID: "mid", PackageManager: "pacman", ImageTag: "localhost/dsh-podman/mid:latest"},
+		{ImageID: "gone", Parent: "mid", PackageManager: "pacman", ImageTag: tag},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	fake := newFakePodman()
+	fake.images = map[string]bool{tag: false}
+	server := &Server{Store: store, Podman: fake, ImageBuilder: &imagebuild.Builder{}, Logger: silentLogger()}
+	_, err := server.RebuildImage(context.Background(), &ctl.RebuildImageRequest{ImageId: "gone"})
+	if status.Code(err) == codes.NotFound {
+		t.Fatalf("a missing podman image must still resolve to its stored record: %v", err)
+	}
+	if status.Code(err) != codes.Internal {
+		t.Fatalf("expected the build to run, stopping at the unconfigured builder (Internal), got %v", err)
+	}
+}
+
 func TestRemoveImageRejectsBaseName(t *testing.T) {
 	server := &Server{Store: newTestStore(t), Logger: silentLogger()}
 	_, err := server.RemoveImage(context.Background(), &ctl.RemoveImageRequest{ImageId: "archlinux"})
@@ -538,6 +723,88 @@ func TestRemoveImageRequiresPodman(t *testing.T) {
 	_, err := server.RemoveImage(context.Background(), &ctl.RemoveImageRequest{ImageId: "valkey"})
 	if status.Code(err) != codes.FailedPrecondition {
 		t.Fatalf("expected FailedPrecondition, got %v", err)
+	}
+}
+
+// TestRemoveImageToleratesAnAbsentPodmanImage pins the reported bug: a record
+// outlives the podman image removed with "podman rmi", and removing that stale
+// row must succeed, drop the record, and stop listing it, instead of failing
+// with an internal error.
+func TestRemoveImageToleratesAnAbsentPodmanImage(t *testing.T) {
+	const tag = "localhost/dsh-podman/gone:latest"
+	store := newTestStore(t)
+	if err := store.SaveImages([]state.Image{{ImageID: "gone", Parent: "archlinux", PackageManager: "pacman", ImageTag: tag, BuiltAt: "2026-10-01T00:00:00Z"}}); err != nil {
+		t.Fatal(err)
+	}
+	fake := newFakePodman()
+	fake.images = map[string]bool{tag: false}
+	fake.imageRemoveErr = errors.New(tag + ": image not known")
+	server := &Server{Store: store, Podman: fake, Logger: silentLogger()}
+	if _, err := server.RemoveImage(context.Background(), &ctl.RemoveImageRequest{ImageId: "gone"}); err != nil {
+		t.Fatalf("removing a record whose podman image is gone must succeed: %v", err)
+	}
+	images, err := store.Images()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(images) != 0 {
+		t.Fatalf("the stale record must be dropped, got %#v", images)
+	}
+	response, err := server.ListImages(context.Background(), &ctl.ListImagesRequest{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, image := range response.Images {
+		if image.ImageId == "gone" {
+			t.Fatalf("a removed record must no longer be listed: %#v", image)
+		}
+	}
+}
+
+// TestRemoveImageSurfacesThePodmanFailure pins that only a not-known answer is
+// tolerated: a genuine removal failure keeps a code the caller can act on and
+// the podman cause in its message, so the sanitizing interceptor cannot flatten
+// it into the generic "internal error". The record must survive a failed
+// removal.
+func TestRemoveImageSurfacesThePodmanFailure(t *testing.T) {
+	const tag = "localhost/dsh-podman/valkey:latest"
+	cases := []struct {
+		name string
+		err  error
+		code codes.Code
+		want []string
+	}{
+		{"in use", errors.New(tag + ": image is in use by a container"), codes.FailedPrecondition, []string{`image "valkey" is in use`, "image is in use by a container"}},
+		{"permission", errors.New(tag + ": permission denied"), codes.PermissionDenied, []string{`cannot remove image "valkey"`, "permission denied"}},
+		{"daemon", errors.New("cannot connect to Podman socket: connection refused"), codes.Unavailable, []string{`cannot remove image "valkey"`, "connection refused"}},
+		{"state", errors.New(tag + ": image store is read-only"), codes.FailedPrecondition, []string{`cannot remove image "valkey"`, "image store is read-only"}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			store := newTestStore(t)
+			if err := store.SaveImages([]state.Image{{ImageID: "valkey", PackageManager: "pacman", ImageTag: tag}}); err != nil {
+				t.Fatal(err)
+			}
+			fake := newFakePodman()
+			fake.imageRemoveErr = tc.err
+			server := &Server{Store: store, Podman: fake, Logger: silentLogger()}
+			_, err := server.RemoveImage(context.Background(), &ctl.RemoveImageRequest{ImageId: "valkey"})
+			if status.Code(err) != tc.code {
+				t.Fatalf("expected %v, got %v", tc.code, err)
+			}
+			for _, want := range tc.want {
+				if !strings.Contains(err.Error(), want) {
+					t.Fatalf("error %q does not contain %q", err, want)
+				}
+			}
+			images, readErr := store.Images()
+			if readErr != nil {
+				t.Fatal(readErr)
+			}
+			if len(images) != 1 || images[0].ImageID != "valkey" {
+				t.Fatalf("a refused removal must keep the record, got %#v", images)
+			}
+		})
 	}
 }
 

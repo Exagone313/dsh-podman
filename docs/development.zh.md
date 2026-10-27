@@ -26,7 +26,7 @@ SPDX-License-Identifier: MIT
 
 ```sh
 pnpm install
-pnpm run build       # tsc host + tsc client -> dist/, copies proto/ -> dist/grpc/proto/
+pnpm run build       # tsc 主进程 + tsc 客户端 -> dist/，并复制 proto/ -> dist/grpc/proto/
 ```
 
 Go 构建标签会跳过 btrfs 和 devicemapper 存储驱动，它们需要宿主机的 C
@@ -35,21 +35,21 @@ Go 构建标签会跳过 btrfs 和 devicemapper 存储驱动，它们需要宿�
 `Makefile` 封装了常见的工作流：
 
 ```sh
-make build-go       # build the Go binaries into bin/<os>-<arch>/
+make build-go       # 构建 Go 二进制到 bin/<os>-<arch>/
 make build          # build-go + pnpm-build
-make vet            # gofmt -s check + go vet with the build tags
-make lint           # vet + oxlint over the TypeScript sources
-make lint-ts        # oxlint only
-make test-go        # go test with the build tags
-make test           # test-go + pnpm test (JS tests, which run against dist/)
-make govulncheck    # fixable findings fail; unfixed advisories are tolerated
-make fmt            # gofmt -s + dprint (TypeScript and Markdown)
-make fmt-check      # verify the formatting without rewriting anything
-make proto          # regenerate the protobuf Go bindings with buf
-make proto-check    # buf lint + buf breaking + check the committed bindings are current
-make download-licenses  # generate third-party-licenses.pkg from the project and third-party Go licenses
-make image-go       # build the Go container images (orchestrator, guest-agent, gateway)
-make image          # image-go + the dsh container image
+make vet            # gofmt -s 检查 + 使用构建标签的 go vet
+make lint           # vet + 对 TypeScript 源码运行 oxlint
+make lint-ts        # 仅运行 oxlint
+make test-go        # 使用构建标签运行 go test
+make test           # test-go + pnpm test（针对 dist/ 运行的 JS 测试）
+make govulncheck    # 可修复的发现导致失败；未修复的公告会被容忍
+make fmt            # gofmt -s + dprint（TypeScript 与 Markdown）
+make fmt-check      # 校验格式但不改写任何文件
+make proto          # 使用 buf 重新生成 protobuf Go 绑定
+make proto-check    # buf lint + buf breaking + 检查已提交绑定是否最新
+make download-licenses  # 从项目与第三方 Go 许可证生成 third-party-licenses.pkg
+make image-go       # 构建 Go 容器镜像（orchestrator、guest-agent、gateway）
+make image          # image-go + dsh 容器镜像
 ```
 
 `make image` 依赖 `third-party-licenses.pkg`：`download-licenses` 目标会运行由
@@ -92,8 +92,8 @@ camelCase；持久化的 TOML 状态使用下划线标签。
 ### 构建
 
 ```bash
-make  # builds plugin and go binaries
-make image  # build images
+make  # 构建插件与 Go 二进制
+make image  # 构建镜像
 ```
 
 ### 运行本地镜像（Quadlet）
@@ -143,9 +143,9 @@ systemctl --user daemon-reload
 ### 部署改动
 
 ```bash
-make            # Go binaries + the plugin bundle
-make image      # orchestrator, guest-agent, gateway and dsh images
-npm pack        # the plugin archive the dsh entrypoint installs
+make            # Go 二进制 + 插件归档
+make image      # orchestrator、guest-agent、gateway 与 dsh 镜像
+npm pack        # dsh 入口要安装的插件归档
 systemctl --user restart dsh dsh-podman-orchestrator dsh-podman-gateway
 ```
 

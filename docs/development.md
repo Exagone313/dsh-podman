@@ -68,7 +68,7 @@ have run first (the `test` target handles this).
 The `.proto` sources live in `proto/`; the generated Go bindings in
 `internal/genproto/` are committed. After changing a `.proto`, regenerate them
 with `make proto`, which runs `buf generate`; Buf must be installed separately —
-pin it with `go install github.com/bufbuild/buf/cmd/buf@v1.73.0`. Commit the
+pin it with `go install github.com/bufbuild/buf/cmd/buf@v1.75.0`. Commit the
 `.proto` change together with the regenerated Go bindings.
 
 The JS side loads the raw `.proto` files at runtime via `@grpc/proto-loader`

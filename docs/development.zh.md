@@ -67,7 +67,7 @@ orchestrator 和 guest-agent 镜像，位于
 `.proto` 源文件位于 `proto/`；生成的 Go 绑定位于
 `internal/genproto/`，会被提交。修改 `.proto` 后，请用 `make proto`（即运行 `buf
 generate`）重新生成。Buf 需单独安装——请用 `go install
-github.com/bufbuild/buf/cmd/buf@v1.73.0` 固定版本。请将 `.proto`
+github.com/bufbuild/buf/cmd/buf@v1.75.0` 固定版本。请将 `.proto`
 改动与重新生成的 Go 绑定一起提交。
 
 JS 端在运行时通过 `@grpc/proto-loader` 加载原始 `.proto` 文件（构建时复制到

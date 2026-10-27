@@ -227,7 +227,7 @@ jobs:
           tag_type="$(git cat-file -t "$VERSION" 2>/dev/null || true)"
           args=()
           if [[ "$tag_type" == "tag" ]]; then
-            args+=(--notes-from-tag)
+            args+=(--title "$VERSION" --notes-from-tag)
           else
             args+=(--generate-notes)
           fi

@@ -292,9 +292,10 @@ pre-releases like `1.0.0-rc.1` also work). The release workflow
    the version tag only.
 3. Publishes the plugin to **npm** (`@exagone313/dsh-podman`) with provenance;
    pre-releases are published under the `next` dist-tag.
-4. Creates a **GitHub release**. An annotated tag supplies its description from
-   the tag message; a lightweight tag falls back to auto-generated notes. No
-   files are attached: the binaries ship in the images, and the plugin on npm.
+4. Creates a **GitHub release**. Its title is the version; an annotated tag
+   supplies its description from the tag message, while a lightweight tag falls
+   back to auto-generated notes. No files are attached: the binaries ship in the
+   images, and the plugin on npm.
 
 The tag must match `package.json`'s version — the workflow fails otherwise — so
 prepare the release with the `release-notes` skill and bump with the version

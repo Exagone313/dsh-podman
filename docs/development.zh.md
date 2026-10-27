@@ -267,8 +267,9 @@ zizmor）、`ci-code.yml`（Go、JS、镜像、Trivy）、`ci-docs.yml`（dprint
    发布以及任何带连字符的标签都属于预发布：只打版本标签。
 3. 将插件发布到 **npm**（`@exagone313/dsh-podman`），附带来源证明； 预发布在
    `next` dist-tag 下发布。
-4. 创建 **GitHub release**。附注标签以其标签信息作为说明；轻量标签则回退到自动
-   生成的说明。不会附加任何文件：二进制文件随镜像发布，插件发布在 npm 上。
+4. 创建 **GitHub release**。标题为版本号；附注标签以其标签信息作为说明，轻量标签
+   回退到自动生成的说明。不会附加任何文件：二进制文件随镜像发布，插件发布在 npm
+   上。
 
 标签必须与 `package.json` 中的版本一致——否则工作流会失败——因此请先用
 `release-notes` skill 准备发布，再用版本脚本更新两者。该 skill

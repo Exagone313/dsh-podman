@@ -17,8 +17,13 @@ import {
   type MountInput,
 } from "./container-card-controller.js";
 import { EnvEditor, MountsEditor } from "./container-card-editors.js";
+import {
+  firstMountDestinationError,
+  nonProjectDestinationError,
+} from "./container-card-mount-sources.js";
 import { PathsEditor } from "./container-card-paths.js";
 import { PortsEditor } from "./container-card-ports.js";
+import { buildParentImages } from "./container-card-ptc.js";
 import { SecretEnvEditor } from "./container-card-secrets.js";
 import { DialogGroup, ImageRow, LockGlyph } from "./container-card-shared.js";
 import { FIELD_CLASS } from "./container-card-field-styles.js";
@@ -81,7 +86,12 @@ export function ContainerForm(props: {
   // Whether removing a mount asks for confirmation; only a live container has
   // something to recreate behind it.
   confirmRemoveMount?: boolean;
-  onCreateSecret: (name: string, length?: number, charset?: string) => void;
+  onCreateVolume: (name: string) => Promise<boolean>;
+  onCreateSecret: (
+    name: string,
+    length?: number,
+    charset?: string,
+  ) => Promise<boolean>;
   onChangeImage: (image: string) => void;
   onChangeEnv: (env: Record<string, string>) => void;
   onChangeMounts: (mounts: MountInput[]) => void;
@@ -118,6 +128,7 @@ export function ContainerForm(props: {
     mainProject,
     primaryProject,
     confirmRemoveMount,
+    onCreateVolume,
     onCreateSecret,
     onChangeImage,
     onChangeEnv,
@@ -131,7 +142,8 @@ export function ContainerForm(props: {
   const nameId = useId();
   // The two variable editors report their own appended row here; the form keeps
   // both so the first one names the reason, and bubbles it to the dialog's
-  // footer action.
+  // footer action. A refused mount destination is folded in from the mounts
+  // below, so the same footer refuses the action too.
   const [blocking, setBlocking] = useState<{
     env?: Translation;
     secretEnv?: Translation;
@@ -149,7 +161,29 @@ export function ContainerForm(props: {
     },
     [],
   );
-  const blockingKey = blocking.env ?? blocking.secretEnv;
+  // A volume, secret or tmpfs row's destination is validated from the form's
+  // current mounts, so the row error and the footer reason never disagree. A
+  // project mount derives its destination and is exempt.
+  const reportMountError = useCallback(
+    (mount: MountInput): string | undefined => {
+      const error = nonProjectDestinationError(
+        mount.kind,
+        mount.destination,
+        projectsRoot,
+      );
+      return error === undefined ? undefined : t(error.key, error.params);
+    },
+    [projectsRoot, t],
+  );
+  // The first refused destination names the footer reason only when no variable
+  // editor already does: fixing the destination must not clear — or be hidden by
+  // — another field's blocking error.
+  const mountDestinationBlocking = firstMountDestinationError(
+    mounts,
+    projectsRoot,
+  );
+  const blockingKey = blocking.env ?? blocking.secretEnv ??
+    mountDestinationBlocking;
   useEffect(() => {
     onBlockingError?.(blockingKey);
     return () => onBlockingError?.(undefined);
@@ -173,11 +207,14 @@ export function ContainerForm(props: {
     );
   }, []);
   // The candidate images in the order the Images tab lists them: base images
-  // first, custom ones after. An image the snapshot no longer lists stays
-  // selectable rather than silently replaced by the first candidate.
+  // first, custom ones after, and never the reserved PTC image the orchestrator
+  // owns. An image the snapshot no longer lists stays selectable rather than
+  // silently replaced by the first candidate, so a container already running
+  // the PTC image keeps showing it as its current value.
+  const offered = buildParentImages(images);
   const candidates = [
-    ...images.filter((candidate) => candidate.isBase),
-    ...images.filter((candidate) => !candidate.isBase),
+    ...offered.filter((candidate) => candidate.isBase),
+    ...offered.filter((candidate) => !candidate.isBase),
   ].map((candidate) => candidate.imageId);
   return (
     <div style={dialogBody}>
@@ -234,11 +271,15 @@ export function ContainerForm(props: {
           secrets={secrets}
           busy={busy}
           enabled={enabled}
+          writable={writable}
           projectsRoot={projectsRoot}
           directoryPicker={directoryPicker}
           confirmRemove={confirmRemoveMount}
           primaryProject={primaryProject}
           mainProject={mainProject}
+          rowError={reportMountError}
+          onCreateVolume={onCreateVolume}
+          onCreateSecret={onCreateSecret}
           onAdd={(mount) => onChangeMounts([...mounts, mount])}
           onRemove={(mount) =>
             onChangeMounts(mounts.filter((item) => item !== mount))}

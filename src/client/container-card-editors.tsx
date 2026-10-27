@@ -6,9 +6,14 @@ import {
   DiscardChangesModal,
   emptyMount,
   EnvRow,
+  mountDestination,
   MountRow,
-  orderedMounts,
 } from "./container-card-shared.js";
+import { isPrimaryProjectMount, orderedMounts } from "../mount-order.js";
+import {
+  nonProjectDestinationError,
+  withPreselectedStorageSource,
+} from "./container-card-mount-sources.js";
 import { imageSelect } from "./container-card-styles.js";
 import { ROW_LIST_CLASS } from "./container-card-table-styles.js";
 import { mountInputsEqual, recordsEqual } from "./container-card-config.js";
@@ -150,15 +155,6 @@ export function EnvEditor(props: {
   );
 }
 
-// The destination a mount row shows for a mount: a project mount's derived
-// mirror under the projects root, or the destination the other kinds carry.
-function mountDestination(mount: MountInput, projectsRoot: string): string {
-  if (mount.kind !== "project") return mount.destination;
-  return mount.project.trim() === ""
-    ? ""
-    : hostPathForProjectName(projectsRoot, mount.project);
-}
-
 // The inline error a refused typed project path raises. The path's shape and
 // its existence are different mistakes, so they get different wording.
 function projectPathError(t: Translate, reason: ProjectPathRejection): string {
@@ -193,6 +189,17 @@ export function MountsEditor(props: {
   secrets: readonly { name: string }[];
   busy: boolean;
   enabled: boolean;
+  // Whether the workspace may create storages; it gates the row's own creation
+  // button, while `enabled` gates the fields and the Add action.
+  writable: boolean;
+  // The settings dialogs' creators, so a volume or secret mount can be pointed
+  // at a storage created without leaving the row.
+  onCreateVolume: (name: string) => Promise<boolean>;
+  onCreateSecret: (
+    name: string,
+    length?: number,
+    charset?: string,
+  ) => Promise<boolean>;
   // The host projects root, so a project path can be browsed for and stored
   // relative to it.
   projectsRoot: string;
@@ -206,6 +213,31 @@ export function MountsEditor(props: {
   // The workspace's own project mount, listed first in the editor and by the
   // project it carries.
   mainProject?: string;
+  // Whether a listed row's project path may be retyped. The editor dialogs leave
+  // it unset: there a project path is chosen in the Add-mount popup, which
+  // validates it on submit. The template popup sets it so a seeded project
+  // reference can be corrected in place.
+  projectPathEditable?: boolean;
+  // A validation message for a listed row — a reference it names that does not
+  // exist, or a volume, secret or tmpfs destination the host would refuse. The
+  // container form supplies the destination wording; the template popup its own
+  // reference checks.
+  rowError?: (mount: MountInput, index: number) => string | undefined;
+  // Reports that a listed row's project path lost focus, so the caller can
+  // re-check it against the host.
+  onProjectBlur?: (index: number) => void;
+  // Opens the caller's host directory browser for a listed project row, as the
+  // row's own Browse action beside Remove. The template popup passes it; the
+  // editor dialogs and the container block leave it unset, so their project
+  // rows show only the actions they already had.
+  onProjectBrowse?: (index: number) => void;
+  // The row-action Browse's label. The popup words it without the ellipsis the
+  // Add-mount field's own Browse carries; other callers never browse a row.
+  projectBrowseLabel?: string;
+  // Extra actions rendered beside Add mount — the template popup's Create
+  // volume and Create secret. Omitted everywhere else, so the editor's Add
+  // control stands alone exactly as it does today.
+  actions?: ReactNode;
   onAdd: (mount: MountInput) => void;
   onRemove: (mount: MountInput) => void;
   onUpdate?: (mount: MountInput, index: number) => void;
@@ -217,11 +249,20 @@ export function MountsEditor(props: {
     secrets,
     busy,
     enabled,
+    writable,
+    onCreateVolume,
+    onCreateSecret,
     projectsRoot,
     directoryPicker,
     confirmRemove,
     primaryProject = "",
     mainProject = "",
+    projectPathEditable,
+    rowError,
+    onProjectBlur,
+    onProjectBrowse,
+    projectBrowseLabel,
+    actions,
     onAdd,
     onRemove,
     onUpdate,
@@ -231,28 +272,98 @@ export function MountsEditor(props: {
   const [browseError, setBrowseError] = useState("");
   const [confirmClose, setConfirmClose] = useState(false);
   const [draft, setDraft] = useState<MountInput>(emptyMount());
+  // The storage lists may fill or change while the popup stays open — a storage
+  // created from it appears in one of them — so an empty draft adopts the first
+  // entry of the list its kind reads, exactly what the picker shows. A value
+  // already chosen is never replaced.
+  useEffect(() => {
+    if (!adding) return;
+    setDraft((previous) =>
+      withPreselectedStorageSource(previous, volumes, secrets)
+    );
+  }, [adding, volumes, secrets]);
   // Where the draft's project path came from: typing it arms the host check on
   // submit, while a Browse pick skips it.
   const [projectOrigin, setProjectOrigin] = useState<ProjectPathOrigin>(
     "typed",
   );
   // Whether the host check a submit started is still running, and a token that
-  // invalidates its result once the popup closes or another submit starts.
+  // invalidates its result once the popup closes, another submit starts or the
+  // draft's project path changes.
   const [checking, setChecking] = useState(false);
   const checkToken = useRef(0);
+  // The host's answer to the draft project path the field last listed on blur:
+  // the value it was started for, so an answer never marks a newer value, and
+  // whether the directory was missing. `listing` blocks Add while the host is
+  // still answering.
+  const [projectListing, setProjectListing] = useState<
+    { project: string; missing: boolean } | undefined
+  >(undefined);
+  const [listing, setListing] = useState(false);
+  // Whether the project field has been left or typed into, so an empty value
+  // stays quiet until the user has actually made a choice.
+  const [projectTouched, setProjectTouched] = useState(false);
+  // The listed rows live in memoized components, so their callbacks keep one
+  // identity for as long as the list has the same length. Each callback reads
+  // the row and the parent's handler through refs, which therefore always point
+  // at the latest render: editing one row re-renders that row alone.
+  const mountsRef = useRef(mounts);
+  mountsRef.current = mounts;
+  const onUpdateRef = useRef(onUpdate);
+  onUpdateRef.current = onUpdate;
+  const onRemoveRef = useRef(onRemove);
+  onRemoveRef.current = onRemove;
+  const onProjectBlurRef = useRef(onProjectBlur);
+  onProjectBlurRef.current = onProjectBlur;
+  const onProjectBrowseRef = useRef(onProjectBrowse);
+  onProjectBrowseRef.current = onProjectBrowse;
+  const rowCallbacks = useMemo(
+    () =>
+      Array.from({ length: mounts.length }, (_, index) => ({
+        update: (patch: Partial<MountInput>): void => {
+          const mount = mountsRef.current[index];
+          if (mount === undefined) return;
+          onUpdateRef.current?.({ ...mount, ...patch }, index);
+        },
+        remove: (): void => {
+          const mount = mountsRef.current[index];
+          if (mount !== undefined) onRemoveRef.current(mount);
+        },
+        blur: (): void => {
+          onProjectBlurRef.current?.(index);
+        },
+        browse: (): void => {
+          onProjectBrowseRef.current?.(index);
+        },
+      })),
+    [mounts.length],
+  );
   const updateDraft = (patch: Partial<MountInput>): void => {
     if (patch.project !== undefined) {
+      // A new value invalidates the host answer and listing the previous one
+      // held: a stale answer must never mark the value on screen. An empty
+      // value is not a mistake while it is being retyped, so only a non-empty
+      // one counts as touched; leaving the field is what reports emptiness.
+      checkToken.current += 1;
       setProjectOrigin("typed");
+      setProjectListing(undefined);
+      setListing(false);
+      setProjectTouched(patch.project !== "");
       setBrowseError("");
     }
     setDraft((prev) => ({ ...prev, ...patch }));
   };
   // Picking a kind is not an edit; anything typed into the pristine kind's
-  // fields is, and closing then would lose it.
-  const dirty = !mountInputsEqual(draft, emptyMount(draft.kind));
+  // fields is, and closing then would lose it. The first storage a kind
+  // preselects is not an edit either, so the pristine draft carries it too.
+  const dirty = !mountInputsEqual(
+    draft,
+    withPreselectedStorageSource(emptyMount(draft.kind), volumes, secrets),
+  );
   const closeAdd = (): void => {
     checkToken.current += 1;
     setChecking(false);
+    setListing(false);
     setAdding(false);
   };
   const requestClose = (): void => {
@@ -263,21 +374,115 @@ export function MountsEditor(props: {
     setConfirmClose(false);
     closeAdd();
   };
-  const canAdd = draft.kind === "project"
-    ? draft.project.trim() !== ""
-    : draft.kind === "volume"
-    ? draft.volume !== ""
-    : draft.kind === "secret"
-    ? draft.secret !== ""
-    : true;
+  // A volume, secret or tmpfs destination is validated while it is typed, the
+  // same rule the host applies: an empty, relative, unclean or overlapping
+  // destination refuses Add and says why under the row. A project mount derives
+  // its destination, so it is never checked here.
+  const draftDestination = nonProjectDestinationError(
+    draft.kind,
+    draft.destination,
+    projectsRoot,
+  );
+  const draftDestinationError = draftDestination === undefined
+    ? undefined
+    : t(draftDestination.key, draftDestination.params);
+  // The draft's project path is judged lexically as it is typed, with the same
+  // pure decision the submit makes; its directory is listed only on blur. A
+  // project mount derives its destination, so the destination rule never
+  // applies to it, and the other kinds never carry a project path.
+  const draftProjectDecision = draft.kind === "project"
+    ? decideProjectPath({
+      origin: projectOrigin,
+      project: draft.project,
+      directoryExists: true,
+    })
+    : undefined;
+  const draftProjectMissing = draft.kind === "project" &&
+    projectOrigin === "typed" &&
+    projectListing !== undefined &&
+    projectListing.project === draft.project &&
+    projectListing.missing;
+  // The row's one error slot carries the project wording for a project mount
+  // and the destination wording for every other kind. An empty project path
+  // stays quiet until the field is touched, since it is a choice still to
+  // make; every other refusal reports itself as it is typed or listed.
+  let draftProjectError: string | undefined;
+  if (draft.kind === "project" && draftProjectDecision !== undefined) {
+    if (!draftProjectDecision.ok) {
+      if (draftProjectDecision.reason !== "empty" || projectTouched) {
+        draftProjectError = projectPathError(t, draftProjectDecision.reason);
+      }
+    } else if (draftProjectMissing) {
+      draftProjectError = t("mountProjectPathMissing");
+    }
+  }
+  const draftError = draft.kind === "project"
+    ? draftProjectError
+    : draftDestinationError;
+  // Add is refused while the project path is lexically invalid, after the host
+  // reported its directory missing, and while a listing is still running. The
+  // submit-time check below stays the final gate.
+  const canAdd = draftDestination === undefined &&
+    (draft.kind === "project"
+      ? draftProjectDecision?.ok === true && !draftProjectMissing && !listing
+      : draft.kind === "volume"
+      ? draft.volume !== ""
+      : draft.kind === "secret"
+      ? draft.secret !== ""
+      : true);
   const openAdd = (): void => {
     checkToken.current += 1;
-    setDraft(emptyMount());
+    setDraft(withPreselectedStorageSource(emptyMount(), volumes, secrets));
     setProjectOrigin("typed");
     setChecking(false);
+    setProjectListing(undefined);
+    setListing(false);
+    setProjectTouched(false);
     setBrowseError("");
     setConfirmClose(false);
     setAdding(true);
+  };
+  // A typed project path is listed against the host's directory picker when
+  // the field loses focus, never on a keystroke: the lexical decision already
+  // covers the shape, and only the host knows whether the directory exists. A
+  // browsed path names a directory the picker already listed, and a deployment
+  // without a picker cannot check one, so both skip the listing and the
+  // submit-time check stays the final gate.
+  const checkDraftProject = async (): Promise<void> => {
+    setProjectTouched(true);
+    const decision = decideProjectPath({
+      origin: projectOrigin,
+      project: draft.project,
+      directoryExists: true,
+    });
+    if (
+      draft.kind !== "project" ||
+      projectOrigin === "browsed" ||
+      !decision.ok ||
+      directoryPicker === undefined ||
+      checking
+    ) {
+      return;
+    }
+    const project = draft.project;
+    const token = ++checkToken.current;
+    setListing(true);
+    try {
+      const exists = await projectDirectoryExists(
+        directoryPicker,
+        projectsRoot,
+        project,
+      );
+      // The popup closed, a submit started or the value changed while the host
+      // listed it: this answer belongs to no draft on screen.
+      if (token !== checkToken.current) return;
+      setProjectListing({ project, missing: !exists });
+    } catch {
+      // A listing that fails outright says nothing about the path, so the
+      // value stays unchecked and the submit-time check decides.
+    } finally {
+      if (token === checkToken.current) setListing(false);
+    }
   };
   // A typed project path is checked against the host on submit: a value chosen
   // through Browse already names a listed directory and skips the check, and a
@@ -346,12 +551,10 @@ export function MountsEditor(props: {
       style={{ display: "flex", flexDirection: "column", gap: "8px" }}
     >
       {orderedMounts(mounts, mainProject).map(({ mount, index }) => {
-        const removable = mount.kind !== "project" ||
-          primaryProject === "" ||
-          mount.project !== primaryProject;
-        const update = (patch: Partial<MountInput>): void => {
-          onUpdate?.({ ...mount, ...patch }, index);
-        };
+        // The workspace's own project mount is the one row a container's
+        // editor locks; every other mount stays removable.
+        const removable = !isPrimaryProjectMount(mount, primaryProject);
+        const callbacks = rowCallbacks[index];
         return (
           <MountRow
             // A mount keeps the index it has in the draft as its key, so a
@@ -364,17 +567,34 @@ export function MountsEditor(props: {
             disabled={!enabled}
             volumes={volumes}
             secrets={secrets}
-            onUpdate={update}
-            onRemove={removable ? () => onRemove(mount) : undefined}
+            onUpdate={callbacks.update}
+            writable={writable}
+            busy={busy}
+            onRemove={removable ? callbacks.remove : undefined}
             confirmRemove={confirmRemove}
             removeDisabledReason={removable
               ? undefined
               : t("defaultMountNotRemovable")}
-            projectPathLocked
+            error={rowError?.(mount, index)}
+            onProjectBlur={onProjectBlur === undefined
+              ? undefined
+              : callbacks.blur}
+            onProjectBrowse={onProjectBrowse === undefined
+              ? undefined
+              : callbacks.browse}
+            projectBrowseLabel={projectBrowseLabel}
+            projectPathLocked={projectPathEditable !== true}
           />
         );
       })}
-      <div>
+      <div
+        style={actions === undefined ? undefined : {
+          display: "flex",
+          flexWrap: "wrap",
+          alignItems: "center",
+          gap: "8px",
+        }}
+      >
         <Button
           variant="outline"
           size="sm"
@@ -383,6 +603,7 @@ export function MountsEditor(props: {
         >
           {t("addMount")}
         </Button>
+        {actions ?? null}
       </div>
       <Modal
         open={adding}
@@ -409,41 +630,65 @@ export function MountsEditor(props: {
           </>
         }
       >
-        <MountRow
-          t={t}
-          mode="edit"
-          mount={draft}
-          destination={draft.kind === "project"
-            ? projectDestination
-            : draft.destination}
-          kindValue={
-            <select
-              style={imageSelect}
-              value={draft.kind}
-              disabled={busy || checking}
-              aria-label={t("mountKind")}
-              onChange={(event) => {
-                setDraft(emptyMount(event.target.value));
-                setProjectOrigin("typed");
-                setBrowseError("");
-              }}
-            >
-              <option value="project">{t("mountProject")}</option>
-              <option value="tmpfs">{t("mountTmpfs")}</option>
-              <option value="volume">{t("mountVolume")}</option>
-              <option value="secret">{t("mountSecret")}</option>
-            </select>
-          }
-          disabled={busy || checking}
-          volumes={volumes}
-          secrets={secrets}
-          onUpdate={updateDraft}
-          onBrowse={directoryPicker === undefined ? undefined : () => {
-            setBrowseError("");
-            setBrowsing(true);
-          }}
-          browseError={browseError}
-        />
+        {
+          /* The row raises its validation message after itself, and the row
+            list is what normally supplies the 8px between the two; this
+            wrapper stands in for that list, so the dialog's message is not
+            flush against the row. Without a message the wrapper holds a single
+            child and changes nothing. */
+        }
+        <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+          <MountRow
+            t={t}
+            mode="edit"
+            mount={draft}
+            destination={draft.kind === "project"
+              ? projectDestination
+              : draft.destination}
+            kindValue={
+              <select
+                style={imageSelect}
+                value={draft.kind}
+                disabled={busy || checking}
+                aria-label={t("mountKind")}
+                onChange={(event) => {
+                  const next = emptyMount(event.target.value);
+                  setDraft(
+                    withPreselectedStorageSource(next, volumes, secrets),
+                  );
+                  // Another kind has another source and destination to judge;
+                  // the previous project answer and message do not carry over.
+                  checkToken.current += 1;
+                  setProjectOrigin("typed");
+                  setProjectListing(undefined);
+                  setListing(false);
+                  setProjectTouched(false);
+                  setBrowseError("");
+                }}
+              >
+                <option value="project">{t("mountProject")}</option>
+                <option value="tmpfs">{t("mountTmpfs")}</option>
+                <option value="volume">{t("mountVolume")}</option>
+                <option value="secret">{t("mountSecret")}</option>
+              </select>
+            }
+            disabled={busy || checking}
+            volumes={volumes}
+            secrets={secrets}
+            onUpdate={updateDraft}
+            writable={writable}
+            busy={busy}
+            error={draftError}
+            onProjectBlur={() => void checkDraftProject()}
+            onCreateVolume={onCreateVolume}
+            onCreateSecret={onCreateSecret}
+            onBrowse={directoryPicker === undefined ? undefined : () => {
+              setBrowseError("");
+              setBrowsing(true);
+            }}
+            browseError={browseError}
+          />
+        </div>
       </Modal>
       <DiscardChangesModal
         t={t}
@@ -466,6 +711,12 @@ export function MountsEditor(props: {
             }
             setDraft((previous) => ({ ...previous, project }));
             setProjectOrigin("browsed");
+            // A browsed path names a directory the picker just listed: it is
+            // checked already, and any listing for the typed value is stale.
+            checkToken.current += 1;
+            setProjectListing(undefined);
+            setListing(false);
+            setProjectTouched(false);
             setBrowseError("");
             setBrowsing(false);
           }}

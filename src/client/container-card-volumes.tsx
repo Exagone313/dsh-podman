@@ -2,13 +2,9 @@
 //
 // SPDX-License-Identifier: MIT
 
-import {
-  ConfirmButton,
-  countLabel,
-  Field,
-  namePattern,
-} from "./container-card-shared.js";
+import { ConfirmButton, countLabel } from "./container-card-shared.js";
 import { CardGroup } from "./container-card-group.js";
+import { CreateVolumeModal } from "./container-card-create-volume.js";
 import { scopedActionKey } from "./card-protocol.js";
 import {
   cardList,
@@ -20,8 +16,8 @@ import {
   rowMain,
 } from "./container-card-styles.js";
 import type { Translate } from "./locales.js";
-import { Button, Input, Modal } from "@deepseek-ai/dsh-client-ui-primitives";
-import { type ReactNode, useId, useState } from "react";
+import { Button } from "@deepseek-ai/dsh-client-ui-primitives";
+import { type ReactNode, useState } from "react";
 
 export function VolumesSection(props: {
   t: Translate;
@@ -35,15 +31,6 @@ export function VolumesSection(props: {
   const { t, volumes, busy, writable, pendingActions, onCreate, onRemove } =
     props;
   const [open, setOpen] = useState(false);
-  const [name, setName] = useState("");
-  const volumeId = useId();
-  const canCreate = namePattern.test(name);
-  const submit = (): void => {
-    if (!namePattern.test(name)) return;
-    onCreate(name.trim());
-    setName("");
-    setOpen(false);
-  };
   return (
     <CardGroup
       title={t("volumesTitle")}
@@ -99,51 +86,14 @@ export function VolumesSection(props: {
             ))}
           </div>
         )}
-      <Modal
+      <CreateVolumeModal
+        t={t}
         open={open}
+        busy={busy}
+        writable={writable}
+        onCreate={onCreate}
         onClose={() => setOpen(false)}
-        title={t("volumesTitle")}
-        closeLabel={t("cancel")}
-        footer={
-          <>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setOpen(false)}
-            >
-              {t("cancel")}
-            </Button>
-            <Button
-              variant="primary"
-              size="sm"
-              disabled={!canCreate}
-              onClick={submit}
-            >
-              {t("createVolume")}
-            </Button>
-          </>
-        }
-      >
-        <Field label={t("volumeName")} htmlFor={volumeId}>
-          <Input
-            id={volumeId}
-            value={name}
-            disabled={!writable || busy}
-            autoFocus
-            onChange={(event) => setName(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === "Enter") submit();
-            }}
-          />
-          {name !== "" && !namePattern.test(name)
-            ? (
-              <p style={{ ...hint, margin: 0 }} role="alert">
-                {t("invalidName")}
-              </p>
-            )
-            : null}
-        </Field>
-      </Modal>
+      />
     </CardGroup>
   );
 }

@@ -21,6 +21,27 @@ const KIND_FROM_PROTO: Record<string, string> = {
   MOUNT_KIND_SECRET: "secret",
 };
 
+// The order the container editor's mounts list shows the kinds in: project
+// mounts first, then volumes, secrets and tmpfs. The list further splits
+// projects and volumes by mode, and the container-template renderer uses this
+// kind order alone, keeping the existing sequence within a kind.
+export const MOUNT_KIND_ORDER = [
+  "project",
+  "volume",
+  "secret",
+  "tmpfs",
+] as const;
+
+// mountKindRank returns a kind's position in MOUNT_KIND_ORDER. An unknown kind
+// sorts last instead of throwing, since callers also rank values decoded from
+// layers this module does not control.
+export function mountKindRank(kind: string): number {
+  const index = MOUNT_KIND_ORDER.indexOf(
+    kind as (typeof MOUNT_KIND_ORDER)[number],
+  );
+  return index === -1 ? MOUNT_KIND_ORDER.length : index;
+}
+
 // The logical names and the proto enum numbers a mount kind can decode to. A
 // value reaches a layer in one of several spellings — the enum name with or
 // without its MOUNT_KIND_ prefix, the short name, or the number a decoder that

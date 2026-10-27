@@ -18,6 +18,12 @@ export const TERMINAL_RETAINED_PATH = "/api/podman/terminal/retained";
 /** The workspace the host resolved for one session. */
 export const TERMINAL_TARGET_PATH = "/api/podman/terminal/target";
 
+/**
+ * Error code the target route answers with while the session's workspace is
+ * still registering. The answer is retryable; every other refusal is not.
+ */
+export const WORKSPACE_PENDING_CODE = "workspace-pending";
+
 /** The workspace a session runs in, resolved by the host from the session itself. */
 export interface TerminalTargetView {
   /** Workspace project name, as the card lists it. */

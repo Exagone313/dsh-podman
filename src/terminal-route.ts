@@ -16,6 +16,7 @@ import {
   type TerminalFrame,
   type TerminalOpenQuery,
   type TerminalTargetView,
+  WORKSPACE_PENDING_CODE,
 } from "./client/terminal-protocol.js";
 import { discoverShells } from "./terminal-shells.js";
 import { type TerminalSessions } from "./terminal-sessions.js";
@@ -25,6 +26,11 @@ const MIN_COLS = 2;
 const MAX_COLS = 500;
 const MIN_ROWS = 1;
 const MAX_ROWS = 200;
+// A page load may ask before the session or its workspace has registered: the
+// target route can wait for it, but only within this budget and by polling at
+// this interval.
+const MAX_TARGET_WAIT_MS = 5_000;
+const TARGET_POLL_INTERVAL_MS = 100;
 
 function json(status: number, body: unknown): Response {
   return new Response(JSON.stringify(body), {
@@ -46,6 +52,29 @@ function integer(
   const value = Number(raw);
   if (!Number.isInteger(value) || value < min || value > max) return undefined;
   return value;
+}
+
+// How long the target route may wait for the session's workspace. Absent or
+// malformed means no wait; the maximum bounds one browser request.
+function targetWait(raw: string | null): number {
+  if (raw === null || raw === "") return 0;
+  const value = Number(raw);
+  if (!Number.isFinite(value) || value <= 0) return 0;
+  return Math.min(Math.floor(value), MAX_TARGET_WAIT_MS);
+}
+
+// Sleep between polls, cut short when the browser goes away.
+function targetDelay(ms: number, signal: AbortSignal): Promise<void> {
+  if (ms <= 0) return Promise.resolve();
+  return new Promise((resolve) => {
+    const timer = setTimeout(done, ms);
+    function done(): void {
+      clearTimeout(timer);
+      signal.removeEventListener("abort", done);
+      resolve();
+    }
+    signal.addEventListener("abort", done, { once: true });
+  });
 }
 
 // The workspace's mirrored path under the projects root, or the session's own
@@ -100,24 +129,38 @@ function sessionWorkspace(
     : { workspace: best.projectName, workspaceSlug: best.slug };
 }
 
-function handleTarget(
+async function handleTarget(
   request: Request,
   ctx: any,
   resolver: WorkspaceResolver,
   workspaceRegistry: any,
-): Response {
-  const sessionId = new URL(request.url).searchParams.get("sessionId") ?? "";
+): Promise<Response> {
+  const url = new URL(request.url);
+  const sessionId = url.searchParams.get("sessionId") ?? "";
+  // Missing ids are misuse, never retried; an unresolvable session may only be
+  // one that is still registering.
   if (sessionId === "") return json(400, { error: "sessionId is required" });
-  const target = sessionWorkspace(
-    ctx,
-    workspaceRegistry,
-    resolver.getConfig().projectsRoot,
-    sessionId,
-  );
-  if (target === undefined) {
-    return json(400, { error: "Cannot determine this session's workspace" });
+  const projectsRoot = resolver.getConfig().projectsRoot;
+  const deadline = Date.now() + targetWait(url.searchParams.get("wait"));
+  for (;;) {
+    const target = sessionWorkspace(
+      ctx,
+      workspaceRegistry,
+      projectsRoot,
+      sessionId,
+    );
+    if (target !== undefined) return json(200, target);
+    const remaining = deadline - Date.now();
+    if (remaining <= 0 || request.signal.aborted) break;
+    await targetDelay(
+      Math.min(TARGET_POLL_INTERVAL_MS, remaining),
+      request.signal,
+    );
   }
-  return json(200, target);
+  return json(409, {
+    error: "Cannot determine this session's workspace",
+    code: WORKSPACE_PENDING_CODE,
+  });
 }
 
 function controlOf(body: any): TerminalControl | undefined {

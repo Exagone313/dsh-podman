@@ -7,6 +7,7 @@
 // session the harness issued for it; no service is injected here so the module
 // stays testable and usable from any component.
 
+import { WorkspacePendingError } from "./terminal-errors.js";
 import {
   TERMINAL_PATH,
   TERMINAL_RETAINED_PATH,
@@ -18,6 +19,7 @@ import {
   type TerminalRetainedView,
   type TerminalShellView,
   type TerminalTargetView,
+  WORKSPACE_PENDING_CODE,
 } from "./terminal-protocol.js";
 
 // `reopen` forces a fresh shell instead of reattaching the retained one.
@@ -25,20 +27,49 @@ export type TerminalStreamQuery = TerminalOpenQuery & {
   readonly reopen?: boolean;
 };
 
+/** Options of one session-workspace read. */
+export interface FetchTerminalTargetOptions {
+  /**
+   * How long the host may wait for the session's workspace to register, in
+   * milliseconds. Omitted means the host answers at once.
+   */
+  readonly waitMs?: number;
+}
+
+/**
+ * The short wait a terminal pane grants a page load to restore its session's
+ * workspace, so a tab opened during that window resolves instead of failing.
+ */
+export const TERMINAL_TARGET_READY_WAIT_MS = 1_000;
+
+// The host's read is cheap, so a failed parse falls back to the status text.
 async function failure(response: Response): Promise<Error> {
+  let body: { error?: unknown; code?: unknown } = {};
   try {
-    const body = (await response.json()) as { error?: unknown };
-    if (typeof body.error === "string" && body.error !== "") {
-      return new Error(body.error);
-    }
+    body = (await response.json()) as { error?: unknown; code?: unknown };
   } catch {
     // A non-JSON body falls through to the status text.
+  }
+  // The target route's pending answer is retryable, so it keeps its code; every
+  // other refusal stays a plain error.
+  if (response.status === 409 && body.code === WORKSPACE_PENDING_CODE) {
+    return new WorkspacePendingError(
+      typeof body.error === "string" && body.error !== "" ? body.error : "",
+    );
+  }
+  if (typeof body.error === "string" && body.error !== "") {
+    return new Error(body.error);
   }
   return new Error(`terminal request failed (${response.status})`);
 }
 
 function endpoint(path: string): URL {
-  return new URL(path, globalThis.location.origin);
+  // The browser always provides `location`; the fallback keeps this module
+  // importable from the host test program, which has no DOM lib.
+  const origin =
+    (globalThis as { location?: { readonly origin?: string } }).location
+      ?.origin ?? "http://localhost";
+  return new URL(path, origin);
 }
 
 function trimmed(value: unknown): string {
@@ -159,15 +190,22 @@ export async function fetchTerminalShells(
  * the session itself and reports when it cannot place it.
  * @param sessionId - owning session.
  * @param signal - cancellation of the read.
+ * @param options - how long the host may wait for the workspace to register.
  * @returns the resolved workspace and its harness workspace slug.
- * @throws when the host cannot determine the session's workspace.
+ * @throws when the host cannot determine the session's workspace, with a
+ * `WorkspacePendingError` while that is only a matter of waiting.
  */
 export async function fetchTerminalTarget(
   sessionId: string,
   signal?: AbortSignal,
+  options: FetchTerminalTargetOptions = {},
 ): Promise<TerminalTargetView> {
   const url = endpoint(TERMINAL_TARGET_PATH);
   url.searchParams.set("sessionId", sessionId);
+  const waitMs = options.waitMs;
+  if (typeof waitMs === "number" && Number.isFinite(waitMs) && waitMs > 0) {
+    url.searchParams.set("wait", String(Math.floor(waitMs)));
+  }
   const response = await fetch(url, {
     headers: { accept: "application/json" },
     signal,

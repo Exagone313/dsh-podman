@@ -45,6 +45,7 @@ import {
   fetchTerminalTarget,
   openTerminalStream,
   sendTerminalControl,
+  TERMINAL_TARGET_READY_WAIT_MS,
 } from "./terminal-transport.js";
 import type {} from "@deepseek-ai/dsh-client-ui-sidebar-right/client";
 
@@ -205,7 +206,9 @@ export function PodmanTerminal(props: PodmanTerminalProps): ReactNode {
   useEffect(() => {
     const controller = new AbortController();
     setTarget({ phase: "loading" });
-    void fetchTerminalTarget(sessionId, controller.signal).then(
+    void fetchTerminalTarget(sessionId, controller.signal, {
+      waitMs: TERMINAL_TARGET_READY_WAIT_MS,
+    }).then(
       (resolved) => {
         if (!controller.signal.aborted) {
           setTarget({ phase: "ready", target: resolved });

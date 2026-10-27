@@ -16,6 +16,7 @@ import {
   TERMINAL_TARGET_PATH,
   type TerminalFrame,
   type TerminalShellView,
+  WORKSPACE_PENDING_CODE,
 } from "./client/terminal-protocol.js";
 import { workspaceSlug } from "./workspace-binding.js";
 import { discoverShells, requireShell } from "./terminal-shells.js";
@@ -154,11 +155,85 @@ test("the host resolves a session's workspace from its own directory", async () 
       const refused = await other.fetch(
         new Request(`http://dsh.internal${TERMINAL_TARGET_PATH}?sessionId=s1`),
       );
-      assert.equal(refused.status, 400);
+      assert.equal(refused.status, 409);
       assert.deepEqual(await refused.json(), {
         error: "Cannot determine this session's workspace",
+        code: WORKSPACE_PENDING_CODE,
       });
     }
+  } finally {
+    sessions.dispose();
+  }
+});
+
+test("the target route waits for a workspace that registers late", async () => {
+  const { binding } = fakeGuest();
+  const resolver = fakeResolver(binding);
+  const sessions = new TerminalSessions({ resolver, retentionMs: 60_000 });
+  try {
+    // The first polls run before the session exists, like a page restoring a
+    // tab while the harness is still creating it.
+    let lateCalls = 0;
+    const late = routeHarness(sessions, resolver, {
+      get: (id: string) => {
+        lateCalls++;
+        return id === "s1" && lateCalls > 2
+          ? { header: { cwd: `${ROOT}/src` } }
+          : undefined;
+      },
+    }).get(TERMINAL_TARGET_PATH);
+    assert.ok(late);
+    const found = await late.fetch(
+      new Request(
+        `http://dsh.internal${TERMINAL_TARGET_PATH}?sessionId=s1&wait=5000`,
+      ),
+    );
+    assert.equal(found.status, 200);
+    assert.deepEqual(await found.json(), {
+      workspace: "team",
+      workspaceSlug: workspaceSlug(WORKSPACE_ID),
+    });
+    assert.ok(lateCalls > 2);
+
+    // A session that never registers spends the budget and then reports the
+    // retryable pending answer, not the old hard refusal.
+    let pendingCalls = 0;
+    const pending = routeHarness(sessions, resolver, {
+      get: () => {
+        pendingCalls++;
+        return undefined;
+      },
+    }).get(TERMINAL_TARGET_PATH);
+    assert.ok(pending);
+    const exhausted = await pending.fetch(
+      new Request(
+        `http://dsh.internal${TERMINAL_TARGET_PATH}?sessionId=s1&wait=250`,
+      ),
+    );
+    assert.equal(exhausted.status, 409);
+    assert.deepEqual(await exhausted.json(), {
+      error: "Cannot determine this session's workspace",
+      code: WORKSPACE_PENDING_CODE,
+    });
+    assert.ok(pendingCalls > 1);
+
+    // Without `wait` the same unknown session is polled once and answered at
+    // once, so a client that cannot retry does not pay the budget.
+    let immediateCalls = 0;
+    const immediate = routeHarness(sessions, resolver, {
+      get: () => {
+        immediateCalls++;
+        return undefined;
+      },
+    }).get(TERMINAL_TARGET_PATH);
+    assert.ok(immediate);
+    const immediateResponse = await immediate.fetch(
+      new Request(
+        `http://dsh.internal${TERMINAL_TARGET_PATH}?sessionId=s1`,
+      ),
+    );
+    assert.equal(immediateResponse.status, 409);
+    assert.equal(immediateCalls, 1);
   } finally {
     sessions.dispose();
   }

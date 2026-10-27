@@ -43,6 +43,10 @@ import {
 import { CONTAINERS_PANEL_CLASS } from "./podman-containers-styles.js";
 import type { TerminalTargetView } from "./terminal-protocol.js";
 import { fetchTerminalTarget } from "./terminal-transport.js";
+import {
+  waitForWorkspaceTarget,
+  WORKSPACE_TARGET_WAIT_MS,
+} from "./workspace-target.js";
 
 /** Everything the tab body is given: framework shares plus the injected card face. */
 export interface PodmanContainersInjected extends ContainerCardFace {
@@ -58,6 +62,7 @@ export type PodmanContainersProps =
 type TargetState =
   | { readonly phase: "loading" }
   | { readonly phase: "ready"; readonly target: TerminalTargetView }
+  | { readonly phase: "pending" }
   | { readonly phase: "failed"; readonly message: string };
 
 export function PodmanContainers(
@@ -74,9 +79,13 @@ export function PodmanContainers(
     pluginSettingsAvailable,
   );
   // The host resolves the Session's workspace from the Session itself; the
-  // browser neither chooses nor guesses one. `failed` means it cannot place this
-  // session in a workspace, so the panel says so instead of listing every row.
+  // browser neither chooses nor guesses one. While the session or its workspace
+  // is still registering, the route answers `workspace-pending`, which this pane
+  // retries with backoff; `failed` means a real refusal, so the panel says so
+  // instead of listing every row.
   const [target, setTarget] = useState<TargetState>({ phase: "loading" });
+  // Bumped by the Retry action to start one fresh wait after the budget ran out.
+  const [attempt, setAttempt] = useState(0);
   const scope = target.phase === "ready" ? target.target : undefined;
   const listedWorkspace = scope === undefined
     ? undefined
@@ -108,24 +117,35 @@ export function PodmanContainers(
   useEffect(() => {
     const controller = new AbortController();
     setTarget({ phase: "loading" });
-    void fetchTerminalTarget(sessionId, controller.signal).then(
-      (resolved) => {
-        if (!controller.signal.aborted) {
-          setTarget({ phase: "ready", target: resolved });
-        }
-      },
-      (error: unknown) => {
-        if (controller.signal.aborted) return;
-        setTarget({
-          phase: "failed",
-          message: error instanceof Error ? error.message : String(error),
-        });
-      },
-    );
+    void waitForWorkspaceTarget({
+      signal: controller.signal,
+      fetchTarget: (signal) =>
+        fetchTerminalTarget(sessionId, signal, {
+          waitMs: WORKSPACE_TARGET_WAIT_MS,
+        }),
+    }).then((result) => {
+      // Unmount or a tab switch aborts the loop and must leave the pane alone.
+      if (controller.signal.aborted || result.status === "aborted") return;
+      switch (result.status) {
+        case "ready":
+          setTarget({ phase: "ready", target: result.target });
+          return;
+        case "pending":
+          setTarget({ phase: "pending" });
+          return;
+        default:
+          setTarget({
+            phase: "failed",
+            message: result.error instanceof Error
+              ? result.error.message
+              : String(result.error),
+          });
+      }
+    });
     return () => {
       controller.abort();
     };
-  }, [sessionId]);
+  }, [sessionId, attempt]);
 
   const containers = containersInWorkspace(state.containers, scope);
   // The workspace header is the settings card's own block header, with this
@@ -156,6 +176,21 @@ export function PodmanContainers(
         ? <p style={hint} role="status">{t("loading")}</p>
         : target.phase === "failed"
         ? <p style={hint} role="alert">{target.message}</p>
+        : target.phase === "pending"
+        ? (
+          <div style={hint} role="status">
+            <p style={PENDING_MESSAGE_STYLE}>
+              {t("containersWorkspaceStarting")}
+            </p>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setAttempt((count) => count + 1)}
+            >
+              {t("retry")}
+            </Button>
+          </div>
+        )
         : workspace === undefined
         ? <p style={hint} role="status">{t("containersPanelNoWorkspace")}</p>
         : (
@@ -178,17 +213,34 @@ export function PodmanContainers(
             onRecreate={props.recreate}
             onRemoveWorkspace={props.removeWorkspace}
             onCreate={props.createContainer}
+            onCreateVolume={props.createVolume}
             onCreateSecret={props.createSecret}
             onStartContainer={props.startContainer}
             onApplyContainerConfig={props.applyContainerConfig}
             gatewayUnavailable={state.gatewayState === "absent" ||
               state.gatewayState === "incompatible"}
+            templateActions={{
+              listTemplates: props.listTemplates,
+              inspectTemplate: props.inspectTemplate,
+              buildTemplate: props.buildTemplate,
+              applyTemplate: props.applyTemplate,
+              publishTemplate: props.publishTemplate,
+            }}
+            onBuildImage={props.buildImage}
+            onRebuildImage={props.rebuildImage}
+            onRebuildBaseImage={props.rebuildBaseImage}
+            onPullBaseImage={props.pullBaseImage}
+            onReload={props.reload}
             extraAction={settingsAction}
           />
         )}
     </section>
   );
 }
+
+// The pending notice keeps the pane's hint typography but drops the paragraph's
+// own margins, so the Retry action sits right below it.
+const PENDING_MESSAGE_STYLE: React.CSSProperties = { margin: 0 };
 
 // The slot body has no padding of its own, so the pane supplies its insets and
 // scrolls the workspace block as one unit. The pane is the panel's one surface:

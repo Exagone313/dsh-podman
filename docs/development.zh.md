@@ -65,15 +65,15 @@ orchestrator 和 guest-agent 镜像，位于
 ## Protobuf
 
 `.proto` 源文件位于 `proto/`；生成的 Go 绑定位于
-`internal/genproto/`，会被提交。修改 `.proto` 后，请用 `make proto`（即运行
-`buf generate`）重新生成。Buf 需单独安装——请用
-`go install github.com/bufbuild/buf/cmd/buf@v1.73.0` 固定版本。请将 `.proto`
+`internal/genproto/`，会被提交。修改 `.proto` 后，请用 `make proto`（即运行 `buf
+generate`）重新生成。Buf 需单独安装——请用 `go install
+github.com/bufbuild/buf/cmd/buf@v1.73.0` 固定版本。请将 `.proto`
 改动与重新生成的 Go 绑定一起提交。
 
 JS 端在运行时通过 `@grpc/proto-loader` 加载原始 `.proto` 文件（构建时复制到
 `dist/grpc/proto/`）；不生成 TypeScript 绑定。CI 运行的 `make proto-check`
-会校验 schema、针对最新发布标签运行
-`buf breaking`，若已提交的绑定与重新生成的结果不一致则失败。
+会校验 schema、针对最新发布标签运行 `buf
+breaking`，若已提交的绑定与重新生成的结果不一致则失败。
 
 ## 命名
 
@@ -167,8 +167,8 @@ guest agent 之后，请自行重建容器：
 及其所有容器都会被移除，下次接入时会重新创建 pod
 与默认容器。重启这两个服务绝不会触及工作区容器，上述两种操作也都不会删除卷、机密或项目数据。
 
-仍在运行旧镜像中 guest agent 的容器会让 dsh 为其 guest 套接字记录
-`rejected by server because of excess pings`。该消息无害（grpc-js
+仍在运行旧镜像中 guest agent 的容器会让 dsh 为其 guest 套接字记录 `rejected by
+server because of excess pings`。该消息无害（grpc-js
 会退避并重连），重建该容器后即消失；若同样的消息出现在 `orchestrator.sock`
 上，则说明 orchestrator 服务仍在运行上一个镜像。
 
@@ -244,8 +244,8 @@ zizmor）、`ci-code.yml`（Go、JS、镜像、Trivy）、`ci-docs.yml`（dprint
 - **reuse** — REUSE 许可证合规检查。
 - **go** — 构建、`gofmt -s` 检查、vet、测试和 govulncheck（Go 漏洞）。未修复的
   发现不会导致任务失败；可修复的会导致失败。
-- **js** — 安装、TypeScript 格式检查、lint、类型检查、构建、测试和
-  `pnpm audit`。
+- **js** — 安装、TypeScript 格式检查、lint、类型检查、构建、测试和 `pnpm
+  audit`。
 - **docs** — Markdown 格式检查（通过 `make fmt-check-md` 运行 `dprint`）。
 - **images** — 构建 orchestrator 和 guest-agent
   镜像（仅在测试任务通过后运行）；**dsh image** 构建 `Containerfile.dsh`。
@@ -286,10 +286,9 @@ git push origin master x.y.z
 会回退到自动生成的说明。加上 `--dry-run` 可只校验版本与说明，不做任何改动。
 
 `scripts/bump-version.mjs` 会检查版本是否为递增的 Semver
-正式版或预发布版，将其写入 `package.json`，提交
-`chore: bump version to X`，并创建标签；它不会推送，且要求处于 `master`
-分支且工作区干净。使用 `--notes` 时，提交正文和附注标签信息都会带上批准的说明；
-`--notes -`
+正式版或预发布版，将其写入 `package.json`，提交 `chore: bump version to
+X`，并创建标签；它不会推送，且要求处于 `master` 分支且工作区干净。使用 `--notes`
+时，提交正文和附注标签信息都会带上批准的说明； `--notes -`
 从标准输入读取，空正文会被拒绝。标签同时也是构建出的插件与二进制文件所
 报告的版本，因为 `scripts/generate-version.mjs` 从 `git describe --tags`
 推导嵌入的版本。预发布版（`1.0.0-rc.1`）也用同样的方式递增。

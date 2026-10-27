@@ -112,15 +112,14 @@ alone.
 
 ### `DSH_PODMAN_BASE_IMAGE_PREFIX`
 
-Prefix under which base images are tagged, as
-`BASE_IMAGE_PREFIX + <short> +
-":latest"`. When the prefix starts with
-`localhost/`, base images are **built locally** by the orchestrator from their
-upstream primitive reference; any other prefix marks them as **public**, in
-which case the orchestrator **pulls** the tagged base images from that registry
-instead of building them. The built-in base images are `archlinux` (pacman),
-`ubuntu` (apt), and `alpine` (apk); their short names are reserved and cannot be
-built over, rebuilt, or removed as custom images.
+Prefix under which base images are tagged, as `BASE_IMAGE_PREFIX + <short> +
+":latest"`. When the prefix starts with `localhost/`, base images are **built
+locally** by the orchestrator from their upstream primitive reference; any other
+prefix marks them as **public**, in which case the orchestrator **pulls** the
+tagged base images from that registry instead of building them. The built-in
+base images are `archlinux` (pacman), `ubuntu` (apt), and `alpine` (apk); their
+short names are reserved and cannot be built over, rebuilt, or removed as custom
+images.
 
 ### `DSH_PODMAN_GUEST_AGENT_IMAGE` and `DSH_PODMAN_HOST_GUEST_AGENT_BIN`
 
@@ -177,22 +176,22 @@ configuration.
 
 An arbitrary shared secret string that the orchestrator and the plugin must
 agree on; every control-plane request carries it as the gRPC metadata header
-`authorization: bearer <token>`. Use a long, random value — for example
-`openssl rand -hex 32` — and set the same value on both sides. When the
-orchestrator has no token set, it accepts unauthenticated control-plane calls
-(relying on the socket's file permissions instead); when a token is set,
-requests without the matching header are rejected with `Unauthenticated`.
+`authorization: bearer <token>`. Use a long, random value — for example `openssl
+rand -hex 32` — and set the same value on both sides. When the orchestrator has
+no token set, it accepts unauthenticated control-plane calls (relying on the
+socket's file permissions instead); when a token is set, requests without the
+matching header are rejected with `Unauthenticated`.
 
 ### `DSH_PODMAN_GATEWAY_TOKEN`
 
 An arbitrary shared secret string that the gateway and the orchestrator must
 agree on; every gateway control call carries it as the gRPC metadata header
-`authorization: bearer <token>`. Use a long, random value — for example
-`openssl rand -hex 32` — and set the same value on both sides. When the gateway
-has no token set, it accepts unauthenticated control calls (relying on the
-socket's file permissions instead) and logs a warning; when a token is set,
-calls without the matching header are rejected with `Unauthenticated`. The dsh
-plugin does not talk to the gateway and does not need this variable.
+`authorization: bearer <token>`. Use a long, random value — for example `openssl
+rand -hex 32` — and set the same value on both sides. When the gateway has no
+token set, it accepts unauthenticated control calls (relying on the socket's
+file permissions instead) and logs a warning; when a token is set, calls without
+the matching header are rejected with `Unauthenticated`. The dsh plugin does not
+talk to the gateway and does not need this variable.
 
 ### `DSH_PODMAN_ORCHESTRATOR_STATE`
 

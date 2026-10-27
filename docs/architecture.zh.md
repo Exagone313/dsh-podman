@@ -34,12 +34,14 @@ token（`DSH_PODMAN_ORCHESTRATOR_TOKEN`）作为 `authorization: bearer` 标头�
 
 orchestrator 服务公开以下 gRPC 方法（同时支撑 UI
 和工具）：`ListContainers`（仅返回 orchestrator 创建的 guest
-容器——它不拥有的容器永远不会被暴露）、`EnsureContainer{workspace_slug, container}`（唯一的接入路径：返回指定容器，若其缺失、已停止或运行过期的
-guest
-agent，则先重建它）、`StartContainer{workspace_slug, container, image_id, mounts, env, secret_env, paths}`（在工作区的
-pod 中创建或替换容器；空的 `container`
-指向默认容器，其他名称会被校验）、`RecreateContainer{workspace_slug, container, image_id, mounts, env, paths}`（停止、删除并重新创建容器，可选择使用新镜像、项目挂载、环境或
-PATH 附加项；空的 `image_id`
+容器——它不拥有的容器永远不会被暴露）、`EnsureContainer{workspace_slug,
+container}`（唯一的接入路径：返回指定容器，若其缺失、已停止或运行过期的 guest
+agent，则先重建它）、`StartContainer{workspace_slug, container, image_id,
+mounts, env, secret_env, paths}`（在工作区的 pod 中创建或替换容器；空的
+`container` 指向默认容器，其他名称会被校验）、`RecreateContainer{workspace_slug,
+container, image_id, mounts, env,
+paths}`（停止、删除并重新创建容器，可选择使用新镜像、项目挂载、环境或 PATH
+附加项；空的 `image_id`
 保留工作区当前的镜像）、`RemoveContainer`、`AddContainerMount`、`UpdateContainerMount`、`RemoveContainerMount`、`SetContainerPaths`、`AddContainerSecret`
 和 `RemoveContainerSecret`。该服务还公开支撑 Podman
 页面的工作区、卷、机密、镜像（构建、重建、删除以及拉取基础镜像）和缓存（列出与清理）操作，以及
@@ -111,8 +113,8 @@ API，运行并监督后台**守护进程**，并读取和写入文件。每个 
 的 control socket，也不会看到任何其他工作区的套接字目录。
 
 Guest API 不提供监视器，因此插件的 `ctx.fs` 提供者对 `watch` 返回
-`FS_IO_ERROR`（`Filesystem watching is not supported by this provider.`）。harness
-的工作区文件变更流因此返回
+`FS_IO_ERROR`（`Filesystem watching is not supported by this
+provider.`）。harness 的工作区文件变更流因此返回
 `workspace-file/watch-unsupported`，浏览器的文件树改为按需刷新，而非实时刷新——与
 harness 自带的 SSH 文件系统提供者对远程路径采取的做法一致。
 
@@ -186,8 +188,8 @@ orchestrator 通过 Podman 构建工作区镜像（有关原始/基础/自定义
 API，因此构建不会向 orchestrator 的状态目录写入任何内容。
 
 `image_rebuild_all` 首先确保每个基础镜像（根据 `DSH_PODMAN_BASE_IMAGE_PREFIX`
-容器模板按模板构建确定的镜像：`template-<净化后的文件基本名>-<模板绝对路径 sha256 的前 8 个十六进制字符>`。插件把模板的规范软件包列表与
-`ListImages`
+容器模板按模板构建确定的镜像：`template-<净化后的文件基本名>-<模板绝对路径
+sha256 的前 8 个十六进制字符>`。插件把模板的规范软件包列表与 `ListImages`
 报告的内容比较，仅当列表（或父基础镜像）不同时才重建；软件包全部属于基础镜像内置项的模板改为引用基础镜像、不构建，而不再需要的模板镜像会在无人引用后删除。加载模板通过
 `CreateWorkspace`/`StartContainer`
 创建或替换容器，始终以读写方式加入工作区项目挂载，并在容器存在后发布端口——发布失败只是警告，不会让加载失败。

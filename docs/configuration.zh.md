@@ -153,8 +153,8 @@ guest-agent 镜像在容器创建时提供 agent：orchestrator 使用 podman
 
 ### `DSH_PODMAN_GUEST_TOKEN`
 
-每次 guest-agent gRPC 调用所需的共享机密，以 gRPC 元数据头
-`authorization: bearer <token>` 传递。实际上，orchestrator
+每次 guest-agent gRPC 调用所需的共享机密，以 gRPC 元数据头 `authorization:
+bearer <token>` 传递。实际上，orchestrator
 会为每个工作区生成一个新的随机令牌，并通过 `DSH_PODMAN_GUEST_TOKEN` 注入到 guest
 容器中，同时将相同的值连同 guest 套接字路径一起交给插件——因此通常无需手动配置。
 
@@ -170,8 +170,7 @@ orchestrator 和插件必须约定的任意共享机密字符串；每个控制�
 
 gateway 与 orchestrator 必须一致的任意共享机密字符串；每次 gateway
 控制调用都会以 gRPC 元数据标头 `authorization: bearer <token>`
-携带它。请使用足够长的随机值——例如
-`openssl rand -hex
+携带它。请使用足够长的随机值——例如 `openssl rand -hex
 32`——并在两端设置相同的值。gateway
 未设置令牌时会接受未经认证的控制调用（改由套接字文件权限保护）并记录一条警告；设置了令牌后，缺少匹配标头的调用会被拒绝并返回
 `Unauthenticated`。dsh 插件不访问 gateway，因此不需要该变量。

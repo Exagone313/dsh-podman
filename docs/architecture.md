@@ -42,15 +42,13 @@ tools): `ListContainers` (returns only the guest containers the orchestrator
 created — containers it does not own are never exposed),
 `EnsureContainer{workspace_slug, container}` (the single attach path: returns
 the named container, recreating it first when it is missing, stopped, or running
-an outdated guest agent),
-`StartContainer{workspace_slug, container, image_id, mounts, env, secret_env,
-paths}`
-(creates or replaces a container in the workspace's pod; an empty `container`
-targets the default container and other names are validated),
-`RecreateContainer{workspace_slug, container, image_id, mounts, env, paths}`
-(stops, removes, and recreates a container, optionally with a new image, project
-mounts, environment, or PATH additions; an empty `image_id` keeps the
-workspace's current image), `RemoveContainer`, `AddContainerMount`,
+an outdated guest agent), `StartContainer{workspace_slug, container, image_id,
+mounts, env, secret_env, paths}` (creates or replaces a container in the
+workspace's pod; an empty `container` targets the default container and other
+names are validated), `RecreateContainer{workspace_slug, container, image_id,
+mounts, env, paths}` (stops, removes, and recreates a container, optionally with
+a new image, project mounts, environment, or PATH additions; an empty `image_id`
+keeps the workspace's current image), `RemoveContainer`, `AddContainerMount`,
 `UpdateContainerMount`, `RemoveContainerMount`, `SetContainerPaths`,
 `AddContainerSecret`, and `RemoveContainerSecret`. The service also exposes the
 workspace, volume, secret, image (build, rebuild, remove and base-image pull),
@@ -238,12 +236,11 @@ Containerfile, so a build writes nothing to the orchestrator's state directory.
 
 Container templates build a deterministic custom image per template:
 `template-<sanitized file basename>-<first 8 hex of sha256(absolute template
-path)>`.
-The plugin compares the template's canonical package list with what `ListImages`
-reports and rebuilds only when it (or the parent base) differs; a template whose
-packages are all base built-ins names the base image instead and builds nothing,
-and a template image no longer needed is removed once nothing references it.
-Loading a template creates a container through
+path)>`. The plugin compares the template's canonical package list with what
+`ListImages` reports and rebuilds only when it (or the parent base) differs; a
+template whose packages are all base built-ins names the base image instead and
+builds nothing, and a template image no longer needed is removed once nothing
+references it. Loading a template creates a container through
 `CreateWorkspace`/`StartContainer`, always with the workspace project mount
 added read-write, and publishes its ports after the container exists — a
 publishing failure is a warning, not a failed load. Replacing an existing

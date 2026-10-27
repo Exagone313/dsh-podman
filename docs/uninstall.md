@@ -47,9 +47,9 @@ root and only `podman unshare` can remove them, from the user namespace.
 
 ### Keep dsh without dsh-podman
 
-Run dsh directly instead of from the image — as the harness documents, with
-`npx @deepseek-ai/dsh web` — after removing the plugin from the profile, so dsh
-stops loading it and its built-in plugins are active again:
+Run dsh directly instead of from the image — as the harness documents, with `npx
+@deepseek-ai/dsh web` — after removing the plugin from the profile, so dsh stops
+loading it and its built-in plugins are active again:
 
 ```bash
 npx @deepseek-ai/dsh plugin --profile web remove @exagone313/dsh-podman

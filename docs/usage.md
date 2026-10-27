@@ -69,14 +69,12 @@ dsh-podman organizes the images its containers run into three tiers:
   extra packages on top. They are referenced by their short name (e.g.
   `valkey`).
 - **Template images** are custom images a container template builds. Their short
-  name is
-  `template-<sanitized file basename>-<first 8 hex of
-  sha256(absolute template path)>`,
-  so two same-named templates in different projects never share an image. A
-  template whose packages are all part of the base's built-in list refers to the
-  **base image** and builds nothing; on export that is written as
-  `image: <base>`, even for a custom image whose extra packages all turned out
-  to be base packages.
+  name is `template-<sanitized file basename>-<first 8 hex of sha256(absolute
+  template path)>`, so two same-named templates in different projects never
+  share an image. A template whose packages are all part of the base's built-in
+  list refers to the **base image** and builds nothing; on export that is
+  written as `image: <base>`, even for a custom image whose extra packages all
+  turned out to be base packages.
 
 Image references (`imageId`, `parent`, `image`) are **short names only** (no
 registry prefix, no `:tag`).
@@ -131,15 +129,14 @@ on `bash`) is accepted but has no effect here: the sandbox is bypassed inside
 the container, so the plugin grants the escalation without prompting.
 
 The prompt's reason is a full sentence naming the action and the objects it
-touches, quoting every identifier — for example
-`Add mount to container "web": volume "data" (read-only)`. It covers the
-container image, each mount's kind and destination, the environment variable
-keys, the secret env var names, and the resolved file path. It follows the UI
-language: the browser client records the active locale in the plugin's
-`uiLocale` preference, which the Host persists in the plugin config (English
-when unset). A policy denial — a read-only sandbox, or a destination on a
-project mount — is reported in the same language. The Podman page's actions are
-direct control calls and are not gated.
+touches, quoting every identifier — for example `Add mount to container "web":
+volume "data" (read-only)`. It covers the container image, each mount's kind and
+destination, the environment variable keys, the secret env var names, and the
+resolved file path. It follows the UI language: the browser client records the
+active locale in the plugin's `uiLocale` preference, which the Host persists in
+the plugin config (English when unset). A policy denial — a read-only sandbox,
+or a destination on a project mount — is reported in the same language. The
+Podman page's actions are direct control calls and are not gated.
 
 `container_start`, `container_recreate`, and `container_bash` accept an `env`
 map applied to the container (or the bash process); `container_exec` and

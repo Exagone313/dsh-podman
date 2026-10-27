@@ -30,8 +30,8 @@ tmpfs，因此每次应用模板时请预期这一点。
 
 以下步骤仍需在宿主机上手动完成，提示词只会请求它们，而不会自行尝试：
 
-- 重建 dsh、orchestrator 和 guest-agent
-  镜像（`make image`），这需要宿主机上的仓库检出与 podman；
+- 重建 dsh、orchestrator 和 guest-agent 镜像（`make
+  image`），这需要宿主机上的仓库检出与 podman；
 - 安装或编辑 `~/.config/containers/systemd/` 下的 Quadlet 单元，随后执行
   `systemctl --user daemon-reload`
   并重启（见[安装开发构建](development.zh.md#安装开发构建)）。

@@ -85,15 +85,15 @@
     "@deepseek-ai/schemastery": "3.18.5",
     "@types/node": "^26.6.5",
     "@types/react": "^18.3.31",
-    "dprint": "0.62.0",
+    "dprint": "0.64.3",
     "esbuild": "^0.28.2",
-    "oxlint": "1.87.0",
+    "oxlint": "1.89.0",
     "typescript": "^7.0.2"
   },
   "engines": {
     "node": ">=22"
   },
-  "packageManager": "pnpm@12.11.2",
+  "packageManager": "pnpm@12.15.0",
   "publishConfig": {
     "access": "public",
     "provenance": true

@@ -44,8 +44,8 @@ namespace）中用 `podman unshare` 删除。
 
 ### 保留 dsh 但不使用 dsh-podman
 
-改为直接运行 dsh，而不是从镜像运行——如 harness 文档所述，使用
-`npx @deepseek-ai/dsh web`——在此之前先从 profile 中移除插件，这样 dsh
+改为直接运行 dsh，而不是从镜像运行——如 harness 文档所述，使用 `npx
+@deepseek-ai/dsh web`——在此之前先从 profile 中移除插件，这样 dsh
 便不再加载它，其内置插件也会重新启用：
 
 ```bash

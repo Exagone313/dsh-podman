@@ -16,6 +16,9 @@ import {
   containerConfigFrom,
 } from "./container-card-config.js";
 import { ContainerEditModal } from "./container-card-edit-modal.js";
+import { exportContainerTemplate } from "../container-template.js";
+import { orderedMounts } from "../mount-order.js";
+import { downloadTextFile } from "./download.js";
 import { type DirectoryPickerFace } from "./directory-picker.js";
 import {
   ConfirmButton,
@@ -26,7 +29,6 @@ import {
   ImageRow,
   MountRow,
   mountViewToInput,
-  orderedMounts,
   PathRow,
   PortRow,
   SecretEnvRow,
@@ -45,6 +47,7 @@ import {
   rowDivider,
   rowMain,
   rowMeta,
+  templateAction,
 } from "./container-card-styles.js";
 import { ROW_LIST_CLASS } from "./container-card-table-styles.js";
 import { orderedEnvEntries } from "../env-rows.js";
@@ -57,8 +60,9 @@ import { type ReactNode, useEffect, useRef, useState } from "react";
 // it holds, so a long list only makes the block taller. A group with no rows at
 // all renders nothing, so its label and gap never reserve empty height. It
 // carries the shared list marker, so the narrow query separates its consecutive
-// rows the way it does in the editor that changes the same list.
-function FieldGroup(props: {
+// rows the way it does in the editor that changes the same list. The template
+// preview reuses it, so both read a spec in the same groups.
+export function FieldGroup(props: {
   label: string;
   children: ReactNode;
 }): ReactNode {
@@ -74,8 +78,9 @@ function FieldGroup(props: {
   );
 }
 
-// The placeholder one empty list of a container block reads with.
-function NoEntries(props: { t: Translate }): ReactNode {
+// The placeholder one empty list of a container block reads with; the template
+// preview states an empty group with it too.
+export function NoEntries(props: { t: Translate }): ReactNode {
   return <span style={missingValue}>{props.t("valueMissing")}</span>;
 }
 
@@ -107,13 +112,31 @@ export function ContainerRow(props: {
   // Recreate the container exactly as it is: the row's own action, with the
   // confirmation the staged apply already uses.
   onRecreate: (workspace: string, container: string, image: string) => void;
-  onCreateSecret: (name: string, length?: number, charset?: string) => void;
+  // The storage creators the edit dialog's mount rows open, shared with the
+  // settings Storage tab.
+  createVolume: (name: string) => Promise<boolean>;
+  onCreateSecret: (
+    name: string,
+    length?: number,
+    charset?: string,
+  ) => Promise<boolean>;
   onApplyContainerConfig: (
     workspace: string,
     container: string,
     base: ContainerConfig,
     next: ContainerConfig,
   ) => void;
+  // A draft from the Load template popup's Continue action, opened on the edit
+  // dialog once. Nothing is saved until the dialog's Apply.
+  prefill?: { token: number; config: ContainerConfig };
+  // The project mount the prefilled dialog forces read-write and non-removable.
+  forcedProject?: string;
+  // Called when the edit dialog closes, so the parent can drop a one-shot
+  // prefill (and its forced mount) again.
+  onEditClosed?: () => void;
+  // Returning to the Load template popup from a prefilled dialog's Back. The
+  // parent clears the prefill and reopens the popup on its recorded draft.
+  onEditBack?: () => void;
   // Whether the snapshot knows the port-publishing gateway is missing or
   // incompatible, so the editor can say so instead of failing on a dial.
   gatewayUnavailable: boolean;
@@ -133,8 +156,13 @@ export function ContainerRow(props: {
     writable,
     onRemove,
     onRecreate,
+    createVolume,
     onCreateSecret,
     onApplyContainerConfig,
+    prefill,
+    forcedProject,
+    onEditClosed,
+    onEditBack,
     gatewayUnavailable,
     projectName,
     projectsRoot,
@@ -189,6 +217,21 @@ export function ContainerRow(props: {
     : t(blockingError.key, blockingError.params);
   const rebuilds = configRebuildsContainer(server, draft);
   const [open, setOpen] = useState(false);
+  // A failed export names its reason in the row instead of replacing the file
+  // with nothing.
+  const [exportError, setExportError] = useState("");
+  // A prefill is opened once per token: a snapshot refresh must not reopen the
+  // dialog or clobber an edit the user has already started.
+  const openedPrefill = useRef(0);
+  useEffect(() => {
+    if (prefill === undefined || prefill.token === openedPrefill.current) {
+      return;
+    }
+    openedPrefill.current = prefill.token;
+    setDraft(prefill.config);
+    setStaged(server);
+    setOpen(true);
+  }, [prefill, server]);
   // The editors share the container-scoped commands, so any of them in flight
   // gates the whole row; the staged commands run from the apply action.
   const containerBusy = containerActionPending(
@@ -304,6 +347,29 @@ export function ContainerRow(props: {
                     container.imageId,
                   )}
               />
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={!usable}
+                style={templateAction}
+                onClick={() => {
+                  try {
+                    const exported = exportContainerTemplate(
+                      container,
+                      images,
+                      projectName,
+                    );
+                    downloadTextFile(exported.filename, exported.yaml);
+                    setExportError("");
+                  } catch (error) {
+                    setExportError(
+                      error instanceof Error ? error.message : String(error),
+                    );
+                  }
+                }}
+              >
+                {t("exportTemplate")}
+              </Button>
               <ConfirmButton
                 t={t}
                 destructive
@@ -395,6 +461,18 @@ export function ContainerRow(props: {
             </FieldGroup>
           </div>
         </div>
+        {exportError === "" ? null : (
+          <p
+            role="alert"
+            style={{
+              margin: 0,
+              color: "var(--dsw-alias-state-error)",
+              fontSize: "12px",
+            }}
+          >
+            {t("exportTemplateFailed", { message: exportError })}
+          </p>
+        )}
       </div>
       <ContainerEditModal
         t={t}
@@ -411,6 +489,7 @@ export function ContainerRow(props: {
         projectName={projectName}
         projectsRoot={projectsRoot}
         directoryPicker={directoryPicker}
+        forcedProject={forcedProject}
         writable={writable}
         draft={draft}
         dirty={dirty}
@@ -420,11 +499,25 @@ export function ContainerRow(props: {
         onBlockingError={setBlockingError}
         rebuilds={rebuilds}
         recreatePending={recreatePending}
+        createVolume={createVolume}
         onCreateSecret={onCreateSecret}
         onChange={setDraft}
         onDiscard={discard}
         onApply={apply}
-        onClose={() => setOpen(false)}
+        onClose={() => {
+          setOpen(false);
+          onEditClosed?.();
+        }}
+        onBack={prefill === undefined || onEditBack === undefined
+          ? undefined
+          : () => {
+            // Back drops the editor's draft without applying, and the parent
+            // clears the one-shot prefill and reopens the template popup.
+            discard();
+            setOpen(false);
+            onEditBack();
+          }}
+        backBaseline={prefill?.config}
       />
     </>
   );

@@ -174,13 +174,15 @@ guest agent 之后，请自行重建容器：
 
 ### 开发容器工具链
 
-工作区容器的根文件系统是只读且一次性的，因此贡献者构建所用的工具链需要工作区的一个卷。项目并不分发开发镜像：请自行构建一个自定义镜像——[设置提示词](development-prompt.zh.md)
-会以 `archlinux` 为父镜像构建 `dsh-podman-tooling`，包含 `go`、`nodejs`（Node
-26）、`npm`、`reuse` 和 `python-chardet`——并为镜像无法保存的状态创建工作区卷：Go
-与 npm 缓存、含 `go install` 工具的 `gopath`， 以及 `package.json`
-固定版本、Arch 仓库没有的 pnpm（dprint 随项目的 `pnpm install` 一并安装）。
+工作区容器的根文件系统是只读且一次性的，因此贡献者构建所用的工具链需要工作区的一个卷。项目并不分发开发镜像：[设置提示词](development-prompt.zh.md)会应用已提交的
+[`.dsh-podman/develop.yml`](../.dsh-podman/develop.yml) 模板，其镜像以
+`archlinux` 为基础并加入 `go`、`nodejs`（Node 26）、`npm`、`reuse` 和
+`python-chardet`，同时以只读方式挂载 `deepseek-harness`——请先把该仓库克隆到
+projects 根目录，否则无法加载。模板还为镜像无法保存的状态声明工作区卷：Go 与 npm
+缓存、含 `go install` 工具的 `gopath`，以及 `package.json` 固定版本、Arch
+仓库没有的 pnpm（dprint 随项目的 `pnpm install` 一并安装）。
 
-提示词会把该卷以 `dsh-podman-toolchain` 挂载到
+模板会把该卷以 `dsh-podman-toolchain` 挂载到
 `/opt/toolchain`（读写），并让容器的缓存都指向它，因此无需 source
 任何脚本即可使用：
 
@@ -194,7 +196,7 @@ guest agent 之后，请自行重建容器：
 身份** 中设置一次提交身份，容器便无需 `~/.gitconfig` 即可获得
 `GIT_AUTHOR_*`/`GIT_COMMITTER_*`。
 
-提示词会在 dsh 内完成上述全部配置，并且可以反复粘贴以修复工作区。Podman
+提示词会在 dsh 内应用该模板，并且可以反复粘贴以修复工作区。Podman
 存储受管卷时会加上 `DSH_PODMAN_VOLUME_PREFIX` 前缀，因此该卷显示为
 `dsh-podman-dsh-podman-toolchain`。
 

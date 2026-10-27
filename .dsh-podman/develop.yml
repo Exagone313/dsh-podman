@@ -1,0 +1,34 @@
+version: 1
+kind: dsh-podman/container-template
+spec:
+  imageTemplate:
+    base: archlinux
+    packages:
+      - go
+      - nodejs
+      - npm
+      - python-chardet
+      - reuse
+  env:
+    GOCACHE: /opt/toolchain/gocache
+    GOENV: /opt/toolchain/home/.config/go/env
+    GOMODCACHE: /opt/toolchain/gomodcache
+    GOPATH: /opt/toolchain/gopath
+    PNPM_HOME: /opt/toolchain/pnpm-home
+    npm_config_cache: /opt/toolchain/npm-cache
+    npm_config_prefix: /opt/toolchain/npm-global
+  mounts:
+    - kind: project
+      project: dsh-podman
+      mode: read_write
+    - kind: project
+      project: deepseek-harness
+      mode: read_only
+    - kind: volume
+      volume: dsh-podman-toolchain
+      destination: /opt/toolchain
+      mode: read_write
+  paths:
+    - /opt/toolchain/gopath/bin
+    - /opt/toolchain/npm-global/bin
+    - /opt/toolchain/pnpm-home

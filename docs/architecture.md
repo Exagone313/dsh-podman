@@ -139,6 +139,14 @@ and writes files. Each guest container gets exactly one socket directory
 bind-mounted into it, so a guest never sees the orchestrator's control socket
 nor any other workspace's socket directory.
 
+The guest agent also serves `WriteTemplate`, which saves a container-template
+YAML into the project's `.dsh-podman` directory: it creates the directory when
+missing, refuses a name that is not a plain basename, and reports a read-only
+project mount as `PermissionDenied` before any I/O. The plugin's own host view
+of the project is read-only (the dsh container mounts the projects root that
+way), so listing and inspecting templates happen on the host while saving always
+goes through this RPC.
+
 The guest API exposes no watcher, so the plugin's `ctx.fs` provider reports
 `FS_IO_ERROR` (`Filesystem watching is not supported by this provider.`) for
 `watch`. The harness's workspace-file change stream therefore answers
@@ -228,6 +236,23 @@ Custom images are layered on top of a parent image and add extra packages. Every
 build streams its context to the Podman API as a tar holding the generated
 Containerfile, so a build writes nothing to the orchestrator's state directory.
 
+Container templates build a deterministic custom image per template:
+`template-<sanitized file basename>-<first 8 hex of sha256(absolute template
+path)>`.
+The plugin compares the template's canonical package list with what `ListImages`
+reports and rebuilds only when it (or the parent base) differs; a template whose
+packages are all base built-ins names the base image instead and builds nothing,
+and a template image no longer needed is removed once nothing references it.
+Loading a template creates a container through
+`CreateWorkspace`/`StartContainer`, always with the workspace project mount
+added read-write, and publishes its ports after the container exists — a
+publishing failure is a warning, not a failed load. Replacing an existing
+container is an edit: the popup opens the edit editor with the template's fields
+filled in (the fields it omits stay as the container currently has them, and its
+ports stay out of the editor) and the normal edit-apply path updates the
+container, so nothing is removed or recreated up front. The template's ports are
+then published through the same warning-only path.
+
 `image_rebuild_all` first ensures every base image (building locally or pulling
 from a public registry per `DSH_PODMAN_BASE_IMAGE_PREFIX`), then rebuilds the
 stored custom images **in dependency order** — each parent before the images
@@ -245,15 +270,23 @@ under a running build.
 
 ## Podman page transport
 
-The Podman page talks to the host over one authenticated fetch route below the
-harness API path (`/api/podman/card`), registered on the connection service so
-the carrier applies its Host/Origin fence and browser authentication first:
+The Podman page talks to the host over authenticated fetch routes below the
+harness API path, registered on the connection service so the carrier applies
+its Host/Origin fence and browser authentication first. The settings card uses
+`/api/podman/card`:
 
 - `GET` returns the live orchestrator snapshot (containers, images, workspaces,
   volumes, secrets, caches), built fresh on every request.
 - `POST` runs exactly one command (`remove` / `recreate` / `create` /
   `image_rebuild` / `image_rebuild_all` / volume / secret / secret-env / mount
   ops) against the orchestrator and returns the notice to show.
+
+The load-template popup uses its own route (`/api/podman/templates`), because
+its operations return structured results rather than one notice: `GET` lists the
+project's `.dsh-podman` templates from the host filesystem (the read-only view
+the workspace directory picker also reads), and `POST` inspects a template
+(including an upload), builds the image it needs, creates a container from it,
+or publishes the ports of a template whose replace the edit editor applied.
 
 The plugin's own config therefore holds **only real preferences**: the default
 image, the default environment, and the page's active locale (`uiLocale`, so the

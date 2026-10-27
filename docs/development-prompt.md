@@ -8,15 +8,29 @@ SPDX-License-Identifier: MIT
 
 English | [中文](development-prompt.zh.md)
 
-This page carries the prompt that builds a development image, creates the
-toolchain volume and wires the workspace container to it, as described in
-[Development](development.md#development-container-toolchain). Nothing it needs
-exists beforehand.
+This page carries the prompt that sets up the development container: it builds
+the development image, creates the `dsh-podman-toolchain` volume and wires the
+workspace container to it with the mounts, environment and PATH additions, as
+described in [Development](development.md#development-container-toolchain). The
+prompt does this by applying the project's committed
+[`.dsh-podman/develop.yml`](../.dsh-podman/develop.yml) container template,
+which declares those elements.
 
 Paste the block below into a dsh session attached to the workspace. It is safe
-to run again: it inspects the workspace first and only creates, mounts or
-changes what is missing or different. Recreating a container stops its daemons
-and clears its tmpfs, so expect that whenever a change is needed.
+to run again: loading the template replaces the default container's image and
+mounts with the template's, replaces the environment, secret environment and
+PATH additions it declares, and keeps the groups it leaves undeclared at their
+current values. Replacing a container stops its daemons and clears its tmpfs, so
+expect that whenever the template is applied.
+
+Before the prompt, clone the `deepseek-harness` repository into the projects
+root so it exists there as the project `deepseek-harness`. The template mounts
+that project read-only and cannot be loaded while it is missing. Run this from
+the projects root, the directory that holds this checkout:
+
+```sh
+git clone https://github.com/deepseek-ai/deepseek-harness.git
+```
 
 Two steps stay manual on the host, and the prompt asks for them instead of
 attempting them:
@@ -28,47 +42,37 @@ attempting them:
   [Install development builds](development.md#install-development-builds)).
 
 ```text
-Set up a development environment for this dsh-podman workspace. It must be safe
-to run again: inspect the current state first, and only create, mount or change
-what is missing or different, keeping whatever is already configured. Use the
-container tools; never run `make` or edit files on the host.
+Set up a development environment for this dsh-podman workspace from the
+project's committed `.dsh-podman/develop.yml` container template. It must be
+safe to run again: applying the template reconciles the default container with
+the image, mounts, environment and PATH it declares. Use the container tools,
+and never run `make` or edit files on the host.
 
-1. Image: build a custom image named `dsh-podman-tooling` from the `archlinux`
-   base with packages `go`, `nodejs`, `npm`, `reuse` and
-   `python-chardet`. It is a local image, not a published one; leave an existing
-   one alone when it already carries exactly these packages, and rebuild it from
-   this list when it does not.
-2. Volume: create the workspace volume `dsh-podman-toolchain` unless it already
-   exists.
-3. Container: inspect the default container's image, mounts, PATH additions and
-   environment. Recreate it once, only if something below is missing or
-   different, passing the complete merged sets so nothing existing is dropped:
-   - image `dsh-podman-tooling`;
-   - `dsh-podman-toolchain` mounted at `/opt/toolchain`, read-write, plus the
-     workspace project mount and every mount already there;
-   - PATH additions `/opt/toolchain/gopath/bin`,
-     `/opt/toolchain/npm-global/bin` and `/opt/toolchain/pnpm-home`, in
-     addition to the ones already there;
-   - environment `GOCACHE=/opt/toolchain/gocache`,
-     `GOMODCACHE=/opt/toolchain/gomodcache`, `GOPATH=/opt/toolchain/gopath`,
-     `npm_config_cache=/opt/toolchain/npm-cache`,
-     `npm_config_prefix=/opt/toolchain/npm-global`,
-     `PNPM_HOME=/opt/toolchain/pnpm-home` and
-     `GOENV=/opt/toolchain/home/.config/go/env`, merged with the variables
-     already on the container.
-4. pnpm: the volume, not the image, carries pnpm. If `pnpm --version` does not
+1. Prerequisite: check that the project `deepseek-harness` exists under the
+   projects root. If it does not, stop and ask me to clone the
+   `deepseek-harness` repository there (a host step); the template mounts that
+   project read-only and cannot be loaded without it.
+2. Template: call the `container_template_load` tool with template `develop`
+   and container `default`; the change needs approval. The tool builds the
+   template image when needed, replaces the default container with the
+   template's image, mounts, environment, secret environment and PATH
+   additions, and publishes the template's ports. The template's mounts replace
+   the container's mounts; the environment, secret environment and PATH
+   additions it declares replace those groups, and groups it leaves undeclared
+   keep their current values. The resulting image is `archlinux`-based and
+   carries `go`, `nodejs`, `npm`, `python-chardet` and `reuse`.
+3. pnpm: the volume, not the image, carries pnpm. If `pnpm --version` does not
    report the version `package.json` pins in `packageManager`, install it with
    `npm install -g pnpm@<that version>` and check again. dprint, the formatter,
    is a project devDependency and arrives with `pnpm install`.
-5. Git identity: do not write a `~/.gitconfig`. If no Git identity is
-   configured, tell me to set it once on the Podman page (sidebar **Plugins**
-   panel → **Installed** → **dsh-podman**): **Default
-   environment → Git identity**.
-6. Verify from inside the container, without sourcing anything: `make build`,
+4. Git identity: do not write a `~/.gitconfig`. If no identity is configured,
+   tell me to set it once on the Podman page's **Defaults** tab: **Default
+   environment variables** → **Git identity**.
+5. Verify from inside the container, without sourcing anything: `make build`,
    `make vet` and `pnpm test` must succeed in the repository.
-7. Report what you created or changed, or that everything was already in place.
-   If a step needs the host — rebuilding the dsh, orchestrator or guest-agent
-   images (`make image`), or editing the Quadlet units under
-   `~/.config/containers/systemd/` and reloading systemd — stop and ask me
-   instead of trying it.
+6. Report what changed, or that everything already matched the template. If a
+   step needs the host — cloning `deepseek-harness`, rebuilding the dsh,
+   orchestrator or guest-agent images (`make image`), or editing the Quadlet
+   units under `~/.config/containers/systemd/` and reloading systemd — stop and
+   ask me instead of trying it.
 ```

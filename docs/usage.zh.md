@@ -60,6 +60,9 @@ dsh-podman 将容器运行的镜像组织为三个层级：
   页面重建或拉取，并且它们的短名称是保留的——它们不能被覆盖构建、重建或作为自定义镜像移除。
 - **自定义镜像**是从**父镜像**——基础镜像或另一个自定义镜像——创建的用户构建镜像，继承其软件包管理器并在此基础上添加额外软件包。它们通过短名称引用（例如
   `valkey`）。
+- **模板镜像**是容器模板构建的自定义镜像。其短名称为
+  `template-<净化后的文件基本名>-<模板绝对路径 sha256 的前 8 个十六进制字符>`，因此不同项目中同名的模板绝不会共享镜像。若模板的软件包全部属于基础镜像的内置列表，则模板引用**基础镜像**、不执行构建；导出时会写成
+  `image: <base>`，即使该自定义镜像的额外软件包恰好都包含在基础镜像中也是如此。
 
 镜像引用（`imageId`、`parent`、`image`）**只能是短名称**（没有镜像仓库前缀，没有
 `:tag`）。
@@ -139,6 +142,14 @@ bash 进程）的 `env` 映射；`container_exec` 和 `daemon_start` 已经接�
 | `image_rebuild_all` ✱ | —                               | 确保每个基础镜像，然后按依赖顺序重建每个自定义镜像，跳过重建失败的任何镜像及其依赖项；无法确保的基础镜像以短名称出现在 `skipped` 中 |
 | `image_rebuild` ✱     | `imageId`                       | 原地重建现有的自定义镜像                                                                                                            |
 | `image_remove` ✱      | `imageId`                       | 移除已构建的镜像；当工作区或容器仍引用它时拒绝                                                                                      |
+
+### 容器模板
+
+| 工具                        | 参数                         | 描述                                                                                                                                                                                              |
+| --------------------------- | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `container_template_export` | `container`                  | 将容器导出为容器模板 YAML 字符串（根基础镜像、递归软件包并集减去基础镜像内置项、挂载、环境、机密名称、PATH 附加项，以及带显式 `protocol: tcp` 的端口）；不改变任何内容                            |
+| `container_template_load` ✱ | `template`、可选 `container` | 加载项目模板：按需构建镜像，然后创建容器，发布其端口并把失败报告为警告；工作区项目挂载始终以读写方式加入                                                                                          |
+| `container_template_save` ✱ | `container`、`name`          | 保存源 `container` 为模板：工具自行将其导出为规范 YAML（没有 YAML 参数），并通过默认容器的 guest agent 以 `name` 写入项目的 `.dsh-podman` 目录；基本名没有 YAML 后缀时补上 `.yml`，目录缺失时创建 |
 
 ### 容器
 
@@ -355,7 +366,12 @@ PTC 容器不属于任何工作区，因此绝不会出现在这里：它的卡�
 按钮用于复制其 UUID，并把每个容器呈现为一个堆叠区块。
 
 没有容器的工作区会得到一个 **创建容器** 按钮；已有容器的工作区则得到
-**添加容器** 按钮，用于添加额外的命名容器。每个工作区行还提供
+**添加容器**
+按钮，用于添加额外的命名容器。紧随其后的是**加载模板**按钮：第一个弹窗从
+`.dsh-podman` 列出项目模板（在 dsh
+宿主机上读取，与目录选择器相同），并提供**从浏览器上传**；选中一个模板只会选定它，点击**下一步**会打开第二个弹窗。该弹窗说明模板将预填的内容——镜像（以及是否需要构建）、挂载、项目挂载目录不存在的警告、所需命名机密及其是否存在，以及端口——并在顶部提供**新容器**或**编辑现有容器**的目标选择。镜像缺失时，镜像卡片提供明确的**构建镜像**按钮；镜像就绪后同一卡片提供**重新构建镜像**，即使当前镜像已是最新也会重新构建。构建或重新构建期间、失败后，以及在其他条件满足前，**继续**保持禁用；阻塞原因显示在页脚左侧、操作按钮之前。**继续**会打开按模板草稿预填的创建编辑器——工作区还没有容器时打开其默认容器的编辑器，否则打开命名容器编辑器并在其中选择名称；若选择了**编辑现有容器**，则改为打开所选容器的编辑编辑器，填入模板的字段，模板省略的字段显示容器当前的值，模板的端口不进入草稿。此处只有镜像卡片的操作会执行构建；在编辑器自身点击应用前，不会创建或替换任何内容。
+
+创建工作区的第一个容器时，创建操作的应用会创建其默认容器；否则创建在创建编辑器中选择的命名容器，并在容器存在后发布模板的端口；发布失败会作为警告报告，而不会使创建失败。替换操作的应用通过常规编辑应用路径更新容器——不会事先移除或重建——随后再发布模板的端口，其失败同样作为警告报告。工作区项目挂载会被静默加入、设为读写且强制保留；在编辑器自身点击应用前不会保存任何内容。每个工作区行还提供
 **移除容器**，它会移除该工作区的 dsh-podman 容器及其
 Pod，以及编排器对应的记录（卷、机密和项目数据会保留，dsh
 工作区本身不受影响）；移除工作区的最后一个容器也会一并移除其
@@ -365,9 +381,12 @@ Pod，因此不会留下空的 Pod。
 
 区块的身份行包含容器名称、状态标签与创建时间（相对时间，精确时刻作为提示）。
 
-其 **编辑**、**重建** 与 **移除**
+其 **编辑**、**重建**、**导出模板** 与 **移除**
 操作位于该行右端——有空间时右对齐，空间不足时移到名称下方：**重建**
-会在确认（确认框会指明容器）后按原样重建容器。
+会在确认（确认框会指明容器）后按原样重建容器。**导出模板** 会把容器写为容器模板
+YAML
+并打开浏览器的保存对话框；自定义镜像的父链会折叠为根基础镜像加上去除该基础镜像内置项后的递归软件包并集，因此额外软件包都包含在基础镜像中的镜像会导出为
+`image: <base>`。
 
 有一个容器是保留的：`ptc`，即服务工作流与 PTC
 运行的容器。它不属于任何工作区，因此绝不会出现在某个工作区内部：其卡片位于
@@ -439,8 +458,10 @@ tmpfs 挂载不带模式控件。
 分组会以工作区的默认环境变量开头，使新容器将继承的值可见；不改动的值保留默认值，改动过的值成为该容器自身的环境变量。
 
 机密环境变量通过新增一行并从命名机密中选择来附加——变量名可像环境变量的键一样就地编辑——就地改换其机密，或用该行自己的
-**移除** 按钮移除。工作区没有机密时，机密选择器会替换为
-**创建机密**，在对话框之上打开机密表单。
+**移除**
+按钮移除（模板带来的要求正是这样取消的）。若某行引用的机密已不存在，该行会就地提供
+**创建机密**，以该行所需的名称打开表单；工作区没有机密时，机密选择器也会替换为
+**创建机密**。新建的机密会在请求它的那一行中被选中。
 
 变量名必填，且在环境变量与机密环境变量中必须唯一。
 
@@ -519,6 +540,69 @@ chip 输入框（输入名称并按空格/逗号，或粘贴列表，以添加�
 紧接该表格下方是共享 PTC 容器的卡片：其身份、状态与 **PTC**
 标签、相对创建时间、只读镜像，以及 **重建**／**移除** 操作。
 
+### 容器模板
+
+容器模板是项目 `.dsh-podman` 目录中的 YAML 文件：
+
+```yaml
+version: 1
+kind: dsh-podman/container-template
+spec:
+  imageTemplate: # 或 image: ubuntu（二者恰有其一）
+    base: ubuntu # 仅限 archlinux | ubuntu | alpine
+    packages:
+      - git
+      - ripgrep
+  env:
+    NODE_ENV: development
+  secretEnv:
+    GITHUB_TOKEN: github-token # 变量 -> 机密名称，绝不是值
+  mounts:
+    - kind: project # 没有 destination；mode 省略时为 read_only
+      project: app
+      mode: read_write
+    - kind: volume
+      volume: cache
+      destination: /cache
+      mode: read_write
+    - kind: secret # 只读，没有 mode
+      secret: npm-token
+      destination: /root/.npmrc
+    - kind: tmpfs # 只有 destination
+      destination: /tmp/scratch
+  paths:
+    - /usr/local/bin
+  ports:
+    - container: 8080
+      host: 8080
+      protocol: tcp # protocol 必填，仅 tcp
+    - container: 3000
+      protocol: tcp # host 可选
+```
+
+这就是规范渲染：通篇块风格、两空格缩进；空的 `env`、`secretEnv`、`mounts`、
+`paths` 或 `ports` 组会被省略，而不是写成 `{}` 或 `[]`（解析器会补上空默认值）。
+项目与卷挂载带可选的 `mode`（`read_only` 或 `read_write`），省略时为
+`read_only`，即编辑器的默认值。机密挂载固定只读，tmpfs 挂载完全不接受 mode。
+挂载按容器卡片的顺序分组——project、volume、secret、tmpfs——同一种类内保持原有顺序。
+四个 Git 身份变量（`GIT_AUTHOR_NAME`、`GIT_AUTHOR_EMAIL`、`GIT_COMMITTER_NAME`、
+`GIT_COMMITTER_EMAIL`）绝不会写入模板；模板中声明它们时，加载会忽略它们：它们来自默认环境。
+
+格式是严格的：未知的 `version` 或 `kind`、上述集合之外的任何键（不允许
+`command`、`resources`、tmpfs `size`，端口 `protocol` 也必须是
+`tcp`）、同时或都未提供
+`image`/`imageTemplate`、非三种声明基础镜像之一的基础名称、与挂载类型不匹配的键（项目挂载带
+destination、机密或 tmpfs 挂载带 mode、tmpfs 带来源或
+`size`），以及用机密值代替机密名称，都会被拒绝而不是被忽略。模板中绝不存储机密值，只存储容器应接收的机密名称。
+
+软件包列表在两侧都是规范的：基础镜像内置列表中的软件包会被丢弃，剩余项去重并排序，若为空则模板引用基础镜像。当软件包列表（或父基础镜像）与镜像列表报告的不一致时会重建模板镜像；不再需要的模板镜像会在无人引用后删除。
+
+`container_template_save` 会经过 guest agent（dsh 宿主机对项目只读）：它接收源
+`container` 和一个纯基本名 `name`——而不是 YAML 文档——自行导出该容器，并把规范
+YAML 写成 `name`（名称没有 YAML 后缀时补上 `.yml`），目录缺失时创建
+`.dsh-podman`。它会拒绝不是纯基本名的名称，并把只读项目挂载报告为干净权限错误而不是
+I/O 失败。
+
 ## Podman 终端
 
 插件自带一个右侧边栏的 **Podman 终端**标签页，以自身实现取代 dsh
@@ -577,9 +661,9 @@ mode、jobs）。插件自身的工具是全局的，全部保持可用，分为
 
 - **直接：**
   `image_list`、`image_get`、`container_list`、`container_read`、`container_glob`、`container_grep`、`container_mount_list`、`volume_list`、`secret_list`、`secret_create`、`daemon_list`、`daemon_logs`、`daemon_stop`、`daemon_restart`、`container_start`（仅在传入
-  `mounts` 或 `secretEnv` 时询问）。
+  `mounts` 或 `secretEnv` 时询问），以及 `container_template_export`。
 - **需审批**（通常的 `✱`
-  工具）：`image_build`、`image_rebuild`、`image_rebuild_all`、`image_remove`、`container_recreate`、`container_remove`、`container_mount_add`、`container_mount_remove`、`container_mount_update`、`container_path_set`、`container_path_add`、`container_path_remove`、`volume_remove`、`secret_remove`、`container_secret_add`、`container_secret_remove`。
+  工具）：`image_build`、`image_rebuild`、`image_rebuild_all`、`image_remove`、`container_recreate`、`container_remove`、`container_mount_add`、`container_mount_remove`、`container_mount_update`、`container_path_set`、`container_path_add`、`container_path_remove`、`volume_remove`、`secret_remove`、`container_secret_add`、`container_secret_remove`、`container_template_load`、`container_template_save`。
 - **仅在此预设中需审批：**
   `container_bash`、`container_exec`、`container_write`、`container_edit`、`daemon_start`——因此一旦用户批准，agent
   就可以运行命令、编辑容器文件或启动守护进程，而无需这些工具在其他预设中询问。

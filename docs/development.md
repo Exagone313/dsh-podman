@@ -189,15 +189,17 @@ service is still running the previous image.
 
 A workspace container's root filesystem is read-only and disposable, so the
 toolchain a contributor builds with needs a workspace volume. No development
-image is distributed: build a custom one — the
-[setup prompt](development-prompt.md) builds `dsh-podman-tooling` from the
-`archlinux` base with `go`, `nodejs` (Node 26), `npm`, `reuse` and
-`python-chardet` — and create a workspace volume for the state an image cannot
-keep: the Go and npm caches, `gopath` with the `go install`ed tools, and pnpm,
-which `package.json` pins to a version the Arch repositories do not carry
-(dprint ships with the project's `pnpm install`).
+image is distributed: the [setup prompt](development-prompt.md) applies the
+committed [`.dsh-podman/develop.yml`](../.dsh-podman/develop.yml) template,
+whose image extends `archlinux` with `go`, `nodejs` (Node 26), `npm`, `reuse`
+and `python-chardet`, and which mounts `deepseek-harness` read-only — clone that
+repository into the projects root first, or loading fails. The template also
+declares a workspace volume for the state an image cannot keep: the Go and npm
+caches, `gopath` with the `go install`ed tools, and pnpm, which `package.json`
+pins to a version the Arch repositories do not carry (dprint ships with the
+project's `pnpm install`).
 
-The prompt mounts that volume as `dsh-podman-toolchain` at `/opt/toolchain`
+The template mounts that volume as `dsh-podman-toolchain` at `/opt/toolchain`
 (read-write) and points the container's caches at it, so commands work without
 sourcing anything:
 
@@ -212,9 +214,10 @@ Set the commit identity once on the Podman page (sidebar **Plugins** panel →
 → **Git identity**, so containers get `GIT_AUTHOR_*`/`GIT_COMMITTER_*` without a
 `~/.gitconfig`.
 
-The prompt applies all of this from inside dsh and can be pasted again to repair
-a workspace. Podman stores managed volumes with `DSH_PODMAN_VOLUME_PREFIX`
-prepended, so it lists the volume as `dsh-podman-dsh-podman-toolchain`.
+The prompt applies the template from inside dsh and can be pasted again to
+repair a workspace. Podman stores managed volumes with
+`DSH_PODMAN_VOLUME_PREFIX` prepended, so it lists the volume as
+`dsh-podman-dsh-podman-toolchain`.
 
 ### Install a local plugin build
 

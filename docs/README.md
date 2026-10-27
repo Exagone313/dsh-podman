@@ -24,7 +24,8 @@ SPDX-License-Identifier: MIT
 - [Development](development.md) — build the plugin from this repository and run
   it from a development checkout.
 - [Development container setup prompt](development-prompt.md) — the prompt that
-  creates the development image, volume and container.
+  sets up the workspace's development container from the project's `develop`
+  template.
 - [Uninstall](uninstall.md) — remove dsh-podman and the Quadlet units, and run
   dsh without it.
 
@@ -39,7 +40,7 @@ SPDX-License-Identifier: MIT
   环境变量，以及插件的界面设置。
 - [使用](usage.zh.md) — 面向模型的工具、Podman 页面以及镜像模型。
 - [开发](development.zh.md) — 从本仓库构建插件，并在开发检出环境中运行。
-- [开发容器设置提示词](development-prompt.zh.md) —
-  用于创建开发镜像、卷与容器的提示词。
+- [开发容器设置提示词](development-prompt.zh.md) — 从项目的 `develop`
+  模板设置工作区开发容器的提示词。
 - [卸载](uninstall.zh.md) — 移除 dsh-podman 与 Quadlet
   单元，并在没有它的情况下运行 dsh。

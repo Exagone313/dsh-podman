@@ -68,6 +68,15 @@ dsh-podman organizes the images its containers run into three tiers:
   image or another custom image — inheriting its package manager and adding
   extra packages on top. They are referenced by their short name (e.g.
   `valkey`).
+- **Template images** are custom images a container template builds. Their short
+  name is
+  `template-<sanitized file basename>-<first 8 hex of
+  sha256(absolute template path)>`,
+  so two same-named templates in different projects never share an image. A
+  template whose packages are all part of the base's built-in list refers to the
+  **base image** and builds nothing; on export that is written as
+  `image: <base>`, even for a custom image whose extra packages all turned out
+  to be base packages.
 
 Image references (`imageId`, `parent`, `image`) are **short names only** (no
 registry prefix, no `:tag`).
@@ -169,6 +178,14 @@ managed `DSH_*` fact.
 | `image_rebuild_all` ✱ | —                               | Ensure every base, then rebuild every custom image in dependency order, skipping any image whose rebuild fails and its dependents; a base it cannot ensure is reported in `skipped` by short name |
 | `image_rebuild` ✱     | `imageId`                       | Rebuild an existing custom image in place                                                                                                                                                         |
 | `image_remove` ✱      | `imageId`                       | Remove a built image; refused while a workspace or container still references it                                                                                                                  |
+
+### Container templates
+
+| Tool                        | Params                           | Description                                                                                                                                                                                                                                                                                                                          |
+| --------------------------- | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `container_template_export` | `container`                      | Export a container as a container-template YAML string (root base image, recursive package union minus the base's built-ins, mounts, environment, secret names, PATH additions and ports with explicit `protocol: tcp`); changes nothing                                                                                             |
+| `container_template_load` ✱ | `template`, optional `container` | Load a project template: build its image when needed, then create a container, publish its ports and report failures as warnings; the workspace project mount is added read-write                                                                                                                                                    |
+| `container_template_save` ✱ | `container`, `name`              | Save the source `container` as a template: the tool exports it to canonical YAML itself (there is no YAML argument) and writes the result through the default container's guest agent as `name` in the project's `.dsh-podman` directory, adding `.yml` when the basename has no YAML suffix and creating the directory when missing |
 
 ### Containers
 
@@ -422,21 +439,54 @@ a stacked block.
 
 A workspace with no container gets a **Create container** button; a workspace
 that already has containers gets an **Add container** button for additional,
-named containers. Every workspace row also offers **Remove containers**, which
-removes that workspace's dsh-podman containers and its pod, and the
-orchestrator's record for it (volumes, secrets, and project data are kept, and
-the dsh workspace itself is untouched); removing a workspace's last container
-removes its pod as well, so an empty pod is never left behind.
+named containers. A **Load template** button follows it: a first popup lists the
+project's templates from `.dsh-podman` (read on the dsh host, like the directory
+picker) and offers **Upload from the browser**; choosing one only selects it,
+and **Next** opens a second popup. That popup explains what the template will
+stage — the image (and whether it must be built), the mounts, warnings for
+project mount directories that do not exist, the required named secrets with
+which ones exist, and the ports — with a **New container** / **Edit existing
+container** destination choice at the top. When the image is missing it carries
+an explicit **Build image** button; once the image is ready the same card offers
+**Rebuild image**, which rebuilds it even though it is current. **Continue**
+stays disabled while a build or rebuild runs, after a failure, and until the
+other requirements hold; the blocking reason sits in the footer, left of the
+actions. **Continue** opens the create editor prefilled from the template's
+draft — the workspace's default container editor when it holds no container yet,
+otherwise the named editor where the container name is chosen — or, with **Edit
+existing container** chosen, the chosen container's edit editor, with the
+template's fields filled in, the fields the template omits showing as the
+container currently has them, and the template's ports left out of the draft.
+The image card's action is the only thing that builds here; nothing is created
+or replaced until the editor's own Apply.
+
+A create's Apply makes the default container when the workspace held none, or
+the named container chosen in the create editor otherwise, and publishes the
+template's ports after the container exists; a publishing failure is reported as
+a warning rather than failing the create. A replace's Apply updates the
+container through the normal edit-apply path — nothing is removed or recreated
+up front — and the template's ports are published afterwards, their failures
+again reported as warnings. The workspace project mount is added silently,
+read-write and forced; nothing is saved until that editor's own Apply. Every
+workspace row also offers **Remove containers**, which removes that workspace's
+dsh-podman containers and its pod, and the orchestrator's record for it
+(volumes, secrets, and project data are kept, and the dsh workspace itself is
+untouched); removing a workspace's last container removes its pod as well, so an
+empty pod is never left behind.
 
 #### Containers
 
 The block's identity line carries the container name, its state chip and its
 created time (relative, with the exact instant as a tooltip).
 
-Its **Edit**, **Recreate** and **Remove** actions sit at the right end of that
-line, right-aligned while the block has room and below the name once it does
-not: **Recreate** rebuilds the container as it is once the confirmation naming
-it is accepted.
+Its **Edit**, **Recreate**, **Export template** and **Remove** actions sit at
+the right end of that line, right-aligned while the block has room and below the
+name once it does not: **Recreate** rebuilds the container as it is once the
+confirmation naming it is accepted. **Export template** writes the container as
+a container-template YAML and opens the browser's save dialog; a custom image's
+parent chain is folded into its root base plus the recursive package union minus
+that base's built-ins, so an image whose extra packages were all base packages
+exports as `image: <base>`.
 
 One container is reserved: `ptc`, the container that serves workflows and PTC
 runs. It belongs to no workspace, so it never appears inside one: its card sits
@@ -534,8 +584,10 @@ edited one becomes that container's own.
 Secret environment variables are attached by adding a row and picking a named
 secret, with the variable name editable in place like an environment variable's
 key, switched to another secret in place, or removed from that row's own
-**Remove**. A workspace without secrets offers **Create secret** in place of the
-secret picker, opening the secret form on top of the dialog.
+**Remove** — which is how a requirement a template brought in is dropped. A row
+whose secret no longer exists offers **Create secret** in place, opening the
+form on the name that row requires; a workspace without secrets offers **Create
+secret** too. A newly created secret is selected in the row that asked for it.
 
 A variable name is required and must be unique across the environment variables
 and the secret environment variables.
@@ -635,6 +687,81 @@ Directly below that table sits the shared PTC container's card: its identity,
 its state and **PTC** chips, its relative creation time, its read-only image and
 its **Recreate**/**Remove** actions.
 
+### Container templates
+
+A container template is a YAML file in a project's `.dsh-podman` directory:
+
+```yaml
+version: 1
+kind: dsh-podman/container-template
+spec:
+  imageTemplate: # or image: ubuntu (exactly one of the two)
+    base: ubuntu # archlinux | ubuntu | alpine only
+    packages:
+      - git
+      - ripgrep
+  env:
+    NODE_ENV: development
+  secretEnv:
+    GITHUB_TOKEN: github-token # variable -> secret name, never a value
+  mounts:
+    - kind: project # no destination; mode defaults to read_only
+      project: app
+      mode: read_write
+    - kind: volume
+      volume: cache
+      destination: /cache
+      mode: read_write
+    - kind: secret # read-only, no mode
+      secret: npm-token
+      destination: /root/.npmrc
+    - kind: tmpfs # destination only
+      destination: /tmp/scratch
+  paths:
+    - /usr/local/bin
+  ports:
+    - container: 8080
+      host: 8080
+      protocol: tcp # protocol required, tcp only
+    - container: 3000
+      protocol: tcp # host optional
+```
+
+That is the canonical rendering: block style throughout with two-space
+indentation, and an empty `env`, `secretEnv`, `mounts`, `paths` or `ports` group
+omitted rather than written as `{}` or `[]` (the parser supplies the empty
+defaults). Project and volume mounts carry an optional `mode` (`read_only` or
+`read_write`); omitting it means `read_only`, the editor's default. Secret
+mounts are fixed read-only and tmpfs mounts carry no mode at all. Mounts are
+grouped in the container card's order — project, volume, secret, tmpfs — and
+keep their order within a kind. The four Git identity variables
+(`GIT_AUTHOR_NAME`, `GIT_AUTHOR_EMAIL`, `GIT_COMMITTER_NAME`,
+`GIT_COMMITTER_EMAIL`) are never written to a template, and a template that
+declares them is loaded without them: they come from the default environment.
+
+The format is strict: an unknown `version` or `kind`, any key outside the sets
+above (no `command`, `resources`, tmpfs `size`, or port `protocol` other than
+`tcp`), both or neither of `image`/`imageTemplate`, a base name outside the
+three declared bases, a mount key that does not match its kind (a project mount
+with a destination, a secret or tmpfs mount with a mode, a tmpfs with a source
+or `size`), and a secret value instead of a secret name are refused rather than
+ignored. Secret values are never stored in a template, only the names of the
+secrets a container should receive.
+
+The package list is canonical on both sides: packages already in the base's
+built-in list are dropped, what remains is deduplicated and sorted, and an empty
+remainder means the base image. The template image is rebuilt when its package
+list (or its parent base) differs from what the image list reports, and a
+superseded template image is deleted once no container references it.
+
+`container_template_save` goes through the guest agent (the dsh host only reads
+the project): it takes the source `container` and a plain `name` basename — not
+a YAML document — exports that container itself, and writes the canonical YAML
+as `name` (with `.yml` added when the name has no YAML suffix), creating
+`.dsh-podman` when missing. It refuses a name that is not a plain basename and
+reports a read-only project mount as a clean permission error rather than an I/O
+failure.
+
 ## Podman terminal
 
 The plugin owns a **Podman terminal** right-Sidebar tab. It replaces the
@@ -707,14 +834,15 @@ are global and all remain available, split as:
 - **Direct:** `image_list`, `image_get`, `container_list`, `container_read`,
   `container_glob`, `container_grep`, `container_mount_list`, `volume_list`,
   `secret_list`, `secret_create`, `daemon_list`, `daemon_logs`, `daemon_stop`,
-  `daemon_restart`, `container_start` (asks only when `mounts` or `secretEnv` is
-  passed).
+  `daemon_restart`, `container_template_export`, `container_start` (asks only
+  when `mounts` or `secretEnv` is passed).
 - **Approval-gated** (the usual `✱` tools): `image_build`, `image_rebuild`,
   `image_rebuild_all`, `image_remove`, `container_recreate`, `container_remove`,
   `container_mount_add`, `container_mount_remove`, `container_mount_update`,
   `container_path_set`, `container_path_add`, `container_path_remove`,
   `volume_remove`, `secret_remove`, `container_secret_add`,
-  `container_secret_remove`.
+  `container_secret_remove`, `container_template_load`,
+  `container_template_save`.
 - **Approval-gated only in this preset:** `container_bash`, `container_exec`,
   `container_write`, `container_edit`, `daemon_start` — so the agent can run
   commands, edit container files, or start daemons once the user approves,

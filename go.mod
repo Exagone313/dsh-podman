@@ -51,7 +51,7 @@ require (
 	github.com/felixge/httpsnoop v1.1.0 // indirect
 	github.com/fsnotify/fsnotify v1.10.1 // indirect
 	github.com/fsouza/go-dockerclient v1.13.3 // indirect
-	github.com/go-jose/go-jose/v4 v4.1.5 // indirect
+	github.com/go-jose/go-jose/v4 v4.1.6 // indirect
 	github.com/go-logr/logr v1.4.4 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/godbus/dbus/v5 v5.2.3 // indirect
@@ -164,4 +164,12 @@ replace github.com/cyberphone/json-canonicalization => ./third_party/json-canoni
 tool (
 	gitlab.com/Exagone313/go-download-licenses/cmd/go-download-licenses
 	golang.org/x/vuln/cmd/govulncheck
+)
+
+// cilium/ebpf and goldmark are pulled in transitively only — through
+// opencontainers/cgroups and golang.org/x/tools (the govulncheck tool) — and
+// both advisories are fixed in these releases.
+replace (
+	github.com/cilium/ebpf => github.com/cilium/ebpf v0.22.0
+	github.com/yuin/goldmark => github.com/yuin/goldmark v1.8.6
 )

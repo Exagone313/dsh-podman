@@ -12,6 +12,7 @@ import {
   renderPublishNotice,
   renderReason,
   resolveReasonLocale,
+  type TemplateLoadSummary,
 } from "./approval-reasons.js";
 import { preExecutePolicy, summarizeArgs } from "./index.js";
 import { testReadSession } from "./test-support.js";
@@ -273,5 +274,168 @@ test("preExecutePolicy renders a localized deny reason for a built-in tool", asy
   assert.equal(
     denied.reason,
     "已拒绝：当前会话为只读，而 “bash” 可能修改文件。",
+  );
+});
+
+const DEVELOP_SUMMARY: TemplateLoadSummary = {
+  image: {
+    base: "archlinux",
+    packages: ["go", "nodejs", "npm", "python-chardet", "reuse"],
+  },
+  mounts: [
+    { kind: "project", source: "dsh-podman", readOnly: false },
+    { kind: "project", source: "deepseek-harness", readOnly: true },
+    {
+      kind: "volume",
+      source: "dsh-podman-toolchain",
+      destination: "/opt/toolchain",
+      readOnly: false,
+    },
+  ],
+  secretEnv: [],
+  ports: [],
+  envCount: 7,
+  pathCount: 3,
+  removals: { mounts: 0, env: 0, secretEnv: 0, paths: 0 },
+};
+
+test("a template apply summary renders every fact in English", () => {
+  assert.equal(
+    renderReason("en", {
+      kind: "container_template_load",
+      template: "develop",
+      container: "default",
+      summary: DEVELOP_SUMMARY,
+    }),
+    'Apply container template "develop" to container "default". Image: archlinux plus 5 packages (go, nodejs, npm, python-chardet, reuse). Mounts: project "dsh-podman" (read-write); project "deepseek-harness" (read-only); volume "dsh-podman-toolchain" at "/opt/toolchain" (read-write). Secret environment: none. Ports: none. Environment: 7 variables. PATH: 3 additions.',
+  );
+});
+
+test("a template apply summary renders every fact in Chinese", () => {
+  assert.equal(
+    renderReason("zh", {
+      kind: "container_template_load",
+      template: "develop",
+      container: "default",
+      summary: DEVELOP_SUMMARY,
+    }),
+    "将容器模板“develop”应用到容器“default”。镜像：以 archlinux 为基础，另加 5 个软件包（go、nodejs、npm、python-chardet、reuse）。挂载：项目“dsh-podman”（读写）；项目“deepseek-harness”（只读）；卷“dsh-podman-toolchain”挂载到“/opt/toolchain”（读写）。机密环境变量：无。端口：无。环境变量：7 个；PATH 追加项：3 个。",
+  );
+});
+
+test("a template apply summary names secrets, ports and a base-only image", () => {
+  const summary: TemplateLoadSummary = {
+    image: { base: "ubuntu" },
+    mounts: [
+      { kind: "tmpfs", source: "", destination: "/scratch" },
+      {
+        kind: "secret",
+        source: "npm-token",
+        destination: "/run/secrets/npm",
+      },
+    ],
+    secretEnv: [{ env: "NPM_TOKEN", secret: "npm-token" }],
+    ports: [{ container: 8080, host: 9090 }],
+    envCount: 2,
+    pathCount: 1,
+    removals: { mounts: 0, env: 0, secretEnv: 0, paths: 0 },
+  };
+  assert.equal(
+    renderReason("en", {
+      kind: "container_template_load",
+      template: "web",
+      container: "web",
+      summary,
+    }),
+    'Apply container template "web" to container "web". Image: ubuntu. Mounts: tmpfs at "/scratch"; secret "npm-token" at "/run/secrets/npm". Secret environment: "NPM_TOKEN" from secret "npm-token". Ports: container 8080 to host 9090. Environment: 2 variables. PATH: 1 addition.',
+  );
+  assert.equal(
+    renderReason("zh", {
+      kind: "container_template_load",
+      template: "web",
+      container: "web",
+      summary,
+    }),
+    "将容器模板“web”应用到容器“web”。镜像：ubuntu。挂载：tmpfs 挂载到“/scratch”；机密“npm-token”挂载到“/run/secrets/npm”。机密环境变量：“NPM_TOKEN”来自机密“npm-token”。端口：容器 8080 映射到主机 9090。环境变量：2 个；PATH 追加项：1 个。",
+  );
+});
+
+test("a template apply summary omits a port's host when the gateway picks it", () => {
+  const summary: TemplateLoadSummary = {
+    image: { base: "alpine" },
+    mounts: [],
+    secretEnv: [],
+    ports: [{ container: 8080 }],
+    envCount: 0,
+    pathCount: 0,
+    removals: { mounts: 0, env: 0, secretEnv: 0, paths: 0 },
+  };
+  assert.equal(
+    renderReason("en", {
+      kind: "container_template_load",
+      template: "web",
+      summary,
+    }),
+    'Apply container template "web" to the default container. Image: alpine. Mounts: none. Secret environment: none. Ports: container 8080.',
+  );
+  assert.equal(
+    renderReason("zh", {
+      kind: "container_template_load",
+      template: "web",
+      summary,
+    }),
+    "将容器模板“web”应用到默认容器。镜像：alpine。挂载：无。机密环境变量：无。端口：容器 8080。",
+  );
+});
+
+test("a template apply summary counts every non-zero removal group", () => {
+  const summary: TemplateLoadSummary = {
+    ...DEVELOP_SUMMARY,
+    removals: { mounts: 1, env: 2, secretEnv: 1, paths: 3 },
+  };
+  assert.equal(
+    renderReason("en", {
+      kind: "container_template_load",
+      template: "develop",
+      container: "default",
+      summary,
+    }),
+    'Apply container template "develop" to container "default". Image: archlinux plus 5 packages (go, nodejs, npm, python-chardet, reuse). Mounts: project "dsh-podman" (read-write); project "deepseek-harness" (read-only); volume "dsh-podman-toolchain" at "/opt/toolchain" (read-write). Secret environment: none. Ports: none. Environment: 7 variables. PATH: 3 additions. Removes 1 mount, 2 environment variables, 1 secret environment variable and 3 PATH additions.',
+  );
+  assert.equal(
+    renderReason("zh", {
+      kind: "container_template_load",
+      template: "develop",
+      container: "default",
+      summary,
+    }),
+    "将容器模板“develop”应用到容器“default”。镜像：以 archlinux 为基础，另加 5 个软件包（go、nodejs、npm、python-chardet、reuse）。挂载：项目“dsh-podman”（读写）；项目“deepseek-harness”（只读）；卷“dsh-podman-toolchain”挂载到“/opt/toolchain”（读写）。机密环境变量：无。端口：无。环境变量：7 个；PATH 追加项：3 个。将移除 1 个挂载、2 个环境变量、1 个机密环境变量和 3 个 PATH 追加项。",
+  );
+});
+
+test("a template apply summary counts a single removal without plurals", () => {
+  assert.equal(
+    renderReason("en", {
+      kind: "container_template_load",
+      template: "web",
+      container: "web",
+      summary: {
+        ...DEVELOP_SUMMARY,
+        removals: { mounts: 1, env: 0, secretEnv: 0, paths: 0 },
+      },
+    }).endsWith(" Removes 1 mount."),
+    true,
+  );
+  assert.equal(
+    renderReason("zh", {
+      kind: "container_template_load",
+      template: "web",
+      container: "web",
+      summary: {
+        ...DEVELOP_SUMMARY,
+        removals: { mounts: 0, env: 0, secretEnv: 0, paths: 2 },
+      },
+    }).endsWith("将移除 2 个 PATH 追加项。"),
+    true,
   );
 });

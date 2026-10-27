@@ -14,12 +14,26 @@ import {
   sessionWorkspaceSlug,
   streamLines,
   unaryGuest,
+  writeGuestTemplate,
 } from "./guest-rpc.js";
 import {
   inferMountKind,
   mountsFromInput,
   projectMountDestinationReason,
 } from "./mount-input.js";
+import {
+  exportContainerTemplate,
+  parseContainerTemplate,
+  renderContainerTemplate,
+} from "./container-template.js";
+import { applyContainerTemplate } from "./template-apply.js";
+import {
+  readProjectTemplate,
+  TemplateFileError,
+  templateFileName,
+  workspaceForCwd,
+} from "./template-files.js";
+import { ensureTemplateImage } from "./template-image.js";
 import { mergeDefaultEnv } from "./container-env.js";
 import { isPtcContainer } from "./container-kind.js";
 import {
@@ -46,6 +60,33 @@ const GLOB_MAX_RESULTS = 100;
 // VCS metadata directories ripgrep must never descend into for a discovery
 // listing (`--no-ignore --hidden` would otherwise surface them).
 const GLOB_VCS_EXCLUDES = [".git", ".svn", ".hg", ".bzr", ".jj", ".sl"];
+
+// templateFromContainer exports one container of a workspace as a template,
+// refusing a name that does not belong to the workspace (or the reserved PTC
+// container). The export and save tools share this lookup.
+async function templateFromContainer(
+  resolver: WorkspaceResolver,
+  workspace: Awaited<ReturnType<typeof workspaceForCwd>>,
+  container: string,
+) {
+  const [containers, images] = await Promise.all([
+    resolver.control<{ containers?: any[] }>("listContainers", {}),
+    resolver.control<{ images?: any[] }>("listImages", {}),
+  ]);
+  const row = (containers.containers ?? []).find(
+    (candidate: any) =>
+      candidate.workspaceSlug === workspace.workspaceSlug &&
+      candidate.containerName === container,
+  );
+  if (row === undefined || isPtcContainer(row)) {
+    throw containerNotFound(container, workspace.workspaceSlug);
+  }
+  return exportContainerTemplate(
+    row,
+    images.images ?? [],
+    workspace.projectName,
+  );
+}
 
 // failOnSearchError turns a ripgrep failure into a tool error: exit code 2 means
 // ripgrep rejected the pattern or could not read the tree, and returning an
@@ -257,6 +298,81 @@ export const toolHandlers: Record<
         rows.filter((row: any) => row.containerName !== "default"),
       ),
     ];
+  },
+  container_template_load: async (resolver, input, exec) => {
+    const workspace = await workspaceForCwd(
+      (resolver as any).registry,
+      resolver.getConfig().projectsRoot,
+      currentCwd(exec),
+    );
+    const file = await readProjectTemplate(
+      workspace.projectPath,
+      input.template,
+    );
+    const template = parseContainerTemplate(file.yaml);
+    const ensured = await ensureTemplateImage(resolver, {
+      name: file.name,
+      path: file.path,
+      template,
+    });
+    const container = typeof input.container === "string"
+      ? input.container
+      : undefined;
+    const applied = await applyContainerTemplate(resolver, {
+      workspaceSlug: workspace.workspaceSlug,
+      projectName: workspace.projectName,
+      template,
+      imageId: ensured.imageId,
+      ...(container === undefined || container === "" ? {} : { container }),
+    });
+    return {
+      ...publicContainerResult(applied.row),
+      template: file.name,
+      imageId: ensured.imageId,
+      ...(ensured.built ? { built: true } : {}),
+      ...(applied.warnings.length > 0 ? { warnings: applied.warnings } : {}),
+    };
+  },
+  container_template_export: async (resolver, input, exec) => {
+    const workspace = await workspaceForCwd(
+      (resolver as any).registry,
+      resolver.getConfig().projectsRoot,
+      currentCwd(exec),
+    );
+    return (await templateFromContainer(resolver, workspace, input.container))
+      .yaml;
+  },
+  container_template_save: async (resolver, input, exec) => {
+    const name = templateFileName(input.name);
+    // `container` is required in the tool schema, but the harness does not
+    // validate raw JSON-schema arguments, so name the missing source instead of
+    // letting an empty string fall through to a lookup that cannot match it.
+    if (typeof input.container !== "string" || input.container === "") {
+      throw new TemplateFileError(
+        'the "container" parameter is required: pass the source container name',
+      );
+    }
+    const workspace = await workspaceForCwd(
+      (resolver as any).registry,
+      resolver.getConfig().projectsRoot,
+      currentCwd(exec),
+    );
+    // Saving no longer takes a document: export the named container here, then
+    // write that canonical YAML through the default container's guest agent,
+    // which is the one that always has the project mounted.
+    const exported = await templateFromContainer(
+      resolver,
+      workspace,
+      input.container,
+    );
+    const binding = await resolver.resolve(currentCwd(exec), exec?.signal);
+    const path = await writeGuestTemplate(
+      binding,
+      workspace.projectPath,
+      name,
+      renderContainerTemplate(exported.template),
+    );
+    return { container: input.container, name, path };
   },
   container_start: async (resolver, input, exec) => {
     const mounts = mountsFromInput(

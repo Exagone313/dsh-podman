@@ -5,7 +5,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { EXPECTED_TOOLS } from "./test-support.js";
-import { TOOL_PRESENTATION } from "./client/tool-presentations.js";
+import {
+  TOOL_PRESENTATION,
+  toolPresentation,
+  toolResultCode,
+} from "./client/tool-presentations.js";
 import { en, zh } from "./client/locales.js";
 
 // Every tool this package registers must own a client row, or the shipped
@@ -30,4 +34,34 @@ test("every tool has a client row with a title in both languages", () => {
       `${tool} has no zh title`,
     );
   }
+});
+
+// A string result reaches the row as its JSON scalar, so the export's YAML
+// would otherwise show as one quoted line with escaped newlines. Declaring the
+// fence and decoding the envelope is what makes the row render the template as
+// a selectable, copyable YAML code block instead.
+test("the template export result is presented as fenced YAML", () => {
+  const yaml = "image: ubuntu\nmounts:\n  - kind: project\n";
+  assert.equal(TOOL_PRESENTATION.container_template_export.resultFence, "yaml");
+  assert.deepEqual(
+    toolResultCode("container_template_export", JSON.stringify(yaml)),
+    { lang: "yaml", code: yaml },
+  );
+  assert.notEqual(
+    toolResultCode("container_template_export", JSON.stringify(yaml))?.code,
+    JSON.stringify(yaml),
+    "the quoted JSON envelope must not reach the code block",
+  );
+  // A short status result stays a raw string.
+  assert.equal(
+    toolResultCode(
+      "container_template_save",
+      JSON.stringify({ name: "web.yml", path: "/p/.dsh-podman/web.yml" }),
+    ),
+    null,
+  );
+  assert.equal(
+    toolPresentation("container_template_save")?.resultFence,
+    undefined,
+  );
 });

@@ -23,6 +23,9 @@ import {
   containerSecretAddParameters,
   containerSecretRemoveParameters,
   containerStartParameters,
+  containerTemplateExportParameters,
+  containerTemplateLoadParameters,
+  containerTemplateSaveParameters,
   containerUnpublishPortParameters,
   containerWriteParameters,
   daemonListParameters,
@@ -93,6 +96,20 @@ export const TOOLS: ToolDefinition[] = [
   },
   { name: "image_remove", parameters: imageRemoveParameters, approval: true },
   { name: "container_list", parameters: containerListParameters },
+  {
+    name: "container_template_load",
+    parameters: containerTemplateLoadParameters,
+    approval: true,
+  },
+  {
+    name: "container_template_export",
+    parameters: containerTemplateExportParameters,
+  },
+  {
+    name: "container_template_save",
+    parameters: containerTemplateSaveParameters,
+    approval: true,
+  },
   {
     name: "container_start",
     parameters: containerStartParameters,
@@ -205,6 +222,12 @@ export const TOOL_DESCRIPTIONS: Record<string, string> = {
     "Remove a built custom image by short name. Base images are managed from the settings. Requires approval: removing deletes the image so containers using it must be recreated from another image.",
   container_list:
     "List the containers of the current workspace, including the default container that is started on demand.",
+  container_template_load:
+    "Load a container template from the project's .dsh-podman directory: build its image when needed, then create the container or replace an existing one. The workspace project mount is always added read-write. The template's mounts replace the container's mounts; the environment, secret environment and PATH additions it declares replace those groups, and groups it leaves undeclared keep their current values. Requires approval: creating or replacing a container changes what runs in the workspace.",
+  container_template_export:
+    "Export a container of the current workspace as a container-template YAML document (its root base image, recursive package union, mounts, environment, secrets, PATH additions and ports). Returns the YAML string and changes nothing.",
+  container_template_save:
+    "Validate a container-template YAML document and save it through the workspace container's guest agent into the project's .dsh-podman directory, creating the directory when missing. Requires approval: it writes a file into the project.",
   container_start:
     "Start a container in the current workspace. Named containers are created with exactly the mounts you pass — the project directory is not mounted automatically. The default container always keeps its workspace project mount. Pass paths to replace the container's PATH additions.",
   container_recreate:
@@ -274,6 +297,15 @@ export const TOOL_UI: Record<string, { title: string; kind: string }> = {
   image_rebuild_all: { title: "Rebuild all images", kind: "execute" },
   image_remove: { title: "Remove image", kind: "delete" },
   container_list: { title: "List containers", kind: "search" },
+  container_template_load: {
+    title: "Load container template",
+    kind: "execute",
+  },
+  container_template_export: {
+    title: "Export container template",
+    kind: "read",
+  },
+  container_template_save: { title: "Save container template", kind: "edit" },
   container_start: { title: "Start container", kind: "execute" },
   container_recreate: { title: "Recreate container", kind: "execute" },
   container_remove: { title: "Remove container", kind: "delete" },

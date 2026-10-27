@@ -638,3 +638,39 @@ export const daemonLogsParameters = {
   },
   required: ["container", "name"],
 };
+
+const templateNameParam = {
+  type: "string",
+  description:
+    'Template name: a YAML file in the project\'s .dsh-podman directory, with or without the ".yml" suffix.',
+};
+
+export const containerTemplateLoadParameters = {
+  type: "object",
+  properties: {
+    template: templateNameParam,
+    container: {
+      type: "string",
+      description:
+        'Logical name of the container to create; defaults to "default".',
+    },
+  },
+  required: ["template"],
+};
+
+export const containerTemplateExportParameters = {
+  type: "object",
+  properties: {
+    container: containerParam,
+  },
+  required: ["container"],
+};
+
+export const containerTemplateSaveParameters = {
+  type: "object",
+  properties: {
+    container: containerParam,
+    name: templateNameParam,
+  },
+  required: ["container", "name"],
+};

@@ -74,6 +74,8 @@ test("the destructive mutations require approval", () => {
     "container_remove",
     "container_secret_add",
     "container_secret_remove",
+    "container_template_load",
+    "container_template_save",
     "container_unpublish_port",
     "image_build",
     "image_rebuild",
@@ -136,6 +138,11 @@ test("approvalDecision gates exactly the approval-flagged tools", () => {
       container: "valkey-ctr",
       env: "REDIS_PASSWORD",
     },
+    container_template_load: {
+      template: "web",
+      container: "default",
+    },
+    container_template_save: { container: "app", name: "web.yml" },
     container_publish_port: {
       container: "valkey-ctr",
       port: 6379,

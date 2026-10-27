@@ -7,9 +7,14 @@ import type { Context as ClientContext } from "@deepseek-ai/cordis";
 // The class passed to TerminalBlock for podman command results.
 export const TERMINAL_CLASS = "dsh-podman-terminal";
 
+// The class passed to CodeBlock for a fenced podman result (an exported
+// container template).
+export const CODE_BLOCK_CLASS = "dsh-podman-code-block";
+
 // Mirrors ui-tool's .terminalBody/.terminal so a podman command result matches
 // the built-in Bash result: small code font (12px/18px), 224px output cap,
-// 4px indent, l1 border.
+// 4px indent, l1 border. The code block takes ui-tool's 4px row indent too,
+// because CodeBlock otherwise carries standalone markdown spacing.
 export const TERMINAL_STYLES = `
 .dsh-podman-terminal {
   --dsl-terminal-font: var(--dsw-font-markdown-code-block-small);
@@ -17,6 +22,10 @@ export const TERMINAL_STYLES = `
   --dsl-terminal-output-max-height: 224px;
   margin: 4px 0 4px 4px;
   border: 1px solid var(--dsw-alias-border-l1);
+}
+
+.dsh-podman-code-block {
+  margin: 4px 0 4px 4px;
 }
 `;
 

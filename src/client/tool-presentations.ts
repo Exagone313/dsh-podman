@@ -13,6 +13,13 @@ import type { ContainerPluginKey } from "./locales.js";
 export interface ToolPresentation {
   readonly titleKey: ContainerPluginKey;
   readonly summaryKeys: readonly string[];
+  /**
+   * The fence language when the tool's result is source text to show verbatim
+   * (a template YAML document), rather than a status or a JSON payload. The row
+   * renders it as a code block — real line breaks, selectable, with a copy
+   * control — instead of the raw quoted result string.
+   */
+  readonly resultFence?: string;
 }
 
 export const TOOL_PRESENTATION = {
@@ -47,6 +54,19 @@ export const TOOL_PRESENTATION = {
   container_list: {
     titleKey: "toolTitle_container_list",
     summaryKeys: [],
+  },
+  container_template_load: {
+    titleKey: "toolTitle_container_template_load",
+    summaryKeys: ["template", "container"],
+  },
+  container_template_export: {
+    titleKey: "toolTitle_container_template_export",
+    summaryKeys: ["container"],
+    resultFence: "yaml",
+  },
+  container_template_save: {
+    titleKey: "toolTitle_container_template_save",
+    summaryKeys: ["name"],
   },
   container_start: {
     titleKey: "toolTitle_container_start",
@@ -180,4 +200,31 @@ export const TOOL_VIEW_KEYS: readonly string[] = Object.keys(TOOL_PRESENTATION);
 /** The presentation of one tool, or undefined when this package has no row. */
 export function toolPresentation(name: string): ToolPresentation | undefined {
   return (TOOL_PRESENTATION as Record<string, ToolPresentation>)[name];
+}
+
+/** The source text a fenced result renders, with its fence language. */
+export interface ToolResultCode {
+  readonly lang: string;
+  readonly code: string;
+}
+
+/**
+ * The code block a tool's result presents as, or null when the tool declares no
+ * fenced result. A string-returning tool's model-facing result is the
+ * JSON-encoded scalar, so decode that envelope before rendering the source;
+ * any other payload stays verbatim.
+ */
+export function toolResultCode(
+  name: string,
+  text: string | null,
+): ToolResultCode | null {
+  const lang = toolPresentation(name)?.resultFence;
+  if (lang === undefined || text === null) return null;
+  try {
+    const value: unknown = JSON.parse(text);
+    if (typeof value === "string") return { lang, code: value };
+  } catch {
+    // Not JSON: the result is already the source text.
+  }
+  return { lang, code: text };
 }

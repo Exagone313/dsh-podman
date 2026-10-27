@@ -10,6 +10,7 @@ import {
   type SessionFacts,
 } from "./approval.js";
 import { type ReasonLocale, resolveReasonLocale } from "./approval-reasons.js";
+import { readTemplateLoadSummary } from "./approval-template-summary.js";
 import { createFilesystemProvider } from "./fs-provider.js";
 import { createSpillStore } from "./spill-store.js";
 import {
@@ -30,6 +31,7 @@ import {
 } from "./tool-schemas.js";
 import { toolCallView, toolResultView } from "./tool-views.js";
 import { registerCardRoute } from "./card-route.js";
+import { registerTemplateRoute } from "./template-route.js";
 import { dshVersion } from "./dsh-version.js";
 import { registerTerminalRoutes } from "./terminal-route.js";
 import { TerminalSessions } from "./terminal-sessions.js";
@@ -97,6 +99,12 @@ export function apply(ctx: any, config: Config): void {
         () => readLocale(),
         readSession,
         readOnlyShellGate(),
+        (request) =>
+          readTemplateLoadSummary(
+            resolver,
+            resolver.getConfig().projectsRoot,
+            request,
+          ),
       ),
   );
   // The harness asks the user to widen the sandbox before a confined call (for
@@ -178,6 +186,10 @@ export function apply(ctx: any, config: Config): void {
     readLocale,
     dshVersionValue,
   );
+  // The load-template popup needs structured results (a parsed template, its
+  // image plan, apply warnings), so it has its own route rather than riding the
+  // card's one-notice command response.
+  registerTemplateRoute(ctx, resolver, ctx.workspaceRegistry);
   // The Podman terminal tab talks to guest ptys through its own routes; the
   // registry keeps shells alive while the browser is away.
   const terminalSessions = new TerminalSessions({ resolver });

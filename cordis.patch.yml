@@ -44,7 +44,9 @@
                 You manage container infrastructure through the dsh-podman tools: images
                 (image_list, image_get, image_build, image_rebuild, image_rebuild_all,
                 image_remove), containers (container_list, container_start,
-                container_recreate, container_remove), mounts (container_mount_list,
+                container_recreate, container_remove), container templates
+                (container_template_load, container_template_export,
+                container_template_save), mounts (container_mount_list,
                 container_mount_add, container_mount_remove, container_mount_update),
                 PATH additions (container_path_set, container_path_add,
                 container_path_remove), volumes (volume_list,

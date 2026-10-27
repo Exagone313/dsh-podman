@@ -3,6 +3,8 @@
 // SPDX-License-Identifier: MIT
 
 import { approvalPath, currentCwd } from "./guest-rpc.js";
+import { TEMPLATE_DIRECTORY } from "./container-template.js";
+import { templateFileName } from "./template-files.js";
 import {
   inferMountKind,
   projectMountDestinationReason,
@@ -16,7 +18,19 @@ import {
   type ReasonLocale,
   renderDenial,
   renderReason,
+  type TemplateLoadSummary,
 } from "./approval-reasons.js";
+
+// templateFileForApproval resolves the file name a save will write without
+// throwing: the prompt must render even for a name the handler is about to
+// reject, so an invalid name is shown as given.
+function templateFileForApproval(name: string): string {
+  try {
+    return templateFileName(name);
+  } catch {
+    return name;
+  }
+}
 
 // Build the mount fact for one mount object, or undefined when it names no
 // source. `readOnly` is the mount's mode when the call carries one; omit it
@@ -244,6 +258,31 @@ export function reasonFact(
       if (container === undefined || path === undefined) return undefined;
       return { kind: name, container, path };
     }
+    case "container_template_load": {
+      const template = str("template");
+      if (template === undefined) return undefined;
+      const container = str("container");
+      return {
+        kind: "container_template_load",
+        template,
+        ...(container === undefined ? {} : { container }),
+      };
+    }
+    case "container_template_save": {
+      const name = str("name");
+      const container = str("container");
+      if (name === undefined || container === undefined) return undefined;
+      // Show the file that will be written, not just the requested name: the
+      // handler appends the canonical ".yml" suffix, and a traversal attempt
+      // still reaches the prompt (the handler is what refuses it).
+      const file = templateFileForApproval(name);
+      return {
+        kind: "container_template_save",
+        name: file,
+        container,
+        path: approvalPath(`${TEMPLATE_DIRECTORY}/${file}`, sessionCwd),
+      };
+    }
     case "container_bash": {
       const container = str("container");
       const command = str("command");
@@ -299,15 +338,22 @@ export function reasonFact(
 //
 // sessionCwd is used to name the resolved target of a relative path, so the
 // prompt describes the file that will actually be touched. `locale` selects
-// the language; it defaults to English.
+// the language; it defaults to English. `templateSummary` carries the
+// pre-read facts of a template apply; without it the base sentence renders.
 export function summarizeArgs(
   name: string,
   args: Record<string, unknown>,
   sessionCwd?: unknown,
   locale: ReasonLocale = "en",
+  templateSummary?: TemplateLoadSummary,
 ): string {
   const fact = reasonFact(name, args, sessionCwd);
-  return fact === undefined ? "" : renderReason(locale, fact);
+  if (fact === undefined) return "";
+  const withSummary =
+    fact.kind === "container_template_load" && templateSummary !== undefined
+      ? { ...fact, summary: templateSummary }
+      : fact;
+  return renderReason(locale, withSummary);
 }
 
 // The ask reason, omitted when no summary can be derived so the approval panel
@@ -318,8 +364,15 @@ function askReason(
   args: Record<string, unknown>,
   sessionCwd?: unknown,
   locale: ReasonLocale = "en",
+  templateSummary?: TemplateLoadSummary,
 ): { reason?: string } {
-  const reason = summarizeArgs(name, args, sessionCwd, locale);
+  const reason = summarizeArgs(
+    name,
+    args,
+    sessionCwd,
+    locale,
+    templateSummary,
+  );
   return reason === "" ? {} : { reason };
 }
 
@@ -334,14 +387,21 @@ export function approvalDecision(
   args?: Record<string, unknown>,
   sessionCwd?: unknown,
   locale: ReasonLocale = "en",
+  templateSummary?: TemplateLoadSummary,
 ): { kind: "ask"; reason?: string } | undefined {
   const tool = TOOLS.find((entry) => entry.name === name);
   if (tool === undefined) return undefined;
   if (tool.approval === true) {
-    return { kind: "ask", ...askReason(name, args ?? {}, sessionCwd, locale) };
+    return {
+      kind: "ask",
+      ...askReason(name, args ?? {}, sessionCwd, locale, templateSummary),
+    };
   }
   if (tool.approvalWhen !== undefined && tool.approvalWhen(args ?? {})) {
-    return { kind: "ask", ...askReason(name, args ?? {}, sessionCwd, locale) };
+    return {
+      kind: "ask",
+      ...askReason(name, args ?? {}, sessionCwd, locale, templateSummary),
+    };
   }
   return undefined;
 }
@@ -359,6 +419,7 @@ export const READ_ONLY_TOOLS: ReadonlySet<string> = new Set([
   "secret_list",
   "daemon_list",
   "daemon_logs",
+  "container_template_export",
 ]);
 
 // The agent preset id this plugin ships ("Podman operator mode"). Tools in
@@ -423,6 +484,9 @@ export async function preExecutePolicy(
     exec: unknown,
     locale: ReasonLocale,
   ) => Promise<ReadOnlyShellDecision>,
+  readTemplateLoadSummary?: (
+    request: { template: string; container: string; cwd?: string },
+  ) => Promise<TemplateLoadSummary | undefined>,
 ): Promise<unknown> {
   const name = exec.name;
   const locale = getLocale?.() ?? "en";
@@ -472,7 +536,49 @@ export async function preExecutePolicy(
       ...askReason(name, parsed ?? {}, sessionCwd, locale),
     };
   }
-  return approvalDecision(name, parsed, sessionCwd, locale) ?? next();
+  const decision = approvalDecision(name, parsed, sessionCwd, locale);
+  if (decision === undefined) return next();
+  if (
+    name !== "container_template_load" ||
+    readTemplateLoadSummary === undefined
+  ) {
+    return decision;
+  }
+  const request = templateLoadSummaryRequest(parsed, sessionCwd);
+  if (request === undefined) return decision;
+  let summary: TemplateLoadSummary | undefined;
+  try {
+    summary = await readTemplateLoadSummary(request);
+  } catch {
+    // The provider is documented to fail closed to undefined; a rejection is
+    // the same fallback so the prompt still renders its base sentence.
+    summary = undefined;
+  }
+  if (summary === undefined) return decision;
+  return approvalDecision(name, parsed, sessionCwd, locale, summary) ??
+    decision;
+}
+
+// The template and target an apply will use, or undefined when the call carries
+// no template to read. The handler treats an empty target as the default one.
+function templateLoadSummaryRequest(
+  args: Record<string, unknown> | undefined,
+  sessionCwd: unknown,
+): { template: string; container: string; cwd?: string } | undefined {
+  const template = typeof args?.template === "string" && args.template !== ""
+    ? args.template
+    : undefined;
+  if (template === undefined) return undefined;
+  const container = typeof args?.container === "string" && args.container !== ""
+    ? args.container
+    : "default";
+  return {
+    template,
+    container,
+    ...(typeof sessionCwd === "string" && sessionCwd !== ""
+      ? { cwd: sessionCwd }
+      : {}),
+  };
 }
 
 // The reason to deny a mount-bearing tool call that puts a destination on a

@@ -4,6 +4,7 @@
 
 import { type CSSProperties, type ReactNode, useState } from "react";
 import {
+  CodeBlock,
   DisclosureRow,
   IconApiOutlineRegular,
   IconArchiveOutlineRegular,
@@ -29,10 +30,14 @@ import type {
 } from "@deepseek-ai/dsh-client-ui-slots";
 import type { ToolCallViewProps } from "@deepseek-ai/dsh-client-ui-tool/client";
 import { NS } from "./locales.js";
-import { TOOL_PRESENTATION, toolPresentation } from "./tool-presentations.js";
+import {
+  TOOL_PRESENTATION,
+  toolPresentation,
+  toolResultCode,
+} from "./tool-presentations.js";
 
 export { TOOL_VIEW_KEYS } from "./tool-presentations.js";
-import { TERMINAL_CLASS } from "./terminal-styles.js";
+import { CODE_BLOCK_CLASS, TERMINAL_CLASS } from "./terminal-styles.js";
 
 // A domain-owned row for every podman tool, registered over the keyed
 // `tool.call.toolview` slot. Without it the shipped client renders each call as
@@ -49,6 +54,9 @@ const TOOL_ICONS: Record<keyof typeof TOOL_PRESENTATION, ReactNode> = {
   container_glob: <IconSearchOutlineRegular size={14} />,
   container_grep: <IconSearchOutlineRegular size={14} />,
   container_list: <IconDataOutlineRegular size={14} />,
+  container_template_load: <IconFolderOpenOutlineRegular size={14} />,
+  container_template_export: <IconArchiveOutlineRegular size={14} />,
+  container_template_save: <IconEditOutlineRegular size={14} />,
   container_start: <IconPlayOutlineRegular size={14} />,
   container_recreate: <IconRefreshOutlineRegular size={14} />,
   container_remove: <IconTrashOutlineRegular size={14} />,
@@ -318,6 +326,10 @@ export function PodmanToolRow({
     ? "error"
     : "done";
   const output = prettyOutput(resultText(block));
+  // A declared fenced result is source text, shown as a syntax-highlighted
+  // code block rather than the quoted JSON scalar the raw result carries.
+  // Failures keep the generic error body.
+  const code = state === "done" ? toolResultCode(toolName, output) : null;
   const failureLine = state === "error" && output !== null && output !== ""
     ? firstLine(output)
     : null;
@@ -328,7 +340,8 @@ export function PodmanToolRow({
       firstLine(argsRaw) || block.callId,
     );
   const [expanded, setExpanded] = useState(false);
-  const expandable = terminal !== null || (output !== null && output !== "");
+  const expandable = terminal !== null || code !== null ||
+    (output !== null && output !== "");
   const leading = state === "error"
     ? <StateDot state="error" />
     : state === "stopped"
@@ -370,6 +383,16 @@ export function PodmanToolRow({
             maxLines={MAX_RENDERED_LINES}
             className={TERMINAL_CLASS}
             labels={terminalLabels(t)}
+          />
+        )
+        : code !== null
+        ? (
+          <CodeBlock
+            code={code.code}
+            lang={code.lang}
+            className={CODE_BLOCK_CLASS}
+            copyLabel={t("copy")}
+            copiedLabel={t("copied")}
           />
         )
         : expandable

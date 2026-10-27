@@ -19,6 +19,51 @@ export interface MountFact {
   readOnly?: boolean;
 }
 
+// One template image: the base alone, or the base plus the packages the
+// template adds on top of it.
+export interface TemplateImageFact {
+  base: string;
+  // Extra packages the template installs; omitted for a base-only template.
+  packages?: readonly string[];
+}
+
+// One secret environment entry: the variable the template sets and the secret
+// it reads the value from.
+export interface TemplateSecretEnvFact {
+  env: string;
+  secret: string;
+}
+
+// One port the template publishes. `host` is omitted when the gateway picks
+// the host port.
+export interface TemplatePortFact {
+  container: number;
+  host?: number;
+}
+
+// What an apply removes from the existing container: the current items absent
+// from the staged template. A group the template leaves undeclared keeps its
+// values, so its count is always zero.
+export interface TemplateLoadRemovals {
+  mounts: number;
+  env: number;
+  secretEnv: number;
+  paths: number;
+}
+
+// The facts a template apply will act on, read from the template document and
+// the existing container before the user approves it. It is structured so the
+// renderer stays synchronous; the provider that reads it is asynchronous.
+export interface TemplateLoadSummary {
+  image: TemplateImageFact;
+  mounts: readonly MountFact[];
+  secretEnv: readonly TemplateSecretEnvFact[];
+  ports: readonly TemplatePortFact[];
+  envCount: number;
+  pathCount: number;
+  removals: TemplateLoadRemovals;
+}
+
 // The locale-independent shape of one gated call's reason. summarizeArgs builds
 // it; renderReason turns it into the single-line headline.
 export type ReasonFact =
@@ -41,6 +86,20 @@ export type ReasonFact =
     paths?: readonly string[];
   }
   | { kind: "container_remove"; container: string }
+  | {
+    kind: "container_template_load";
+    template: string;
+    container?: string;
+    // Present when the host could read the template and the existing
+    // container; absent keeps the base sentence alone.
+    summary?: TemplateLoadSummary;
+  }
+  | {
+    kind: "container_template_save";
+    name: string;
+    container: string;
+    path: string;
+  }
   | { kind: "container_mount_add"; container: string; mount: MountFact }
   | { kind: "container_mount_remove"; container: string; mount: MountFact }
   | { kind: "container_mount_update"; container: string; mount: MountFact }
@@ -216,6 +275,239 @@ function mountText(locale: ReasonLocale, mount: MountFact): string {
   return `${mountSourceText(locale, mount)}${suffix}`;
 }
 
+// Render one template mount compactly for the apply summary. The template
+// sentences keep Chinese naming tight against its quotation marks
+// (`项目“app”`), so they cannot reuse mountText's spaced labels.
+function templateMountText(locale: ReasonLocale, mount: MountFact): string {
+  const name = quoted(locale, mount.source);
+  const destination = mount.destination === undefined
+    ? undefined
+    : quoted(locale, mount.destination);
+  const mode = mountModeName(locale, mount);
+  const suffix = mode === undefined
+    ? ""
+    : pick(locale, ` (${mode})`, `（${mode}）`);
+  switch (mount.kind) {
+    case "tmpfs":
+      return pick(
+        locale,
+        `tmpfs at ${destination ?? ""}`,
+        `tmpfs 挂载到${destination ?? ""}`,
+      );
+    case "volume":
+      return pick(
+        locale,
+        `volume ${name} at ${destination ?? ""}${suffix}`,
+        `卷${name}挂载到${destination ?? ""}${suffix}`,
+      );
+    case "secret":
+      return pick(
+        locale,
+        `secret ${name} at ${destination ?? ""}`,
+        `机密${name}挂载到${destination ?? ""}`,
+      );
+    default:
+      return pick(
+        locale,
+        `project ${name}${suffix}`,
+        `项目${name}${suffix}`,
+      );
+  }
+}
+
+// Render a template's image: the base alone, or the base plus its extra
+// packages.
+function templateImageText(
+  locale: ReasonLocale,
+  image: TemplateImageFact,
+): string {
+  const packages = image.packages ?? [];
+  if (packages.length === 0) {
+    return pick(locale, `Image: ${image.base}.`, `镜像：${image.base}。`);
+  }
+  const count = packages.length;
+  return pick(
+    locale,
+    `Image: ${image.base} plus ${count} ${
+      count === 1 ? "package" : "packages"
+    } (${packages.join(", ")}).`,
+    `镜像：以 ${image.base} 为基础，另加 ${count} 个软件包（${
+      packages.join("、")
+    }）。`,
+  );
+}
+
+// Render every mount the template stages, semicolon-separated.
+function templateMountsText(
+  locale: ReasonLocale,
+  mounts: readonly MountFact[],
+): string {
+  if (mounts.length === 0) {
+    return pick(locale, "Mounts: none.", "挂载：无。");
+  }
+  const list = mounts.map((mount) => templateMountText(locale, mount));
+  return pick(
+    locale,
+    `Mounts: ${list.join("; ")}.`,
+    `挂载：${list.join("；")}。`,
+  );
+}
+
+// Render the template's secret environment entries, or "none" when it declares
+// no secrets.
+function templateSecretEnvText(
+  locale: ReasonLocale,
+  pairs: readonly TemplateSecretEnvFact[],
+): string {
+  if (pairs.length === 0) {
+    return pick(locale, "Secret environment: none.", "机密环境变量：无。");
+  }
+  const list = pairs.map((pair) =>
+    pick(
+      locale,
+      `${quoted(locale, pair.env)} from secret ${quoted(locale, pair.secret)}`,
+      `${quoted(locale, pair.env)}来自机密${quoted(locale, pair.secret)}`,
+    )
+  );
+  return pick(
+    locale,
+    `Secret environment: ${list.join("; ")}.`,
+    `机密环境变量：${list.join("；")}。`,
+  );
+}
+
+// Render the template's published ports, omitting the host port when the
+// gateway will pick one.
+function templatePortsText(
+  locale: ReasonLocale,
+  ports: readonly TemplatePortFact[],
+): string {
+  if (ports.length === 0) {
+    return pick(locale, "Ports: none.", "端口：无。");
+  }
+  const list = ports.map((port) =>
+    port.host === undefined
+      ? pick(locale, `container ${port.container}`, `容器 ${port.container}`)
+      : pick(
+        locale,
+        `container ${port.container} to host ${port.host}`,
+        `容器 ${port.container} 映射到主机 ${port.host}`,
+      )
+  );
+  return pick(
+    locale,
+    `Ports: ${list.join("; ")}.`,
+    `端口：${list.join("；")}。`,
+  );
+}
+
+// A count with its noun: `1 mount` / `2 mounts` and their Chinese unit.
+function countedNoun(
+  locale: ReasonLocale,
+  count: number,
+  singular: string,
+  plural: string,
+  zhUnit: string,
+): string {
+  return pick(
+    locale,
+    `${count} ${count === 1 ? singular : plural}`,
+    `${count} ${zhUnit}`,
+  );
+}
+
+// Render the environment and PATH counts. A zero group is omitted; when both
+// are zero the sentence is omitted entirely.
+function templateCountsText(
+  locale: ReasonLocale,
+  envCount: number,
+  pathCount: number,
+): string {
+  const env = countedNoun(
+    locale,
+    envCount,
+    "variable",
+    "variables",
+    "个",
+  );
+  const paths = countedNoun(locale, pathCount, "addition", "additions", "个");
+  if (envCount > 0 && pathCount > 0) {
+    return pick(
+      locale,
+      `Environment: ${env}. PATH: ${paths}.`,
+      `环境变量：${env}；PATH 追加项：${paths}。`,
+    );
+  }
+  if (envCount > 0) {
+    return pick(locale, `Environment: ${env}.`, `环境变量：${env}。`);
+  }
+  if (pathCount > 0) {
+    return pick(locale, `PATH: ${paths}.`, `PATH 追加项：${paths}。`);
+  }
+  return "";
+}
+
+// Join groups the way each locale lists them: `a, b and c` / `a、b和c`.
+function joinGroups(locale: ReasonLocale, groups: readonly string[]): string {
+  if (groups.length <= 1) return groups.join("");
+  const head = groups.slice(0, -1).join(pick(locale, ", ", "、"));
+  const tail = groups[groups.length - 1];
+  return pick(locale, `${head} and ${tail}`, `${head}和 ${tail}`);
+}
+
+// Render how many current items the apply removes. Only non-zero groups are
+// listed, and a zero total omits the sentence.
+function templateRemovalsText(
+  locale: ReasonLocale,
+  removals: TemplateLoadRemovals,
+): string {
+  const groups: string[] = [];
+  if (removals.mounts > 0) {
+    groups.push(
+      countedNoun(locale, removals.mounts, "mount", "mounts", "个挂载"),
+    );
+  }
+  if (removals.env > 0) {
+    groups.push(
+      countedNoun(
+        locale,
+        removals.env,
+        "environment variable",
+        "environment variables",
+        "个环境变量",
+      ),
+    );
+  }
+  if (removals.secretEnv > 0) {
+    groups.push(
+      countedNoun(
+        locale,
+        removals.secretEnv,
+        "secret environment variable",
+        "secret environment variables",
+        "个机密环境变量",
+      ),
+    );
+  }
+  if (removals.paths > 0) {
+    groups.push(
+      countedNoun(
+        locale,
+        removals.paths,
+        "PATH addition",
+        "PATH additions",
+        "个 PATH 追加项",
+      ),
+    );
+  }
+  if (groups.length === 0) return "";
+  return pick(
+    locale,
+    `Removes ${joinGroups(locale, groups)}.`,
+    `将移除 ${joinGroups(locale, groups)}。`,
+  );
+}
+
 // Render a command word list, capped at 8 words with an ellipsis tail.
 function argvText(argv: readonly string[]): string {
   const shown = argv.slice(0, 8).join(" ");
@@ -342,6 +634,50 @@ export function renderReason(locale: ReasonLocale, fact: ReasonFact): string {
         locale,
         `Remove container ${quoted(locale, fact.container)}.`,
         `移除容器 ${quoted(locale, fact.container)}。`,
+      );
+    case "container_template_load": {
+      const base = fact.container === undefined
+        ? pick(
+          locale,
+          `Apply container template ${
+            quoted(locale, fact.template)
+          } to the default container.`,
+          `将容器模板${quoted(locale, fact.template)}应用到默认容器。`,
+        )
+        : pick(
+          locale,
+          `Apply container template ${
+            quoted(locale, fact.template)
+          } to container ${quoted(locale, fact.container)}.`,
+          `将容器模板${quoted(locale, fact.template)}应用到容器${
+            quoted(locale, fact.container)
+          }。`,
+        );
+      if (fact.summary === undefined) return base;
+      const summary = fact.summary;
+      const sentences = [
+        templateImageText(locale, summary.image),
+        templateMountsText(locale, summary.mounts),
+        templateSecretEnvText(locale, summary.secretEnv),
+        templatePortsText(locale, summary.ports),
+        templateCountsText(locale, summary.envCount, summary.pathCount),
+        templateRemovalsText(locale, summary.removals),
+      ].filter((sentence) => sentence !== "");
+      return pick(
+        locale,
+        [base, ...sentences].join(" "),
+        base + sentences.join(""),
+      );
+    }
+    case "container_template_save":
+      return pick(
+        locale,
+        `Save container ${quoted(locale, fact.container)} as template ${
+          quoted(locale, fact.name)
+        } at ${quoted(locale, fact.path)}.`,
+        `将容器 ${quoted(locale, fact.container)} 保存为模板 ${
+          quoted(locale, fact.name)
+        }，路径为 ${quoted(locale, fact.path)}。`,
       );
     case "container_mount_add":
       return pick(

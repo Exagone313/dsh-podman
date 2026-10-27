@@ -37,7 +37,7 @@ GOFMT_SOURCES := $(shell find cmd internal -type f -name '*.go' -print)
 TS_SOURCES = "src/**/*.ts" "src/**/*.tsx" "scripts/**/*.mjs"
 MD_SOURCES = "**/*.md" ".agents/**/*.md"
 
-.PHONY: all build build-go vet test test-go fmt fmt-go fmt-ts fmt-md fmt-check fmt-check-go fmt-check-ts fmt-check-md lint lint-ts image image-go image-orchestrator image-guestagent image-gateway image-dsh download-licenses pnpm-install pnpm-build pnpm-test pnpm-prune clean proto proto-check
+.PHONY: all build build-go vet test test-go govulncheck fmt fmt-go fmt-ts fmt-md fmt-check fmt-check-go fmt-check-ts fmt-check-md lint lint-ts image image-go image-orchestrator image-guestagent image-gateway image-dsh download-licenses pnpm-install pnpm-build pnpm-test pnpm-prune clean proto proto-check
 
 all: build
 
@@ -50,6 +50,19 @@ test: test-go pnpm-test
 
 test-go:
 	$(GO) test $(GO_BUILD_FLAGS) ./...
+
+# govulncheck is pinned by go.mod's tool directive. A finding with a fix fails;
+# a module advisory with no fix is reported but tolerated, as in CI.
+govulncheck:
+	@out="$$($(GO) tool govulncheck -format text $(GO_BUILD_FLAGS) ./... 2>&1)"; status=$$?; \
+	printf '%s\n' "$$out"; \
+	if [ $$status -eq 3 ]; then \
+		if printf '%s\n' "$$out" | grep 'Fixed in:' | grep -qv 'Fixed in: N/A'; then \
+			exit 1; \
+		fi; \
+		exit 0; \
+	fi; \
+	exit $$status
 
 # Formatting. fmt rewrites in place, fmt-check verifies; both cover every
 # language the project formats (Go, TypeScript, Markdown). JSON, YAML and

@@ -55,22 +55,7 @@ jobs:
       - name: Test
         run: make test-go
       - name: Scan Go dependencies
-        run: |
-          # The tool directive in go.mod pins govulncheck, so Dependabot updates
-          # it together with the Go dependencies.
-          if output=$(go tool govulncheck -format text -tags "containers_image_openpgp,exclude_graphdriver_btrfs,exclude_graphdriver_devicemapper" ./... 2>&1); then
-            status=0
-          else
-            status=$?
-          fi
-          printf '%s\n' "$output"
-          if [ "$status" -eq 3 ]; then
-            if printf '%s\n' "$output" | grep 'Fixed in:' | grep -qv 'Fixed in: N/A'; then
-              exit 1
-            fi
-            exit 0
-          fi
-          exit "$status"
+        run: make govulncheck
 
   proto:
     name: Protobuf

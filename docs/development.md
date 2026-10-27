@@ -43,6 +43,7 @@ make lint           # vet + oxlint over the TypeScript sources
 make lint-ts        # oxlint only
 make test-go        # go test with the build tags
 make test           # test-go + pnpm test (JS tests, which run against dist/)
+make govulncheck    # fixable findings fail; unfixed advisories are tolerated
 make fmt            # gofmt -s + dprint (TypeScript and Markdown)
 make fmt-check      # verify the formatting without rewriting anything
 make proto          # regenerate the protobuf Go bindings with buf

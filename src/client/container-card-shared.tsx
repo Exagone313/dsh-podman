@@ -20,6 +20,7 @@ import {
   sectionTitle,
   slotSelect,
   statusChip,
+  violetTone,
 } from "./container-card-styles.js";
 import {
   FIELD_CLASS,
@@ -36,6 +37,15 @@ import {
   MOUNT_ROW_CLASS,
 } from "./container-card-table-styles.js";
 import { normalizeMountKind, normalizeMountMode } from "../mount-enums.js";
+import { hostPathForProjectName } from "../project-path.js";
+import {
+  createdMountSource,
+  mountRowBrowseDisabled,
+  mountRowBrowseOffered,
+  mountSourceOptions,
+  revertCreatedMountSource,
+} from "./container-card-mount-sources.js";
+import { MountSourceActions } from "./container-card-mount-actions.js";
 import {
   type MountInput,
   type ProjectMountView,
@@ -49,7 +59,14 @@ import {
   Modal,
   writeClipboard,
 } from "@deepseek-ai/dsh-client-ui-primitives";
-import { type ReactNode, useEffect, useId, useRef, useState } from "react";
+import {
+  memo,
+  type ReactNode,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+} from "react";
 
 // Localized cardinal count: the singular key renders only at exactly one, so
 // both languages can word the count their own way.
@@ -206,7 +223,7 @@ export function CopyButton(props: {
   );
 }
 
-export const namePattern = /^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,63}$/;
+export { namePattern } from "./container-card-names.js";
 
 export const imageIdPattern = /^[a-zA-Z0-9_][a-zA-Z0-9_.\-/:]{0,127}$/;
 
@@ -221,7 +238,7 @@ export type StatusTone =
 
 // Each tone's foreground and fill come from the design system's state palette.
 // No error- or business-tertiary fill exists, so those tones tint their own
-// primary; violet has no token at all, so it tints its own literal.
+// primary; violet has no token at all, so it reads the shared violet literal.
 const STATUS_TONES: Record<StatusTone, React.CSSProperties> = {
   ok: {
     color: "var(--dsw-alias-state-success-primary)",
@@ -241,10 +258,7 @@ const STATUS_TONES: Record<StatusTone, React.CSSProperties> = {
     background:
       "color-mix(in srgb, var(--dsw-alias-state-business-primary) 12%, transparent)",
   },
-  violet: {
-    color: "#a78bfa",
-    background: "color-mix(in srgb, #a78bfa 12%, transparent)",
-  },
+  violet: violetTone,
   muted: {
     color: "var(--dsw-alias-label-tertiary)",
     background: "var(--dsw-alias-bg-layer-3)",
@@ -319,12 +333,11 @@ export function FieldSlot(props: {
   className?: string;
   children: ReactNode;
 }): ReactNode {
-  const { className } = props;
   return (
     <div
-      className={className === undefined
+      className={props.className === undefined
         ? MOUNT_FIELD_CLASS
-        : `${MOUNT_FIELD_CLASS} ${className}`}
+        : `${MOUNT_FIELD_CLASS} ${props.className}`}
       style={mountField}
     >
       <label htmlFor={props.htmlFor} style={envFieldLabel}>
@@ -640,6 +653,10 @@ function MountSourceControl(props: {
   // The mounts list rows set it; the Add-mount popup leaves it unset, so a path
   // is still typed there.
   projectPathLocked?: boolean;
+  // Reports that a typed project path lost focus, so a caller that validates
+  // the value against the host can re-check it then. Absent in the editor
+  // dialogs, which validate on submit instead.
+  onProjectBlur?: () => void;
   onProject: (project: string) => void;
   onVolume: (volume: string) => void;
   onSecret: (secret: string) => void;
@@ -650,8 +667,7 @@ function MountSourceControl(props: {
   if (normalized === "volume") {
     // A volume the snapshot no longer lists stays selectable rather than being
     // silently replaced by the first candidate.
-    const missing = props.volume !== "" &&
-      !props.volumes.some((volume) => volume.name === props.volume);
+    const options = mountSourceOptions(props.volume, props.volumes);
     return (
       <select
         id={id}
@@ -660,21 +676,19 @@ function MountSourceControl(props: {
         disabled={disabled}
         onChange={(event) => props.onVolume(event.target.value)}
       >
-        {missing ? <option value={props.volume}>{props.volume}</option> : null}
-        {props.volumes.length === 0
+        {options.names.length === 0
           ? <option value="">{t("none")}</option>
           : null}
-        {props.volumes.map((volume) => (
-          <option key={volume.name} value={volume.name}>
-            {volume.name}
+        {options.names.map((name) => (
+          <option key={name} value={name}>
+            {name}
           </option>
         ))}
       </select>
     );
   }
   if (normalized === "secret") {
-    const missing = props.secret !== "" &&
-      !props.secrets.some((secret) => secret.name === props.secret);
+    const options = mountSourceOptions(props.secret, props.secrets);
     return (
       <select
         id={id}
@@ -683,13 +697,12 @@ function MountSourceControl(props: {
         disabled={disabled}
         onChange={(event) => props.onSecret(event.target.value)}
       >
-        {missing ? <option value={props.secret}>{props.secret}</option> : null}
-        {props.secrets.length === 0
+        {options.names.length === 0
           ? <option value="">{t("none")}</option>
           : null}
-        {props.secrets.map((secret) => (
-          <option key={secret.name} value={secret.name}>
-            {secret.name}
+        {options.names.map((name) => (
+          <option key={name} value={name}>
+            {name}
           </option>
         ))}
       </select>
@@ -706,6 +719,7 @@ function MountSourceControl(props: {
       readOnly={projectLocked}
       disabled={disabled}
       onChange={(event) => props.onProject(event.target.value)}
+      onBlur={props.onProjectBlur}
     />
   );
 }
@@ -716,7 +730,7 @@ function MountSourceControl(props: {
 // tmpfs mounts no source, and a secret or tmpfs carries no mode. The block
 // fills each field with the container's own value; an editor fills it with the
 // control that changes it.
-export function MountRow(props: {
+export const MountRow = memo(function MountRow(props: {
   t: Translate;
   mode: RowMode;
   mount: MountInput;
@@ -734,6 +748,37 @@ export function MountRow(props: {
   // path is typed rather than browsed omits both.
   onBrowse?: () => void;
   browseError?: string;
+  // The row-action Browse for a project path the popup adds to a listed row: it
+  // opens the host directory browser, so the path can be chosen instead of
+  // typed. It is gated like the row's other write actions and left unset by the
+  // editor dialogs and the container block, which never browse a listed row.
+  onProjectBrowse?: () => void;
+  // The Browse action's label, supplied by the caller so a popup can word it
+  // without the ellipsis the Add-mount field's own Browse carries.
+  projectBrowseLabel?: string;
+  // A validation message shown after the row — a reference the row names that
+  // does not exist, or a destination the host would refuse. The Add-mount popup
+  // raises the destination wording while it is typed, and the container form
+  // passes it for a listed row.
+  error?: string;
+  // Reports that a typed project path lost focus; absent where the path is
+  // fixed or the row validates on submit.
+  onProjectBlur?: () => void;
+  // Whether the workspace may create storages and whether a command is in
+  // flight; they gate a volume or secret row's own creation button, which stays
+  // available on a lock that only covers the project path.
+  writable?: boolean;
+  busy?: boolean;
+  // The creators a volume or secret row opens the settings dialogs on. They
+  // resolve with whether the host accepted the create, so the row can drop a
+  // name it selected optimistically after a refusal. A created volume or secret
+  // is selected on this row before the snapshot lists it.
+  onCreateVolume?: (name: string) => Promise<boolean>;
+  onCreateSecret?: (
+    name: string,
+    length?: number,
+    charset?: string,
+  ) => Promise<boolean>;
   // The row's own Remove, which an editor passes and the block omits. Removing
   // a mount from a live container is gated behind that confirmation, and a
   // mount that cannot be removed keeps its Remove in place, greyed out and
@@ -759,6 +804,14 @@ export function MountRow(props: {
     onUpdate,
     onBrowse,
     browseError,
+    onProjectBrowse,
+    projectBrowseLabel,
+    error,
+    onProjectBlur,
+    writable = false,
+    busy = false,
+    onCreateVolume,
+    onCreateSecret,
     onRemove,
     confirmRemove,
     removeDisabledReason,
@@ -766,6 +819,12 @@ export function MountRow(props: {
   } = props;
   const disabledField = disabled === true;
   const update = (patch: Partial<MountInput>): void => onUpdate?.(patch);
+  // The row's own value and patch entry as they now stand, read when an
+  // asynchronous create settles so a refusal only undoes the selection it made.
+  const mountRef = useRef(mount);
+  mountRef.current = mount;
+  const updateRef = useRef(update);
+  updateRef.current = update;
   // A project mount never takes a destination of its own — the host derives its
   // mirror under the projects root — so the preview of it is a fixed value.
   const destinationFixed = normalizeMountKind(mount.kind) === "project";
@@ -801,6 +860,28 @@ export function MountRow(props: {
   ];
   const source = mountSourceName(mount);
   if (mountHasSource(mount.kind)) {
+    // Creating a volume or a secret from the row selects it immediately: the
+    // refreshed snapshot may not list it yet, and the picker keeps the row's own
+    // value among its options until it does. A refusal — a duplicate name — is
+    // resolved by the creator, which then puts the previous source back.
+    const adopt = (
+      name: string,
+      previous: string,
+      accepted: Promise<boolean>,
+    ): Promise<boolean> => {
+      const patch = createdMountSource(mount.kind, name);
+      if (patch !== undefined) update(patch);
+      return accepted.then((ok) => {
+        if (ok) return true;
+        const revert = revertCreatedMountSource(
+          mountRef.current,
+          name,
+          previous,
+        );
+        if (revert !== undefined) updateRef.current(revert);
+        return false;
+      });
+    };
     fields.push({
       label: mountSourceLabel(t, mount.kind),
       render: (id) => (
@@ -810,13 +891,13 @@ export function MountRow(props: {
           id={id}
           value={source}
           copyLabel={t("copyMountName", { name: source })}
-          below={browseError === undefined || browseError === ""
-            ? undefined
-            : (
+          below={browseError !== undefined && browseError !== ""
+            ? (
               <p className={MOUNT_ERROR_CLASS} role="alert">
                 {browseError}
               </p>
-            )}
+            )
+            : undefined}
         >
           <MountSourceControl
             t={t}
@@ -829,20 +910,31 @@ export function MountRow(props: {
             secrets={secrets ?? []}
             disabled={disabledField}
             projectPathLocked={projectPathLocked}
+            onProjectBlur={onProjectBlur}
             onProject={(project) => update({ project })}
             onVolume={(volume) => update({ volume })}
             onSecret={(secret) => update({ secret })}
           />
-          {onBrowse === undefined ? null : (
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={disabledField}
-              onClick={onBrowse}
-            >
-              {t("browse")}
-            </Button>
-          )}
+          <MountSourceActions
+            t={t}
+            kind={mount.kind}
+            writable={writable}
+            busy={busy}
+            disabled={disabledField}
+            onBrowse={onBrowse}
+            onCreateVolume={onCreateVolume === undefined
+              ? undefined
+              : (name) => {
+                const accepted = onCreateVolume(name);
+                return adopt(name, mount.volume, accepted);
+              }}
+            onCreateSecret={onCreateSecret === undefined
+              ? undefined
+              : (name, length, charset) => {
+                const accepted = onCreateSecret(name, length, charset);
+                return adopt(name, mount.secret, accepted);
+              }}
+          />
         </ValueField>
       ),
     });
@@ -873,7 +965,7 @@ export function MountRow(props: {
       ),
     });
   }
-  const actions = mode === "view"
+  const removeAction = mode === "view"
     ? undefined
     : removeDisabledReason !== undefined
     ? (
@@ -918,14 +1010,61 @@ export function MountRow(props: {
         {t("remove")}
       </Button>
     );
+  // Browse is the row's own action rather than a control on the label's line, so
+  // it shares the Remove button's line and weight. It exists only for an editor
+  // project row whose caller supplied a browser, and a read-only or busy
+  // session disables it like the row's other writes.
+  const browseAction =
+    mountRowBrowseOffered(mode, mount.kind, onProjectBrowse) &&
+      onProjectBrowse !== undefined
+      ? (
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={mountRowBrowseDisabled(disabledField, writable, busy)}
+          onClick={onProjectBrowse}
+        >
+          {projectBrowseLabel ?? t("templateBrowse")}
+        </Button>
+      )
+      : undefined;
+  // One fragment, Browse first: the row actions line carries both without
+  // changing where Remove sits, including a disabled Remove kept in place.
+  const actions = browseAction === undefined && removeAction === undefined
+    ? undefined
+    : (
+      <>
+        {browseAction}
+        {removeAction}
+      </>
+    );
   return (
-    <FieldRow
-      leading={
-        <MountKindField t={t} kind={mount.kind}>{kindValue}</MountKindField>
-      }
-      fields={fields}
-      actions={actions}
-    />
+    <>
+      <FieldRow
+        leading={
+          <MountKindField t={t} kind={mount.kind}>{kindValue}</MountKindField>
+        }
+        fields={fields}
+        actions={actions}
+      />
+      <RowValidationError message={error} />
+    </>
+  );
+});
+
+// The validation message a row raises after itself: it belongs to the whole
+// entry, so it sits under the row at the list's full width rather than inside
+// the narrow source slot. The editor dialogs never pass one.
+function RowValidationError(props: { message?: string }): ReactNode {
+  if (props.message === undefined || props.message === "") return null;
+  return (
+    <p
+      className={MOUNT_ERROR_CLASS}
+      style={{ width: "100%", textAlign: "left" }}
+      role="alert"
+    >
+      {props.message}
+    </p>
   );
 }
 
@@ -1069,7 +1208,7 @@ export function PathRow(props: {
 // the row's own Remove at the value line's end, exactly where the block puts
 // that field's copy control, so both render the same two fields at the same
 // widths. Removing one only stages the change, so it needs no confirmation.
-export function SecretEnvRow(props: {
+export const SecretEnvRow = memo(function SecretEnvRow(props: {
   t: Translate;
   mode: RowMode;
   name: string;
@@ -1082,10 +1221,16 @@ export function SecretEnvRow(props: {
   onChangeSecret?: (secret: string) => void;
   // The row's own Remove, which an editor passes and the block omits.
   onRemove?: () => void;
+  // Creates the secret the row names when it no longer exists, so a template's
+  // requirement can be satisfied in place instead of only picked around.
+  onCreateSecret?: () => void;
   // Whether the row's key conflicts in an editor — empty, or a name used twice —
   // which paints only the key with the error state's stroke; the secret picker
   // never carries it.
   keyInvalid?: boolean;
+  // A validation message shown after the row — a secret the row names that the
+  // workspace does not hold. The editor dialogs leave it unset.
+  error?: string;
 }): ReactNode {
   const {
     t,
@@ -1098,10 +1243,18 @@ export function SecretEnvRow(props: {
     onChangeName,
     onChangeSecret,
     onRemove,
+    onCreateSecret,
     keyInvalid,
+    error,
   } = props;
   const disabledField = disabled === true;
   const candidates = secrets ?? [];
+  // A named secret the snapshot no longer lists is a requirement a template can
+  // bring in; the row offers creating it, and its own Remove drops the
+  // requirement.
+  const missing = mode === "edit" && secret !== "" && !candidates.some(
+    (candidate) => candidate.name === secret,
+  );
   const removeControl = mode === "edit" && onRemove !== undefined
     ? (
       <Button
@@ -1115,74 +1268,98 @@ export function SecretEnvRow(props: {
       </Button>
     )
     : undefined;
+  const createControl = missing && onCreateSecret !== undefined
+    ? (
+      <Button
+        variant="outline"
+        size="sm"
+        disabled={disabledField}
+        aria-label={t("templateSecretMissing", { secret })}
+        onClick={onCreateSecret}
+      >
+        {t("createSecret")}
+      </Button>
+    )
+    : undefined;
+  const trailing = createControl === undefined && removeControl === undefined
+    ? undefined
+    : (
+      <div style={{ display: "flex", gap: "4px" }}>
+        {createControl}
+        {removeControl}
+      </div>
+    );
   return (
-    <FieldRow
-      fields={[
-        {
-          label: t("envKey"),
-          render: (id) => (
-            <ValueField
-              t={t}
-              mode={mode}
-              id={id}
-              value={name}
-              copyLabel={t("copyEnvKey", { key: name })}
-            >
-              <Input
+    <>
+      <FieldRow
+        fields={[
+          {
+            label: t("envKey"),
+            render: (id) => (
+              <ValueField
+                t={t}
+                mode={mode}
                 id={id}
-                className={keyInvalid === true
-                  ? `${SLOT_CLASS} ${SLOT_INVALID_CLASS}`
-                  : SLOT_CLASS}
                 value={name}
-                disabled={disabledField}
-                placeholder={t("secretEnvName")}
-                autoFocus={autoFocus}
-                onChange={(event) => onChangeName?.(event.target.value)}
-              />
-            </ValueField>
-          ),
-        },
-        {
-          label: t("envValue"),
-          render: (id) => (
-            <ValueField
-              t={t}
-              mode={mode}
-              id={id}
-              value={secret}
-              copyLabel={t("copyEnvValue", { key: name })}
-              trailing={removeControl}
-            >
-              <select
-                id={id}
-                style={slotSelect}
-                value={secret}
-                disabled={disabledField}
-                onChange={(event) => onChangeSecret?.(event.target.value)}
+                copyLabel={t("copyEnvKey", { key: name })}
               >
-                {
-                  /* A secret the snapshot no longer lists stays selectable
-                     rather than being silently replaced. */
-                }
-                {candidates.some((candidate) => candidate.name === secret)
-                  ? null
-                  : <option value={secret}>{secret}</option>}
-                {candidates.length === 0
-                  ? <option value="">{t("none")}</option>
-                  : null}
-                {candidates.map((candidate) => (
-                  <option key={candidate.name} value={candidate.name}>
-                    {candidate.name}
-                  </option>
-                ))}
-              </select>
-            </ValueField>
-          ),
-        },
-      ]}
-    />
+                <Input
+                  id={id}
+                  className={keyInvalid === true
+                    ? `${SLOT_CLASS} ${SLOT_INVALID_CLASS}`
+                    : SLOT_CLASS}
+                  value={name}
+                  disabled={disabledField}
+                  placeholder={t("secretEnvName")}
+                  autoFocus={autoFocus}
+                  onChange={(event) => onChangeName?.(event.target.value)}
+                />
+              </ValueField>
+            ),
+          },
+          {
+            label: t("secretName"),
+            render: (id) => (
+              <ValueField
+                t={t}
+                mode={mode}
+                id={id}
+                value={secret}
+                copyLabel={t("copyEnvValue", { key: name })}
+                trailing={trailing}
+              >
+                <select
+                  id={id}
+                  style={slotSelect}
+                  value={secret}
+                  disabled={disabledField}
+                  onChange={(event) => onChangeSecret?.(event.target.value)}
+                >
+                  {
+                    /* A secret the snapshot no longer lists stays selectable
+                       rather than being silently replaced. */
+                  }
+                  {candidates.some((candidate) => candidate.name === secret)
+                    ? null
+                    : <option value={secret}>{secret}</option>}
+                  {candidates.length === 0
+                    ? <option value="">{t("none")}</option>
+                    : null}
+                  {candidates.map((candidate) => (
+                    <option key={candidate.name} value={candidate.name}>
+                      {candidate.name}
+                    </option>
+                  ))}
+                </select>
+              </ValueField>
+            ),
+          },
+        ]}
+      />
+      <RowValidationError message={error} />
+    </>
   );
-}
+});
 
 // One published port, shared by the container block and the port editor: the
 // container port, then the host port the gateway bound — or, while the gateway
@@ -1425,42 +1602,18 @@ export const mountViewToInput = (mount: ProjectMountView): MountInput => {
   };
 };
 
-// The category a mount sorts under in an ordered mounts list: the workspace's
-// main project mount first, then read-write projects, read-only projects,
-// read-write volumes, read-only volumes, secrets and tmpfs.
-function mountRank(mount: MountInput, mainProject: string): number {
-  if (
-    mount.kind === "project" && mainProject !== "" &&
-    mount.project === mainProject
-  ) {
-    return 0;
-  }
-  if (mount.kind === "project") return mount.mode === "read_write" ? 1 : 2;
-  if (mount.kind === "volume") return mount.mode === "read_write" ? 3 : 4;
-  if (mount.kind === "secret") return 5;
-  return 6;
-}
-
-// The mounts in the one order both the editors and a container block list them
-// in: one category at a time, sorted by mounted path inside the category. Each
-// entry keeps the index it has in the draft, so an edit or a removal still
-// targets the entry behind the row.
-export function orderedMounts(
-  mounts: readonly MountInput[],
-  mainProject: string,
-): { mount: MountInput; index: number }[] {
-  return mounts
-    .map((mount, index) => ({ mount, index }))
-    .sort((left, right) => {
-      const rank = mountRank(left.mount, mainProject) -
-        mountRank(right.mount, mainProject);
-      if (rank !== 0) return rank;
-      // A stable sort keeps the draft order inside a category when two mounts
-      // share a destination.
-      const a = left.mount.destination;
-      const b = right.mount.destination;
-      return a < b ? -1 : a > b ? 1 : 0;
-    });
+// The destination a mount row shows: a project mount's derived mirror under
+// the projects root, or the destination the other kinds carry. The editor, the
+// container block and the template preview all render a mount through the same
+// row, so they also share this one mapping.
+export function mountDestination(
+  mount: MountInput,
+  projectsRoot: string,
+): string {
+  if (mount.kind !== "project") return mount.destination;
+  return mount.project.trim() === ""
+    ? ""
+    : hostPathForProjectName(projectsRoot, mount.project);
 }
 
 export const mountLabel = (

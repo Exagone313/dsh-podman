@@ -14,7 +14,7 @@
 // the Add and Create dialogs; the staged marker is the one thing it adds to
 // their footer.
 
-import { type ContainerConfig } from "./container-card-config.js";
+import { configsEqual, type ContainerConfig } from "./container-card-config.js";
 import {
   type ContainerView,
   type ImageView,
@@ -22,10 +22,10 @@ import {
 import { ContainerDialog } from "./container-card-dialog.js";
 import { ContainerForm } from "./container-card-form.js";
 import { type DirectoryPickerFace } from "./directory-picker.js";
-import { ConfirmButton } from "./container-card-shared.js";
+import { ConfirmButton, DiscardChangesModal } from "./container-card-shared.js";
 import { type Translate, type Translation } from "./locales.js";
 import { Button } from "@deepseek-ai/dsh-client-ui-primitives";
-import { type ReactNode } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 
 export function ContainerEditModal(props: {
   t: Translate;
@@ -45,6 +45,9 @@ export function ContainerEditModal(props: {
   projectName: string;
   projectsRoot: string;
   directoryPicker?: DirectoryPickerFace;
+  // A project mount the edit dialog forces read-write and non-removable, used by
+  // a template prefill.
+  forcedProject?: string;
   writable: boolean;
   // The row's draft and staged copy, so the dialog cannot drift from the row.
   draft: ContainerConfig;
@@ -64,11 +67,22 @@ export function ContainerEditModal(props: {
   // primary action's label and tone say.
   rebuilds: boolean;
   recreatePending: boolean;
-  onCreateSecret: (name: string, length?: number, charset?: string) => void;
+  createVolume: (name: string) => Promise<boolean>;
+  onCreateSecret: (
+    name: string,
+    length?: number,
+    charset?: string,
+  ) => Promise<boolean>;
   onChange: (draft: ContainerConfig) => void;
   onDiscard: () => void;
   onApply: () => void;
   onClose: () => void;
+  // Returning to the Load template popup this editor came from, dropping the
+  // editor's own changes. Absent for a row's own Edit action.
+  onBack?: () => void;
+  // The configuration the template handed on: a draft equal to it has no edit
+  // to confirm before Back.
+  backBaseline?: ContainerConfig;
 }): ReactNode {
   const {
     t,
@@ -85,6 +99,7 @@ export function ContainerEditModal(props: {
     projectName,
     projectsRoot,
     directoryPicker,
+    forcedProject,
     writable,
     draft,
     dirty,
@@ -94,96 +109,134 @@ export function ContainerEditModal(props: {
     onBlockingError,
     rebuilds,
     recreatePending,
+    createVolume,
     onCreateSecret,
     onChange,
     onDiscard,
     onApply,
     onClose,
+    onBack,
+    backBaseline,
   } = props;
   // The one primary action names what it does: a change that rebuilds the
   // container reads as a destructive recreate, and one the running container
   // takes on its own reads as an update.
   const applyLabel = rebuilds ? t("recreateContainer") : t("updateContainer");
+  // Back drops the editor's draft, so a draft that no longer matches the one
+  // the template supplied is confirmed first; an untouched draft goes straight
+  // back and leaves the popup's own edits intact.
+  const [confirmBack, setConfirmBack] = useState(false);
+  const backDirty = backBaseline !== undefined &&
+    !configsEqual(draft, backBaseline);
+  useEffect(() => {
+    if (!open) setConfirmBack(false);
+  }, [open]);
+  const requestBack = (): void => {
+    if (backDirty) setConfirmBack(true);
+    else onBack?.();
+  };
+  const discardAndBack = (): void => {
+    setConfirmBack(false);
+    onBack?.();
+  };
   return (
-    <ContainerDialog
-      t={t}
-      open={open}
-      title={t("editContainerTitle")}
-      onClose={onClose}
-      marker={marker}
-      markerError={markerError}
-      actions={
-        <>
-          <Button
-            variant="ghost"
-            size="sm"
-            disabled={!enabled || (!dirty && !pending)}
-            onClick={onDiscard}
-          >
-            {t("discard")}
-          </Button>
-          <ConfirmButton
-            t={t}
-            label={applyLabel}
-            variant={rebuilds ? "outline" : "primary"}
-            destructive={rebuilds}
-            title={rebuilds ? t("recreate") : t("updateContainer")}
-            description={rebuilds
-              ? t("confirmRecreate", {
-                workspace: projectName,
-                container: container.containerName,
-              })
-              : t("confirmUpdate", {
-                workspace: projectName,
-                container: container.containerName,
-              })}
-            confirmLabel={applyLabel}
-            disabled={!usable || marker === undefined || markerError === true}
-            pending={recreatePending || busy}
-            onConfirm={onApply}
-          />
-        </>
-      }
-    >
-      <ContainerForm
+    <>
+      <ContainerDialog
         t={t}
-        image={draft.image}
-        env={draft.env}
-        mounts={draft.mounts}
-        paths={draft.paths}
-        secretEnv={draft.secretEnv}
-        ports={draft.ports}
-        images={images}
-        volumes={volumes}
-        secrets={secrets}
-        busy={busy}
-        enabled={enabled}
-        canPublish={canPublish}
-        gatewayUnavailable={gatewayUnavailable}
-        writable={writable}
-        projectsRoot={projectsRoot}
-        directoryPicker={directoryPicker}
-        mainProject={projectName}
-        primaryProject={container.containerName === "default"
-          ? projectName
-          : ""}
-        confirmRemoveMount
-        onCreateSecret={onCreateSecret}
-        onChangeImage={(image) => onChange({ ...draft, image })}
-        onChangeEnv={(env) => onChange({ ...draft, env })}
-        onChangeMounts={(mounts) => onChange({ ...draft, mounts })}
-        onChangePaths={(paths) => onChange({ ...draft, paths })}
-        onChangeSecretEnv={(secretEnv) => onChange({ ...draft, secretEnv })}
-        onChangePorts={(ports) => onChange({ ...draft, ports })}
-        onBlockingError={onBlockingError}
-        name={{
-          /* A container's name is its identity, so the group states it. */
-          value: container.containerName,
-          error: "",
-          readOnly: true,
-          disabled: false,
-        }}
+        open={open}
+        title={t("editContainerTitle")}
+        onClose={onClose}
+        marker={marker}
+        markerError={markerError}
+        actions={
+          <>
+            {onBack === undefined ? null : (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={requestBack}
+              >
+                {t("templateBack")}
+              </Button>
+            )}
+            <Button
+              variant="ghost"
+              size="sm"
+              disabled={!enabled || (!dirty && !pending)}
+              onClick={onDiscard}
+            >
+              {t("discard")}
+            </Button>
+            <ConfirmButton
+              t={t}
+              label={applyLabel}
+              variant={rebuilds ? "outline" : "primary"}
+              destructive={rebuilds}
+              title={rebuilds ? t("recreate") : t("updateContainer")}
+              description={rebuilds
+                ? t("confirmRecreate", {
+                  workspace: projectName,
+                  container: container.containerName,
+                })
+                : t("confirmUpdate", {
+                  workspace: projectName,
+                  container: container.containerName,
+                })}
+              confirmLabel={applyLabel}
+              disabled={!usable || marker === undefined || markerError === true}
+              pending={recreatePending || busy}
+              onConfirm={onApply}
+            />
+          </>
+        }
+      >
+        <ContainerForm
+          t={t}
+          image={draft.image}
+          env={draft.env}
+          mounts={draft.mounts}
+          paths={draft.paths}
+          secretEnv={draft.secretEnv}
+          ports={draft.ports}
+          images={images}
+          volumes={volumes}
+          secrets={secrets}
+          busy={busy}
+          enabled={enabled}
+          canPublish={canPublish}
+          gatewayUnavailable={gatewayUnavailable}
+          writable={writable}
+          projectsRoot={projectsRoot}
+          directoryPicker={directoryPicker}
+          mainProject={projectName}
+          primaryProject={container.containerName === "default"
+            ? projectName
+            : (forcedProject ?? "")}
+          confirmRemoveMount
+          onCreateVolume={createVolume}
+          onCreateSecret={onCreateSecret}
+          onChangeImage={(image) => onChange({ ...draft, image })}
+          onChangeEnv={(env) => onChange({ ...draft, env })}
+          onChangeMounts={(mounts) => onChange({ ...draft, mounts })}
+          onChangePaths={(paths) => onChange({ ...draft, paths })}
+          onChangeSecretEnv={(secretEnv) => onChange({ ...draft, secretEnv })}
+          onChangePorts={(ports) => onChange({ ...draft, ports })}
+          onBlockingError={onBlockingError}
+          name={{
+            /* A container's name is its identity, so the group states it. */
+            value: container.containerName,
+            error: "",
+            readOnly: true,
+            disabled: false,
+          }}
+        />
+      </ContainerDialog>
+      <DiscardChangesModal
+        t={t}
+        open={confirmBack}
+        onCancel={() => setConfirmBack(false)}
+        onDiscard={discardAndBack}
       />
-    </ContainerDialog>
+    </>
   );
 }

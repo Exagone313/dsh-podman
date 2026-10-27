@@ -81,6 +81,10 @@ export type ContainerPluginKey =
   | "countImageMany"
   | "countVolumeOne"
   | "countVolumeMany"
+  | "countMountOne"
+  | "countMountMany"
+  | "countPortOne"
+  | "countPortMany"
   | "countSecretOne"
   | "countSecretMany"
   | "countCacheOne"
@@ -140,9 +144,11 @@ export type ContainerPluginKey =
   | "removeSecret"
   | "removeImage"
   | "rebuildImage"
+  | "rebuilding"
   | "rebuildAllImages"
   | "buildImage"
   | "build"
+  | "building"
   | "buildImageTitle"
   | "pullImage"
   | "setDefaultImage"
@@ -210,6 +216,10 @@ export type ContainerPluginKey =
   | "mountProjectPathInvalid"
   | "mountProjectPathMissing"
   | "mountDestination"
+  | "mountDestinationRequired"
+  | "mountDestinationAbsolute"
+  | "mountDestinationClean"
+  | "mountDestinationReserved"
   | "pathsTitle"
   | "path"
   | "copyPathEntry"
@@ -278,6 +288,9 @@ export type ContainerPluginKey =
   | "toolTitle_container_glob"
   | "toolTitle_container_grep"
   | "toolTitle_container_list"
+  | "toolTitle_container_template_load"
+  | "toolTitle_container_template_export"
+  | "toolTitle_container_template_save"
   | "toolTitle_container_start"
   | "toolTitle_container_recreate"
   | "toolTitle_container_remove"
@@ -330,8 +343,53 @@ export type ContainerPluginKey =
   | "containersTabTitle"
   | "containersCommand"
   | "containersPanelNoWorkspace"
+  | "containersWorkspaceStarting"
+  | "retry"
   | "containersGuideTitle"
   | "containersGuideDescription"
+  | "loadTemplate"
+  | "templatePickHint"
+  | "templateChoose"
+  | "templateSelect"
+  | "templateNone"
+  | "templateUpload"
+  | "templateUploadChip"
+  | "templateNext"
+  | "templateDetails"
+  | "templateBack"
+  | "templateSecretMissing"
+  | "templateVolumeMissing"
+  | "templateProjectMissing"
+  | "templateProjectInvalid"
+  | "templateChooseProject"
+  | "templateChooseVolume"
+  | "templateChooseSecret"
+  | "templateBrowse"
+  | "templateBuildRequired"
+  | "templateFactEnv"
+  | "templateFactMounts"
+  | "templateFactSecrets"
+  | "templateFactPath"
+  | "templateFactPorts"
+  | "templateFactPackageOne"
+  | "templateFactPackageMany"
+  | "templateDestination"
+  | "templateCreate"
+  | "templateReplaceContainer"
+  | "templateFilterTargets"
+  | "templateNoMatchingContainers"
+  | "templateCreateHint"
+  | "templateCreateDefaultHint"
+  | "templateLoading"
+  | "templateImageMissing"
+  | "templateCheckingReferences"
+  | "templateReferenceMissingOne"
+  | "templateReferenceMissingMany"
+  | "templateNoContainer"
+  | "templateContinue"
+  | "close"
+  | "exportTemplate"
+  | "exportTemplateFailed"
   | "moreSettings";
 
 /**
@@ -432,6 +490,10 @@ export const en: Record<ContainerPluginKey, string> = {
   countImageMany: "{n} images",
   countVolumeOne: "1 volume",
   countVolumeMany: "{n} volumes",
+  countMountOne: "1 mount",
+  countMountMany: "{n} mounts",
+  countPortOne: "1 port",
+  countPortMany: "{n} ports",
   countSecretOne: "1 secret",
   countSecretMany: "{n} secrets",
   countCacheOne: "1 cache",
@@ -496,9 +558,11 @@ export const en: Record<ContainerPluginKey, string> = {
   removeSecret: "Remove",
   removeImage: "Remove",
   rebuildImage: "Rebuild",
+  rebuilding: "Rebuilding",
   rebuildAllImages: "Rebuild all images",
   buildImage: "Build custom image",
   build: "Build",
+  building: "Building",
   buildImageTitle: "Build an image",
   pullImage: "Pull",
   setDefaultImage: "Set default",
@@ -576,6 +640,11 @@ export const en: Record<ContainerPluginKey, string> = {
     "Enter a project path inside the projects root, relative to it.",
   mountProjectPathMissing: "No project directory exists at this path.",
   mountDestination: "Destination",
+  mountDestinationRequired: "A destination is required.",
+  mountDestinationAbsolute: "The destination must be an absolute path.",
+  mountDestinationClean:
+    'The destination must be a clean path (no "..", doubled separators or trailing slash).',
+  mountDestinationReserved: "The destination must not be or overlap {path}.",
   pathsTitle: "PATH variable additions",
   path: "Path",
   copyPathEntry: "Copy PATH addition {path}",
@@ -653,6 +722,9 @@ export const en: Record<ContainerPluginKey, string> = {
   toolTitle_container_glob: "Container glob",
   toolTitle_container_grep: "Container grep",
   toolTitle_container_list: "List containers",
+  toolTitle_container_template_load: "Load container template",
+  toolTitle_container_template_export: "Export container template",
+  toolTitle_container_template_save: "Save container template",
   toolTitle_container_start: "Start container",
   toolTitle_container_recreate: "Recreate container",
   toolTitle_container_remove: "Remove container",
@@ -705,8 +777,59 @@ export const en: Record<ContainerPluginKey, string> = {
   containersTabTitle: "Containers",
   containersCommand: "Containers",
   containersPanelNoWorkspace: "This session is not in a known workspace.",
+  containersWorkspaceStarting:
+    "This session's workspace is still starting. Retrying usually finds it.",
+  retry: "Retry",
   containersGuideTitle: "Workspace containers",
   containersGuideDescription: "Manage the Session workspace's containers",
+
+  loadTemplate: "Load template",
+  templatePickHint:
+    "Choose a project template or upload a file. The next step shows its details.",
+  templateChoose: "Template",
+  templateSelect: "Select a template…",
+  templateNone: "No template in this project yet",
+  templateUpload: "Upload from the browser",
+  templateUploadChip: "Upload",
+  templateNext: "Next",
+  templateDetails: "Template details",
+  templateBack: "Back",
+  templateSecretMissing: "Secret “{secret}” does not exist.",
+  templateVolumeMissing: "Volume “{volume}” does not exist.",
+  templateProjectMissing:
+    "Project “{project}” does not exist under the projects root.",
+  templateProjectInvalid: "Project “{project}” is not a valid project path.",
+  templateChooseProject: "Choose a project.",
+  templateChooseVolume: "Choose a volume.",
+  templateChooseSecret: "Choose a secret.",
+  templateBrowse: "Browse",
+  templateBuildRequired: "Build the image to continue.",
+  templateFactEnv: "env",
+  templateFactMounts: "mounts",
+  templateFactSecrets: "secrets",
+  templateFactPath: "PATH",
+  templateFactPorts: "ports",
+  templateFactPackageOne: "package",
+  templateFactPackageMany: "packages",
+  templateDestination: "Create or replace",
+  templateCreate: "New container",
+  templateReplaceContainer: "Edit existing container",
+  templateFilterTargets: "Filter containers",
+  templateNoMatchingContainers: "No matching containers.",
+  templateCreateHint: "The container name is chosen in the next step.",
+  templateCreateDefaultHint:
+    "The workspace's default container is created in the next step.",
+  templateLoading: "Loading template…",
+  templateImageMissing:
+    "Choose an existing image or build the template's image to continue.",
+  templateCheckingReferences: "Checking project paths…",
+  templateReferenceMissingOne: "One reference needs to be resolved.",
+  templateReferenceMissingMany: "{n} references need to be resolved.",
+  templateNoContainer: "No container to replace.",
+  templateContinue: "Continue",
+  close: "Close",
+  exportTemplate: "Export template",
+  exportTemplateFailed: "Export failed: {message}",
   moreSettings: "More settings…",
 };
 
@@ -786,6 +909,10 @@ export const zh: Record<ContainerPluginKey, string> = {
   countImageMany: "{n} 个镜像",
   countVolumeOne: "1 个卷",
   countVolumeMany: "{n} 个卷",
+  countMountOne: "1 个挂载",
+  countMountMany: "{n} 个挂载",
+  countPortOne: "1 个端口",
+  countPortMany: "{n} 个端口",
   countSecretOne: "1 个机密",
   countSecretMany: "{n} 个机密",
   countCacheOne: "1 个缓存",
@@ -848,9 +975,11 @@ export const zh: Record<ContainerPluginKey, string> = {
   removeSecret: "移除",
   removeImage: "移除",
   rebuildImage: "重建",
+  rebuilding: "重建中",
   rebuildAllImages: "重建全部镜像",
   buildImage: "构建自定义镜像",
   build: "构建",
+  building: "构建中",
   buildImageTitle: "构建镜像",
   pullImage: "拉取",
   setDefaultImage: "设为默认",
@@ -921,6 +1050,11 @@ export const zh: Record<ContainerPluginKey, string> = {
   mountProjectPathInvalid: "请输入项目根目录内的相对项目路径。",
   mountProjectPathMissing: "此路径下没有项目目录。",
   mountDestination: "目标路径",
+  mountDestinationRequired: "必须填写目标路径。",
+  mountDestinationAbsolute: "目标路径必须是绝对路径。",
+  mountDestinationClean:
+    "目标路径必须是规范路径（不含“..”、重复分隔符或结尾斜杠）。",
+  mountDestinationReserved: "目标路径不得等于或与 {path} 重叠。",
   pathsTitle: "PATH 变量附加项",
   path: "路径",
   copyPathEntry: "复制 PATH 变量附加项 {path}",
@@ -992,6 +1126,9 @@ export const zh: Record<ContainerPluginKey, string> = {
   toolTitle_container_glob: "容器文件匹配",
   toolTitle_container_grep: "容器文件搜索",
   toolTitle_container_list: "列出容器",
+  toolTitle_container_template_load: "加载容器模板",
+  toolTitle_container_template_export: "导出容器模板",
+  toolTitle_container_template_save: "保存容器模板",
   toolTitle_container_start: "启动容器",
   toolTitle_container_recreate: "重建容器",
   toolTitle_container_remove: "移除容器",
@@ -1044,8 +1181,54 @@ export const zh: Record<ContainerPluginKey, string> = {
   containersTabTitle: "容器",
   containersCommand: "容器",
   containersPanelNoWorkspace: "此会话不属于任何已知工作区。",
+  containersWorkspaceStarting: "此会话的工作区仍在启动中，重试通常就能找到。",
+  retry: "重试",
   containersGuideTitle: "工作区容器",
   containersGuideDescription: "管理会话工作区中的容器",
+
+  loadTemplate: "加载模板",
+  templatePickHint: "选择项目模板或上传文件。下一步将显示其详细信息。",
+  templateChoose: "模板",
+  templateSelect: "选择模板…",
+  templateNone: "此项目还没有模板",
+  templateUpload: "从浏览器上传",
+  templateUploadChip: "上传",
+  templateNext: "下一步",
+  templateDetails: "模板详情",
+  templateBack: "返回",
+  templateSecretMissing: "机密“{secret}”不存在。",
+  templateVolumeMissing: "卷“{volume}”不存在。",
+  templateProjectMissing: "项目“{project}”在项目根目录下不存在。",
+  templateProjectInvalid: "项目“{project}”不是有效的项目路径。",
+  templateChooseProject: "请选择一个项目。",
+  templateChooseVolume: "请选择一个卷。",
+  templateChooseSecret: "请选择一个机密。",
+  templateBrowse: "浏览",
+  templateBuildRequired: "请先构建镜像再继续。",
+  templateFactEnv: "环境变量",
+  templateFactMounts: "挂载",
+  templateFactSecrets: "机密",
+  templateFactPath: "PATH",
+  templateFactPorts: "端口",
+  templateFactPackageOne: "个软件包",
+  templateFactPackageMany: "个软件包",
+  templateDestination: "创建或替换",
+  templateCreate: "新容器",
+  templateReplaceContainer: "编辑现有容器",
+  templateFilterTargets: "筛选容器",
+  templateNoMatchingContainers: "没有匹配的容器。",
+  templateCreateHint: "容器名称将在下一步中选择。",
+  templateCreateDefaultHint: "将在下一步中创建工作区的默认容器。",
+  templateLoading: "正在加载模板…",
+  templateImageMissing: "请选择现有镜像或构建模板镜像后再继续。",
+  templateCheckingReferences: "正在检查项目路径…",
+  templateReferenceMissingOne: "还有 1 个引用需要处理。",
+  templateReferenceMissingMany: "还有 {n} 个引用需要处理。",
+  templateNoContainer: "没有可替换的容器。",
+  templateContinue: "继续",
+  close: "关闭",
+  exportTemplate: "导出模板",
+  exportTemplateFailed: "导出失败：{message}",
   moreSettings: "更多设置…",
 };
 

@@ -5,10 +5,13 @@
 import {
   type ContainerCreateConfig,
   type ImageView,
-  type MountInput,
   type WorkspaceView,
 } from "./container-card-controller.js";
 import { configsEqual, type ContainerConfig } from "./container-card-config.js";
+import {
+  createDialogConfig,
+  initialConfig,
+} from "./container-card-create-config.js";
 import { ContainerDialog } from "./container-card-dialog.js";
 import { ContainerForm } from "./container-card-form.js";
 import { type DirectoryPickerFace } from "./directory-picker.js";
@@ -18,49 +21,18 @@ import {
   PTC_CONTAINER_NAME,
   reservedContainerName,
 } from "./container-card-ptc.js";
-import { mergeDefaultEnv } from "../container-env.js";
-import { orderedEnvRecord } from "../env-rows.js";
 import { type Translate, type Translation } from "./locales.js";
 import { Button } from "@deepseek-ai/dsh-client-ui-primitives";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 
-// The project mount every new container starts with; it is the pristine mount
-// the draft is compared against for its dirty state.
-function initialMounts(workspace: WorkspaceView): MountInput[] {
-  return [
-    {
-      kind: "project",
-      project: workspace.projectName,
-      destination: "",
-      mode: "read_write",
-      volume: "",
-      secret: "",
-    },
-  ];
-}
-
-// The draft an Add/Create dialog opens on: the workspace's image (or the
-// configured default), its own project mount, and the workspace's default
-// environment. The defaults are seeded so the values a new container inherits
-// are visible: a value left alone keeps the default, and an edited one is sent
-// as that container's own.
-function initialConfig(
-  workspace: WorkspaceView,
-  defaultImage: string,
-  defaultEnv: Record<string, string>,
-): ContainerConfig {
-  return {
-    image: workspace.imageId || defaultImage,
-    env: orderedEnvRecord(mergeDefaultEnv(defaultEnv, undefined)),
-    mounts: initialMounts(workspace),
-    paths: [],
-    secretEnv: {},
-    ports: [],
-  };
-}
-
 export function CreateContainerModal(props: {
   t: Translate;
+  // A draft the dialog opens on instead of its own defaults, used by the Load
+  // template popup's Continue action. Nothing is saved until Create.
+  initial?: { name?: string; config: ContainerConfig };
+  // A project mount the editor greys out and cannot remove, beyond the default
+  // container's own workspace mount.
+  forcedProject?: string;
   workspace: WorkspaceView;
   images: readonly ImageView[];
   volumes: readonly { name: string }[];
@@ -81,12 +53,22 @@ export function CreateContainerModal(props: {
   gatewayUnavailable: boolean;
   open: boolean;
   onClose: () => void;
-  onCreateSecret: (name: string, length?: number, charset?: string) => void;
+  // Returning to the Load template popup this editor came from, dropping the
+  // editor's own changes. Absent for an editor opened outside that flow.
+  onBack?: () => void;
+  createVolume: (name: string) => Promise<boolean>;
+  onCreateSecret: (
+    name: string,
+    length?: number,
+    charset?: string,
+  ) => Promise<boolean>;
   onCreate: (container: string, config: ContainerCreateConfig) => void;
 }): ReactNode {
   const {
     t,
     workspace,
+    initial,
+    forcedProject,
     images,
     volumes,
     secrets,
@@ -101,15 +83,26 @@ export function CreateContainerModal(props: {
     gatewayUnavailable,
     open,
     onClose,
+    onBack,
+    createVolume,
     onCreateSecret,
     onCreate,
   } = props;
-  const [draft, setDraft] = useState<ContainerConfig>(() =>
-    initialConfig(workspace, defaultImage, defaultEnv)
-  );
-  const [name, setName] = useState("");
+  // The draft the dialog opens on: a named draft keeps exactly the mounts it
+  // was given; the default container forces the workspace's own project mount
+  // first and keeps the mode a template declared for it.
+  const pristineConfig = (): ContainerConfig => {
+    const base = initial?.config ??
+      initialConfig(workspace, defaultImage, defaultEnv);
+    return createDialogConfig(base, named, workspace.projectName);
+  };
+  const [draft, setDraft] = useState<ContainerConfig>(pristineConfig);
+  const [name, setName] = useState(initial?.name ?? "");
   const [submitting, setSubmitting] = useState(false);
   const [confirmClose, setConfirmClose] = useState(false);
+  // Back leaves for the Load template popup the draft was handed from; a draft
+  // the user has edited is confirmed before that draft is dropped.
+  const [confirmBack, setConfirmBack] = useState(false);
   // A row the editors flagged as conflicting — unnamed or named twice — refuses
   // the create; the footer says why until it is fixed or removed.
   const [blockingError, setBlockingError] = useState<Translation | undefined>(
@@ -128,12 +121,15 @@ export function CreateContainerModal(props: {
     }
     if (initialized.current) return;
     initialized.current = true;
-    setDraft(initialConfig(workspace, defaultImage, defaultEnv));
-    setName("");
+    const base = initial?.config ??
+      initialConfig(workspace, defaultImage, defaultEnv);
+    setDraft(createDialogConfig(base, named, workspace.projectName));
+    setName(initial?.name ?? "");
     setSubmitting(false);
     setConfirmClose(false);
-  }, [open, workspace, defaultImage, defaultEnv]);
-  const pristine = initialConfig(workspace, defaultImage, defaultEnv);
+    setConfirmBack(false);
+  }, [open, workspace, defaultImage, defaultEnv, initial, named]);
+  const pristine = pristineConfig();
   const reservedName = reservedContainerName(name);
   const nameTaken = existing.includes(name);
   const namePatternOk = namePattern.test(name);
@@ -160,9 +156,19 @@ export function CreateContainerModal(props: {
     if (dirty) setConfirmClose(true);
     else onClose();
   };
+  // Back returns to the template popup with the draft it handed on; an edited
+  // draft is confirmed first, so the editor is never left open by a back.
+  const requestBack = (): void => {
+    if (dirty) setConfirmBack(true);
+    else onBack?.();
+  };
   const discardAndClose = (): void => {
     setConfirmClose(false);
     onClose();
+  };
+  const discardAndBack = (): void => {
+    setConfirmBack(false);
+    onBack?.();
   };
   const submit = (): void => {
     if (!canCreate || submitting) return;
@@ -191,6 +197,15 @@ export function CreateContainerModal(props: {
         markerError={blockingError !== undefined}
         actions={
           <>
+            {onBack === undefined ? null : (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={requestBack}
+              >
+                {t("templateBack")}
+              </Button>
+            )}
             <Button
               variant="outline"
               size="sm"
@@ -231,7 +246,8 @@ export function CreateContainerModal(props: {
           // The workspace's default container always keeps its main project
           // mount, so Create greys out its Remove; a named container (Add) keeps
           // the mounts it was given, the seeded project one included.
-          primaryProject={named ? "" : workspace.projectName}
+          primaryProject={named ? (forcedProject ?? "") : workspace.projectName}
+          onCreateVolume={createVolume}
           onCreateSecret={onCreateSecret}
           onChangeImage={(image) => setDraft({ ...draft, image })}
           onChangeEnv={(env) => setDraft({ ...draft, env })}
@@ -263,6 +279,12 @@ export function CreateContainerModal(props: {
         open={confirmClose}
         onCancel={() => setConfirmClose(false)}
         onDiscard={discardAndClose}
+      />
+      <DiscardChangesModal
+        t={t}
+        open={confirmBack}
+        onCancel={() => setConfirmBack(false)}
+        onDiscard={discardAndBack}
       />
     </>
   );

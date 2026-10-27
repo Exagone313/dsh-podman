@@ -26,6 +26,7 @@ import {
 import { ROW_LIST_CLASS } from "./container-card-table-styles.js";
 import type { Translate, Translation } from "./locales.js";
 import { COMPACT_DIALOG_CLASS } from "./container-card-dialog-styles.js";
+import { missingSecretNames } from "./container-template-ui.js";
 import {
   conflictingEnvNames,
   emptyEnvRow,
@@ -37,6 +38,7 @@ import {
 import { Button, Input, Modal } from "@deepseek-ai/dsh-client-ui-primitives";
 import {
   type ReactNode,
+  useCallback,
   useEffect,
   useId,
   useMemo,
@@ -115,6 +117,9 @@ export function SecretModal(props: {
   mode: "create" | "edit";
   // The secret an edit overwrites; ignored while creating.
   name?: string;
+  // The name a create form opens on, used when a template (or a row) already
+  // names the secret that has to exist.
+  initialName?: string;
   open: boolean;
   busy: boolean;
   writable: boolean;
@@ -128,6 +133,7 @@ export function SecretModal(props: {
     t,
     mode,
     name,
+    initialName,
     open,
     busy,
     writable,
@@ -156,11 +162,11 @@ export function SecretModal(props: {
   // secret.
   useEffect(() => {
     if (!open) return;
-    setNewName("");
+    setNewName(editing ? "" : (initialName ?? ""));
     setLength("32");
     setCharset("alphanumeric");
     setValue("");
-  }, [open]);
+  }, [open, editing, initialName]);
   const submit = (): void => {
     if (editing) {
       if (value === "" || name === undefined) return;
@@ -309,6 +315,9 @@ export function SecretEnvEditor(props: {
   // unnamed row it is still typing — so the other group's editor catches a name
   // used in both groups before either row is applied.
   onNames?: (names: readonly string[]) => void;
+  // A validation message for a row — a secret it names that the workspace does
+  // not hold. The editor dialogs leave it unset.
+  rowError?: (name: string, secret: string) => string | undefined;
 }): ReactNode {
   const {
     t,
@@ -322,6 +331,7 @@ export function SecretEnvEditor(props: {
     onBlockingError,
     otherNames,
     onNames,
+    rowError,
   } = props;
   // The rows are the editor's own: a row keeps its place while its name is
   // retyped, so clearing a key never drops the row — it stays, red, until its
@@ -336,6 +346,10 @@ export function SecretEnvEditor(props: {
     setRows(envEditRows(secretEnv));
   }
   const [createOpen, setCreateOpen] = useState(false);
+  // The name the create form opens on: a missing requirement's own name, or
+  // empty for the generic Create secret button.
+  const [createName, setCreateName] = useState("");
+  const missingSecrets = missingSecretNames(secretEnv, secrets);
   const [pendingSecret, setPendingSecret] = useState("");
   // The row the user appended, where a newly created secret is selected; it is
   // kept while that row exists, so the secret lands where the user was working.
@@ -379,43 +393,95 @@ export function SecretEnvEditor(props: {
   useEffect(() => {
     onNames?.(names);
   }, [names, onNames]);
-  const update = (next: EnvEditRow[]): void => {
+  // The rows are memoized, so their callbacks keep one identity while the list
+  // holds the same row ids. Each one reads the latest rows and handler through a
+  // ref, so typing in one row re-renders that row alone.
+  const onChangeRef = useRef(onChange);
+  onChangeRef.current = onChange;
+  const writeRows = useCallback((next: EnvEditRow[]): void => {
     setRows(next);
-    onChange(envRecordFromRows(next));
-  };
+    onChangeRef.current(envRecordFromRows(next));
+  }, []);
+  const updateRowAt = useCallback(
+    (id: number, patch: Partial<EnvEditRow>): void => {
+      writeRows(
+        rowsRef.current.map((row) =>
+          row.id === id ? { ...row, ...patch } : row
+        ),
+      );
+    },
+    [writeRows],
+  );
+  const removeRowAt = useCallback(
+    (id: number): void => {
+      setDraftRowId((previous) => previous === id ? undefined : previous);
+      writeRows(rowsRef.current.filter((row) => row.id !== id));
+    },
+    [writeRows],
+  );
+  // Opens the create form on the secret the row still names, so a template's
+  // missing requirement can be satisfied in place.
+  const openCreateFor = useCallback((id: number): void => {
+    const row = rowsRef.current.find((candidate) => candidate.id === id);
+    if (row === undefined || row.value === "") return;
+    setDraftRowId(id);
+    setCreateName(row.value);
+    setCreateOpen(true);
+  }, []);
+  const rowIds = rows.map((row) => row.id).join(",");
+  const rowCallbacks = useMemo(() => {
+    const callbacks = new Map<number, {
+      changeName: (name: string) => void;
+      changeSecret: (secret: string) => void;
+      remove: () => void;
+      createSecret: () => void;
+    }>();
+    for (const row of rowsRef.current) {
+      const id = row.id;
+      callbacks.set(id, {
+        changeName: (name) => updateRowAt(id, { key: name }),
+        changeSecret: (secret) => updateRowAt(id, { value: secret }),
+        remove: () => removeRowAt(id),
+        createSecret: () => openCreateFor(id),
+      });
+    }
+    return callbacks;
+  }, [rowIds, updateRowAt, removeRowAt, openCreateFor]);
+  const update = (next: EnvEditRow[]): void => writeRows(next);
   const addRow = (): void => {
     const row = { ...emptyEnvRow(), value: secrets[0]?.name ?? "" };
     setDraftRowId(row.id);
     update([...rows, row]);
-  };
-  const updateRow = (id: number, patch: Partial<EnvEditRow>): void => {
-    update(rows.map((row) => (row.id === id ? { ...row, ...patch } : row)));
-  };
-  const removeRow = (id: number): void => {
-    if (id === draftRowId) setDraftRowId(undefined);
-    update(rows.filter((row) => row.id !== id));
   };
   return (
     <div
       className={ROW_LIST_CLASS}
       style={{ display: "flex", flexDirection: "column", gap: "8px" }}
     >
-      {rows.map((row) => (
-        <SecretEnvRow
-          key={row.id}
-          t={t}
-          mode="edit"
-          name={row.key}
-          secret={row.value}
-          secrets={secrets}
-          disabled={!enabled}
-          autoFocus={row.id === draftRowId}
-          keyInvalid={conflicts.has(row.key)}
-          onChangeName={(name) => updateRow(row.id, { key: name })}
-          onChangeSecret={(secret) => updateRow(row.id, { value: secret })}
-          onRemove={() => removeRow(row.id)}
-        />
-      ))}
+      {rows.map((row) => {
+        const callbacks = rowCallbacks.get(row.id);
+        return (
+          <SecretEnvRow
+            key={row.id}
+            t={t}
+            mode="edit"
+            name={row.key}
+            secret={row.value}
+            secrets={secrets}
+            disabled={!enabled}
+            autoFocus={row.id === draftRowId}
+            keyInvalid={conflicts.has(row.key)}
+            error={rowError?.(row.key, row.value)}
+            onChangeName={callbacks?.changeName}
+            onChangeSecret={callbacks?.changeSecret}
+            onRemove={callbacks?.remove}
+            onCreateSecret={row.value !== "" &&
+                missingSecrets.includes(row.value)
+              ? callbacks?.createSecret
+              : undefined}
+          />
+        );
+      })}
       {
         /* A workspace without secrets shows no picker and no "none" line: the
           one action that fixes it, Create secret, is offered below. */
@@ -437,7 +503,10 @@ export function SecretEnvEditor(props: {
           variant="outline"
           size="sm"
           disabled={!writable || busy}
-          onClick={() => setCreateOpen(true)}
+          onClick={() => {
+            setCreateName("");
+            setCreateOpen(true);
+          }}
         >
           {t("createSecret")}
         </Button>
@@ -445,6 +514,7 @@ export function SecretEnvEditor(props: {
       <SecretModal
         t={t}
         mode="create"
+        initialName={createName}
         open={createOpen}
         busy={busy}
         writable={writable}

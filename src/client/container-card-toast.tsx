@@ -29,7 +29,7 @@ export function ContainerCardToast(props: ContainerCardToastProps): ReactNode {
       // A new report remounts the banner, which restarts its hold.
       key={`podman-card-toast-${String(toast.seq)}`}
       text={toast.text}
-      icon={toast.kind === "error" ? <IconWarningOutlineRegular /> : undefined}
+      icon={toast.kind === "ok" ? undefined : <IconWarningOutlineRegular />}
       onDone={props.dismissToast}
     />
   );

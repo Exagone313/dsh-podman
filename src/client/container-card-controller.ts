@@ -30,6 +30,21 @@ import {
 } from "./card-protocol.js";
 import { type CardClient, createCardClient } from "./card-client.js";
 import {
+  createTemplateClient,
+  type TemplateClient,
+} from "./template-client.js";
+import type {
+  TemplateApplyRequest,
+  TemplateApplyView,
+  TemplateBuildRequest,
+  TemplateBuildView,
+  TemplateEntryView,
+  TemplateInspectionView,
+  TemplateInspectRequest,
+  TemplatePublishRequest,
+  TemplatePublishView,
+} from "./template-protocol.js";
+import {
   configNeedsRecreate,
   type ContainerConfig,
   envDiff,
@@ -83,11 +98,11 @@ export type {
 };
 
 // One transient command report: the sequence keys the rendered toast so a new
-// report restarts its hold, kind picks the failure icon, and text is the host's
-// own notice (or an error message), never a dictionary key.
+// report restarts its hold, kind picks the failure or warning icon, and text is
+// the host's own notice (or an error message), never a dictionary key.
 export interface CardToast {
   seq: number;
-  kind: "ok" | "error";
+  kind: "ok" | "warn" | "error";
   text: string;
 }
 
@@ -226,7 +241,9 @@ export interface ContainerCardFace {
     port: number,
     protocol: string,
   ) => void;
-  createVolume: (name: string) => void;
+  // A create resolves with whether the host accepted it, so a mount row can
+  // drop the name it optimistically selected after a refusal.
+  createVolume: (name: string) => Promise<boolean>;
   removeVolume: (name: string) => void;
   removeImage: (imageId: string) => void;
   rebuildImage: (imageId: string) => void;
@@ -235,7 +252,11 @@ export interface ContainerCardFace {
   rebuildBaseImage: (name: string) => void;
   pullBaseImage: (name: string) => void;
   setDefaultImage: (name: string) => void;
-  createSecret: (name: string, length?: number, charset?: string) => void;
+  createSecret: (
+    name: string,
+    length?: number,
+    charset?: string,
+  ) => Promise<boolean>;
   removeSecret: (name: string) => void;
   setSecret: (name: string, value: string) => void;
   addContainerSecret: (
@@ -257,12 +278,32 @@ export interface ContainerCardFace {
   applyDefaultEnv: (workspace: string) => void;
   // Apply a container's saved configuration: every group is staged on the host
   // and the container is recreated only when the change reaches what it runs.
+  // Resolves true when every staged change was accepted, so a template-sourced
+  // replace publishes its ports only after a successful Apply.
   applyContainerConfig: (
     workspace: string,
     container: string,
     base: ContainerConfig,
     next: ContainerConfig,
-  ) => void;
+  ) => Promise<boolean>;
+  // The Load template popup's operations. They return structured results (the
+  // parsed template, its image plan, apply warnings) and refresh the snapshot
+  // after a build or an apply.
+  listTemplates: (workspace: string) => Promise<TemplateEntryView[]>;
+  inspectTemplate: (
+    request: TemplateInspectRequest,
+  ) => Promise<TemplateInspectionView>;
+  buildTemplate: (
+    request: TemplateBuildRequest,
+  ) => Promise<TemplateBuildView>;
+  applyTemplate: (
+    request: TemplateApplyRequest,
+  ) => Promise<TemplateApplyView>;
+  // Publish the ports of a template whose replace the edit editor applied.
+  // Failures come back as warnings; the container is already updated.
+  publishTemplate: (
+    request: TemplatePublishRequest,
+  ) => Promise<TemplatePublishView>;
 }
 
 const EMPTY_SNAPSHOT: CardSnapshot = {
@@ -402,6 +443,7 @@ export class ContainerCardController {
   constructor(
     private readonly scope: ConfigForm<ContainerSettings>,
     client: CardClient = createCardClient(),
+    private readonly templateClient: TemplateClient = createTemplateClient(),
   ) {
     this.client = client;
     this.store = createSnapshotStore(this.project());
@@ -498,7 +540,7 @@ export class ContainerCardController {
 
   // showToast publishes one command report; an empty notice means there is
   // nothing to say (a successful command that reported no result).
-  private showToast(kind: "ok" | "error", text: string): void {
+  private showToast(kind: CardToast["kind"], text: string): void {
     if (text === "") return;
     this.toastSeq += 1;
     this.toast = { seq: this.toastSeq, kind, text };
@@ -676,31 +718,36 @@ export class ContainerCardController {
   // takes effect. Each dispatch reports its own failure and never rejects, so
   // one refused change does not strand the rest; the recreate runs last, only
   // when the image or the environment changed, since those are the two fields
-  // it carries.
+  // it carries. Resolves whether every dispatched change was accepted, which is
+  // what a template-sourced replace waits for before publishing its ports.
   private async applyConfig(
     workspace: string,
     container: string,
     base: ContainerConfig,
     next: ContainerConfig,
-  ): Promise<void> {
+  ): Promise<boolean> {
+    let applied = true;
+    const run = async (request: Promise<boolean>): Promise<void> => {
+      if (!(await request)) applied = false;
+    };
     const mounts = mountDiff(base.mounts, next.mounts);
     for (const mount of mounts.removed) {
-      await this.request("container_mount_remove", workspace, "", {
+      await run(this.request("container_mount_remove", workspace, "", {
         container,
         mount,
-      });
+      }));
     }
     for (const mount of mounts.updated) {
-      await this.request("container_mount_update", workspace, "", {
+      await run(this.request("container_mount_update", workspace, "", {
         container,
         mount,
-      });
+      }));
     }
     for (const mount of mounts.added) {
-      await this.request("container_mount_add", workspace, "", {
+      await run(this.request("container_mount_add", workspace, "", {
         container,
         mount,
-      });
+      }));
     }
     // A secret env var has no in-place update: a changed value is detached and
     // reattached, so the variable never keeps a stale secret name.
@@ -710,54 +757,55 @@ export class ContainerCardController {
       ...secrets.changed.map(([envVar]) => envVar),
     ];
     for (const secretEnvName of detach) {
-      await this.request("container_secret_remove", workspace, "", {
+      await run(this.request("container_secret_remove", workspace, "", {
         container,
         secretEnvName,
-      });
+      }));
     }
     for (
       const [secretEnvName, secret] of [...secrets.added, ...secrets.changed]
     ) {
-      await this.request("container_secret_add", workspace, "", {
+      await run(this.request("container_secret_add", workspace, "", {
         container,
         secretEnvName,
         secret,
-      });
+      }));
     }
     if (!pathsEqual(base.paths, next.paths)) {
-      await this.request("container_path_set", workspace, "", {
+      await run(this.request("container_path_set", workspace, "", {
         container,
         paths: [...next.paths],
-      });
+      }));
     }
     const ports = portDiff(base.ports, next.ports);
     for (const published of ports.removed) {
-      await this.request("container_unpublish_port", workspace, "", {
+      await run(this.request("container_unpublish_port", workspace, "", {
         container,
         port: published.port,
         protocol: published.protocol,
-      });
+      }));
     }
     for (const published of ports.added) {
-      await this.request("container_publish_port", workspace, "", {
+      await run(this.request("container_publish_port", workspace, "", {
         container,
         port: published.port,
         protocol: published.protocol,
         ...(published.suggestedHostPort > 0
           ? { suggestedHostPort: published.suggestedHostPort }
           : {}),
-      });
+      }));
     }
     // The recreate command is what carries a new image or environment. Every
     // other group is applied by the commands above, and a mount or a secret
     // environment variable recreates the container on its own, so the recreate
     // only runs when one of the two fields it applies changed.
     if (configNeedsRecreate(base, next)) {
-      await this.request("recreate", workspace, next.image, {
+      await run(this.request("recreate", workspace, next.image, {
         container,
         env: next.env,
-      });
+      }));
     }
+    return applied;
   }
 
   inject(): ContainerCardFace {
@@ -827,7 +875,7 @@ export class ContainerCardController {
           port,
           protocol,
         }),
-      createVolume: (name) => this.command("volume_create", name, ""),
+      createVolume: (name) => this.request("volume_create", name, ""),
       removeVolume: (name) => this.command("volume_remove", name, ""),
       removeImage: (imageId) => this.command("image_remove", imageId, ""),
       rebuildImage: (imageId) => this.command("image_rebuild", imageId, ""),
@@ -841,7 +889,7 @@ export class ContainerCardController {
         this.save("defaultImage");
       },
       createSecret: (name, length, charset) =>
-        this.command("secret_create", name, "", {
+        this.request("secret_create", name, "", {
           ...(length ? { length } : {}),
           ...(charset ? { charset } : {}),
         }),
@@ -864,8 +912,36 @@ export class ContainerCardController {
       },
       applyDefaultEnv: (workspace) =>
         this.command("default_env_sync", workspace, ""),
-      applyContainerConfig: (workspace, container, base, next) => {
-        void this.applyConfig(workspace, container, base, next);
+      applyContainerConfig: (workspace, container, base, next) =>
+        this.applyConfig(workspace, container, base, next),
+      listTemplates: (workspace) => this.templateClient.list(workspace),
+      inspectTemplate: (request) => this.templateClient.inspect(request),
+      buildTemplate: async (request) => {
+        const result = await this.templateClient.build(request);
+        void this.reload();
+        return result;
+      },
+      applyTemplate: async (request) => {
+        const result = await this.templateClient.apply(request);
+        void this.reload();
+        return result;
+      },
+      publishTemplate: async (request) => {
+        try {
+          const result = await this.templateClient.publish(request);
+          if (result.warnings.length > 0) {
+            this.showToast("warn", result.warnings.join("\n"));
+          }
+          return result;
+        } catch (error) {
+          this.showToast(
+            "error",
+            error instanceof Error ? error.message : String(error),
+          );
+          return { warnings: [] };
+        } finally {
+          void this.reload();
+        }
       },
     };
   }

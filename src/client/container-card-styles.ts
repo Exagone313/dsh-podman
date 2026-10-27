@@ -151,6 +151,31 @@ export const successAction: React.CSSProperties = {
     "color-mix(in srgb, var(--dsw-alias-state-success-primary) 12%, transparent)",
 };
 
+// The violet the PTC chip, the tmpfs mount marker and the template actions all
+// read with. The harness ships no violet accent token — its accent pair is blue
+// — so all three tint this one literal, at the chip's 12% fill, rather than
+// each carrying its own copy. One literal is what keeps them identical.
+export const violetTone: { color: string; background: string } = {
+  color: "#a78bfa",
+  background: "color-mix(in srgb, #a78bfa 12%, transparent)",
+};
+
+// A template action: its ink, stroke and fill are the violet shared with the PTC
+// and tmpfs styling, so the three stay identical in colour.
+export const templateAction: React.CSSProperties = {
+  color: violetTone.color,
+  borderColor: violetTone.color,
+  background: violetTone.background,
+};
+
+// The chosen destination in the load popup: the same shared violet with a
+// stronger tint, so the selected mode stays visible without becoming a second
+// filled primary control.
+export const templateActionSelected: React.CSSProperties = {
+  ...templateAction,
+  background: `color-mix(in srgb, ${violetTone.color} 20%, transparent)`,
+};
+
 // The emphasis styles by name, so a caller that renders a plain Button can paint
 // it the same way ConfirmButton's own emphasis prop does.
 export const emphasisAction: Record<ActionEmphasis, React.CSSProperties> = {

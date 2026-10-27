@@ -62,10 +62,11 @@ export const MOUNT_DESTINATION_CLASS = "dsh-podman-mount-destination";
 // control beside a field.
 export const MOUNT_ACTIONS_CLASS = "dsh-podman-mount-actions";
 
-// The class on a mount row's error line under its source field: a typed project
-// path the host refused, or a browse outside the projects root. It sets the
-// line's typography and the error state's colour, so a refused path reads as the
-// failure it is in both themes.
+// The class on a field row's error line: a refused reference under the entry it
+// belongs to, or a typed project path the host refused or a browse outside the
+// projects root under the source field. It sets the line's typography and the
+// error state's colour, so a refused value reads as the failure it is in both
+// themes.
 export const MOUNT_ERROR_CLASS = "dsh-podman-mount-error";
 
 // The class on a group that lists shared rows: a container block's field group,

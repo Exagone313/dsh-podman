@@ -9,6 +9,12 @@
 // greyed zero it holds.
 
 import { ContainerRow, CreateContainerModal } from "./container-card-row.js";
+import {
+  LoadTemplateModal,
+  type TemplateActions,
+  type TemplateResume,
+} from "./container-card-templates.js";
+import type { TemplateSource } from "./container-template-ui.js";
 import { countLabel } from "./container-card-shared.js";
 import { scopedActionKey } from "./card-protocol.js";
 import {
@@ -27,6 +33,7 @@ import {
   rowMain,
   rowName,
   statusMuted,
+  templateAction,
   workspaceStatus,
 } from "./container-card-styles.js";
 import {
@@ -108,21 +115,41 @@ export function WorkspaceSection(props: {
   onRecreate: (workspace: string, container: string, image: string) => void;
   onRemoveWorkspace: (workspace: string) => void;
   onCreate: (workspace: WorkspaceView, config?: ContainerCreateConfig) => void;
-  onCreateSecret: (name: string, length?: number, charset?: string) => void;
+  // The storage creators the create and edit dialogs' mount rows open, shared
+  // with the settings Storage tab.
+  onCreateVolume: (name: string) => Promise<boolean>;
+  onCreateSecret: (
+    name: string,
+    length?: number,
+    charset?: string,
+  ) => Promise<boolean>;
   onStartContainer: (
     workspace: WorkspaceView,
     container: string,
     config?: ContainerCreateConfig,
   ) => void;
+  // Resolves whether every staged change was accepted, so a template-sourced
+  // replace publishes its ports only after a successful Apply.
   onApplyContainerConfig: (
     workspace: string,
     container: string,
     base: ContainerConfig,
     next: ContainerConfig,
-  ) => void;
+  ) => Promise<boolean>;
   // Whether the port-publishing gateway is known to be missing, forwarded to
   // each row.
   gatewayUnavailable: boolean;
+  // The Load template popup's host operations.
+  templateActions: TemplateActions;
+  // The Images tab's own image controls, shared with the template popup so its
+  // image card dispatches the same commands for an image that is not the
+  // template's own.
+  onBuildImage: (imageId: string, parent: string, packages: string[]) => void;
+  onRebuildImage: (imageId: string) => void;
+  onRebuildBaseImage: (name: string) => void;
+  onPullBaseImage: (name: string) => void;
+  // Refresh the live snapshot after a template build or apply.
+  onReload: () => void;
   // An extra control appended to the header's action group. The sidebar panel
   // uses it for its settings action; the settings card passes nothing, so both
   // places render the same workspace header.
@@ -147,15 +174,45 @@ export function WorkspaceSection(props: {
     onRecreate,
     onRemoveWorkspace,
     onCreate,
+    onCreateVolume,
     onCreateSecret,
     onStartContainer,
     onApplyContainerConfig,
     gatewayUnavailable,
+    templateActions,
+    onBuildImage,
+    onRebuildImage,
+    onRebuildBaseImage,
+    onPullBaseImage,
+    onReload,
     extraAction,
   } = props;
   const [createOpen, setCreateOpen] = useState<"default" | "named" | null>(
     null,
   );
+  const [templateOpen, setTemplateOpen] = useState(false);
+  // What the Load template popup's Continue handed the editor, kept while that
+  // editor is open so its Back can reopen the popup's details step exactly as
+  // the user left it. It is dropped when the popup closes or the flow applies.
+  const [templateResume, setTemplateResume] = useState<TemplateResume | null>(
+    null,
+  );
+  // A one-shot draft the Load template popup's Continue hands to the create or
+  // edit editor; the editor saves nothing until its own Apply.
+  const [createPrefill, setCreatePrefill] = useState<
+    { name: string; config: ContainerConfig } | null
+  >(null);
+  const [editPrefill, setEditPrefill] = useState<
+    {
+      container: string;
+      token: number;
+      config: ContainerConfig;
+      // The template a replace came from, whose ports are published after a
+      // successful Apply; dropped once they have been.
+      source?: TemplateSource;
+    } | null
+  >(null);
+  const editToken = useRef(0);
   const [removeWorkspaceOpen, setRemoveWorkspaceOpen] = useState(false);
   const [removeWorkspaceAcknowledged, setRemoveWorkspaceAcknowledged] =
     useState(false);
@@ -238,6 +295,15 @@ export function WorkspaceSection(props: {
           >
             {hasContainer ? t("addContainer") : t("createContainer")}
           </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={busy}
+            style={templateAction}
+            onClick={() => setTemplateOpen(true)}
+          >
+            {t("loadTemplate")}
+          </Button>
           {
             /* A workspace that holds no container has nothing to remove, so
               the action is hidden rather than offered as a no-op. */
@@ -279,12 +345,72 @@ export function WorkspaceSection(props: {
                   writable={writable}
                   onRemove={onRemove}
                   onRecreate={onRecreate}
+                  createVolume={onCreateVolume}
                   onCreateSecret={onCreateSecret}
-                  onApplyContainerConfig={onApplyContainerConfig}
+                  onApplyContainerConfig={async (
+                    workspace,
+                    container,
+                    base,
+                    next,
+                  ) => {
+                    const applied = await onApplyContainerConfig(
+                      workspace,
+                      container,
+                      base,
+                      next,
+                    );
+                    const prefill = editPrefill;
+                    if (
+                      !applied || prefill === null ||
+                      prefill.container !== container
+                    ) {
+                      return applied;
+                    }
+                    // The template flow is over once its draft applied, so a
+                    // later Load template starts at the picker with a fresh
+                    // draft rather than resuming this one.
+                    setTemplateResume(null);
+                    if (prefill.source === undefined) return applied;
+                    // The editor is the one edit-apply path: ports are not in
+                    // its draft, so the template's own are published here.
+                    setEditPrefill((current) =>
+                      current !== null && current.container === container
+                        ? { ...current, source: undefined }
+                        : current
+                    );
+                    await templateActions.publishTemplate({
+                      op: "publish",
+                      workspace,
+                      container,
+                      name: prefill.source.name,
+                      yaml: prefill.source.yaml,
+                    });
+                    return applied;
+                  }}
                   projectName={workspace.projectName}
                   projectsRoot={projectsRoot}
                   directoryPicker={directoryPicker}
                   gatewayUnavailable={gatewayUnavailable}
+                  prefill={editPrefill !== null &&
+                      editPrefill.container === container.containerName
+                    ? { token: editPrefill.token, config: editPrefill.config }
+                    : undefined}
+                  forcedProject={editPrefill !== null &&
+                      editPrefill.container === container.containerName &&
+                      container.containerName === "default"
+                    ? workspace.projectName
+                    : undefined}
+                  onEditBack={templateResume === null ? undefined : () => {
+                    // Back drops the editor without applying, clears the
+                    // one-shot prefill and reopens the popup on its recorded
+                    // draft; the resume payload itself stays for that reopen.
+                    setEditPrefill(null);
+                    setTemplateOpen(true);
+                  }}
+                  onEditClosed={() => {
+                    setEditPrefill(null);
+                    setTemplateResume(null);
+                  }}
                 />
               ))}
             </div>
@@ -319,6 +445,54 @@ export function WorkspaceSection(props: {
           onRemoveWorkspace(workspace.workspaceSlug);
         }}
       />
+      <LoadTemplateModal
+        t={t}
+        locale={locale}
+        open={templateOpen}
+        workspace={workspace}
+        containers={containers}
+        images={images}
+        volumes={volumes}
+        secrets={secrets}
+        defaultEnv={defaultEnv}
+        projectsRoot={projectsRoot}
+        directoryPicker={directoryPicker}
+        busy={busy}
+        writable={writable}
+        gatewayUnavailable={gatewayUnavailable}
+        actions={templateActions}
+        onBuildImage={onBuildImage}
+        onRebuildImage={onRebuildImage}
+        onRebuildBaseImage={onRebuildBaseImage}
+        onPullBaseImage={onPullBaseImage}
+        onCreateSecret={onCreateSecret}
+        createVolume={onCreateVolume}
+        onReload={onReload}
+        resume={templateResume}
+        onClose={() => {
+          setTemplateOpen(false);
+          setTemplateResume(null);
+        }}
+        onContinue={(mode, container, config, source, resume) => {
+          setTemplateOpen(false);
+          setTemplateResume(resume ?? null);
+          if (mode === "create") {
+            setCreateOpen(container === "default" ? "default" : "named");
+            setCreatePrefill({
+              name: container === "default" ? "" : container,
+              config,
+            });
+          } else {
+            editToken.current += 1;
+            setEditPrefill({
+              container,
+              token: editToken.current,
+              config,
+              ...(source === undefined ? {} : { source }),
+            });
+          }
+        }}
+      />
       <CreateContainerModal
         t={t}
         workspace={workspace}
@@ -335,7 +509,27 @@ export function WorkspaceSection(props: {
         existing={containers.map((container) => container.containerName)}
         gatewayUnavailable={gatewayUnavailable}
         open={createOpen !== null}
-        onClose={() => setCreateOpen(null)}
+        initial={createPrefill ?? undefined}
+        forcedProject={createOpen === "default"
+          ? workspace.projectName
+          : undefined}
+        onBack={templateResume === null || createPrefill === null
+          ? undefined
+          : () => {
+            // Back drops the editor without creating anything and reopens the
+            // popup on the draft Continue handed on.
+            setCreateOpen(null);
+            setCreatePrefill(null);
+            setTemplateOpen(true);
+          }}
+        onClose={() => {
+          setCreateOpen(null);
+          setCreatePrefill(null);
+          // Closing the editor ends the template flow, so its recorded draft
+          // must not resurface on the next Load template.
+          setTemplateResume(null);
+        }}
+        createVolume={onCreateVolume}
         onCreateSecret={onCreateSecret}
         onCreate={(container, config) => {
           if (createOpen === "named") {
@@ -344,6 +538,8 @@ export function WorkspaceSection(props: {
             onCreate(workspace, config);
           }
           setCreateOpen(null);
+          setCreatePrefill(null);
+          setTemplateResume(null);
         }}
       />
     </section>

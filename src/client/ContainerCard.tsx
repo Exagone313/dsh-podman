@@ -358,11 +358,24 @@ export function ContainerCard(props: ContainerCardProps): ReactNode {
               onRecreate={props.recreate}
               onRemoveWorkspace={props.removeWorkspace}
               onCreate={props.createContainer}
+              onCreateVolume={props.createVolume}
               onCreateSecret={props.createSecret}
               onStartContainer={props.startContainer}
               onApplyContainerConfig={props.applyContainerConfig}
               gatewayUnavailable={state.gatewayState === "absent" ||
                 state.gatewayState === "incompatible"}
+              templateActions={{
+                listTemplates: props.listTemplates,
+                inspectTemplate: props.inspectTemplate,
+                buildTemplate: props.buildTemplate,
+                applyTemplate: props.applyTemplate,
+                publishTemplate: props.publishTemplate,
+              }}
+              onBuildImage={props.buildImage}
+              onRebuildImage={props.rebuildImage}
+              onRebuildBaseImage={props.rebuildBaseImage}
+              onPullBaseImage={props.pullBaseImage}
+              onReload={props.reload}
             />
           ))
         )}

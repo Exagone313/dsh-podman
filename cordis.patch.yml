@@ -15,6 +15,10 @@
 # disable built-in terminal.
 - id: ui-sidebar-terminal
   disabled: true
+# the harness checkout this context names exists only in the dsh container; the
+# agent's tools run in guest containers, where that host path does not exist.
+- id: harness-dev-context
+  disabled: true
 - insert:
     - id: podman
       name: '@exagone313/dsh-podman'

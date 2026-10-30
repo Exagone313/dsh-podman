@@ -89,6 +89,7 @@ async function harness(
     workspaces?: unknown[];
     workspace?: unknown;
     failControl?: string;
+    containerEnv?: Record<string, string>;
   } = {},
 ): Promise<Harness> {
   const root = await mkdtemp(join(tmpdir(), "dsh-template-summary-"));
@@ -109,7 +110,10 @@ async function harness(
           ? { id: WORKSPACE_ID, path: project }
           : options.workspace,
     },
-    getConfig: () => ({ projectsRoot: root }),
+    getConfig: () => ({
+      projectsRoot: root,
+      containerEnv: options.containerEnv,
+    }),
     async control(method: string, request: any) {
       calls.push([method, request]);
       if (method === options.failControl) throw new Error("control failed");
@@ -278,6 +282,74 @@ test("removals count each group the template replaces", async () => {
       secretEnv: 1,
       paths: 1,
     });
+  } finally {
+    await cleanup(t);
+  }
+});
+
+test("the default environment is not counted as removed", async () => {
+  // The container carries the four git identity variables seeded from the
+  // default environment. A template load layers the defaults under its own
+  // `env`, so they survive and must not be reported as removed; KEEP is not a
+  // default and really is dropped by the template's declared map.
+  const gitIdentity = {
+    GIT_AUTHOR_NAME: "John Doe",
+    GIT_AUTHOR_EMAIL: "john.doe@git.example",
+    GIT_COMMITTER_NAME: "John Doe",
+    GIT_COMMITTER_EMAIL: "john.doe@git.example",
+  };
+  const t = await harness({
+    containerEnv: gitIdentity,
+    containers: [{
+      workspaceSlug: WORKSPACE_ID,
+      containerName: "default",
+      mounts: [
+        {
+          projectName: "app",
+          kind: "MOUNT_KIND_PROJECT",
+          mode: "MOUNT_MODE_READ_ONLY",
+        },
+        {
+          volume: "cache",
+          destination: "/cache",
+          kind: "MOUNT_KIND_VOLUME",
+          mode: "MOUNT_MODE_READ_ONLY",
+        },
+        {
+          secret: "npm-token",
+          destination: "/run/secrets/npm",
+          kind: "MOUNT_KIND_SECRET",
+        },
+        {
+          destination: "/scratch",
+          kind: "MOUNT_KIND_TMPFS",
+        },
+      ],
+      env: { ...gitIdentity, KEEP: "1" },
+      secretEnv: { TOKEN: "npm-token" },
+      paths: ["/usr/local/bin"],
+    }],
+  });
+  try {
+    const summary = await readTemplateLoadSummary(t.resolver, t.root, {
+      template: "web",
+      container: "default",
+      cwd: t.project,
+    });
+    assert.deepEqual(summary?.removals, {
+      mounts: 0,
+      env: 1,
+      secretEnv: 0,
+      paths: 0,
+    });
+    const reason = summarizeArgs(
+      "container_template_load",
+      { template: "web" },
+      t.project,
+      "en",
+      summary,
+    );
+    assert.match(reason, /Removes 1 environment variable\./);
   } finally {
     await cleanup(t);
   }

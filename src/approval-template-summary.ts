@@ -25,6 +25,7 @@ import type {
   TemplateLoadSummary,
 } from "./approval-reasons.js";
 import { normalizeMountKind } from "./mount-enums.js";
+import { mergeDefaultEnv } from "./container-env.js";
 import { readProjectTemplate, workspaceForCwd } from "./template-files.js";
 import type { WorkspaceResolver } from "./workspace-binding.js";
 
@@ -92,7 +93,12 @@ export async function readTemplateLoadSummary(
       ),
       envCount: Object.keys(template.spec.env).length,
       pathCount: template.spec.paths.length,
-      removals: removalCounts(staged, template, current),
+      removals: removalCounts(
+        staged,
+        template,
+        current,
+        seededEnvKeys(resolver),
+      ),
     };
   } catch {
     return undefined;
@@ -193,6 +199,17 @@ function currentMountKey(mount: any): string {
   }
 }
 
+// seededEnvKeys returns the environment keys the apply always seeds: the
+// plugin's default environment, filtered exactly as mergeDefaultEnv filters it
+// (empty keys and the reserved DSH_PODMAN namespace are dropped). Those keys
+// survive a template load whatever the template declares, so they are never
+// counted as removed.
+function seededEnvKeys(resolver: WorkspaceResolver): ReadonlySet<string> {
+  return new Set(
+    Object.keys(mergeDefaultEnv(resolver.getConfig().containerEnv, undefined)),
+  );
+}
+
 // removalCounts counts the current items absent from the staged template. A
 // group the template leaves undeclared is kept by StartContainer, so its
 // current values are not removed and its count stays zero.
@@ -200,6 +217,7 @@ function removalCounts(
   staged: readonly TemplateMountInput[],
   template: ContainerTemplate,
   current: CurrentContainer | undefined,
+  seededEnv: ReadonlySet<string>,
 ): TemplateLoadRemovals {
   if (current === undefined) {
     return { mounts: 0, env: 0, secretEnv: 0, paths: 0 };
@@ -209,22 +227,25 @@ function removalCounts(
   const mounts =
     currentMounts.filter((mount) => !stagedKeys.has(currentMountKey(mount)))
       .length;
-  const env = removedKeys(current.env, template.spec.env);
+  const env = removedKeys(current.env, template.spec.env, seededEnv);
   const secretEnv = removedKeys(current.secretEnv, template.spec.secretEnv);
   const paths = removedPaths(current.paths, template.spec.paths);
   return { mounts, env, secretEnv, paths };
 }
 
 // removedKeys counts the current keys a declared map does not name. An empty
-// declared map means the group was not declared, so nothing is removed.
+// declared map means the group was not declared, so nothing is removed. `kept`
+// names keys that survive regardless of the declaration.
 function removedKeys(
   current: unknown,
   declared: Readonly<Record<string, unknown>>,
+  kept: ReadonlySet<string> = new Set<string>(),
 ): number {
-  const declaredKeys = Object.keys(declared);
-  if (declaredKeys.length === 0) return 0;
-  const declaredSet = new Set(declaredKeys);
-  return objectKeys(current).filter((key) => !declaredSet.has(key)).length;
+  const declaredKeys = new Set(Object.keys(declared));
+  if (declaredKeys.size === 0) return 0;
+  return objectKeys(current).filter((key) =>
+    !declaredKeys.has(key) && !kept.has(key)
+  ).length;
 }
 
 // removedPaths counts the current PATH additions a declared list does not

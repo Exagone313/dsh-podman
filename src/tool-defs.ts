@@ -223,7 +223,7 @@ export const TOOL_DESCRIPTIONS: Record<string, string> = {
   container_list:
     "List the containers of the current workspace, including the default container that is started on demand.",
   container_template_load:
-    "Load a container template from the project's .dsh-podman directory: build its image when needed, then create the container or replace an existing one. The workspace project mount is always added read-write. The template's mounts replace the container's mounts; the environment, secret environment and PATH additions it declares replace those groups, and groups it leaves undeclared keep their current values. Requires approval: creating or replacing a container changes what runs in the workspace.",
+    "Load a container template from the project's .dsh-podman directory: build its image when needed, then create the container or replace an existing one. The workspace project mount is always added read-write. The template's mounts replace the container's mounts; the environment, secret environment and PATH additions it declares replace those groups, and groups it leaves undeclared keep their current values. The default environment variables are layered under the environment the template declares, so a template never has to repeat them. Requires approval: creating or replacing a container changes what runs in the workspace.",
   container_template_export:
     "Export a container of the current workspace as a container-template YAML document (its root base image, recursive package union, mounts, environment, secrets, PATH additions and ports). Returns the YAML string and changes nothing.",
   container_template_save:

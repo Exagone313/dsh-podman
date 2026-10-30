@@ -49,11 +49,16 @@ async function harness(options: {
   containers?: any[];
   images?: any[];
   publishFails?: boolean;
+  containerEnv?: Record<string, string>;
+  template?: string;
 } = {}): Promise<Harness> {
   const root = await mkdtemp(join(tmpdir(), "dsh-template-tools-"));
   const project = join(root, "app");
   await mkdir(join(project, ".dsh-podman"), { recursive: true });
-  await writeFile(join(project, ".dsh-podman", "web.yml"), TEMPLATE);
+  await writeFile(
+    join(project, ".dsh-podman", "web.yml"),
+    options.template ?? TEMPLATE,
+  );
   const calls: Array<[string, any]> = [];
   const saved: any[] = [];
   let containers = options.containers ?? [];
@@ -62,7 +67,10 @@ async function harness(options: {
     registry: {
       resolveByPath: async () => ({ id: WORKSPACE_ID, path: project }),
     },
-    getConfig: () => ({ projectsRoot: root }),
+    getConfig: () => ({
+      projectsRoot: root,
+      containerEnv: options.containerEnv,
+    }),
     async resolve() {
       return {
         token: "t",
@@ -264,6 +272,62 @@ test("container_template_load replaces an existing container in place", async ()
     assert.deepEqual({ ...start[1].env }, { NODE_ENV: "development" });
     assert.deepEqual({ ...start[1].secretEnv }, { TOKEN: "token" });
     assert.deepEqual(start[1].paths, ["/usr/local/bin"]);
+  } finally {
+    await cleanup(t);
+  }
+});
+
+test("container_template_load layers the default environment under the template env", async () => {
+  const t = await harness({
+    workspaceExists: false,
+    containerEnv: {
+      NODE_ENV: "from-defaults",
+      GIT_AUTHOR_NAME: "John Doe",
+      GIT_AUTHOR_EMAIL: "john.doe@git.example",
+      DSH_PODMAN_RESERVED: "dropped",
+    },
+  });
+  try {
+    await toolHandlers.container_template_load(
+      t.resolver,
+      { template: "web" },
+      await exec(t.project),
+    );
+    const create = t.calls.find(([method]) => method === "createWorkspace");
+    // The template's own NODE_ENV wins over the default of the same name, and
+    // the reserved default never reaches the orchestrator.
+    assert.deepEqual({ ...create?.[1].env }, {
+      GIT_AUTHOR_NAME: "John Doe",
+      GIT_AUTHOR_EMAIL: "john.doe@git.example",
+      NODE_ENV: "development",
+    });
+  } finally {
+    await cleanup(t);
+  }
+});
+
+test("a template without env keeps the whole stored environment", async () => {
+  const t = await harness({
+    containers: [{ containerName: "default", imageId: "ubuntu" }],
+    containerEnv: { GIT_AUTHOR_NAME: "John Doe" },
+    template: `version: 1
+kind: dsh-podman/container-template
+spec:
+  image: alpine
+  mounts:
+    - {kind: project, project: app}
+`,
+  });
+  try {
+    await toolHandlers.container_template_load(
+      t.resolver,
+      { template: "web" },
+      await exec(t.project),
+    );
+    const start = t.calls.find(([method]) => method === "startContainer");
+    // No env sent: StartContainer keeps the container's stored map untouched,
+    // defaults included.
+    assert.equal(Object.hasOwn(start?.[1] ?? {}, "env"), false);
   } finally {
     await cleanup(t);
   }

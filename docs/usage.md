@@ -181,7 +181,7 @@ managed `DSH_*` fact.
 | Tool                        | Params                           | Description                                                                                                                                                                                                                                                                                                                          |
 | --------------------------- | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `container_template_export` | `container`                      | Export a container as a container-template YAML string (root base image, recursive package union minus the base's built-ins, mounts, environment, secret names, PATH additions and ports with explicit `protocol: tcp`); changes nothing                                                                                             |
-| `container_template_load` ✱ | `template`, optional `container` | Load a project template: build its image when needed, then create a container, publish its ports and report failures as warnings; the workspace project mount is added read-write                                                                                                                                                    |
+| `container_template_load` ✱ | `template`, optional `container` | Load a project template: build its image when needed, then create a container, publish its ports and report failures as warnings; the workspace project mount is added read-write, and the default environment is layered under the template's `env`                                                                                 |
 | `container_template_save` ✱ | `container`, `name`              | Save the source `container` as a template: the tool exports it to canonical YAML itself (there is no YAML argument) and writes the result through the default container's guest agent as `name` in the project's `.dsh-podman` directory, adding `.yml` when the basename has no YAML suffix and creating the directory when missing |
 
 ### Containers
@@ -734,7 +734,8 @@ grouped in the container card's order — project, volume, secret, tmpfs — and
 keep their order within a kind. The four Git identity variables
 (`GIT_AUTHOR_NAME`, `GIT_AUTHOR_EMAIL`, `GIT_COMMITTER_NAME`,
 `GIT_COMMITTER_EMAIL`) are never written to a template, and a template that
-declares them is loaded without them: they come from the default environment.
+declares them is loaded without them: they come from the default environment,
+which is layered under the `env` a template declares whenever one is loaded.
 
 The format is strict: an unknown `version` or `kind`, any key outside the sets
 above (no `command`, `resources`, tmpfs `size`, or port `protocol` other than

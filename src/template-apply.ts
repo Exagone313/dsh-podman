@@ -19,6 +19,7 @@ import {
   type ContainerTemplate,
   templateMountInputs,
 } from "./container-template.js";
+import { mergeDefaultEnv } from "./container-env.js";
 import { grpc } from "./grpc/runtime-client.js";
 import { mountInputToProto } from "./mount-input.js";
 import { portProtocolToProto } from "./publish-port.js";
@@ -68,7 +69,14 @@ export async function applyContainerTemplate(
   };
   if (mounts.length > 0) payload.mounts = mounts;
   if (Object.keys(template.spec.env).length > 0) {
-    payload.env = template.spec.env;
+    // The default environment is layered under the template's own variables,
+    // the same way every other creation path seeds it: a template never has to
+    // repeat the git identity (which it may not carry at all) and loading one
+    // never drops the defaults.
+    payload.env = mergeDefaultEnv(
+      resolver.getConfig().containerEnv,
+      template.spec.env,
+    );
   }
   if (Object.keys(template.spec.secretEnv).length > 0) {
     payload.secretEnv = template.spec.secretEnv;

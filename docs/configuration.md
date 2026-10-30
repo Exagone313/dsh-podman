@@ -47,11 +47,12 @@ section):
 the default container of a new workspace and every named container. Existing
 containers keep their own environment; a container's own `env` wins per key, and
 a recreate stores exactly the environment it is given, so edit it in the
-workspace and recreate to change or remove a value. The **Add container** and
-**Create container** dialogs open their **Environment variables** group on these
-defaults, so the values a new container inherits are visible; a value left alone
-keeps the default and an edited one becomes part of that container's own
-environment.
+workspace and recreate to change or remove a value. Loading a container template
+seeds these values under the template's `env`, so a template never has to repeat
+them. The **Add container** and **Create container** dialogs open their
+**Environment variables** group on these defaults, so the values a new container
+inherits are visible; a value left alone keeps the default and an edited one
+becomes part of that container's own environment.
 
 The Podman page's **Default environment variables** section edits it with the
 same key/value rows a container uses: add or remove variables, then **Save** (or

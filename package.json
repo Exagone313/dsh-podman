@@ -87,7 +87,7 @@
     "@types/react": "^18.3.31",
     "dprint": "0.64.3",
     "esbuild": "^0.28.2",
-    "oxlint": "1.89.0",
+    "oxlint": "1.90.0",
     "typescript": "^7.0.2"
   },
   "engines": {

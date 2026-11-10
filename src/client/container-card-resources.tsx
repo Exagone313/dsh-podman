@@ -213,10 +213,8 @@ export function ImagesSection(props: {
             </div>
           )}
       </CardGroup>
-      {
-        /* Rebuilding every image in dependency order cannot be undone, so it
-          is gated behind an explicit acknowledgement. */
-      }
+      {/* Rebuilding every image in dependency order cannot be undone, so it
+          is gated behind an explicit acknowledgement. */}
       <RiskConfirmation
         open={rebuildAllOpen}
         title={t("rebuildAllImagesTitle")}

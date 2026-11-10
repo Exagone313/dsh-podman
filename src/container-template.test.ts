@@ -129,8 +129,7 @@ spec:
 });
 
 test("mount keys are matched to their kind", () => {
-  const template = (mount: string): string =>
-    `version: 1
+  const template = (mount: string): string => `version: 1
 kind: dsh-podman/container-template
 spec:
   image: ubuntu
@@ -203,8 +202,7 @@ spec:
 });
 
 test("a project mount takes a mode, defaulting to the editor's read_only", () => {
-  const template = (mode: string): string =>
-    `version: 1
+  const template = (mode: string): string => `version: 1
 kind: dsh-podman/container-template
 spec:
   image: ubuntu
@@ -231,8 +229,7 @@ spec:
 });
 
 test("secret names, not values, are accepted everywhere", () => {
-  const template = (secret: string): string =>
-    `version: 1
+  const template = (secret: string): string => `version: 1
 kind: dsh-podman/container-template
 spec:
   image: ubuntu
@@ -272,8 +269,7 @@ spec:
 });
 
 test("ports require an explicit tcp protocol and valid ports", () => {
-  const template = (port: string): string =>
-    `version: 1
+  const template = (port: string): string => `version: 1
 kind: dsh-podman/container-template
 spec:
   image: ubuntu
@@ -304,8 +300,7 @@ spec:
 });
 
 test("PATH additions must be absolute and clean", () => {
-  const template = (path: string): string =>
-    `version: 1
+  const template = (path: string): string => `version: 1
 kind: dsh-podman/container-template
 spec:
   image: ubuntu

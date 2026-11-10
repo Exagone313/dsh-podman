@@ -298,11 +298,9 @@ export function PtcImageRow(props: {
         </div>
       </div>
       <div style={imageFields}>
-        {
-          /* A missing image was never built, so the line is absent there just
+        {/* A missing image was never built, so the line is absent there just
             as it is on every other row; the exact instant stays available as
-            the tooltip. */
-        }
+            the tooltip. */}
         {row.builtAt === "" ? null : (
           <ImageField label={t("built")}>
             <span title={row.builtAt}>

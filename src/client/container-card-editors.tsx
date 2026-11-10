@@ -630,13 +630,11 @@ export function MountsEditor(props: {
           </>
         }
       >
-        {
-          /* The row raises its validation message after itself, and the row
+        {/* The row raises its validation message after itself, and the row
             list is what normally supplies the 8px between the two; this
             wrapper stands in for that list, so the dialog's message is not
             flush against the row. Without a message the wrapper holds a single
-            child and changes nothing. */
-        }
+            child and changes nothing. */}
         <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
           <MountRow
             t={t}

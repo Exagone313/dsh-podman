@@ -628,9 +628,10 @@ test("create replaces a container name that already exists", async () => {
       mode: "MOUNT_MODE_READ_ONLY",
     });
     assert.deepEqual({ ...start[1].env }, { NODE_ENV: "development" });
-    assert.deepEqual({ ...start[1].secretEnv }, {
-      GITHUB_TOKEN: "github-token",
-    });
+    assert.deepEqual(
+      { ...start[1].secretEnv },
+      { GITHUB_TOKEN: "github-token" },
+    );
     assert.deepEqual(start[1].paths, ["/usr/local/bin"]);
     assert.equal(applied.container.containerName, "dev");
     assert.equal(applied.container.imageId, "ubuntu");

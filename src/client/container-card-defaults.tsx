@@ -205,10 +205,8 @@ export function DefaultsSection(props: {
         </select>
       </div>
       <div style={editorGroup}>
-        {
-          /* The Git identity popup edits the same draft as the editor below,
-            so its button shares that editor's own title line. */
-        }
+        {/* The Git identity popup edits the same draft as the editor below,
+            so its button shares that editor's own title line. */}
         <div style={actionRow}>
           <div style={rowMain}>
             <h4 style={editorTitle}>{t("defaultEnvironment")}</h4>

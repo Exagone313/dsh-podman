@@ -66,11 +66,10 @@ test("envRecordFromRows lets the last of a repeated name win", () => {
 test("the conflict checks flag an empty or repeated name", () => {
   assert.deepEqual([...conflictingEnvNames([])], []);
   assert.deepEqual([...conflictingEnvNames(["A", "B"])], []);
-  assert.deepEqual([...conflictingEnvNames(["A", "A", "B", "B", ""])], [
-    "A",
-    "B",
-    "",
-  ]);
+  assert.deepEqual(
+    [...conflictingEnvNames(["A", "A", "B", "B", ""])],
+    ["A", "B", ""],
+  );
   assert.equal(firstDuplicateEnvName(["A", "B"]), undefined);
   assert.equal(firstDuplicateEnvName(["", "A", "B", "A"]), "A");
 });

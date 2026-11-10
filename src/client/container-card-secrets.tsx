@@ -482,10 +482,8 @@ export function SecretEnvEditor(props: {
           />
         );
       })}
-      {
-        /* A workspace without secrets shows no picker and no "none" line: the
-          one action that fixes it, Create secret, is offered below. */
-      }
+      {/* A workspace without secrets shows no picker and no "none" line: the
+          one action that fixes it, Create secret, is offered below. */}
       {secrets.length === 0 ? null : (
         <div>
           <Button

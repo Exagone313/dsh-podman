@@ -322,13 +322,11 @@ export function ContainerCard(props: ContainerCardProps): ReactNode {
           },
         ]}
       />
-      {
-        /* Every panel stays mounted while it is hidden, so a draft a tab holds
+      {/* Every panel stays mounted while it is hidden, so a draft a tab holds
           (a staged container edit, an environment being typed) survives a
           switch between tabs. The body style is only applied to the visible
           panel: an inline display would otherwise beat the `hidden` attribute
-          and show every tab at once. */
-      }
+          and show every tab at once. */}
       <div
         id={panelId("workspaces")}
         role="tabpanel"
@@ -476,11 +474,9 @@ export function ContainerCard(props: ContainerCardProps): ReactNode {
           onRemovePtc={props.removePtc}
         />
       </div>
-      {
-        /* The reload re-reads the whole snapshot, so it acts on the page rather
+      {/* The reload re-reads the whole snapshot, so it acts on the page rather
           than on one tab: it sits below the tabs, where it is reachable from
-          every one of them without competing with the state chips. */
-      }
+          every one of them without competing with the state chips. */}
       <div style={actionRow}>
         <Button
           variant="outline"

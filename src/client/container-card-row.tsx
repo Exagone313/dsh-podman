@@ -290,12 +290,10 @@ export function ContainerRow(props: {
     <>
       <div style={last ? cardBlockRow : { ...cardBlockRow, ...rowDivider }}>
         <div style={blockWrapper}>
-          {
-            /* The identity line carries the name, the state, the age and the
+          {/* The identity line carries the name, the state, the age and the
               row's own actions: the fields below all read after it. The name
               wraps rather than truncating, so a long identifier only makes the
-              line taller. */
-          }
+              line taller. */}
           <div style={actionRow}>
             <div style={rowMain}>
               <h4 style={{ ...cardTitle, overflowWrap: "anywhere" }}>
@@ -314,11 +312,9 @@ export function ContainerRow(props: {
                 label={t("copyCreated")}
               />
             </div>
-            {
-              /* Edit, Recreate and Remove share the name's line, at its right
+            {/* Edit, Recreate and Remove share the name's line, at its right
                 end while the block has room and below the name once it does
-                not. */
-            }
+                not. */}
             <div style={rowActions}>
               <Button
                 variant="outline"

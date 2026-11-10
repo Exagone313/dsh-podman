@@ -196,8 +196,7 @@ export function DirectoryPickerModal(props: {
                     type="button"
                     className="dsh-podman-directory-crumb"
                     disabled={busy}
-                    onClick={() =>
-                      navigate(crumb)}
+                    onClick={() => navigate(crumb)}
                   >
                     {crumbLabel(crumb)}
                   </button>

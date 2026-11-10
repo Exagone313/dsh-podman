@@ -1335,10 +1335,8 @@ export const SecretEnvRow = memo(function SecretEnvRow(props: {
                   disabled={disabledField}
                   onChange={(event) => onChangeSecret?.(event.target.value)}
                 >
-                  {
-                    /* A secret the snapshot no longer lists stays selectable
-                       rather than being silently replaced. */
-                  }
+                  {/* A secret the snapshot no longer lists stays selectable
+                       rather than being silently replaced. */}
                   {candidates.some((candidate) => candidate.name === secret)
                     ? null
                     : <option value={secret}>{secret}</option>}

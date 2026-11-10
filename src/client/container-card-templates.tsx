@@ -1397,12 +1397,10 @@ function TemplateDetailsModal(props: {
   const fileName = inspection?.name ?? selection?.name ?? "";
   const footer = (
     <div style={footerRow}>
-      {
-        /* The left slot: a blocking reason is announced as an alert and painted
+      {/* The left slot: a blocking reason is announced as an alert and painted
            in the harness's error colour, the same one a mount error uses. With
            no blocking reason the slot stays empty, so informational wording
-           would never be painted as an error. */
-      }
+           would never be painted as an error. */}
       <span
         style={blockText === undefined ? footerReason : footerReasonError}
         role={blockText === undefined ? "status" : "alert"}
@@ -1544,13 +1542,11 @@ function TemplateDetailsModal(props: {
               : null
             : (
               <>
-                {
-                  /* The image group keeps the row-list marker around its card:
+                {/* The image group keeps the row-list marker around its card:
                   the card is a list, so the marker keeps its facts' narrow
                   layout and the gap between the card and a failed build. The
                   picker sits above the same card, so the image it edits and the
-                  facts that describe it read together. */
-                }
+                  facts that describe it read together. */}
                 {imageFacts === undefined
                   ? null
                   : (
@@ -1598,13 +1594,11 @@ function TemplateDetailsModal(props: {
                       </div>
                     </DialogGroup>
                   )}
-                {
-                  /* The draft's field groups are the container editor's own
+                {/* The draft's field groups are the container editor's own
                   dialog groups and field components, in its order and under its
                   titles: environment, mounts, PATH additions, secret
                   environment and ports. Every row edits the draft, so the
-                  values Continue hands over are exactly what the user saw. */
-                }
+                  values Continue hands over are exactly what the user saw. */}
                 <div style={blockFields}>
                   <DialogGroup title={t("envTitle")}>
                     <EnvEditor

@@ -326,11 +326,9 @@ export function StatusSection(props: {
           </table>
         </Subsection>
       </CardGroup>
-      {
-        /* The shared PTC container belongs to no workspace, so its own card
+      {/* The shared PTC container belongs to no workspace, so its own card
           sits here, directly below the component card, rather than above the
-          workspace cards. */
-      }
+          workspace cards. */}
       <PtcSection
         t={t}
         ptc={ptc}

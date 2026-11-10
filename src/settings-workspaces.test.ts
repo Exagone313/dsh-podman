@@ -66,9 +66,10 @@ test("refresh on install publishes containers, images and workspaces", async () 
   assert.equal(workspaces[0].workspaceSlug, "w1");
   assert.equal(workspaces[0].projectName, "team/app");
   assert.deepEqual(scope.value.volumes, [{ name: "data" }, { name: "cache" }]);
-  assert.deepEqual(scope.value.secrets, [{ name: "db-pass" }, {
-    name: "api-key",
-  }]);
+  assert.deepEqual(scope.value.secrets, [
+    { name: "db-pass" },
+    { name: "api-key" },
+  ]);
 });
 
 test("create command drives createWorkspace with env", async () => {

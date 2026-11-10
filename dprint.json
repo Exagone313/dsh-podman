@@ -19,8 +19,8 @@
     "jsx.multiLineParens": "prefer",
     "module.sortImportDeclarations": "maintain",
     "module.sortExportDeclarations": "maintain",
-    "exportDeclaration.sortTypeOnlyExports": "none",
-    "importDeclaration.sortTypeOnlyImports": "none"
+    "exportDeclaration.sortTypeOnlyExports": "inline",
+    "importDeclaration.sortTypeOnlyImports": "inline"
   },
   "markdown": {
     "textWrap": "always"
@@ -34,7 +34,7 @@
   ],
   "excludes": ["bin", "dist", "node_modules", "third_party"],
   "plugins": [
-    "npm:@dprint/typescript@0.96.1",
-    "npm:@dprint/markdown@0.28.2"
+    "npm:@dprint/typescript@0.99.2",
+    "npm:@dprint/markdown@0.29.0"
   ]
 }

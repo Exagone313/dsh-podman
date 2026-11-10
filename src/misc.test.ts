@@ -190,10 +190,11 @@ test("tool presenters render command results as terminal output", () => {
     { card: "terminal", output: "", signal: "SIGTERM" },
   );
   assert.equal(
-    toolResultView("container_bash", {}, {
-      content: [{ type: "text", text: "boom" }],
-      isError: true,
-    }),
+    toolResultView(
+      "container_bash",
+      {},
+      { content: [{ type: "text", text: "boom" }], isError: true },
+    ),
     undefined,
   );
   assert.equal(toolResultView("image_list", {}, result({})), undefined);

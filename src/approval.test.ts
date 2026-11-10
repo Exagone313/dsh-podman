@@ -441,9 +441,10 @@ test("read-only denies the built-in file and shell tools", async () => {
 
 test("workspace-write and full access delegate the built-in file and shell tools", async () => {
   for (
-    const facts of [{ mode: "workspace-write", policy: "ask" }, {
-      policy: "never",
-    }]
+    const facts of [
+      { mode: "workspace-write", policy: "ask" },
+      { policy: "never" },
+    ]
   ) {
     for (const name of ["write", "edit", "bash", "pwsh"]) {
       let delegated = false;
@@ -629,9 +630,12 @@ test("podman-ops keeps open tools ungated and respects permissions", async () =>
 
   let fullDelegated = false;
   const full = (await preExecutePolicy(
-    presetExec("daemon_start", "podman-ops", { container: "c", argv: ["x"] }, {
-      policy: "never",
-    }),
+    presetExec(
+      "daemon_start",
+      "podman-ops",
+      { container: "c", argv: ["x"] },
+      { policy: "never" },
+    ),
     () => {
       fullDelegated = true;
       return Promise.resolve({ kind: "allow" });

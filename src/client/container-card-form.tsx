@@ -239,11 +239,9 @@ export function ContainerForm(props: {
             </p>
           )}
       </DialogGroup>
-      {
-        /* The image is one field, so its own row labels it, exactly as the
+      {/* The image is one field, so its own row labels it, exactly as the
           container block renders it; wrapping it in a group heading would say
-          "Image" twice. */
-      }
+          "Image" twice. */}
       <ImageRow
         t={t}
         mode="edit"

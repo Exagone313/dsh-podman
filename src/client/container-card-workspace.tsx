@@ -304,10 +304,8 @@ export function WorkspaceSection(props: {
           >
             {t("loadTemplate")}
           </Button>
-          {
-            /* A workspace that holds no container has nothing to remove, so
-              the action is hidden rather than offered as a no-op. */
-          }
+          {/* A workspace that holds no container has nothing to remove, so
+              the action is hidden rather than offered as a no-op. */}
           {hasContainer
             ? (
               <Button
@@ -417,11 +415,9 @@ export function WorkspaceSection(props: {
           </div>
         )
         : null}
-      {
-        /* Removing the workspace's containers is irreversible and takes the
+      {/* Removing the workspace's containers is irreversible and takes the
           whole pod with it, so it is gated behind an explicit acknowledgement.
-          The action is only offered when the workspace actually has one. */
-      }
+          The action is only offered when the workspace actually has one. */}
       <RiskConfirmation
         open={removeWorkspaceOpen}
         title={t("removeWorkspace")}

@@ -1216,15 +1216,17 @@ test("an unchanged project check is not written back", () => {
     false,
   );
   assert.equal(
-    templateProjectChecksEqual({ 0: ok }, {
-      0: { state: "pending", project: "app" },
-    }),
+    templateProjectChecksEqual(
+      { 0: ok },
+      { 0: { state: "pending", project: "app" } },
+    ),
     false,
   );
   assert.equal(
-    templateProjectChecksEqual({ 0: missing }, {
-      0: { ...missing, error: "another message" },
-    }),
+    templateProjectChecksEqual(
+      { 0: missing },
+      { 0: { ...missing, error: "another message" } },
+    ),
     false,
   );
   assert.equal(templateProjectChecksEqual({ 0: ok }, {}), false);

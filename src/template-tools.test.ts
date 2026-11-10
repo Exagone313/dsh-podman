@@ -296,11 +296,14 @@ test("container_template_load layers the default environment under the template 
     const create = t.calls.find(([method]) => method === "createWorkspace");
     // The template's own NODE_ENV wins over the default of the same name, and
     // the reserved default never reaches the orchestrator.
-    assert.deepEqual({ ...create?.[1].env }, {
-      GIT_AUTHOR_NAME: "John Doe",
-      GIT_AUTHOR_EMAIL: "john.doe@git.example",
-      NODE_ENV: "development",
-    });
+    assert.deepEqual(
+      { ...create?.[1].env },
+      {
+        GIT_AUTHOR_NAME: "John Doe",
+        GIT_AUTHOR_EMAIL: "john.doe@git.example",
+        NODE_ENV: "development",
+      },
+    );
   } finally {
     await cleanup(t);
   }

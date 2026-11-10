@@ -16,7 +16,7 @@ ENV DSH_TELEMETRY_OTLP_URL=https://dsh-telemetry-disabled.invalid/v1/logs
 ARG DSH_VERSION=0.2.2-rc.1
 # Keep in sync with package.json's packageManager field: the profiles dsh
 # manages install their plugins with this pnpm.
-ARG PNPM_VERSION=12.15.0
+ARG PNPM_VERSION=12.18.0
 RUN npm install -g pnpm@${PNPM_VERSION} @deepseek-ai/dsh@${DSH_VERSION} \
     && npm cache clean --force
 

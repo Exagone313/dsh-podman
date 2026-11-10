@@ -22,7 +22,7 @@ This page is for **contributors** building the plugin from this repository.
 
 ## Building
 
-Prerequisites: Go 1.27, Node ≥ 22, pnpm 12, and (for the browser half) the
+Prerequisites: Go 1.27, Node ≥ 24.9, pnpm 12, and (for the browser half) the
 `@deepseek-ai/dsh-client-*` packages published on npm.
 
 ```sh

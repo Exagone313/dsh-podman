@@ -21,7 +21,7 @@ SPDX-License-Identifier: MIT
 
 ## 构建
 
-前置要求：Go 1.27、Node ≥ 22、pnpm 12，以及（浏览器端所需的）发布在 npm 上的
+前置要求：Go 1.27、Node ≥ 24.9、pnpm 12，以及（浏览器端所需的）发布在 npm 上的
 `@deepseek-ai/dsh-client-*` 包。
 
 ```sh

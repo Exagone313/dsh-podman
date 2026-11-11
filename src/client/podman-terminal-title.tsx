@@ -11,6 +11,7 @@ import type {
   PropsRuntime,
 } from "@deepseek-ai/dsh-client-ui-slots";
 import { type ReactNode, useSyncExternalStore } from "react";
+import { TabTitleChip } from "./tab-title-chip.js";
 import type { PodmanTerminalParams } from "./terminal-tab.js";
 import { shellName } from "./terminal-targets.js";
 import { subscribeTerminalTitles, terminalTitle } from "./terminal-titles.js";
@@ -36,12 +37,7 @@ export function PodmanTerminalTitle(
     subscribeTerminalTitles,
     () => terminalTitle(key) ?? fallback,
   );
-  return (
-    <span style={CHIP_STYLE}>
-      <TerminalGlyph />
-      <span style={TITLE_STYLE}>{title}</span>
-    </span>
-  );
+  return <TabTitleChip icon={<TerminalGlyph />} title={title} />;
 }
 
 // The built-in tab chip's 16px terminal prompt, drawn in the surrounding ink
@@ -60,16 +56,3 @@ function TerminalGlyph(): ReactNode {
     </svg>
   );
 }
-
-const CHIP_STYLE: React.CSSProperties = {
-  display: "inline-flex",
-  alignItems: "center",
-  gap: "4px",
-  minWidth: 0,
-};
-
-const TITLE_STYLE: React.CSSProperties = {
-  overflow: "hidden",
-  whiteSpace: "nowrap",
-  textOverflow: "ellipsis",
-};

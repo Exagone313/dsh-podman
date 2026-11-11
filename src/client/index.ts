@@ -24,6 +24,7 @@ import { ContainerCard } from "./ContainerCard.js";
 import { ContainerCardToast } from "./container-card-toast.js";
 import { PodmanContainers } from "./podman-containers.js";
 import { PodmanContainersGuide } from "./podman-containers-guide.js";
+import { PodmanContainersTitle } from "./podman-containers-title.js";
 import { PodmanTerminal } from "./podman-terminal.js";
 import { PodmanTerminalGuide } from "./podman-terminal-guide.js";
 import { PodmanTerminalTitle } from "./podman-terminal-title.js";
@@ -368,6 +369,25 @@ export function apply(ctx: ClientContext): void {
         }
       }),
     "podman: containers body",
+  );
+
+  ctx.effect(
+    () =>
+      ctx.slots.inject("sidebar.right.pane.tab.title", () => {
+        try {
+          return ctx.slots.register(
+            {
+              name: "sidebar.right.pane.tab.title",
+              key: PODMAN_CONTAINERS_TAB_ID,
+            },
+            PodmanContainersTitle,
+          );
+        } catch (error) {
+          reportRegistrationFailure("containers title", error);
+          return () => {};
+        }
+      }),
+    "podman: containers title",
   );
 
   ctx.effect(

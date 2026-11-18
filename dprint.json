@@ -34,7 +34,7 @@
   ],
   "excludes": ["bin", "dist", "node_modules", "third_party"],
   "plugins": [
-    "npm:@dprint/typescript@0.99.2",
+    "npm:@dprint/typescript@0.101.0",
     "npm:@dprint/markdown@0.29.0"
   ]
 }

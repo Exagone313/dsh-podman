@@ -94,7 +94,7 @@ could be added in the future.
 
 ## Preparation
 
-- You need to choose a project directory. This directory will be mounted
+- You need to choose a project root directory. This directory will be mounted
   read-only in dsh (necessary for the integrated project manager) and read-write
   in guest containers. In this guide we will use `${HOME}/project`
   (`%h/project`) but you are free to choose another path, as long as your user

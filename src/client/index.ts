@@ -52,6 +52,7 @@ import { installFieldStyles } from "./container-card-field-styles.js";
 import { installTableStyles } from "./container-card-table-styles.js";
 import { installTabsStyles } from "./container-card-tabs-styles.js";
 import { installContainersPanelStyles } from "./podman-containers-styles.js";
+import { installSettingsPageStyles } from "./settings-page-styles.js";
 import {
   CONTAINER_NS,
   ContainerCardController,
@@ -110,6 +111,7 @@ export function apply(ctx: ClientContext): void {
   installTableStyles(ctx);
   installTabsStyles(ctx);
   installContainersPanelStyles(ctx);
+  installSettingsPageStyles(ctx);
   ctx.effect(
     () => locale.register(NS, { en, zh }),
     "podman: dictionaries",

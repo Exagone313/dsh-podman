@@ -4,7 +4,7 @@
 
 module github.com/Exagone313/dsh-podman
 
-go 1.27.3
+go 1.27.4
 
 require (
 	github.com/creack/pty v1.1.24
@@ -78,11 +78,11 @@ require (
 	github.com/mattn/go-sqlite3 v1.14.53 // indirect
 	github.com/miekg/pkcs11 v1.1.2 // indirect
 	github.com/mistifyio/go-zfs/v4 v4.0.0 // indirect
-	github.com/moby/buildkit v0.34.2 // indirect
+	github.com/moby/buildkit v0.35.1 // indirect
 	github.com/moby/docker-image-spec v1.3.1 // indirect
 	github.com/moby/go-archive v0.3.3 // indirect
-	github.com/moby/moby/api v1.56.1 // indirect
-	github.com/moby/moby/client v0.6.2 // indirect
+	github.com/moby/moby/api v1.57.0 // indirect
+	github.com/moby/moby/client v0.6.3 // indirect
 	github.com/moby/patternmatcher v0.6.1 // indirect
 	github.com/moby/sys/capability v0.5.0 // indirect
 	github.com/moby/sys/devices v0.1.1 // indirect
@@ -94,7 +94,7 @@ require (
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.3-0.20250322232337-35a7c28c31ee // indirect
 	github.com/nxadm/tail v1.4.11 // indirect
-	github.com/opencontainers/cgroups v0.1.0 // indirect
+	github.com/opencontainers/cgroups v0.1.1 // indirect
 	github.com/opencontainers/go-digest v1.0.0 // indirect
 	github.com/opencontainers/image-spec v1.1.1 // indirect
 	github.com/opencontainers/runtime-tools v0.9.1-0.20260316125833-8a4db579f5c8 // indirect
@@ -105,8 +105,8 @@ require (
 	github.com/planetscale/vtprotobuf v0.6.1-0.20240319094008-0393e58bdf10 // indirect
 	github.com/proglottis/gpgme v0.1.6 // indirect
 	github.com/secure-systems-lab/go-securesystemslib v0.11.1 // indirect
-	github.com/sergi/go-diff v1.4.0 // indirect
-	github.com/sigstore/fulcio v1.10.0 // indirect
+	github.com/sergi/go-diff v1.4.5 // indirect
+	github.com/sigstore/fulcio v1.10.1 // indirect
 	github.com/sigstore/protobuf-specs v0.5.2 // indirect
 	github.com/sigstore/sigstore v1.11.3 // indirect
 	github.com/sirupsen/logrus v1.10.2 // indirect
@@ -134,29 +134,28 @@ require (
 	go.opentelemetry.io/otel/log v1.47.0 // indirect
 	go.opentelemetry.io/otel/metric v1.47.0 // indirect
 	go.opentelemetry.io/otel/trace v1.47.0 // indirect
-	go.podman.io/buildah v1.46.0 // indirect
+	go.podman.io/buildah v1.46.1 // indirect
 	go.podman.io/common v0.70.0 // indirect
 	go.podman.io/image/v5 v5.42.1 // indirect
 	go.podman.io/storage v1.65.1 // indirect
 	go.yaml.in/yaml/v2 v2.4.5 // indirect
 	go.yaml.in/yaml/v3 v3.0.6 // indirect
-	golang.org/x/crypto v0.58.0 // indirect
-	golang.org/x/mod v0.42.0 // indirect
-	golang.org/x/net v0.62.0 // indirect
+	golang.org/x/crypto v0.59.0 // indirect
+	golang.org/x/mod v0.43.0 // indirect
+	golang.org/x/net v0.63.0 // indirect
 	golang.org/x/sync v0.25.0 // indirect
 	golang.org/x/sys v0.50.0 // indirect
-	golang.org/x/telemetry v0.0.0-20261010193011-f71dc92da45e // indirect
+	golang.org/x/telemetry v0.0.0-20261119160235-508b12de1089 // indirect
 	golang.org/x/term v0.48.0 // indirect
 	golang.org/x/text v0.44.0 // indirect
-	golang.org/x/tools v0.52.0 // indirect
-	golang.org/x/vuln v1.9.0 // indirect
-	google.golang.org/genproto/googleapis/api v0.0.0-20261110000943-09e21b237f2c // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20261110000943-09e21b237f2c // indirect
+	golang.org/x/tools v0.53.0 // indirect
+	golang.org/x/vuln v1.10.0 // indirect
+	google.golang.org/genproto/googleapis/api v0.0.0-20261118221215-c8830f628b3f // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20261118221215-c8830f628b3f // indirect
 	gopkg.in/tomb.v1 v1.0.0-20141024135613-dd632973f1e7 // indirect
 	k8s.io/klog/v2 v2.140.0 // indirect
-	pgregory.net/rapid v1.3.0 // indirect
 	sigs.k8s.io/yaml v1.6.0 // indirect
-	tags.cncf.io/container-device-interface v1.1.1 // indirect
+	tags.cncf.io/container-device-interface v1.1.2 // indirect
 )
 
 replace github.com/cyberphone/json-canonicalization => ./third_party/json-canonicalization

@@ -6,6 +6,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { EventEmitter } from "node:events";
 import {
+  resolveSessionToolBinding,
   runExec,
   sessionWorkspaceSlug,
   sliceLines,
@@ -355,4 +356,44 @@ test("writeGuestTemplate sends the project directory, name and content", async (
   assert.equal(request.projectDir, "/projects/app");
   assert.equal(request.name, "web");
   assert.equal(Buffer.from(request.content).toString("utf8"), "version: 1\n");
+});
+
+test("resolveSessionToolBinding uses the session directory and records the default", async () => {
+  const calls: string[][] = [];
+  const binding = { defaultCwd: "/projects/other" };
+  const resolver = {
+    resolveSessionDirectory: async (header: string, target: string) => {
+      calls.push(["default", header, target]);
+      return binding;
+    },
+    containerBindingForSession: async (
+      header: string,
+      target: string,
+      container: string,
+    ) => {
+      calls.push([container, header, target]);
+      return binding;
+    },
+    recordMountedCwd: () => {},
+  };
+  assert.equal(
+    await resolveSessionToolBinding(
+      resolver as never,
+      "/projects/team",
+      "/projects/other",
+      "default",
+    ),
+    binding,
+  );
+  assert.deepEqual(calls, [["default", "/projects/team", "/projects/other"]]);
+  assert.equal(
+    await resolveSessionToolBinding(
+      resolver as never,
+      "/projects/team",
+      "/projects/other",
+      "db",
+    ),
+    binding,
+  );
+  assert.deepEqual(calls[1], ["db", "/projects/team", "/projects/other"]);
 });

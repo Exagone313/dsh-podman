@@ -931,3 +931,60 @@ test("container_grep fails loudly when ripgrep reports an error", async () => {
     /error parsing glob/,
   );
 });
+
+test("container_read resolves a relative path against the working directory", async () => {
+  const files = guestFileRecorder("hello");
+  const binding = await files.resolver.resolveForPath();
+  const resolver = {
+    ...files.resolver,
+    resolveSessionDirectory: async (_header: string, target: string) => ({
+      ...binding,
+      defaultCwd: target,
+    }),
+    recordMountedCwd: () => {},
+  };
+  const ctx = {
+    ...fakeToolContext(resolver),
+    get: (name: string) =>
+      name === "workingDirectory"
+        ? { get: () => "/projects/other" }
+        : undefined,
+  };
+  const exec = { agent: { session: { header: { cwd: "/projects/team" } } } };
+  const out = await toolHandlers.container_read(
+    resolver as never,
+    { file_path: "README.md", container: "default" },
+    exec,
+    ctx,
+  );
+  assert.match(String(out), /hello/);
+  assert.deepEqual(files.reads, ["/projects/other/README.md"]);
+});
+
+test("container_bash runs in the working directory", async () => {
+  const execs = guestExecRecorder();
+  const binding = await execs.resolver.resolve();
+  const resolver = {
+    ...execs.resolver,
+    resolveSessionDirectory: async (_header: string, target: string) => ({
+      ...binding,
+      defaultCwd: target,
+    }),
+    recordMountedCwd: () => {},
+  };
+  const ctx = {
+    ...fakeToolContext(resolver),
+    get: (name: string) =>
+      name === "workingDirectory"
+        ? { get: () => "/projects/other" }
+        : undefined,
+  };
+  const exec = { agent: { session: { header: { cwd: "/projects/team" } } } };
+  await toolHandlers.container_bash(
+    resolver as never,
+    { command: "pwd", container: "default" },
+    exec,
+    ctx,
+  );
+  assert.equal(execs.starts[0]?.cwd, "/projects/other");
+});

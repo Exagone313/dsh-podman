@@ -180,15 +180,21 @@ bash 进程）的 `env` 映射；`container_exec` 和 `daemon_start` 已经接�
 UI 行（图标、标题、摘要和结果正文），因此它们会像内置工具一样渲染，而不是显示为
 通用的 `Tool call` 行。
 
-路径和工作目录可以是绝对路径或相对路径。相对路径会相对于会话的工作目录解析，项目也正是挂载在容器中的该目录下。`container_read`、`container_write`
+路径和工作目录可以是绝对路径或相对路径。相对路径会相对于会话的有效工作目录解析：默认是原始项目，除非
+harness 的 `working_directory`
+工具更改了它。该目录可以是工作区的子目录、会话默认容器中挂载的另一个项目，或挂载到那里的
+volume 或 tmpfs
+目标；不在这些范围内的目录会被拒绝，而不会破坏会话。`container_read`、`container_write`
 和 `container_edit` 的 `file_path` 不能包含 `..`
 片段；工作目录可以包含，因为命令不受限于 projects 根目录。
 
 未指定工作目录时，`container_bash`、`container_exec` 和 `daemon_start`
-会在会话的工作目录中运行（与 harness 的 `bash`
+会在会话的有效工作目录中运行（与 harness 的 `bash`
 工具一致），`container_glob`/`container_grep`
-默认也在其中搜索。该目录必须已挂载到容器中——否则将使用 guest agent
-自身的工作目录。显式的 `workdir`（或 `path`）始终优先。
+默认也在其中搜索。如果命名容器没有挂载该目录，则使用其自身的项目挂载或 guest
+agent 的工作目录。显式的 `workdir`（或 `path`）始终优先。
+
+已持久化但不再挂载的工作目录会在下一次提示时恢复为会话的原始项目，因此过期的路径不会阻塞每一轮对话。
 
 `container_bash` 和 `container_exec` 接受可选的 `uid`、`gid` 和 `groups`
 以其他用户身份运行命令。这些值只能是数字：容器的 `/etc/passwd` 和 `/etc/group`

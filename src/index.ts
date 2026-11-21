@@ -37,6 +37,10 @@ import { registerTerminalRoutes } from "./terminal-route.js";
 import { TerminalSessions } from "./terminal-sessions.js";
 import { type Config } from "./settings-schema.js";
 import { normalizeToolError, WorkspaceResolver } from "./workspace-binding.js";
+import {
+  registerWorkingDirectoryAccess,
+  workingCwd,
+} from "./working-directory.js";
 
 export const name = "podman";
 
@@ -105,6 +109,7 @@ export function apply(ctx: any, config: Config): void {
             resolver.getConfig().projectsRoot,
             request,
           ),
+        (exec) => workingCwd(ctx, exec),
       ),
   );
   // The harness asks the user to widen the sandbox before a confined call (for
@@ -135,6 +140,7 @@ export function apply(ctx: any, config: Config): void {
   );
   ctx.provide("workspaceResolver", resolver);
   ctx.effect(() => () => resolver.dispose(), "podman: resolver cleanup");
+  registerWorkingDirectoryAccess(ctx, resolver);
   const subprocess = createSubprocessProvider(resolver);
   ctx.provide("subprocess", subprocess);
   ctx.effect(() => () => subprocess.dispose(), "podman: subprocess cleanup");

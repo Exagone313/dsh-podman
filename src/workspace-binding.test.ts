@@ -14,7 +14,9 @@ import { controlClient, guestClient } from "./grpc/runtime-client.js";
 import {
   containerNotFound,
   metadata,
+  mountCovers,
   normalizeToolError,
+  WorkingDirectoryUnreachableError,
   WorkspaceResolver,
   workspaceSlug,
 } from "./workspace-binding.js";
@@ -753,5 +755,109 @@ test("resolve rejects a missing cwd without stringifying it", async () => {
   await assert.rejects(
     () => resolver.resolve(undefined),
     /session working directory/,
+  );
+});
+
+test("mountCovers understands project and destination mounts", () => {
+  assert.equal(
+    mountCovers("/projects", [{ projectName: "team" }], "/projects/team/src"),
+    true,
+  );
+  assert.equal(
+    mountCovers(
+      "/projects",
+      [{ kind: "MOUNT_KIND_VOLUME", destination: "/data" }],
+      "/data/work",
+    ),
+    true,
+  );
+  assert.equal(
+    mountCovers("/projects", [{ projectName: "team" }], "/projects/other"),
+    false,
+  );
+});
+
+test("resolveSessionDirectory accepts sibling project and volume mounts", async () => {
+  const control = await startControlServer([{
+    workspaceSlug: SLUG,
+    containerName: "default",
+    agentSocketPath: "/rewritten/below",
+    agentToken: "tok",
+    mounts: [
+      { projectName: "team", mode: "MOUNT_MODE_READ_WRITE" },
+      { projectName: "other", mode: "MOUNT_MODE_READ_WRITE" },
+      {
+        kind: "MOUNT_KIND_VOLUME",
+        destination: "/data",
+        mode: "MOUNT_MODE_READ_WRITE",
+      },
+    ],
+  }]);
+  try {
+    const resolver = new WorkspaceResolver(
+      {
+        socketsRoot: control.socketsRoot,
+        defaultImage: "arch",
+        projectsRoot: "/projects",
+        controlToken: "",
+      },
+      {
+        resolveByPath: (path: string) =>
+          path === "/projects/team"
+            ? { id: SLUG, path: "/projects/team" }
+            : undefined,
+      } as any,
+    );
+    const sibling = await resolver.resolveSessionDirectory(
+      "/projects/team",
+      "/projects/other/src",
+    );
+    assert.equal(sibling.defaultCwd, "/projects/other/src");
+    assert.equal(sibling.workspaceSlug, SLUG);
+    assert.ok(
+      sibling.mounts?.some((mount: any) => mount.projectName === "other"),
+    );
+
+    const volume = await resolver.resolveSessionDirectory(
+      "/projects/team",
+      "/data/work",
+    );
+    assert.equal(volume.defaultCwd, "/data/work");
+
+    await assert.rejects(
+      () => resolver.resolveSessionDirectory("/projects/team", "/tmp/gone"),
+      WorkingDirectoryUnreachableError,
+    );
+  } finally {
+    control.stop();
+  }
+});
+
+test("mounted cwd cache serves subpaths and clears with the workspace", async () => {
+  const resolver = new WorkspaceResolver(
+    {
+      socketsRoot: "/run/dsh",
+      defaultImage: "arch",
+      projectsRoot: "/projects",
+      controlToken: "",
+    },
+    { resolveByPath: () => undefined } as any,
+  );
+  resolver.recordMountedCwd("/projects/other", {
+    defaultCwd: "/projects/other",
+    workspaceSlug: SLUG,
+  } as any);
+  const subpath = await resolver.resolve("/projects/other/src");
+  assert.equal(subpath.defaultCwd, "/projects/other/src");
+  assert.equal(await resolver.workspaceSlugFor("/projects/other/src"), SLUG);
+  const file = await resolver.resolveForPath(
+    "/projects/other/src/README.md",
+    undefined,
+  );
+  assert.equal(file.defaultCwd, "/projects/other/src/README.md");
+  resolver.forgetWorkspace(SLUG);
+  await assert.rejects(
+    () => resolver.resolve("/projects/other/src"),
+    /no DH workspace/,
   );
 });

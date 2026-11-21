@@ -487,6 +487,7 @@ export async function preExecutePolicy(
   readTemplateLoadSummary?: (
     request: { template: string; container: string; cwd?: string },
   ) => Promise<TemplateLoadSummary | undefined>,
+  readCwd?: (exec: any) => unknown,
 ): Promise<unknown> {
   const name = exec.name;
   const locale = getLocale?.() ?? "en";
@@ -527,7 +528,7 @@ export async function preExecutePolicy(
     return { kind: "deny", reason: denyReason };
   }
   if (facts.policy === "never") return next();
-  const sessionCwd = currentCwd(exec);
+  const sessionCwd = readCwd?.(exec) ?? currentCwd(exec);
   if (
     facts.preset === PODMAN_OPS_PRESET && PODMAN_OPS_APPROVAL_TOOLS.has(name)
   ) {

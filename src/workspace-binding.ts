@@ -11,6 +11,7 @@ import {
 } from "./grpc/runtime-client.js";
 import { mergeDefaultEnv } from "./container-env.js";
 import { pinnedDshVersion } from "./dsh-version.js";
+import { normalizeFsKey } from "./fs-key.js";
 import { isAbsolute, join } from "node:path";
 import { VERSION } from "./generated/version.js";
 
@@ -21,10 +22,27 @@ export interface WorkspaceBinding {
   // The session working directory to use when a command tool is not given an
   // explicit one, or undefined when it is not mounted in the container.
   defaultCwd?: string;
+  // The container's mount set, when the binding was built from a real row. It
+  // decides whether a working directory is reachable in this binding.
+  mounts?: readonly any[];
+  // The workspace slug this binding belongs to, so a mounted cwd can still
+  // select a named container of the same workspace.
+  workspaceSlug?: string;
   // refresh re-resolves the binding, dropping any cached credential. A caller
   // that sees the agent reject its token retries once against a refreshed
   // binding instead of failing the turn. Absent on test doubles.
   refresh?: () => Promise<WorkspaceBinding>;
+}
+
+// WorkingDirectoryUnreachableError reports a directory that is neither inside
+// the session's workspace nor covered by a mount of its default container. The
+// access listener uses it to distinguish that recoverable case from a
+// container that is merely not ready.
+export class WorkingDirectoryUnreachableError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "WorkingDirectoryUnreachableError";
+  }
 }
 export interface BindingConfig {
   socketsRoot: string;
@@ -65,6 +83,11 @@ export const PTC_CONTAINER = "ptc";
 // slug nor dropped when a workspace is forgotten.
 const PTC_BINDING_KEY = "ptc:shared";
 
+// A working-directory listener refreshes its entry before every access, so a
+// small bound is enough and keeps a long-lived plugin from growing without
+// limit when a session walks through many directories.
+const MAX_MOUNTED_CWDS = 64;
+
 export class WorkspaceResolver {
   private readonly bindings = new Map<string, Promise<WorkspaceBinding>>();
   // Named containers get their own cache, keyed by "<slug>:<logical name>", so
@@ -75,6 +98,11 @@ export class WorkspaceResolver {
     string,
     Promise<{ binding: WorkspaceBinding; mounts: readonly any[] }>
   >();
+  // Mounted cwds resolved by the working-directory listener. The harness's
+  // built-in fs/subprocess tools carry only the cwd path, so this index lets
+  // their providers find the session's default container without session
+  // state. The listener refreshes an entry before every ensure/set.
+  private readonly mounted = new Map<string, WorkspaceBinding>();
   constructor(
     // A reader rather than a snapshot: the plugin's preferences are volatile
     // config fields, so every call must observe their current values.
@@ -89,12 +117,18 @@ export class WorkspaceResolver {
   dispose(): void {
     this.bindings.clear();
     this.containerBindings.clear();
+    this.mounted.clear();
     closeClients();
   }
   // forgetContainer drops the cached binding for one named container, so the
   // next call re-resolves its row and picks up a changed mount set.
   forgetContainer(slug: string, container: string): void {
     this.containerBindings.delete(`${slug}:${container}`);
+    // The default binding lives under the slug, not the named-container key.
+    // A mount change must re-read its row before the next working-directory
+    // validation, or the resolver would trust a stale mount list.
+    if (container === "default") this.bindings.delete(slug);
+    this.forgetMounted(slug);
   }
   // forgetWorkspace drops every cached container binding of one workspace, so
   // a removed (or recreated) workspace cannot serve stale rows.
@@ -103,8 +137,12 @@ export class WorkspaceResolver {
     for (const key of Array.from(this.containerBindings.keys())) {
       if (key.startsWith(prefix)) this.containerBindings.delete(key);
     }
+    this.bindings.delete(slug);
+    this.forgetMounted(slug);
   }
   async resolve(cwd: unknown, signal?: AbortSignal): Promise<WorkspaceBinding> {
+    const mounted = this.mountedCwd(cwd);
+    if (mounted !== undefined) return mounted;
     const workspace = await this.workspaceForCwd(cwd);
     const key = workspaceSlug(workspace.id);
     const projectName = projectNameForPath(
@@ -119,6 +157,111 @@ export class WorkspaceResolver {
       ? binding
       : { ...binding, defaultCwd: session };
   }
+  // recordMountedCwd remembers the binding that serves a working directory.
+  // The harness's built-in fs/subprocess calls carry only the path, so this is
+  // how they find the container between working-directory access events.
+  recordMountedCwd(cwd: unknown, binding: WorkspaceBinding): void {
+    if (typeof cwd !== "string" || cwd === "") return;
+    const key = normalizeFsKey(cwd);
+    this.mounted.set(key, binding);
+    if (this.mounted.size > MAX_MOUNTED_CWDS) {
+      const oldest = this.mounted.keys().next().value;
+      if (oldest !== undefined) this.mounted.delete(oldest);
+    }
+  }
+  // mountedCwd returns the binding serving a path, matching the longest
+  // recorded directory prefix, with the caller's path as its default cwd.
+  mountedCwd(cwd: unknown): WorkspaceBinding | undefined {
+    if (typeof cwd !== "string" || cwd === "") return undefined;
+    const key = normalizeFsKey(cwd);
+    let matchKey: string | undefined;
+    let match: WorkspaceBinding | undefined;
+    for (const [root, binding] of this.mounted) {
+      if (key !== root && !key.startsWith(`${root}/`)) continue;
+      if (matchKey === undefined || root.length > matchKey.length) {
+        matchKey = root;
+        match = binding;
+      }
+    }
+    return match === undefined ? undefined : { ...match, defaultCwd: key };
+  }
+  // forgetMounted drops the cached directories of one workspace. A container
+  // mount change or a workspace removal can make them stale.
+  private forgetMounted(slug: string): void {
+    for (const [key, binding] of this.mounted) {
+      if (binding.workspaceSlug === slug) this.mounted.delete(key);
+    }
+  }
+  // workspaceSlugFor resolves the workspace that owns a cwd, including a
+  // mounted directory recorded by the working-directory listener.
+  async workspaceSlugFor(cwd: unknown): Promise<string> {
+    const mounted = this.mountedCwd(cwd);
+    if (mounted?.workspaceSlug !== undefined && mounted.workspaceSlug !== "") {
+      return mounted.workspaceSlug;
+    }
+    const workspace = await this.workspaceForCwd(cwd);
+    return workspaceSlug(workspace.id);
+  }
+  // resolveSessionDirectory validates and resolves a session working directory
+  // against the session's own workspace and its default container's mounts.
+  // The harness's working-directory service calls this through the access
+  // listener; the plugin's tools call it directly.
+  async resolveSessionDirectory(
+    headerCwd: string,
+    targetCwd: string,
+    signal?: AbortSignal,
+  ): Promise<WorkspaceBinding> {
+    if (!isAbsolute(targetCwd)) {
+      throw new WorkingDirectoryUnreachableError(
+        `working directory ${JSON.stringify(targetCwd)} must be absolute`,
+      );
+    }
+    const workspace = await this.workspaceForCwd(headerCwd);
+    // Resolve the session's own workspace through the readiness path rather
+    // than the mounted-path cache: the cache deliberately skips the Ping that
+    // refreshes a rotated agent credential, and the header is always a
+    // registered workspace.
+    const binding = await this.ready(
+      workspaceSlug(workspace.id),
+      projectNameForPath(this.getConfig().projectsRoot, workspace.path),
+      signal,
+    );
+    const target = normalizeFsKey(targetCwd);
+    const root = normalizeFsKey(String(workspace.path));
+    if (target === root || target.startsWith(`${root}/`)) {
+      return { ...binding, defaultCwd: target };
+    }
+    if (mountCovers(this.getConfig().projectsRoot, binding.mounts, target)) {
+      return { ...binding, defaultCwd: target };
+    }
+    throw new WorkingDirectoryUnreachableError(
+      `working directory ${
+        JSON.stringify(target)
+      } is not mounted in the session's default container`,
+    );
+  }
+  // containerBindingForSession selects a named container of the session's
+  // workspace. The working directory becomes its default cwd only when that
+  // container exposes the directory; otherwise an explicit workdir still works.
+  async containerBindingForSession(
+    headerCwd: string,
+    workingCwd: string,
+    container: string,
+    signal?: AbortSignal,
+  ): Promise<WorkspaceBinding> {
+    const binding = await this.containerBinding(headerCwd, container, signal);
+    if (workingCwd === "") return binding;
+    const target = normalizeFsKey(workingCwd);
+    const workspace = await this.workspaceForCwd(headerCwd);
+    const root = normalizeFsKey(String(workspace.path));
+    if (
+      target === root || target.startsWith(`${root}/`) ||
+      mountCovers(this.getConfig().projectsRoot, binding.mounts, target)
+    ) {
+      return { ...binding, defaultCwd: target };
+    }
+    return binding;
+  }
   // Resolve the workspace binding for a filesystem path when the caller did not
   // supply a session working directory. The 0.1.5 `fs.resolve` contract allows
   // `{ signal }` alone, and the workspace that CONTAINS the path is the only
@@ -131,6 +274,8 @@ export class WorkspaceResolver {
     signal?: AbortSignal,
   ): Promise<WorkspaceBinding> {
     if (typeof cwd === "string" && cwd !== "") return this.resolve(cwd, signal);
+    const mounted = this.mountedCwd(path);
+    if (mounted !== undefined) return mounted;
     if (isAbsolute(path)) {
       const workspace = this.containingWorkspace(path);
       if (workspace !== undefined) {
@@ -183,8 +328,14 @@ export class WorkspaceResolver {
     container: string,
     signal?: AbortSignal,
   ): Promise<WorkspaceBinding> {
-    const workspace = await this.workspaceForCwd(cwd);
-    const slug = workspaceSlug(workspace.id);
+    const mounted = this.mountedCwd(cwd);
+    let slug: string;
+    if (mounted?.workspaceSlug !== undefined && mounted.workspaceSlug !== "") {
+      slug = mounted.workspaceSlug;
+    } else {
+      const workspace = await this.workspaceForCwd(cwd);
+      slug = workspaceSlug(workspace.id);
+    }
     const key = `${slug}:${container}`;
     let entry = await this.resolveContainerBinding(
       slug,
@@ -207,13 +358,18 @@ export class WorkspaceResolver {
       };
     }
     const session = defaultCwdOf(cwd);
+    const binding = {
+      ...entry.binding,
+      mounts: entry.mounts,
+      workspaceSlug: slug,
+    };
     if (
       session !== undefined &&
-      projectMountCovers(this.getConfig().projectsRoot, entry.mounts, session)
+      mountCovers(this.getConfig().projectsRoot, entry.mounts, session)
     ) {
-      return { ...entry.binding, defaultCwd: session };
+      return { ...binding, defaultCwd: session };
     }
-    return entry.binding;
+    return binding;
   }
   // ptcBinding resolves the one shared PTC container. It needs no session
   // working directory: the container belongs to no workspace, so its binding is
@@ -280,7 +436,10 @@ export class WorkspaceResolver {
       this.containerBindings.set(key, next);
       return next.then((fresh) => fresh.binding);
     };
-    return { binding: this.bindingFor(row, refresh), mounts: row.mounts ?? [] };
+    return {
+      binding: this.bindingFor(row, refresh, slug),
+      mounts: row.mounts ?? [],
+    };
   }
   // ready resolves a workspace's default container and waits for its guest
   // agent, recreating the container once when it is reported running but its
@@ -316,6 +475,7 @@ export class WorkspaceResolver {
   private bindingFor(
     row: any,
     refresh: () => Promise<WorkspaceBinding>,
+    slug: string,
   ): WorkspaceBinding {
     const socket = row.agentSocketPath as string;
     return {
@@ -323,6 +483,8 @@ export class WorkspaceResolver {
       token: row.agentToken as string,
       socket,
       refresh,
+      mounts: row.mounts ?? [],
+      workspaceSlug: slug,
     };
   }
   // ensureAgentReady waits for the agent and verifies the credential with a
@@ -425,7 +587,7 @@ export class WorkspaceResolver {
     return this.bindingFor(row, () => {
       this.bindings.delete(slug);
       return this.resolveBinding(slug, projectName);
-    });
+    }, slug);
   }
   // ensureContainer asks the orchestrator for a usable container, recreating it
   // when it is missing, stopped, or runs a guest agent from an outdated image,
@@ -624,24 +786,43 @@ function projectNameForPath(projectsRoot: string, path: unknown): string {
   return value.slice(root.length + 1);
 }
 
-// projectMountCovers reports whether a project mount of a container makes the
-// given container path reachable: the mount destination itself or a path below
-// it.
-function projectMountCovers(
+// mountCovers reports whether any container mount makes the given container
+// path reachable: the mount destination itself or a path below it. Project
+// mounts are addressed by project name; volume, tmpfs and secret mounts carry
+// an explicit destination.
+export function mountCovers(
   projectsRoot: string,
-  mounts: readonly any[],
+  mounts: readonly any[] | undefined,
   path: string,
 ): boolean {
-  return mounts.some((mount) => {
-    if (!isProjectMount(mount)) return false;
-    const destination = `${projectsRoot}/${mount.projectName}`;
-    return path === destination || path.startsWith(`${destination}/`);
-  });
+  const target = normalizeFsKey(path);
+  const root = normalizeFsKey(String(projectsRoot ?? ""));
+  for (const mount of mounts ?? []) {
+    let destination: string;
+    if (isProjectMount(mount)) {
+      const project = typeof mount.projectName === "string"
+        ? mount.projectName
+        : "";
+      destination = project === "" ? root : `${root}/${project}`;
+    } else {
+      if (typeof mount.destination !== "string" || mount.destination === "") {
+        continue;
+      }
+      destination = normalizeFsKey(mount.destination);
+    }
+    if (target === destination || target.startsWith(`${destination}/`)) {
+      return true;
+    }
+  }
+  return false;
 }
 
 // isProjectMount reports whether a proto mount is a project mount. An unset
 // kind is the project default.
 function isProjectMount(mount: any): boolean {
   const kind = mount?.kind;
-  return kind === undefined || kind === "" || kind === "MOUNT_KIND_PROJECT";
+  return kind === undefined ||
+    kind === "" ||
+    kind === "MOUNT_KIND_PROJECT" ||
+    kind === "MOUNT_KIND_UNSPECIFIED";
 }

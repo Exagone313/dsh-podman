@@ -39,6 +39,9 @@ export interface TerminalOpenOptions {
   tabId: string;
   workspace: string;
   cwd: string;
+  // The session's original project. It selects the workspace and container;
+  // `cwd` is the effective working directory inside that container.
+  headerCwd?: string;
   container: string;
   shell: string;
   cols: number;
@@ -117,13 +120,31 @@ export class TerminalSessions {
         snapshot: existing.serializer.serialize(),
       };
     }
+    const headerCwd = typeof options.headerCwd === "string" &&
+        options.headerCwd !== ""
+      ? options.headerCwd
+      : options.cwd;
+    const resolver = this.options.resolver as any;
     const binding = options.container === "" || options.container === "default"
-      ? await this.options.resolver.resolveForPath(
+      ? typeof resolver.resolveSessionDirectory === "function"
+        ? await resolver.resolveSessionDirectory(
+          headerCwd,
+          options.cwd,
+          options.signal,
+        )
+        : await resolver.resolveForPath(
+          options.cwd,
+          options.cwd,
+          options.signal,
+        )
+      : typeof resolver.containerBindingForSession === "function"
+      ? await resolver.containerBindingForSession(
+        headerCwd,
         options.cwd,
-        options.cwd,
+        options.container,
         options.signal,
       )
-      : await this.options.resolver.containerBinding(
+      : await resolver.containerBinding(
         options.cwd,
         options.container,
         options.signal,

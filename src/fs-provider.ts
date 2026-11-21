@@ -148,6 +148,16 @@ export function createFilesystemProvider(
       // segment, a trailing slash) before anything keys on it, so a read
       // through one spelling satisfies the read-before-write guard for another.
       const resolved = normalizeFsKey(resolveGuestPath(path, opts?.cwd));
+      // The plugin's own file tools resolve the exact binding first, including
+      // a named container whose mount set may differ. The harness's built-in
+      // tools never pass this and keep the workspace/cache route below.
+      if (opts?.binding !== undefined) {
+        return {
+          targetKey: resolved,
+          displayPath: resolved,
+          binding: opts.binding,
+        };
+      }
       // An explicit container targets that container's guest; the harness's own
       // tools never pass one and keep the session workspace's default.
       const container = typeof opts?.container === "string"

@@ -217,16 +217,25 @@ summary, and result body), so they render like the built-in tools rather than as
 a generic `Tool call` row.
 
 Paths and working directories may be absolute or relative. A relative value is
-resolved against the session's working directory, which is also where the
-project is mounted inside the container. A `file_path` on `container_read`,
-`container_write` and `container_edit` may not contain a `..` segment; working
-directories may, since commands are not confined to the projects root.
+resolved against the session's effective working directory: the original
+project, unless the harness `working_directory` tool changed it. The directory
+may be a subdirectory of the workspace, another project mounted in the session's
+default container, or a volume or tmpfs destination mounted there; a directory
+outside all of those is rejected instead of breaking the session. A `file_path`
+on `container_read`, `container_write` and `container_edit` may not contain a
+`..` segment; working directories may, since commands are not confined to the
+projects root.
 
 When no working directory is given, `container_bash`, `container_exec` and
-`daemon_start` run in the session's working directory (like the harness's `bash`
-tool), and `container_glob`/`container_grep` search it by default. That
-directory must be mounted in the container — otherwise the guest agent's own
-working directory is used. An explicit `workdir` (or `path`) takes precedence.
+`daemon_start` run in the session's effective working directory (like the
+harness's `bash` tool), and `container_glob`/`container_grep` search it by
+default. A named container that does not mount that directory uses its own
+project mount or the guest agent's working directory instead. An explicit
+`workdir` (or `path`) always takes precedence.
+
+A persisted working directory that is no longer mounted is restored to the
+session's original project on the next prompt, so an obsolete path cannot block
+every turn.
 
 `container_bash` and `container_exec` accept an optional `uid`, `gid` and
 `groups` to run the command as another user. The values are numeric only: the

@@ -312,7 +312,9 @@ container's PATH (including the deployment's PATH additions) and merged with
 offered, most capable first — the order mirrors the harness's own candidate
 preference and ends with the minimal POSIX shells, and the first entry is the
 client's default. The tab's workspace is resolved by the host from the session's
-own working directory — never chosen, shown or defaulted in the browser: a
-session outside every workspace is reported, and the client only uses the
-project name and workspace slug it is given. The selected path is re-verified
-before the shell starts.
+original project — never chosen, shown or defaulted in the browser — while the
+shell opens in the session's effective working directory when that directory is
+inside the workspace or covered by a mount of the same default container. A
+persisted directory outside both is restored to the original project before the
+shell starts. The client only uses the project name and workspace slug it is
+given; the selected path is re-verified before the shell starts.

@@ -9,6 +9,7 @@ import {
   fsError,
   guestCwd,
   outputLines,
+  resolveSessionToolBinding,
   resolveToolBinding,
   runExec,
   sessionWorkspaceSlug,
@@ -52,6 +53,7 @@ import {
   mountModeToProto,
 } from "./mount-enums.js";
 import { containerNotFound, WorkspaceResolver } from "./workspace-binding.js";
+import { workingCwd } from "./working-directory.js";
 
 // Cap on paths `container_glob` returns, matching the built-in glob tool's
 // default result limit; `--sort=modified` makes the retained head the newest.
@@ -187,14 +189,24 @@ async function startContainerEnv(
 // diagnostics) instead of calling the guest directly.
 async function containerTarget(
   ctx: any,
+  resolver: WorkspaceResolver,
   path: string,
   container: string,
   exec: any,
 ): Promise<any> {
+  const cwd = workingCwd(ctx, exec);
+  const binding = await resolveSessionToolBinding(
+    resolver,
+    currentCwd(exec),
+    cwd,
+    container ?? "",
+    exec?.signal,
+  );
   return await ctx.fs.resolve(path, {
-    cwd: currentCwd(exec),
+    cwd,
     container: container ?? "",
     signal: exec?.signal,
+    binding,
   });
 }
 
@@ -416,9 +428,10 @@ export const toolHandlers: Record<
     return { removed: input.container };
   },
   container_bash: async (resolver, input, exec, ctx) => {
-    const sessionCwd = currentCwd(exec);
-    const binding = await resolveToolBinding(
+    const sessionCwd = workingCwd(ctx, exec);
+    const binding = await resolveSessionToolBinding(
       resolver,
+      currentCwd(exec),
       sessionCwd,
       input.container,
       exec?.signal,
@@ -436,9 +449,10 @@ export const toolHandlers: Record<
     );
   },
   container_exec: async (resolver, input, exec, ctx) => {
-    const sessionCwd = currentCwd(exec);
-    const binding = await resolveToolBinding(
+    const sessionCwd = workingCwd(ctx, exec);
+    const binding = await resolveSessionToolBinding(
       resolver,
+      currentCwd(exec),
       sessionCwd,
       input.container,
       exec?.signal,
@@ -458,6 +472,7 @@ export const toolHandlers: Record<
   container_read: async (resolver, input, exec, ctx) => {
     const target = await containerTarget(
       ctx,
+      resolver,
       input.file_path,
       input.container,
       exec,
@@ -498,6 +513,7 @@ export const toolHandlers: Record<
   container_write: async (resolver, input, exec, ctx) => {
     const target = await containerTarget(
       ctx,
+      resolver,
       input.file_path,
       input.container,
       exec,
@@ -527,6 +543,7 @@ export const toolHandlers: Record<
   container_edit: async (resolver, input, exec, ctx) => {
     const target = await containerTarget(
       ctx,
+      resolver,
       input.file_path,
       input.container,
       exec,
@@ -553,10 +570,11 @@ export const toolHandlers: Record<
     }, exec);
     return { before: outcome.before, after: outcome.after };
   },
-  container_glob: async (resolver, input, exec) => {
-    const sessionCwd = currentCwd(exec);
-    const binding = await resolveToolBinding(
+  container_glob: async (resolver, input, exec, ctx) => {
+    const sessionCwd = workingCwd(ctx, exec);
+    const binding = await resolveSessionToolBinding(
       resolver,
+      currentCwd(exec),
       sessionCwd,
       input.container,
       exec?.signal,
@@ -595,10 +613,11 @@ export const toolHandlers: Record<
         : {}),
     };
   },
-  container_grep: async (resolver, input, exec) => {
-    const sessionCwd = currentCwd(exec);
-    const binding = await resolveToolBinding(
+  container_grep: async (resolver, input, exec, ctx) => {
+    const sessionCwd = workingCwd(ctx, exec);
+    const binding = await resolveSessionToolBinding(
       resolver,
+      currentCwd(exec),
       sessionCwd,
       input.container,
       exec?.signal,
@@ -894,10 +913,11 @@ export const toolHandlers: Record<
     });
     return publicContainerResult(row);
   },
-  daemon_start: async (resolver, input, exec) => {
-    const sessionCwd = currentCwd(exec);
-    const binding = await resolveToolBinding(
+  daemon_start: async (resolver, input, exec, ctx) => {
+    const sessionCwd = workingCwd(ctx, exec);
+    const binding = await resolveSessionToolBinding(
       resolver,
+      currentCwd(exec),
       sessionCwd,
       input.container,
       exec?.signal,

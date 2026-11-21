@@ -682,10 +682,18 @@ export async function sessionWorkspaceSlug(
   resolver: WorkspaceResolver,
   cwd: unknown,
 ): Promise<string> {
-  const workspace = await (resolver as any).registry?.resolveByPath?.(
-    String(cwd),
-  );
-  if (workspace === undefined) {
+  try {
+    if (typeof (resolver as any).workspaceSlugFor === "function") {
+      return await resolver.workspaceSlugFor(cwd);
+    }
+    // Test doubles and older callers may only expose the registry. Keep the
+    // exact-root lookup as their fallback.
+    const workspace = await (resolver as any).registry?.resolveByPath?.(
+      String(cwd),
+    );
+    if (workspace === undefined) throw new Error("workspace not found");
+    return workspaceSlug(workspace.id);
+  } catch {
     // "default" is not a workspace slug, so returning it only produced an
     // opaque orchestrator error downstream and a fabricated container_list
     // row; fail with the same shape resolve() uses instead.
@@ -695,7 +703,6 @@ export async function sessionWorkspaceSlug(
       })`,
     );
   }
-  return workspaceSlug(workspace.id);
 }
 
 export async function resolveToolBinding(
@@ -706,6 +713,47 @@ export async function resolveToolBinding(
 ): Promise<WorkspaceBinding> {
   if (container === "default") return resolver.resolve(cwd, signal);
   return resolver.containerBinding(cwd, container, signal);
+}
+
+// resolveSessionToolBinding resolves a command tool's binding from the
+// session's original project (which owns the workspace and container) and its
+// effective working directory (which supplies the default cwd). The default
+// container must expose the working directory; a named container may leave it
+// unset so an explicit workdir still works.
+export async function resolveSessionToolBinding(
+  resolver: WorkspaceResolver,
+  headerCwd: unknown,
+  workingCwd: unknown,
+  container: string,
+  signal?: AbortSignal,
+): Promise<WorkspaceBinding> {
+  if (typeof headerCwd !== "string" || headerCwd === "") {
+    throw new Error("the session has no original working directory");
+  }
+  const target = typeof workingCwd === "string" && workingCwd !== ""
+    ? workingCwd
+    : headerCwd;
+  if (container === "" || container === "default") {
+    if (typeof (resolver as any).resolveSessionDirectory !== "function") {
+      return await resolveToolBinding(resolver, target, container, signal);
+    }
+    const binding = await resolver.resolveSessionDirectory(
+      headerCwd,
+      target,
+      signal,
+    );
+    if (target !== headerCwd) resolver.recordMountedCwd(target, binding);
+    return binding;
+  }
+  if (typeof (resolver as any).containerBindingForSession !== "function") {
+    return await resolveToolBinding(resolver, target, container, signal);
+  }
+  return await resolver.containerBindingForSession(
+    headerCwd,
+    target,
+    container,
+    signal,
+  );
 }
 
 export async function guestStat(

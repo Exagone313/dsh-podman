@@ -77,8 +77,25 @@ function targetDelay(ms: number, signal: AbortSignal): Promise<void> {
   });
 }
 
+function sessionOf(ctx: any, sessionId: string): any {
+  return ctx?.get?.("sessions")?.get?.(sessionId);
+}
+
+function sessionHeaderCwd(ctx: any, sessionId: string): string | undefined {
+  const cwd = sessionOf(ctx, sessionId)?.header?.cwd;
+  return typeof cwd === "string" && cwd !== "" ? cwd : undefined;
+}
+
+function projectNameOf(projectsRoot: string, path: string): string {
+  return path.startsWith(`${projectsRoot}/`)
+    ? path.slice(projectsRoot.length + 1)
+    : path;
+}
+
 // The workspace's mirrored path under the projects root, or the session's own
-// working directory when the request names no workspace.
+// effective working directory. A request naming the session's workspace opens
+// in the session working directory, which may be a sibling mount or a
+// subdirectory; a request naming a different workspace keeps that workspace.
 function workspaceCwd(
   ctx: any,
   workspaceRegistry: any,
@@ -86,19 +103,24 @@ function workspaceCwd(
   projectName: string,
   sessionId: string,
 ): string | undefined {
-  const list = workspaceRegistry?.list?.() ?? [];
+  const session = sessionOf(ctx, sessionId);
+  const current = ctx?.get?.("workingDirectory")?.get?.(session);
+  const working = typeof current === "string" && current !== ""
+    ? current
+    : undefined;
+  const header = sessionHeaderCwd(ctx, sessionId);
   if (projectName !== "") {
-    for (const workspace of list) {
+    for (const workspace of workspaceRegistry?.list?.() ?? []) {
       const path = String(workspace.path ?? "");
-      const name = path.startsWith(`${projectsRoot}/`)
-        ? path.slice(projectsRoot.length + 1)
+      if (projectNameOf(projectsRoot, path) !== projectName) continue;
+      return header !== undefined &&
+          projectNameOf(projectsRoot, header) === projectName
+        ? working ?? path
         : path;
-      if (name === projectName) return path;
     }
     return undefined;
   }
-  const cwd = ctx?.get?.("sessions")?.get?.(sessionId)?.header?.cwd;
-  return typeof cwd === "string" && cwd !== "" ? cwd : undefined;
+  return working ?? header;
 }
 
 // The workspace one session runs in, resolved from the session's own working
@@ -193,12 +215,24 @@ function controlOf(body: any): TerminalControl | undefined {
 
 async function bindingFor(
   resolver: WorkspaceResolver,
+  headerCwd: string,
   cwd: string,
   container: string,
   signal: AbortSignal,
 ) {
-  return container === "" || container === "default"
-    ? await resolver.resolveForPath(cwd, cwd, signal)
+  const sessions = resolver as any;
+  if (container === "" || container === "default") {
+    return typeof sessions.resolveSessionDirectory === "function"
+      ? await sessions.resolveSessionDirectory(headerCwd, cwd, signal)
+      : await resolver.resolveForPath(cwd, cwd, signal);
+  }
+  return typeof sessions.containerBindingForSession === "function"
+    ? await sessions.containerBindingForSession(
+      headerCwd,
+      cwd,
+      container,
+      signal,
+    )
     : await resolver.containerBinding(cwd, container, signal);
 }
 
@@ -212,6 +246,7 @@ async function handleOpen(
   const url = new URL(request.url);
   let options: TerminalOpenQuery & {
     cwd: string;
+    headerCwd: string;
     reopen: boolean;
     signal: AbortSignal;
   };
@@ -243,11 +278,19 @@ async function handleOpen(
     if (cwd === undefined) {
       throw new Error(`unknown workspace ${JSON.stringify(workspace)}`);
     }
+    const header = sessionHeaderCwd(ctx, sessionId);
+    const headerCwd = workspace === "" ||
+        (header !== undefined &&
+          projectNameOf(resolver.getConfig().projectsRoot, header) ===
+            workspace)
+      ? header ?? cwd
+      : cwd;
     options = {
       sessionId,
       tabId,
       workspace,
       cwd,
+      headerCwd,
       container,
       shell,
       cols,
@@ -340,7 +383,20 @@ async function handleShells(
     });
   }
   try {
-    const binding = await bindingFor(resolver, cwd, container, request.signal);
+    const header = sessionHeaderCwd(ctx, sessionId);
+    const headerCwd = workspace === "" ||
+        (header !== undefined &&
+          projectNameOf(resolver.getConfig().projectsRoot, header) ===
+            workspace)
+      ? header ?? cwd
+      : cwd;
+    const binding = await bindingFor(
+      resolver,
+      headerCwd,
+      cwd,
+      container,
+      request.signal,
+    );
     return json(200, {
       shells: await discoverShells(binding, cwd, request.signal),
     });
